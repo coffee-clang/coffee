@@ -9,159 +9,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-typedef enum {
-        CMD_UNKNOWN = -1,
-        CMD_ADD,
-        CMD_B,
-        CMD_BENCH,
-        CMD_BUILD,
-        CMD_C,
-        CMD_CHECK,
-        CMD_CLEAN,
-        CMD_CLIPPY,
-        CMD_CONFIG,
-        CMD_D,
-        CMD_DOC,
-        CMD_FETCH,
-        CMD_FIX,
-        CMD_FMT,
-        CMD_GENERATE_LOCKFILE,
-        CMD_HELP,
-        CMD_INFO,
-        CMD_INIT,
-        CMD_INSTALL,
-        CMD_INSTALL_UPDATE,
-        CMD_INSTALL_UPDATE_CONFIG,
-        CMD_LOCATE_PROJECT,
-        CMD_LOGIN,
-        CMD_LOGOUT,
-        CMD_MACHETE,
-        CMD_METADATA,
-        CMD_MIRI,
-        CMD_NEW,
-        CMD_OWNER,
-        CMD_PACKAGE,
-        CMD_PKGID,
-        CMD_PUBLISH,
-        CMD_R,
-        CMD_REMOVE,
-        CMD_REPORT,
-        CMD_RM,
-        CMD_RUN,
-        CMD_RUSTC,
-        CMD_RUSTDOC,
-        CMD_SEARCH,
-        CMD_T,
-        CMD_TEST,
-        CMD_TREE,
-        CMD_UNINSTALL,
-        CMD_UPDATE,
-        CMD_VENDOR,
-        CMD_VERSION,
-        CMD_YANK
-} command_t;
-
-static command_t parse_command(const char *cmd) {
-    if (strcmp(cmd, "add") == 0)
-            return CMD_ADD;
-    else if (strcmp(cmd, "b") == 0)
-            return CMD_B;
-    else if (strcmp(cmd, "bench") == 0)
-            return CMD_BENCH;
-    else if (strcmp(cmd, "build") == 0)
-            return CMD_BUILD;
-    else if (strcmp(cmd, "c") == 0)
-            return CMD_C;
-    else if (strcmp(cmd, "check") == 0)
-            return CMD_CHECK;
-    else if (strcmp(cmd, "clean") == 0)
-            return CMD_CLEAN;
-    else if (strcmp(cmd, "clippy") == 0)
-            return CMD_CLIPPY;
-    else if (strcmp(cmd, "config") == 0)
-            return CMD_CONFIG;
-    else if (strcmp(cmd, "d") == 0)
-            return CMD_D;
-    else if (strcmp(cmd, "doc") == 0)
-            return CMD_DOC;
-    else if (strcmp(cmd, "fetch") == 0)
-            return CMD_FETCH;
-    else if (strcmp(cmd, "fix") == 0)
-            return CMD_FIX;
-    else if (strcmp(cmd, "fmt") == 0)
-            return CMD_FMT;
-    else if (strcmp(cmd, "generate-lockfile") == 0)
-            return CMD_GENERATE_LOCKFILE;
-    else if (strcmp(cmd, "help") == 0)
-            return CMD_HELP;
-    else if (strcmp(cmd, "info") == 0)
-            return CMD_INFO;
-    else if (strcmp(cmd, "init") == 0)
-            return CMD_INIT;
-    else if (strcmp(cmd, "install") == 0)
-            return CMD_INSTALL;
-    else if (strcmp(cmd, "install-update") == 0)
-            return CMD_INSTALL_UPDATE;
-    else if (strcmp(cmd, "install-update-config") == 0)
-            return CMD_INSTALL_UPDATE_CONFIG;
-    else if (strcmp(cmd, "locate-project") == 0)
-            return CMD_LOCATE_PROJECT;
-    else if (strcmp(cmd, "login") == 0)
-            return CMD_LOGIN;
-    else if (strcmp(cmd, "logout") == 0)
-            return CMD_LOGOUT;
-    else if (strcmp(cmd, "machete") == 0)
-            return CMD_MACHETE;
-    else if (strcmp(cmd, "metadata") == 0)
-            return CMD_METADATA;
-    else if (strcmp(cmd, "miri") == 0)
-            return CMD_MIRI;
-    else if (strcmp(cmd, "new") == 0)
-            return CMD_NEW;
-    else if (strcmp(cmd, "owner") == 0)
-            return CMD_OWNER;
-    else if (strcmp(cmd, "package") == 0)
-            return CMD_PACKAGE;
-    else if (strcmp(cmd, "pkgid") == 0)
-            return CMD_PKGID;
-    else if (strcmp(cmd, "publish") == 0)
-            return CMD_PUBLISH;
-    else if (strcmp(cmd, "r") == 0)
-            return CMD_R;
-    else if (strcmp(cmd, "remove") == 0)
-            return CMD_REMOVE;
-    else if (strcmp(cmd, "report") == 0)
-            return CMD_REPORT;
-    else if (strcmp(cmd, "rm") == 0)
-            return CMD_RM;
-    else if (strcmp(cmd, "run") == 0)
-            return CMD_RUN;
-    else if (strcmp(cmd, "rustc") == 0)
-            return CMD_RUSTC;
-    else if (strcmp(cmd, "rustdoc") == 0)
-            return CMD_RUSTDOC;
-    else if (strcmp(cmd, "search") == 0)
-            return CMD_SEARCH;
-    else if (strcmp(cmd, "t") == 0)
-            return CMD_T;
-    else if (strcmp(cmd, "test") == 0)
-            return CMD_TEST;
-    else if (strcmp(cmd, "tree") == 0)
-            return CMD_TREE;
-    else if (strcmp(cmd, "uninstall") == 0)
-            return CMD_UNINSTALL;
-    else if (strcmp(cmd, "update") == 0)
-            return CMD_UPDATE;
-    else if (strcmp(cmd, "vendor") == 0)
-            return CMD_VENDOR;
-    else if (strcmp(cmd, "version") == 0)
-            return CMD_VERSION;
-    else if (strcmp(cmd, "yank") == 0)
-            return CMD_YANK;
-    else
-            return CMD_UNKNOWN;
-}
-
 static void handle_add(void) {
     printf("Handling command add\n");
 }
@@ -384,155 +231,105 @@ int main(int argc, char **argv) {
         }
 
         if (command_idx != -1) {
-                command_t command = parse_command(args_info.inputs[command_idx]);
-                switch (command) {
-                        case CMD_ADD:
-                                handle_add();
-                                break;
-                        case CMD_B:
-                                handle_b();
-                                break;
-                        case CMD_BENCH:
-                                handle_bench();
-                                break;
-                        case CMD_BUILD:
-                                handle_build();
-                                break;
-                        case CMD_C:
-                                handle_c();
-                                break;
-                        case CMD_CHECK:
-                                handle_check();
-                                break;
-                        case CMD_CLEAN:
-                                handle_clean();
-                                break;
-                        case CMD_CLIPPY:
-                                handle_clippy();
-                                break;
-                        case CMD_CONFIG:
-                                handle_config();
-                                break;
-                        case CMD_D:
-                                handle_d();
-                                break;
-                        case CMD_DOC:
-                                handle_doc();
-                                break;
-                        case CMD_FETCH:
-                                handle_fetch();
-                                break;
-                        case CMD_FIX:
-                                handle_fix();
-                                break;
-                        case CMD_FMT:
-                                handle_fmt();
-                                break;
-                        case CMD_GENERATE_LOCKFILE:
-                                handle_generate_lockfile();
-                                break;
-                        case CMD_HELP:
-                                handle_help();
-                                break;
-                        case CMD_INFO:
-                                handle_info();
-                                break;
-                        case CMD_INIT:
-                                handle_init();
-                                break;
-                        case CMD_INSTALL:
-                                handle_install();
-                                break;
-                        case CMD_INSTALL_UPDATE:
-                                handle_install_update();
-                                break;
-                        case CMD_INSTALL_UPDATE_CONFIG:
-                                handle_install_update_config();
-                                break;
-                        case CMD_LOCATE_PROJECT:
-                                handle_locate_project();
-                                break;
-                        case CMD_LOGIN:
-                                handle_login();
-                                break;
-                        case CMD_LOGOUT:
-                                handle_logout();
-                                break;
-                        case CMD_MACHETE:
-                                handle_machete();
-                                break;
-                        case CMD_METADATA:
-                                handle_metadata();
-                                break;
-                        case CMD_MIRI:
-                                handle_miri();
-                                break;
-                        case CMD_NEW:
-                                handle_new();
-                                break;
-                        case CMD_OWNER:
-                                handle_owner();
-                                break;
-                        case CMD_PACKAGE:
-                                handle_package();
-                                break;
-                        case CMD_PKGID:
-                                handle_pkgid();
-                                break;
-                        case CMD_PUBLISH:
-                                handle_publish();
-                                break;
-                        case CMD_R:
-                                handle_r();
-                                break;
-                        case CMD_REMOVE:
-                                handle_remove();
-                                break;
-                        case CMD_REPORT:
-                                handle_report();
-                                break;
-                        case CMD_RM:
-                                handle_rm();
-                                break;
-                        case CMD_RUN:
-                                handle_run();
-                                break;
-                        case CMD_RUSTC:
-                                handle_rustc();
-                                break;
-                        case CMD_RUSTDOC:
-                                handle_rustdoc();
-                                break;
-                        case CMD_SEARCH:
-                                handle_search();
-                                break;
-                        case CMD_T:
-                                handle_t();
-                                break;
-                        case CMD_TEST:
-                                handle_test();
-                                break;
-                        case CMD_TREE:
-                                handle_tree();
-                                break;
-                        case CMD_UNINSTALL:
-                                handle_uninstall();
-                                break;
-                        case CMD_UPDATE:
-                                handle_update();
-                                break;
-                        case CMD_VENDOR:
-                                handle_vendor();
-                                break;
-                        case CMD_VERSION:
-                                handle_version();
-                                break;
-                        case CMD_YANK:
-                                handle_yank();
-                                break;
-                        default:
-                                printf("Command '%s' is not recognized.\n", args_info.inputs[command_idx]);
-                                break;
+                char *cmd = args_info.inputs[command_idx];
+                if (strcmp(cmd, "add") == 0) {
+                        handle_add();
+                } else if (strcmp(cmd, "b") == 0) {
+                        handle_b();
+                } else if (strcmp(cmd, "bench") == 0) {
+                        handle_bench();
+                } else if (strcmp(cmd, "build") == 0) {
+                        handle_build();
+                } else if (strcmp(cmd, "c") == 0) {
+                        handle_c();
+                } else if (strcmp(cmd, "check") == 0) {
+                        handle_check();
+                } else if (strcmp(cmd, "clean") == 0) {
+                        handle_clean();
+                } else if (strcmp(cmd, "clippy") == 0) {
+                        handle_clippy();
+                } else if (strcmp(cmd, "config") == 0) {
+                        handle_config();
+                } else if (strcmp(cmd, "d") == 0) {
+                        handle_d();
+                } else if (strcmp(cmd, "doc") == 0) {
+                        handle_doc();
+                } else if (strcmp(cmd, "fetch") == 0) {
+                        handle_fetch();
+                } else if (strcmp(cmd, "fix") == 0) {
+                        handle_fix();
+                } else if (strcmp(cmd, "fmt") == 0) {
+                        handle_fmt();
+                } else if (strcmp(cmd, "generate-lockfile") == 0) {
+                        handle_generate_lockfile();
+                } else if (strcmp(cmd, "help") == 0) {
+                        handle_help();
+                } else if (strcmp(cmd, "info") == 0) {
+                        handle_info();
+                } else if (strcmp(cmd, "init") == 0) {
+                        handle_init();
+                } else if (strcmp(cmd, "install") == 0) {
+                        handle_install();
+                } else if (strcmp(cmd, "install-update") == 0) {
+                        handle_install_update();
+                } else if (strcmp(cmd, "install-update-config") == 0) {
+                        handle_install_update_config();
+                } else if (strcmp(cmd, "locate-project") == 0) {
+                        handle_locate_project();
+                } else if (strcmp(cmd, "login") == 0) {
+                        handle_login();
+                } else if (strcmp(cmd, "logout") == 0) {
+                        handle_logout();
+                } else if (strcmp(cmd, "machete") == 0) {
+                        handle_machete();
+                } else if (strcmp(cmd, "metadata") == 0) {
+                        handle_metadata();
+                } else if (strcmp(cmd, "miri") == 0) {
+                        handle_miri();
+                } else if (strcmp(cmd, "new") == 0) {
+                        handle_new();
+                } else if (strcmp(cmd, "owner") == 0) {
+                        handle_owner();
+                } else if (strcmp(cmd, "package") == 0) {
+                        handle_package();
+                } else if (strcmp(cmd, "pkgid") == 0) {
+                        handle_pkgid();
+                } else if (strcmp(cmd, "publish") == 0) {
+                        handle_publish();
+                } else if (strcmp(cmd, "r") == 0) {
+                        handle_r();
+                } else if (strcmp(cmd, "remove") == 0) {
+                        handle_remove();
+                } else if (strcmp(cmd, "report") == 0) {
+                        handle_report();
+                } else if (strcmp(cmd, "rm") == 0) {
+                        handle_rm();
+                } else if (strcmp(cmd, "run") == 0) {
+                        handle_run();
+                } else if (strcmp(cmd, "rustc") == 0) {
+                        handle_rustc();
+                } else if (strcmp(cmd, "rustdoc") == 0) {
+                        handle_rustdoc();
+                } else if (strcmp(cmd, "search") == 0) {
+                        handle_search();
+                } else if (strcmp(cmd, "t") == 0) {
+                        handle_t();
+                } else if (strcmp(cmd, "test") == 0) {
+                        handle_test();
+                } else if (strcmp(cmd, "tree") == 0) {
+                        handle_tree();
+                } else if (strcmp(cmd, "uninstall") == 0) {
+                        handle_uninstall();
+                } else if (strcmp(cmd, "update") == 0) {
+                        handle_update();
+                } else if (strcmp(cmd, "vendor") == 0) {
+                        handle_vendor();
+                } else if (strcmp(cmd, "version") == 0) {
+                        handle_version();
+                } else if (strcmp(cmd, "yank") == 0) {
+                        handle_yank();
+                } else {
+                        printf("Command '%s' is not recognized.\n", cmd);
                 }
         }
         return 0;
