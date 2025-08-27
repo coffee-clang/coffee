@@ -4,8 +4,8 @@
 */
 
 #include "coffee.h"
-#include <stdio.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 int main(int argc, char **argv) {
@@ -20,7 +20,68 @@ int main(int argc, char **argv) {
                         break;
                 }
         }
-        int64_t non_toolchain_idx = -1;
+        /* the command is the first unnamed option that is not the toolchain.
+         * Therefore it is at index 0 if the toolchain is in the second place
+         * (or later), while it is at index 1 if the first place is taken by
+         * the toolchain.
+         * The value is -1 if there is no command */
+        int64_t command_idx =
+            (toolchain_idx > 0) ? 0 : ((args_info.inputs_num > 1) ? 0 : -1);
+
+        /*
+
+        add
+        b
+        bench
+        build
+        c
+        check
+        clean
+        clippy
+        config
+        d
+        doc
+        fetch
+        fix
+        fmt
+        generate-lockfile
+        help
+        info
+        init
+        install
+        install-update
+        install-update-config
+        locate-project
+        login
+        logout
+        machete
+        metadata
+        miri
+        new
+        owner
+        package
+        pkgid
+        publish
+        r
+        remove
+        report
+        rm
+        run
+        rustc
+        rustdoc
+        search
+        t
+        test
+        tree
+        uninstall
+        update
+        vendor
+        version
+        yank
+
+                 */
+        // AI! test if args_info.inputs[command_idx] is one of the words in the
+        // preceding comment
         for (int64_t i = 0; i < args_info.inputs_num; i++) {
                 if (i == toolchain_idx) {
                         continue;
