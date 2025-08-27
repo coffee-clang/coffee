@@ -48,19 +48,36 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    // Print the command
-    printf("Command: %s\n", command);
-
-    // Check for any additional arguments (not parsed as options)
-    if (argc > 2) {
-        printf("Additional arguments:\n");
-        for (int i = 2; i < argc; i++) {
-            printf("  %s\n", argv[i]);
+    // Build a substring from command and all options (arguments 1 through argc-1)
+    int total_length = 0;
+    for (int i = 1; i < argc; i++) {
+        total_length += strlen(argv[i]);
+        if (i < argc - 1) {
+            total_length += 1; // for space
         }
     }
+    total_length += 1; // for null terminator
+
+    char *cmd_line_substring = (char *)malloc(total_length * sizeof(char));
+    if (cmd_line_substring == NULL) {
+        fprintf(stderr, "Memory allocation error\n");
+        return 1;
+    }
+    cmd_line_substring[0] = '\0';
+
+    for (int i = 1; i < argc; i++) {
+        strcat(cmd_line_substring, argv[i]);
+        if (i < argc - 1) {
+            strcat(cmd_line_substring, " ");
+        }
+    }
+
+    // Print the substring of the command line including the command and all options
+    printf("Command line substring: %s\n", cmd_line_substring);
 
     // Simulate execution of the cargo command
     printf("Executing cargo %s command...\n", command);
 
+    free(cmd_line_substring);
     return 0;
 }
