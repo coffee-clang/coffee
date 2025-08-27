@@ -17,4 +17,5 @@ int main(int argc, char **argv) {
                         break;
                 }
         }
+        // AI! find the first input that is not the toolchain
 }
