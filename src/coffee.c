@@ -105,6 +105,8 @@ static int64_t handle_build(options *) {
 
 /* static int64_t handle_yank(options *) { printf("Handling command yank\n"); } */
 
+// AI! Fix the warning
+// coffee.c:110:24: warning: missing braces around initializer [-Wmissing-braces]
 command_s commands[] = {
     {
         .name = "add",
