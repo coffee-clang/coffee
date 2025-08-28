@@ -352,56 +352,35 @@ int main(int argc, char **argv) {
     cmdline_parser(argc, argv, &args_info);
 
     printf("Arguments number: %d\n", args_info.inputs_num);
-    int64_t toolchain_idx = -1;
-    for (int64_t i = 0; i < args_info.inputs_num; i++) {
-        if (args_info.inputs[i][0] == '+') {
-            toolchain_idx = i;
-            printf("Toolchain: %s (%w64d)\n", args_info.inputs[i],
-                   toolchain_idx);
+    // Find first non-toolchain argument (commands start with letter)
+    int command_idx = -1;
+    for (int i = 0; i < args_info.inputs_num; i++) {
+        if (args_info.inputs[i][0] != '+') {
+            command_idx = i;
             break;
         }
     }
 
-    /*
-     * the command is the first unnamed option that is not the
-     * toolchain. Therefore it is at index 0 if the toolchain is in
-     * the second place (or later), while it is at index 1 if the
-     * first place is taken by the toolchain. The value is -1 if
-     * there is no command.
-     * */
-    int command_idx = -1;
-    printf("Arguments number: %d\n", args_info.inputs_num);
-    if (args_info.inputs_num > 0) {
-        if ((toolchain_idx < 0) && (args_info.inputs_num >= 1)) {
-            command_idx = 0;
+    if (command_idx == -1) {
+        // No command found - show available commands
+        printf("Installed Commands:\n");
+        for (int64_t i = 0; i < lengthof(commands); i++) {
+            printf("%s\t%s\n", commands[i].name, commands[i].description);
         }
-        if (toolchain_idx > 0) {
-            command_idx = 0;
-        }
-        if ((toolchain_idx == 0) && (args_info.inputs_num >= 2)) {
-            command_idx = 1;
+        exit(EXIT_SUCCESS);
+    }
+
+    char *cmd = args_info.inputs[command_idx];
+    printf("Command is: %s\n", cmd);
+
+    // Find matching command
+    for (int64_t i = 0; i < lengthof(commands); i++) {
+        if (strcmp(cmd, commands[i].name) == 0) {
+            commands[i].action(NULL);
+            exit(EXIT_SUCCESS);
         }
     }
 
-    if (command_idx < 0) {
-        /* no command given */
-        if (args_info.list_given) {
-            printf("Installed Commands:\n");
-            for (int64_t i = 0; i < lengthof(commands); i++) {
-                printf("%s\t%s\n", commands[i].name, commands[i].description);
-            }
-            printf("No command given\n");
-            exit(EXIT_SUCCESS);
-        }
-
-        char *cmd = args_info.inputs[command_idx];
-        printf("Command is: %s (%d).\n", cmd, command_idx);
-
-        if (strcmp(cmd, "add") == 0) {
-            handle_add(0);
-            exit(EXIT_SUCCESS);
-        }
-        printf("Command '%s' is not recognized.\n", cmd);
-        return 0;
-    }
+    printf("Command '%s' is not recognized.\n", cmd);
+    return EXIT_FAILURE;
 }
