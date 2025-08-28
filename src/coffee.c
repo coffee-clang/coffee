@@ -105,26 +105,20 @@ static int64_t handle_build(options *) {
 
 /* static int64_t handle_yank(options *) { printf("Handling command yank\n"); } */
 
-// AI! Fix the following initializer
 command_s commands[] = {
     {
         .name = "add",
         .description = "Add dependencies to a manifest file",
         .action = &handle_add
     },
-    /* { */
-    /*     .name = "b", */
-    /*     .description = "alias: build", */
-    /*     .action = &handle_build */
-    /* }, */
-    /* { */
-    /*     .name = "bench", */
-    /*     .description = "Execute all benchmarks of a local package", */
-    /*     .action = &handle_bench */
-    /* }, */
     {
         .name = "build",
         .description = "Compile a local package and all of its dependencies",
+        .action = &handle_build
+    },
+    {
+        .name = "b",
+        .description = "alias: build",
         .action = &handle_build
     },
     /* { */
