@@ -488,18 +488,19 @@ int main(int argc, char **argv) {
     }
 
     s8 cmd = s8(args_info.inputs[command_idx]);
-    printf("Command is: %s\n", cmd.data);
+    printf("Command is: %s\n", cmd);
 
     // Find matching command
     for (int64_t i = 0; i < lengthof(commands); i++) {
         if (s8compare(s8(cmd), commands[i].name) == 0) {
+// AI! explain the error coffee.c:496:9: error: cannot convert to a pointer type
+// The error is in the previous line
             commands[i].action(NULL);
             exit(EXIT_SUCCESS);
         }
     }
 
-    printf("Command '%s' is not recognized.\n", cmd.data);
+    printf("Command '%s' is not recognized.\n", cmd);
     return EXIT_FAILURE;
 }
-// AI! explain the error coffee.c:496:9: error: cannot convert to a pointer type
 
