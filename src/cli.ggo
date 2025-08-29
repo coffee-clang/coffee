@@ -13,7 +13,7 @@ option  "offline" - "Run without accessing the network" flag off
 option  "frozen"  - "Equivalent to specifying both --locked and --offline" flag off
 option  "config"  - "<KEY=VALUE|PATH>  Override a configuration value" string typestr="config" optional
 option  "unstable-flags" Z "Unstable (nightly-only) flags to Cargo, see 'cargo -Z help' for details" string typestr="unstable_flag" optional
-
+# AI! update the list of option with all possible options of all cargo subcommands
 
 # The last two options are actually used to have a suitable ENUM that makes it easier to validate
 # the values given for the toolchain and command
