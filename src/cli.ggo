@@ -47,6 +47,7 @@ option  "rev" - "Git commit reference to download" string typestr="rev" optional
 option  "registry" - "Package registry for this dependency" string typestr="registry" optional
 option  "dry-run" - "Don't actually write the manifest" flag off
 option  "offline" - "Run without accessing the network" flag off
+# AI! add all options of cargo build
 
 # The last two options are actually used to have a suitable ENUM that makes it easier to validate
 # the values given for the toolchain and command
