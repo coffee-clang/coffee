@@ -33,6 +33,9 @@ option  "offline" - "Run without accessing the network" flag off
 option  "frozen" - "Equivalent to both --locked and --offline" flag off
 option  "config" - "Override a configuration value" string typestr="config" optional
 option  "unstable-flags" Z "Unstable (nightly-only) flags" string typestr="unstable_flag" optional
+# AI! add all options of cargo add
+
+
 
 # The last two options are actually used to have a suitable ENUM that makes it easier to validate
 # the values given for the toolchain and command
