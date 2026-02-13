@@ -38,7 +38,7 @@ option  "build" - "Add as a build dependency" flag off
 option  "optional" - "Mark dependency as optional" flag off
 option  "no-optional" - "Mark dependency as required" flag off
 option  "rename" - "Rename the dependency" string typestr="name" optional
-option  "version" - "Version requirement" string typestr="version" optional
+option  "pkg-version" V "Version" flag off
 option  "path" - "Filesystem path to local dependency" string typestr="path" optional
 option  "git" - "Git repository location" string typestr="url" optional
 option  "branch" - "Git branch to download" string typestr="branch" optional
@@ -46,7 +46,6 @@ option  "tag" - "Git tag to download" string typestr="tag" optional
 option  "rev" - "Git commit reference to download" string typestr="rev" optional
 option  "registry" - "Package registry for this dependency" string typestr="registry" optional
 option  "dry-run" - "Don't actually write the manifest" flag off
-option  "offline" - "Run without accessing the network" flag off
 option  "out-dir" - "Output directory for artifacts" string typestr="path" optional
 option  "build-plan" - "Output the build plan in JSON" flag off
 option  "keep-going" - "Continue building as much as possible" flag off

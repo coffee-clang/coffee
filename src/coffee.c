@@ -274,6 +274,8 @@ int main(int argc, char **argv) {
         .verbose = args_info.verbose_given,
         .verbose2 = args_info.verbose_given,
         .quiet = args_info.quiet_given,
+        .inputs = args_info.inputs,
+        .inputs_num = args_info.inputs_num,
     };
     /* printf("command_idx: %d\n", command_idx); */
     /* printf("num commands: %d\n", lengthof(commands)); */
@@ -294,14 +296,6 @@ int main(int argc, char **argv) {
     }
 
 /* No command has been given */
-    if (args_info.list_given) {
-        printf("Installed Commands:\n");
-        for (i64 i = 0; i < lengthof(commands); i++) {
-            printf("%s\t%s\n", commands[i].name, commands[i].description);
-        }
-        exit(EXIT_SUCCESS);
-    }
-
     cmdline_parser_print_help();
     exit(EXIT_SUCCESS);
 }

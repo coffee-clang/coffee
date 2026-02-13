@@ -33,7 +33,7 @@ typedef size_t    usize;
 #define new(a, t, n)  (t *)alloc(a, sizeof(t), _Alignof(t), n)
 
 
-typedef struct options {
+typedef struct options_s {
     bool verbose;
     bool verbose2;
     bool quiet;
@@ -41,12 +41,14 @@ typedef struct options {
     bool locked;
     bool offline;
     char *error_code;
-};
+    char **inputs;
+    int inputs_num;
+} options_s, options;
 
 typedef struct {
     char *name;
     char *description;
-    i64 (*action)(options *);
+    i64 (*action)(struct options_s *);
 } command_s;
 
 
