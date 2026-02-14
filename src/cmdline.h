@@ -10,7 +10,7 @@
 
 /* If we use autoconf.  */
 #ifdef HAVE_CONFIG_H
-#include "config.h"
+# include "config.h"
 #endif
 
 #include <stdio.h> /* for FILE */
@@ -21,234 +21,246 @@ extern "C" {
 
 #ifndef CMDLINE_PARSER_PACKAGE
 /** @brief the program name (used for printing errors) */
-#define CMDLINE_PARSER_PACKAGE "coffee"
+# define CMDLINE_PARSER_PACKAGE "coffee"
 #endif
 
 #ifndef CMDLINE_PARSER_PACKAGE_NAME
 /** @brief the complete program name (used for help and version) */
-#define CMDLINE_PARSER_PACKAGE_NAME "coffee"
+# define CMDLINE_PARSER_PACKAGE_NAME "coffee"
 #endif
 
 #ifndef CMDLINE_PARSER_VERSION
 /** @brief the program version */
-#define CMDLINE_PARSER_VERSION "0.1.0"
+# define CMDLINE_PARSER_VERSION "0.1.0"
 #endif
 
-enum enum_toolchain { toolchain__NULL = -1, toolchain_arg_PLUS_stable = 0, toolchain_arg_PLUS_clangMINUS_stable, toolchain_arg_PLUS_gccMINUS_stable };
+enum enum_toolchain {
+	toolchain__NULL		  = -1,
+	toolchain_arg_PLUS_stable = 0,
+	toolchain_arg_PLUS_clangMINUS_stable,
+	toolchain_arg_PLUS_gccMINUS_stable
+};
 
 /** @brief Where the command line options are stored */
-struct gengetopt_args_info
-{
-  const char *help_help; /**< @brief Print help and exit help description.  */
-  const char *version_help; /**< @brief Print version and exit help description.  */
-  int verbose_flag;	/**< @brief Use verbose output (-vv very verbose/build.rs output) (default=off).  */
-  const char *verbose_help; /**< @brief Use verbose output (-vv very verbose/build.rs output) help description.  */
-  int quiet_flag;	/**< @brief Do not print cargo log messages (default=off).  */
-  const char *quiet_help; /**< @brief Do not print cargo log messages help description.  */
-  char * color_arg;	/**< @brief Coloring [possible values: auto, always, never].  */
-  char * color_orig;	/**< @brief Coloring [possible values: auto, always, never] original value given at command line.  */
-  const char *color_help; /**< @brief Coloring [possible values: auto, always, never] help description.  */
-  char * message_format_arg;	/**< @brief Error format [possible values: human, json, short].  */
-  char * message_format_orig;	/**< @brief Error format [possible values: human, json, short] original value given at command line.  */
-  const char *message_format_help; /**< @brief Error format [possible values: human, json, short] help description.  */
-  char * manifest_path_arg;	/**< @brief Path to Cargo.toml.  */
-  char * manifest_path_orig;	/**< @brief Path to Cargo.toml original value given at command line.  */
-  const char *manifest_path_help; /**< @brief Path to Cargo.toml help description.  */
-  char * target_arg;	/**< @brief Build for the target triple.  */
-  char * target_orig;	/**< @brief Build for the target triple original value given at command line.  */
-  const char *target_help; /**< @brief Build for the target triple help description.  */
-  int debug_flag;	/**< @brief Build with debug symbols (default=off).  */
-  const char *debug_help; /**< @brief Build with debug symbols help description.  */
-  int release_flag;	/**< @brief Build in release mode (default=off).  */
-  const char *release_help; /**< @brief Build in release mode help description.  */
-  int jobs_arg;	/**< @brief Number of parallel jobs, defaults to # of CPUs.  */
-  char * jobs_orig;	/**< @brief Number of parallel jobs, defaults to # of CPUs original value given at command line.  */
-  const char *jobs_help; /**< @brief Number of parallel jobs, defaults to # of CPUs help description.  */
-  char * bin_arg;	/**< @brief Build only the specified binary.  */
-  char * bin_orig;	/**< @brief Build only the specified binary original value given at command line.  */
-  const char *bin_help; /**< @brief Build only the specified binary help description.  */
-  char * example_arg;	/**< @brief Build only the specified example.  */
-  char * example_orig;	/**< @brief Build only the specified example original value given at command line.  */
-  const char *example_help; /**< @brief Build only the specified example help description.  */
-  char * features_arg;	/**< @brief Space-separated list of features to activate.  */
-  char * features_orig;	/**< @brief Space-separated list of features to activate original value given at command line.  */
-  const char *features_help; /**< @brief Space-separated list of features to activate help description.  */
-  int all_features_flag;	/**< @brief Activate all available features (default=off).  */
-  const char *all_features_help; /**< @brief Activate all available features help description.  */
-  int no_default_features_flag;	/**< @brief Do not activate the `default` feature (default=off).  */
-  const char *no_default_features_help; /**< @brief Do not activate the `default` feature help description.  */
-  char * profile_arg;	/**< @brief Build with given profile.  */
-  char * profile_orig;	/**< @brief Build with given profile original value given at command line.  */
-  const char *profile_help; /**< @brief Build with given profile help description.  */
-  char * target_dir_arg;	/**< @brief Directory for all generated artifacts.  */
-  char * target_dir_orig;	/**< @brief Directory for all generated artifacts original value given at command line.  */
-  const char *target_dir_help; /**< @brief Directory for all generated artifacts help description.  */
-  int unit_graph_flag;	/**< @brief Output build graph in JSON (default=off).  */
-  const char *unit_graph_help; /**< @brief Output build graph in JSON help description.  */
-  int ignore_rust_version_flag;	/**< @brief Ignore `rust-version` specification in packages (default=off).  */
-  const char *ignore_rust_version_help; /**< @brief Ignore `rust-version` specification in packages help description.  */
-  char * timings_arg;	/**< @brief Output build timing information.  */
-  char * timings_orig;	/**< @brief Output build timing information original value given at command line.  */
-  const char *timings_help; /**< @brief Output build timing information help description.  */
-  int future_incompat_report_flag;	/**< @brief Outputs a future incompatibility report (default=off).  */
-  const char *future_incompat_report_help; /**< @brief Outputs a future incompatibility report help description.  */
-  int workspace_flag;	/**< @brief Build all packages in the workspace (default=off).  */
-  const char *workspace_help; /**< @brief Build all packages in the workspace help description.  */
-  char * exclude_arg;	/**< @brief Exclude packages from the build.  */
-  char * exclude_orig;	/**< @brief Exclude packages from the build original value given at command line.  */
-  const char *exclude_help; /**< @brief Exclude packages from the build help description.  */
-  char * include_arg;	/**< @brief Include packages in the build.  */
-  char * include_orig;	/**< @brief Include packages in the build original value given at command line.  */
-  const char *include_help; /**< @brief Include packages in the build help description.  */
-  int lib_flag;	/**< @brief Build only this package's library (default=off).  */
-  const char *lib_help; /**< @brief Build only this package's library help description.  */
-  char * package_arg;	/**< @brief Package to build.  */
-  char * package_orig;	/**< @brief Package to build original value given at command line.  */
-  const char *package_help; /**< @brief Package to build help description.  */
-  int locked_flag;	/**< @brief Require Cargo.lock is up to date (default=off).  */
-  const char *locked_help; /**< @brief Require Cargo.lock is up to date help description.  */
-  int offline_flag;	/**< @brief Run without accessing the network (default=off).  */
-  const char *offline_help; /**< @brief Run without accessing the network help description.  */
-  int frozen_flag;	/**< @brief Equivalent to both --locked and --offline (default=off).  */
-  const char *frozen_help; /**< @brief Equivalent to both --locked and --offline help description.  */
-  char * config_arg;	/**< @brief Override a configuration value.  */
-  char * config_orig;	/**< @brief Override a configuration value original value given at command line.  */
-  const char *config_help; /**< @brief Override a configuration value help description.  */
-  char * unstable_flags_arg;	/**< @brief Unstable (nightly-only) flags.  */
-  char * unstable_flags_orig;	/**< @brief Unstable (nightly-only) flags original value given at command line.  */
-  const char *unstable_flags_help; /**< @brief Unstable (nightly-only) flags help description.  */
-  int dev_flag;	/**< @brief Add as a development dependency (default=off).  */
-  const char *dev_help; /**< @brief Add as a development dependency help description.  */
-  int build_flag;	/**< @brief Add as a build dependency (default=off).  */
-  const char *build_help; /**< @brief Add as a build dependency help description.  */
-  int optional_flag;	/**< @brief Mark dependency as optional (default=off).  */
-  const char *optional_help; /**< @brief Mark dependency as optional help description.  */
-  int no_optional_flag;	/**< @brief Mark dependency as required (default=off).  */
-  const char *no_optional_help; /**< @brief Mark dependency as required help description.  */
-  char * rename_arg;	/**< @brief Rename the dependency.  */
-  char * rename_orig;	/**< @brief Rename the dependency original value given at command line.  */
-  const char *rename_help; /**< @brief Rename the dependency help description.  */
-  int pkg_version_flag;	/**< @brief Version (default=off).  */
-  const char *pkg_version_help; /**< @brief Version help description.  */
-  char * path_arg;	/**< @brief Filesystem path to local dependency.  */
-  char * path_orig;	/**< @brief Filesystem path to local dependency original value given at command line.  */
-  const char *path_help; /**< @brief Filesystem path to local dependency help description.  */
-  char * git_arg;	/**< @brief Git repository location.  */
-  char * git_orig;	/**< @brief Git repository location original value given at command line.  */
-  const char *git_help; /**< @brief Git repository location help description.  */
-  char * branch_arg;	/**< @brief Git branch to download.  */
-  char * branch_orig;	/**< @brief Git branch to download original value given at command line.  */
-  const char *branch_help; /**< @brief Git branch to download help description.  */
-  char * tag_arg;	/**< @brief Git tag to download.  */
-  char * tag_orig;	/**< @brief Git tag to download original value given at command line.  */
-  const char *tag_help; /**< @brief Git tag to download help description.  */
-  char * rev_arg;	/**< @brief Git commit reference to download.  */
-  char * rev_orig;	/**< @brief Git commit reference to download original value given at command line.  */
-  const char *rev_help; /**< @brief Git commit reference to download help description.  */
-  char * registry_arg;	/**< @brief Package registry for this dependency.  */
-  char * registry_orig;	/**< @brief Package registry for this dependency original value given at command line.  */
-  const char *registry_help; /**< @brief Package registry for this dependency help description.  */
-  int dry_run_flag;	/**< @brief Don't actually write the manifest (default=off).  */
-  const char *dry_run_help; /**< @brief Don't actually write the manifest help description.  */
-  char * out_dir_arg;	/**< @brief Output directory for artifacts.  */
-  char * out_dir_orig;	/**< @brief Output directory for artifacts original value given at command line.  */
-  const char *out_dir_help; /**< @brief Output directory for artifacts help description.  */
-  int build_plan_flag;	/**< @brief Output the build plan in JSON (default=off).  */
-  const char *build_plan_help; /**< @brief Output the build plan in JSON help description.  */
-  int keep_going_flag;	/**< @brief Continue building as much as possible (default=off).  */
-  const char *keep_going_help; /**< @brief Continue building as much as possible help description.  */
-  int bins_flag;	/**< @brief Build all binary targets (default=off).  */
-  const char *bins_help; /**< @brief Build all binary targets help description.  */
-  int examples_flag;	/**< @brief Build all example targets (default=off).  */
-  const char *examples_help; /**< @brief Build all example targets help description.  */
-  int tests_flag;	/**< @brief Build all test targets (default=off).  */
-  const char *tests_help; /**< @brief Build all test targets help description.  */
-  int benches_flag;	/**< @brief Build all bench targets (default=off).  */
-  const char *benches_help; /**< @brief Build all bench targets help description.  */
-  int all_targets_flag;	/**< @brief Build all targets (default=off).  */
-  const char *all_targets_help; /**< @brief Build all targets help description.  */
-  int no_run_flag;	/**< @brief Don't run the generated binaries (default=off).  */
-  const char *no_run_help; /**< @brief Don't run the generated binaries help description.  */
-  int no_fail_fast_flag;	/**< @brief Run all tests regardless of failure (default=off).  */
-  const char *no_fail_fast_help; /**< @brief Run all tests regardless of failure help description.  */
-  enum enum_toolchain toolchain_arg;	/**< @brief Toolchain used.  */
-  char * toolchain_orig;	/**< @brief Toolchain used original value given at command line.  */
-  const char *toolchain_help; /**< @brief Toolchain used help description.  */
-  char * command_arg;	/**< @brief command.  */
-  char * command_orig;	/**< @brief command original value given at command line.  */
-  const char *command_help; /**< @brief command help description.  */
-  
-  unsigned int help_given ;	/**< @brief Whether help was given.  */
-  unsigned int version_given ;	/**< @brief Whether version was given.  */
-  unsigned int verbose_given ;	/**< @brief Whether verbose was given.  */
-  unsigned int quiet_given ;	/**< @brief Whether quiet was given.  */
-  unsigned int color_given ;	/**< @brief Whether color was given.  */
-  unsigned int message_format_given ;	/**< @brief Whether message-format was given.  */
-  unsigned int manifest_path_given ;	/**< @brief Whether manifest-path was given.  */
-  unsigned int target_given ;	/**< @brief Whether target was given.  */
-  unsigned int debug_given ;	/**< @brief Whether debug was given.  */
-  unsigned int release_given ;	/**< @brief Whether release was given.  */
-  unsigned int jobs_given ;	/**< @brief Whether jobs was given.  */
-  unsigned int bin_given ;	/**< @brief Whether bin was given.  */
-  unsigned int example_given ;	/**< @brief Whether example was given.  */
-  unsigned int features_given ;	/**< @brief Whether features was given.  */
-  unsigned int all_features_given ;	/**< @brief Whether all-features was given.  */
-  unsigned int no_default_features_given ;	/**< @brief Whether no-default-features was given.  */
-  unsigned int profile_given ;	/**< @brief Whether profile was given.  */
-  unsigned int target_dir_given ;	/**< @brief Whether target-dir was given.  */
-  unsigned int unit_graph_given ;	/**< @brief Whether unit-graph was given.  */
-  unsigned int ignore_rust_version_given ;	/**< @brief Whether ignore-rust-version was given.  */
-  unsigned int timings_given ;	/**< @brief Whether timings was given.  */
-  unsigned int future_incompat_report_given ;	/**< @brief Whether future-incompat-report was given.  */
-  unsigned int workspace_given ;	/**< @brief Whether workspace was given.  */
-  unsigned int exclude_given ;	/**< @brief Whether exclude was given.  */
-  unsigned int include_given ;	/**< @brief Whether include was given.  */
-  unsigned int lib_given ;	/**< @brief Whether lib was given.  */
-  unsigned int package_given ;	/**< @brief Whether package was given.  */
-  unsigned int locked_given ;	/**< @brief Whether locked was given.  */
-  unsigned int offline_given ;	/**< @brief Whether offline was given.  */
-  unsigned int frozen_given ;	/**< @brief Whether frozen was given.  */
-  unsigned int config_given ;	/**< @brief Whether config was given.  */
-  unsigned int unstable_flags_given ;	/**< @brief Whether unstable-flags was given.  */
-  unsigned int dev_given ;	/**< @brief Whether dev was given.  */
-  unsigned int build_given ;	/**< @brief Whether build was given.  */
-  unsigned int optional_given ;	/**< @brief Whether optional was given.  */
-  unsigned int no_optional_given ;	/**< @brief Whether no-optional was given.  */
-  unsigned int rename_given ;	/**< @brief Whether rename was given.  */
-  unsigned int pkg_version_given ;	/**< @brief Whether pkg-version was given.  */
-  unsigned int path_given ;	/**< @brief Whether path was given.  */
-  unsigned int git_given ;	/**< @brief Whether git was given.  */
-  unsigned int branch_given ;	/**< @brief Whether branch was given.  */
-  unsigned int tag_given ;	/**< @brief Whether tag was given.  */
-  unsigned int rev_given ;	/**< @brief Whether rev was given.  */
-  unsigned int registry_given ;	/**< @brief Whether registry was given.  */
-  unsigned int dry_run_given ;	/**< @brief Whether dry-run was given.  */
-  unsigned int out_dir_given ;	/**< @brief Whether out-dir was given.  */
-  unsigned int build_plan_given ;	/**< @brief Whether build-plan was given.  */
-  unsigned int keep_going_given ;	/**< @brief Whether keep-going was given.  */
-  unsigned int bins_given ;	/**< @brief Whether bins was given.  */
-  unsigned int examples_given ;	/**< @brief Whether examples was given.  */
-  unsigned int tests_given ;	/**< @brief Whether tests was given.  */
-  unsigned int benches_given ;	/**< @brief Whether benches was given.  */
-  unsigned int all_targets_given ;	/**< @brief Whether all-targets was given.  */
-  unsigned int no_run_given ;	/**< @brief Whether no-run was given.  */
-  unsigned int no_fail_fast_given ;	/**< @brief Whether no-fail-fast was given.  */
-  unsigned int toolchain_given ;	/**< @brief Whether toolchain was given.  */
-  unsigned int command_given ;	/**< @brief Whether command was given.  */
+struct gengetopt_args_info {
+	const char *help_help;	  /**< @brief Print help and exit help description.  */
+	const char *version_help; /**< @brief Print version and exit help description.  */
+	int	    verbose_flag; /**< @brief Use verbose output (-vv very verbose/build.rs output) (default=off).  */
+	const char *verbose_help; /**< @brief Use verbose output (-vv very verbose/build.rs output) help description. */
+	int	    quiet_flag;	  /**< @brief Do not print cargo log messages (default=off).  */
+	const char *quiet_help;	  /**< @brief Do not print cargo log messages help description.  */
+	char	   *color_arg;	  /**< @brief Coloring [possible values: auto, always, never].  */
+	char *color_orig; /**< @brief Coloring [possible values: auto, always, never] original value given at command
+			     line.  */
+	const char *color_help; /**< @brief Coloring [possible values: auto, always, never] help description.  */
+	char	   *message_format_arg; /**< @brief Error format [possible values: human, json, short].  */
+	char *message_format_orig; /**< @brief Error format [possible values: human, json, short] original value given
+				      at command line.  */
+	const char *
+		message_format_help; /**< @brief Error format [possible values: human, json, short] help description. */
+	char   *manifest_path_arg;   /**< @brief Path to Cargo.toml.  */
+	char   *manifest_path_orig;  /**< @brief Path to Cargo.toml original value given at command line.  */
+	const char *manifest_path_help; /**< @brief Path to Cargo.toml help description.  */
+	char	   *target_arg;		/**< @brief Build for the target triple.  */
+	char	   *target_orig;  /**< @brief Build for the target triple original value given at command line.  */
+	const char *target_help;  /**< @brief Build for the target triple help description.  */
+	int	    debug_flag;	  /**< @brief Build with debug symbols (default=off).  */
+	const char *debug_help;	  /**< @brief Build with debug symbols help description.  */
+	int	    release_flag; /**< @brief Build in release mode (default=off).  */
+	const char *release_help; /**< @brief Build in release mode help description.  */
+	int	    jobs_arg;	  /**< @brief Number of parallel jobs, defaults to # of CPUs.  */
+	char *jobs_orig; /**< @brief Number of parallel jobs, defaults to # of CPUs original value given at command
+			    line.  */
+	const char *jobs_help;	  /**< @brief Number of parallel jobs, defaults to # of CPUs help description.  */
+	char	   *bin_arg;	  /**< @brief Build only the specified binary.  */
+	char	   *bin_orig;	  /**< @brief Build only the specified binary original value given at command line.  */
+	const char *bin_help;	  /**< @brief Build only the specified binary help description.  */
+	char	   *example_arg;  /**< @brief Build only the specified example.  */
+	char	   *example_orig; /**< @brief Build only the specified example original value given at command line.  */
+	const char *example_help; /**< @brief Build only the specified example help description.  */
+	char	   *features_arg; /**< @brief Space-separated list of features to activate.  */
+	char *features_orig; /**< @brief Space-separated list of features to activate original value given at command
+				line.  */
+	const char *features_help;     /**< @brief Space-separated list of features to activate help description.  */
+	int	    all_features_flag; /**< @brief Activate all available features (default=off).  */
+	const char *all_features_help; /**< @brief Activate all available features help description.  */
+	int	    no_default_features_flag; /**< @brief Do not activate the `default` feature (default=off).  */
+	const char *no_default_features_help; /**< @brief Do not activate the `default` feature help description.  */
+	char	   *profile_arg;	      /**< @brief Build with given profile.  */
+	char	   *profile_orig;   /**< @brief Build with given profile original value given at command line.  */
+	const char *profile_help;   /**< @brief Build with given profile help description.  */
+	char	   *target_dir_arg; /**< @brief Directory for all generated artifacts.  */
+	char *target_dir_orig; /**< @brief Directory for all generated artifacts original value given at command line.
+				*/
+	const char *target_dir_help;  /**< @brief Directory for all generated artifacts help description.  */
+	int	    unit_graph_flag;  /**< @brief Output build graph in JSON (default=off).  */
+	const char *unit_graph_help;  /**< @brief Output build graph in JSON help description.  */
+	int ignore_rust_version_flag; /**< @brief Ignore `rust-version` specification in packages (default=off).  */
+	const char *ignore_rust_version_help; /**< @brief Ignore `rust-version` specification in packages help
+						 description.  */
+	char	   *timings_arg;	      /**< @brief Output build timing information.  */
+	char	   *timings_orig; /**< @brief Output build timing information original value given at command line.  */
+	const char *timings_help; /**< @brief Output build timing information help description.  */
+	int	    future_incompat_report_flag; /**< @brief Outputs a future incompatibility report (default=off).  */
+	const char
+		*future_incompat_report_help; /**< @brief Outputs a future incompatibility report help description.  */
+	int	 workspace_flag;	      /**< @brief Build all packages in the workspace (default=off).  */
+	const char *workspace_help;	      /**< @brief Build all packages in the workspace help description.  */
+	char	   *exclude_arg;	      /**< @brief Exclude packages from the build.  */
+	char	   *exclude_orig; /**< @brief Exclude packages from the build original value given at command line.  */
+	const char *exclude_help; /**< @brief Exclude packages from the build help description.  */
+	char	   *include_arg;  /**< @brief Include packages in the build.  */
+	char	   *include_orig; /**< @brief Include packages in the build original value given at command line.  */
+	const char *include_help; /**< @brief Include packages in the build help description.  */
+	int	    lib_flag;	  /**< @brief Build only this package's library (default=off).  */
+	const char *lib_help;	  /**< @brief Build only this package's library help description.  */
+	char	   *package_arg;  /**< @brief Package to build.  */
+	char	   *package_orig; /**< @brief Package to build original value given at command line.  */
+	const char *package_help; /**< @brief Package to build help description.  */
+	int	    locked_flag;  /**< @brief Require Cargo.lock is up to date (default=off).  */
+	const char *locked_help;  /**< @brief Require Cargo.lock is up to date help description.  */
+	int	    offline_flag; /**< @brief Run without accessing the network (default=off).  */
+	const char *offline_help; /**< @brief Run without accessing the network help description.  */
+	int	    frozen_flag;  /**< @brief Equivalent to both --locked and --offline (default=off).  */
+	const char *frozen_help;  /**< @brief Equivalent to both --locked and --offline help description.  */
+	char	   *config_arg;	  /**< @brief Override a configuration value.  */
+	char	   *config_orig;  /**< @brief Override a configuration value original value given at command line.  */
+	const char *config_help;  /**< @brief Override a configuration value help description.  */
+	char	   *unstable_flags_arg; /**< @brief Unstable (nightly-only) flags.  */
+	char *unstable_flags_orig; /**< @brief Unstable (nightly-only) flags original value given at command line.  */
+	const char *unstable_flags_help; /**< @brief Unstable (nightly-only) flags help description.  */
+	int	    dev_flag;		 /**< @brief Add as a development dependency (default=off).  */
+	const char *dev_help;		 /**< @brief Add as a development dependency help description.  */
+	int	    build_flag;		 /**< @brief Add as a build dependency (default=off).  */
+	const char *build_help;		 /**< @brief Add as a build dependency help description.  */
+	int	    optional_flag;	 /**< @brief Mark dependency as optional (default=off).  */
+	const char *optional_help;	 /**< @brief Mark dependency as optional help description.  */
+	int	    no_optional_flag;	 /**< @brief Mark dependency as required (default=off).  */
+	const char *no_optional_help;	 /**< @brief Mark dependency as required help description.  */
+	char	   *rename_arg;		 /**< @brief Rename the dependency.  */
+	char	   *rename_orig;	 /**< @brief Rename the dependency original value given at command line.  */
+	const char *rename_help;	 /**< @brief Rename the dependency help description.  */
+	int	    pkg_version_flag;	 /**< @brief Version (default=off).  */
+	const char *pkg_version_help;	 /**< @brief Version help description.  */
+	char	   *path_arg;		 /**< @brief Filesystem path to local dependency.  */
+	char	   *path_orig; /**< @brief Filesystem path to local dependency original value given at command line.  */
+	const char *path_help; /**< @brief Filesystem path to local dependency help description.  */
+	char	   *git_arg;   /**< @brief Git repository location.  */
+	char	   *git_orig;  /**< @brief Git repository location original value given at command line.  */
+	const char *git_help;  /**< @brief Git repository location help description.  */
+	char	   *branch_arg;	  /**< @brief Git branch to download.  */
+	char	   *branch_orig;  /**< @brief Git branch to download original value given at command line.  */
+	const char *branch_help;  /**< @brief Git branch to download help description.  */
+	char	   *tag_arg;	  /**< @brief Git tag to download.  */
+	char	   *tag_orig;	  /**< @brief Git tag to download original value given at command line.  */
+	const char *tag_help;	  /**< @brief Git tag to download help description.  */
+	char	   *rev_arg;	  /**< @brief Git commit reference to download.  */
+	char	   *rev_orig;	  /**< @brief Git commit reference to download original value given at command line.  */
+	const char *rev_help;	  /**< @brief Git commit reference to download help description.  */
+	char	   *registry_arg; /**< @brief Package registry for this dependency.  */
+	char *registry_orig; /**< @brief Package registry for this dependency original value given at command line.  */
+	const char *registry_help; /**< @brief Package registry for this dependency help description.  */
+	int	    dry_run_flag;  /**< @brief Don't actually write the manifest (default=off).  */
+	const char *dry_run_help;  /**< @brief Don't actually write the manifest help description.  */
+	char	   *out_dir_arg;   /**< @brief Output directory for artifacts.  */
+	char	   *out_dir_orig;  /**< @brief Output directory for artifacts original value given at command line.  */
+	const char *out_dir_help;  /**< @brief Output directory for artifacts help description.  */
+	int	    build_plan_flag;	    /**< @brief Output the build plan in JSON (default=off).  */
+	const char *build_plan_help;	    /**< @brief Output the build plan in JSON help description.  */
+	int	    keep_going_flag;	    /**< @brief Continue building as much as possible (default=off).  */
+	const char *keep_going_help;	    /**< @brief Continue building as much as possible help description.  */
+	int	    bins_flag;		    /**< @brief Build all binary targets (default=off).  */
+	const char *bins_help;		    /**< @brief Build all binary targets help description.  */
+	int	    examples_flag;	    /**< @brief Build all example targets (default=off).  */
+	const char *examples_help;	    /**< @brief Build all example targets help description.  */
+	int	    tests_flag;		    /**< @brief Build all test targets (default=off).  */
+	const char *tests_help;		    /**< @brief Build all test targets help description.  */
+	int	    benches_flag;	    /**< @brief Build all bench targets (default=off).  */
+	const char *benches_help;	    /**< @brief Build all bench targets help description.  */
+	int	    all_targets_flag;	    /**< @brief Build all targets (default=off).  */
+	const char *all_targets_help;	    /**< @brief Build all targets help description.  */
+	int	    no_run_flag;	    /**< @brief Don't run the generated binaries (default=off).  */
+	const char *no_run_help;	    /**< @brief Don't run the generated binaries help description.  */
+	int	    no_fail_fast_flag;	    /**< @brief Run all tests regardless of failure (default=off).  */
+	const char *no_fail_fast_help;	    /**< @brief Run all tests regardless of failure help description.  */
+	enum enum_toolchain toolchain_arg;  /**< @brief Toolchain used.  */
+	char		   *toolchain_orig; /**< @brief Toolchain used original value given at command line.  */
+	const char	   *toolchain_help; /**< @brief Toolchain used help description.  */
+	char		   *command_arg;    /**< @brief command.  */
+	char		   *command_orig;   /**< @brief command original value given at command line.  */
+	const char	   *command_help;   /**< @brief command help description.  */
 
-  char **inputs ; /**< @brief unnamed options (options without names) */
-  unsigned inputs_num ; /**< @brief unnamed options number */
-} ;
+	unsigned int help_given;		   /**< @brief Whether help was given.  */
+	unsigned int version_given;		   /**< @brief Whether version was given.  */
+	unsigned int verbose_given;		   /**< @brief Whether verbose was given.  */
+	unsigned int quiet_given;		   /**< @brief Whether quiet was given.  */
+	unsigned int color_given;		   /**< @brief Whether color was given.  */
+	unsigned int message_format_given;	   /**< @brief Whether message-format was given.  */
+	unsigned int manifest_path_given;	   /**< @brief Whether manifest-path was given.  */
+	unsigned int target_given;		   /**< @brief Whether target was given.  */
+	unsigned int debug_given;		   /**< @brief Whether debug was given.  */
+	unsigned int release_given;		   /**< @brief Whether release was given.  */
+	unsigned int jobs_given;		   /**< @brief Whether jobs was given.  */
+	unsigned int bin_given;			   /**< @brief Whether bin was given.  */
+	unsigned int example_given;		   /**< @brief Whether example was given.  */
+	unsigned int features_given;		   /**< @brief Whether features was given.  */
+	unsigned int all_features_given;	   /**< @brief Whether all-features was given.  */
+	unsigned int no_default_features_given;	   /**< @brief Whether no-default-features was given.  */
+	unsigned int profile_given;		   /**< @brief Whether profile was given.  */
+	unsigned int target_dir_given;		   /**< @brief Whether target-dir was given.  */
+	unsigned int unit_graph_given;		   /**< @brief Whether unit-graph was given.  */
+	unsigned int ignore_rust_version_given;	   /**< @brief Whether ignore-rust-version was given.  */
+	unsigned int timings_given;		   /**< @brief Whether timings was given.  */
+	unsigned int future_incompat_report_given; /**< @brief Whether future-incompat-report was given.  */
+	unsigned int workspace_given;		   /**< @brief Whether workspace was given.  */
+	unsigned int exclude_given;		   /**< @brief Whether exclude was given.  */
+	unsigned int include_given;		   /**< @brief Whether include was given.  */
+	unsigned int lib_given;			   /**< @brief Whether lib was given.  */
+	unsigned int package_given;		   /**< @brief Whether package was given.  */
+	unsigned int locked_given;		   /**< @brief Whether locked was given.  */
+	unsigned int offline_given;		   /**< @brief Whether offline was given.  */
+	unsigned int frozen_given;		   /**< @brief Whether frozen was given.  */
+	unsigned int config_given;		   /**< @brief Whether config was given.  */
+	unsigned int unstable_flags_given;	   /**< @brief Whether unstable-flags was given.  */
+	unsigned int dev_given;			   /**< @brief Whether dev was given.  */
+	unsigned int build_given;		   /**< @brief Whether build was given.  */
+	unsigned int optional_given;		   /**< @brief Whether optional was given.  */
+	unsigned int no_optional_given;		   /**< @brief Whether no-optional was given.  */
+	unsigned int rename_given;		   /**< @brief Whether rename was given.  */
+	unsigned int pkg_version_given;		   /**< @brief Whether pkg-version was given.  */
+	unsigned int path_given;		   /**< @brief Whether path was given.  */
+	unsigned int git_given;			   /**< @brief Whether git was given.  */
+	unsigned int branch_given;		   /**< @brief Whether branch was given.  */
+	unsigned int tag_given;			   /**< @brief Whether tag was given.  */
+	unsigned int rev_given;			   /**< @brief Whether rev was given.  */
+	unsigned int registry_given;		   /**< @brief Whether registry was given.  */
+	unsigned int dry_run_given;		   /**< @brief Whether dry-run was given.  */
+	unsigned int out_dir_given;		   /**< @brief Whether out-dir was given.  */
+	unsigned int build_plan_given;		   /**< @brief Whether build-plan was given.  */
+	unsigned int keep_going_given;		   /**< @brief Whether keep-going was given.  */
+	unsigned int bins_given;		   /**< @brief Whether bins was given.  */
+	unsigned int examples_given;		   /**< @brief Whether examples was given.  */
+	unsigned int tests_given;		   /**< @brief Whether tests was given.  */
+	unsigned int benches_given;		   /**< @brief Whether benches was given.  */
+	unsigned int all_targets_given;		   /**< @brief Whether all-targets was given.  */
+	unsigned int no_run_given;		   /**< @brief Whether no-run was given.  */
+	unsigned int no_fail_fast_given;	   /**< @brief Whether no-fail-fast was given.  */
+	unsigned int toolchain_given;		   /**< @brief Whether toolchain was given.  */
+	unsigned int command_given;		   /**< @brief Whether command was given.  */
+
+	char   **inputs;     /**< @brief unnamed options (options without names) */
+	unsigned inputs_num; /**< @brief unnamed options number */
+};
 
 /** @brief The additional parameters to pass to parser functions */
-struct cmdline_parser_params
-{
-  int override; /**< @brief whether to override possibly already present options (default 0) */
-  int initialize; /**< @brief whether to initialize the option structure gengetopt_args_info (default 1) */
-  int check_required; /**< @brief whether to check that all required options were provided (default 1) */
-  int check_ambiguity; /**< @brief whether to check for options already specified in the option structure gengetopt_args_info (default 0) */
-  int print_errors; /**< @brief whether getopt_long should print an error message for a bad option (default 1) */
-} ;
+struct cmdline_parser_params {
+	int override;	     /**< @brief whether to override possibly already present options (default 0) */
+	int initialize;	     /**< @brief whether to initialize the option structure gengetopt_args_info (default 1) */
+	int check_required;  /**< @brief whether to check that all required options were provided (default 1) */
+	int check_ambiguity; /**< @brief whether to check for options already specified in the option structure
+				gengetopt_args_info (default 0) */
+	int print_errors; /**< @brief whether getopt_long should print an error message for a bad option (default 1) */
+};
 
 /** @brief the purpose string of the program */
 extern const char *gengetopt_args_info_purpose;
@@ -266,8 +278,7 @@ extern const char *gengetopt_args_info_help[];
  * @param args_info the structure where option information will be stored
  * @return 0 if everything went fine, NON 0 if an error took place
  */
-int cmdline_parser (int argc, char **argv,
-  struct gengetopt_args_info *args_info);
+int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info);
 
 /**
  * The command line parser (version with additional parameters - deprecated)
@@ -280,9 +291,8 @@ int cmdline_parser (int argc, char **argv,
  * @return 0 if everything went fine, NON 0 if an error took place
  * @deprecated use cmdline_parser_ext() instead
  */
-int cmdline_parser2 (int argc, char **argv,
-  struct gengetopt_args_info *args_info,
-  int override, int initialize, int check_required);
+int cmdline_parser2(int argc, char **argv, struct gengetopt_args_info *args_info, int override, int initialize,
+		    int check_required);
 
 /**
  * The command line parser (version with additional parameters)
@@ -292,9 +302,8 @@ int cmdline_parser2 (int argc, char **argv,
  * @param params additional parameters for the parser
  * @return 0 if everything went fine, NON 0 if an error took place
  */
-int cmdline_parser_ext (int argc, char **argv,
-  struct gengetopt_args_info *args_info,
-  struct cmdline_parser_params *params);
+int cmdline_parser_ext(int argc, char **argv, struct gengetopt_args_info *args_info,
+		       struct cmdline_parser_params *params);
 
 /**
  * Save the contents of the option struct into an already open FILE stream.
@@ -302,8 +311,7 @@ int cmdline_parser_ext (int argc, char **argv,
  * @param args_info the option struct to dump
  * @return 0 if everything went fine, NON 0 if an error took place
  */
-int cmdline_parser_dump(FILE *outfile,
-  struct gengetopt_args_info *args_info);
+int cmdline_parser_dump(FILE *outfile, struct gengetopt_args_info *args_info);
 
 /**
  * Save the contents of the option struct into a (text) file.
@@ -312,8 +320,7 @@ int cmdline_parser_dump(FILE *outfile,
  * @param args_info the option struct to save
  * @return 0 if everything went fine, NON 0 if an error took place
  */
-int cmdline_parser_file_save(const char *filename,
-  struct gengetopt_args_info *args_info);
+int cmdline_parser_file_save(const char *filename, struct gengetopt_args_info *args_info);
 
 /**
  * Print the help
@@ -325,7 +332,7 @@ void cmdline_parser_print_help(void);
 void cmdline_parser_print_version(void);
 
 /**
- * Initializes all the fields a cmdline_parser_params structure 
+ * Initializes all the fields a cmdline_parser_params structure
  * to their default values
  * @param params the structure to initialize
  */
@@ -343,13 +350,13 @@ struct cmdline_parser_params *cmdline_parser_params_create(void);
  * (also set default values for options that have a default)
  * @param args_info the structure to initialize
  */
-void cmdline_parser_init (struct gengetopt_args_info *args_info);
+void cmdline_parser_init(struct gengetopt_args_info *args_info);
 /**
  * Deallocates the string fields of the gengetopt_args_info structure
  * (but does not deallocate the structure itself)
  * @param args_info the structure to deallocate
  */
-void cmdline_parser_free (struct gengetopt_args_info *args_info);
+void cmdline_parser_free(struct gengetopt_args_info *args_info);
 
 /**
  * Checks that all the required options were specified
@@ -358,11 +365,9 @@ void cmdline_parser_free (struct gengetopt_args_info *args_info);
  *   possible errors
  * @return
  */
-int cmdline_parser_required (struct gengetopt_args_info *args_info,
-  const char *prog_name);
+int cmdline_parser_required(struct gengetopt_args_info *args_info, const char *prog_name);
 
-extern const char *cmdline_parser_toolchain_values[];  /**< @brief Possible values for toolchain. */
-
+extern const char *cmdline_parser_toolchain_values[]; /**< @brief Possible values for toolchain. */
 
 #ifdef __cplusplus
 }
