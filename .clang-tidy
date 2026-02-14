@@ -1,6 +1,7 @@
-Checks: 'modernize-*,performance-*'
+Checks: 'clang-analyzer-*,performance-*,readability-*,bugprone-*,misc-*,c11*,-modernize-*'
 WarningsAsErrors: ''
 FormatStyle: file
+HeaderFilterRegex: 'src/.*'
 CheckOptions:
   - key: readability-identifier-naming.FunctionCase
     value: CamelCase

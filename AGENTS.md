@@ -76,6 +76,7 @@ When planning or implementing any subcommand, read the corresponding markdown fi
 ## Coding style
 
 Coding style is strictly enforced by calling clang-format and clang-tidy after each change.
+The entire codebase MUST be lint clean.
 
 You can use the most recent C standard (C23).
 

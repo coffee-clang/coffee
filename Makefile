@@ -42,8 +42,8 @@ LDFLAGS := -static -lz
 
 CMDLINE_GEN := cmdline.c cmdline.h
 
-DEPS_TOML_URL := https://raw.githubusercontent.com/cktan/tomlc99/master/lib/toml.c
-DEPS_TOML_H_URL := https://raw.githubusercontent.com/cktan/tomlc99/master/include/toml.h
+DEPS_TOML_URL := https://raw.githubusercontent.com/cktan/tomlc99/master/toml.c
+DEPS_TOML_H_URL := https://raw.githubusercontent.com/cktan/tomlc99/master/toml.h
 DEPS_SDS_URL := https://raw.githubusercontent.com/antirez/sds/master/sds.h
 DEPS_SDSALLOC_URL := https://raw.githubusercontent.com/antirez/sds/master/sdsalloc.h
 
