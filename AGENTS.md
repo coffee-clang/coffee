@@ -1,4 +1,4 @@
-# CLAUDE.md
+# AGENTS.md
 
 Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
 
@@ -63,3 +63,69 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+
+# Project specific part
+
+After each change, check README.md
+
+# Coding style
+
+Coding style is strictly enforced by calling indent after each change with the following parameters:
+
+`
+--align-with-spaces
+--no-blank-lines-after-commas
+--no-blank-lines-after-declarations
+--blank-lines-after-procedures
+--no-blank-lines-before-block-comments
+--braces-on-func-def-line
+--braces-on-if-line
+--braces-on-struct-decl-line
+--break-before-boolean-operator
+--dont-break-function-decl-args
+--dont-break-function-decl-args-end
+--dont-break-procedure-type
+--case-brace-indentation 4
+--case-indentation 0
+--no-comment-delimiters-on-blank-lines
+--comment-indentation 33
+--continuation-indentation 4
+--continue-at-parentheses
+--cuddle-do-while
+--cuddle-else
+--declaration-comment-column 33
+--declaration-indentation 1
+--dont-format-first-column-comments
+--dont-format-comments
+--else-endif-column 33
+--honour-newlines
+--indent-label 1
+--indent-level 8
+--dont-left-justify-declarations
+--line-comments-indentation 0
+--line-length 120
+--dont-line-up-parentheses
+--no-parameter-indentation
+--paren-indentation 2
+--preprocessor-indentation 4
+--remove-preprocessor-space
+--preserve-mtime
+--no-space-after-casts
+--space-after-for
+--no-space-after-function-call-names
+--space-after-if
+--no-space-after-parentheses
+--space-after-while
+--spaces-around-initializers
+--space-special-semicolon
+--dont-star-comments
+--struct-brace-indentation 4
+--swallow-optional-blank-lines
+--dont-tab-align-comments
+--tab-size 8
+--no-tabs
+`
+
+You can use the most recent C standard (C23).
+
+
