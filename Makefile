@@ -42,6 +42,11 @@ LDFLAGS := -static -lz
 
 CMDLINE_GEN := cmdline.c cmdline.h
 
+DEPS_TOML_URL := https://raw.githubusercontent.com/cktan/tomlc99/master/lib/toml.c
+DEPS_TOML_H_URL := https://raw.githubusercontent.com/cktan/tomlc99/master/include/toml.h
+DEPS_SDS_URL := https://raw.githubusercontent.com/antirez/sds/master/sds.h
+DEPS_SDSALLOC_URL := https://raw.githubusercontent.com/antirez/sds/master/sdsalloc.h
+
 $(BIN_DIR)/%.o: $(SRC_DIR)/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS_COMMON) -c $< -o $@
@@ -63,6 +68,27 @@ all: indent $(TARGET)
 $(SRC_DIR)/cmdline.c $(SRC_DIR)/cmdline.h: $(SRC_DIR)/cli.ggo
 	gengetopt -i $< --output-dir=$(SRC_DIR)/
 
+bootstrap:
+	@mkdir -p $(DEPS_DIR)/sds
+	@echo "Checking dependencies..."
+	@if [ ! -f $(DEPS_DIR)/toml.c ]; then \
+		echo "Downloading toml.c..."; \
+		curl -fsSL $(DEPS_TOML_URL) -o $(DEPS_DIR)/toml.c; \
+	fi
+	@if [ ! -f $(DEPS_DIR)/toml.h ]; then \
+		echo "Downloading toml.h..."; \
+		curl -fsSL $(DEPS_TOML_H_URL) -o $(DEPS_DIR)/toml.h; \
+	fi
+	@if [ ! -f $(DEPS_DIR)/sds/sds.h ]; then \
+		echo "Downloading sds.h..."; \
+		curl -fsSL $(DEPS_SDS_URL) -o $(DEPS_DIR)/sds/sds.h; \
+	fi
+	@if [ ! -f $(DEPS_DIR)/sds/sdsalloc.h ]; then \
+		echo "Downloading sdsalloc.h..."; \
+		curl -fsSL $(DEPS_SDSALLOC_URL) -o $(DEPS_DIR)/sds/sdsalloc.h; \
+	fi
+	@echo "Dependencies ready."
+
 clean:
 	rm -rf $(BIN_DIR)
 
@@ -72,7 +98,7 @@ indent:
 format:
 	clang-format -i $(SRC_DIR)/*.c $(SRC_DIR)/*.h $(SRC_DIR)/commands/*.c
 
-.PHONY: clean indent format tidy check
+.PHONY: clean indent format tidy check bootstrap
 
 tidy:
 	clang-tidy $(SRC_DIR)/*.c $(SRC_DIR)/commands/*.c \
@@ -80,4 +106,4 @@ tidy:
 
 check: format tidy
 
-.PHONY: clean indent format tidy check
+.PHONY: clean indent format tidy check bootstrap
