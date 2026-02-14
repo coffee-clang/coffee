@@ -1,0 +1,12 @@
+Checks: 'modernize-*,performance-*'
+WarningsAsErrors: ''
+FormatStyle: file
+CheckOptions:
+  - key: readability-identifier-naming.FunctionCase
+    value: CamelCase
+  - key: readability-identifier-naming.VariableCase
+    value: lower_case
+  - key: readability-magic-numbers.Enabled
+    value: false
+  - key: readability-braces-around-statements.Enabled
+    value: false

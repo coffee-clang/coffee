@@ -1,0 +1,67 @@
+Language: Cpp
+Standard: Latest
+
+# --- Indentation ---
+UseTab: Always
+IndentWidth: 8
+TabWidth: 8
+ContinuationIndentWidth: 8
+ColumnLimit: 120
+
+# --- Bracing & Control ---
+BreakBeforeBraces: Linux
+AllowShortLoopsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: None
+AllowShortBlocksOnASingleLine: false
+
+# --- Spacing ---
+PointerAlignment: Right
+SpaceBeforeParens: ControlStatements
+SpaceAfterCStyleCast: false
+SpaceInEmptyParentheses: false
+SpacesInContainerLiterals: false
+SpaceBeforeAssignmentOperators: true
+
+# --- Alignment ---
+AlignAfterOpenBracket: Align
+AlignConsecutiveAssignments:
+  Enabled: true
+AlignConsecutiveMacros: true
+AlignEscapedNewlines: Left
+AlignTrailingComments: true
+
+# --- Modern C ---
+SortIncludes: CaseSensitive
+IncludeBlocks: Regroup
+InsertBraces: true
+IntegerLiteralSeparator:
+  Binary: 4
+  Decimal: 3
+  Hex: 2
+QualifierAlignment: Left
+BreakAfterAttributes: Always
+IncludeCategories:
+  - Regex:           '^"(llvm|llvm-c|clang|clang-c)/'
+    Priority:        0 # Keep tools grouped at the top if using them
+  - Regex:           '^"config\.h"$'
+    Priority:        -1 # Always first (common in C build systems)
+  - Regex:           '^".*"'
+    Priority:        1  # Local project headers
+  - Regex:           '^(<stdint\.h>|<stdbool\.h>|<stddef\.h>)'
+    Priority:        2  # Essential C types
+  - Regex:           '^(<assert\.h>|<errno\.h>|<inttypes\.h>|<limits\.h>|<stdarg\.h>|<stdio\.h>|<stdlib\.h>|<string\.h>|<time\.h>)'
+    Priority:        3  # Standard C library
+  - Regex:           '^<.*'
+    Priority:        4  # System/OS headers (POSIX, etc.)
+AlignConsecutiveDeclarations:
+  Enabled: true
+  AcrossEmptyLines: false
+  AcrossComments: true
+IndentPPDirectives: AfterHash  # Indents the directive itself: #  define
+PPIndentWidth: 1              # Small indent for preprocessor logic
+SpaceBeforeSquareBrackets: false
+
+# --- Cleanup ---
+MaxEmptyLinesToKeep: 1
+PenaltyBreakString: 1000
+PenaltyBreakComment: 300

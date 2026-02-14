@@ -58,7 +58,7 @@ $(TARGET): $(OBJS)
 	@mkdir -p $(BIN_DIR)
 	$(CC) $(LDFLAGS) -o $@ $(OBJS)
 
-all: $(TARGET)
+all: indent $(TARGET)
 
 $(SRC_DIR)/cmdline.c $(SRC_DIR)/cmdline.h: $(SRC_DIR)/cli.ggo
 	gengetopt -i $< --output-dir=$(SRC_DIR)/
@@ -66,4 +66,18 @@ $(SRC_DIR)/cmdline.c $(SRC_DIR)/cmdline.h: $(SRC_DIR)/cli.ggo
 clean:
 	rm -rf $(BIN_DIR)
 
-.PHONY: clean
+indent:
+	find . -name "*.c" -o -name "*.h" | xargs clang-format -i -style=file
+
+format:
+	clang-format -i $(SRC_DIR)/*.c $(SRC_DIR)/*.h $(SRC_DIR)/commands/*.c
+
+.PHONY: clean indent format tidy check
+
+tidy:
+	clang-tidy $(SRC_DIR)/*.c $(SRC_DIR)/commands/*.c \
+		-- $(CFLAGS_COMMON) -I$(SRC_DIR) -I$(DEPS_DIR)
+
+check: format tidy
+
+.PHONY: clean indent format tidy check
