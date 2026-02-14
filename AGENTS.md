@@ -68,6 +68,10 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 After each change, check README.md
 
+# Command Documentation
+
+When planning or implementing any subcommand, read the corresponding markdown file in `docs/commands/` for detailed documentation about that command's purpose, usage, and implementation notes.
+
 # Coding style
 
 Coding style is strictly enforced by calling indent after each change with the following parameters:
