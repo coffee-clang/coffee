@@ -1,13 +1,15 @@
-Checks: 'clang-analyzer-*,performance-*,readability-*,bugprone-*,misc-*,c11*,-modernize-*'
+Checks: 'clang-analyzer-*,performance-*,readability-*,bugprone-*,misc-*,c11*,-modernize-*,-readability-identifier-length'
 WarningsAsErrors: ''
 FormatStyle: file
 HeaderFilterRegex: 'src/.*'
 CheckOptions:
   - key: readability-identifier-naming.FunctionCase
-    value: CamelCase
+    value: snake_case
   - key: readability-identifier-naming.VariableCase
     value: lower_case
   - key: readability-magic-numbers.Enabled
     value: false
   - key: readability-braces-around-statements.Enabled
+    value: false
+  - key: readability-identifier-length.Enabled
     value: false

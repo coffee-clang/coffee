@@ -1,5 +1,5 @@
-Language: Cpp
-Standard: Latest
+#Language: Cpp  # Auto-detected from file extension
+#Standard: c23  # C23 enforced via compiler flags, not clang-format
 
 # --- Indentation ---
 UseTab: Always
