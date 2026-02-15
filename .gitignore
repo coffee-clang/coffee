@@ -56,3 +56,4 @@ dkms.conf
 .aider*
 
 /deps/*
+/.tidy_stamps/*.tidy
