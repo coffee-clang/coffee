@@ -111,7 +111,7 @@ Try using a non-confusing naming scheme for your new functions and variable name
 In if/while/do/for expressions, we write the open brace on the same line as the keyword and we then set the closing
 brace on the same indentation level as the initial keyword. 
 
-Do not omit the braces if they would contain only a one-line statement.
+Never omit the braces.
 
 For functions the opening brace should be on a separate line:
 

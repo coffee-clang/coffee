@@ -1,4 +1,4 @@
-Checks: 'clang-analyzer-*,performance-*,readability-*,bugprone-*,misc-*,c11*,-modernize-*,-readability-identifier-length'
+Checks: 'clang-analyzer-*,performance-*,readability-*,bugprone-*,misc-*,c11*,-modernize-*,-readability-identifier-length,bugprone-assignment-in-if-condition,readability-sizeof-expression'
 WarningsAsErrors: ''
 FormatStyle: file
 HeaderFilterRegex: 'src/.*'
@@ -8,8 +8,10 @@ CheckOptions:
   - key: readability-identifier-naming.VariableCase
     value: lower_case
   - key: readability-magic-numbers.Enabled
-    value: false
+    value: true
   - key: readability-braces-around-statements.Enabled
-    value: false
+    value: true
   - key: readability-identifier-length.Enabled
-    value: false
+    value: true
+  - key: readability-sizeof-expression.WarnOnToIntegerCast
+    value: true
