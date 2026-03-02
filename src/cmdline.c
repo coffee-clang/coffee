@@ -18,8 +18,7 @@
 #include <string.h>
 
 #ifndef FIX_UNUSED
-# define FIX_UNUSED(X) (void)(X)
-/* avoid warnings for unused params */
+# define FIX_UNUSED(X) (void)(X) /* avoid warnings for unused params */
 #endif
 
 #include "cmdline.h"
@@ -114,8 +113,6 @@ static int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_
 
 const char *cmdline_parser_toolchain_values[] = {"+stable", "+clang-stable", "+gcc-stable",
 						 0}; /*< Possible values for toolchain. */
-
-static char *gengetopt_strdup(const char *s);
 
 static void clear_given(struct gengetopt_args_info *args_info)
 {
@@ -727,22 +724,6 @@ void cmdline_parser_free(struct gengetopt_args_info *args_info)
 	cmdline_parser_release(args_info);
 }
 
-/** @brief replacement of strdup, which is not standard */
-char *gengetopt_strdup(const char *s)
-{
-	char *result = 0;
-	if (!s) {
-		return result;
-	}
-
-	result = (char *)malloc(strlen(s) + 1);
-	if (result == (char *)0) {
-		return (char *)0;
-	}
-	strcpy(result, s);
-	return result;
-}
-
 int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 {
 	return cmdline_parser2(argc, argv, args_info, 0, 1, 1);
@@ -882,7 +863,7 @@ static int update_arg(void *field, char **orig_field, unsigned int *field_given,
 			if (!no_free && *string_field) {
 				free(*string_field); /* free previous string */
 			}
-			*string_field = gengetopt_strdup(val);
+			*string_field = strdup(val);
 		}
 		break;
 	default:
@@ -913,7 +894,7 @@ static int update_arg(void *field, char **orig_field, unsigned int *field_given,
 				if (*orig_field) {
 					free(*orig_field); /* free previous string */
 				}
-				*orig_field = gengetopt_strdup(value);
+				*orig_field = strdup(value);
 			}
 		}
 	};
@@ -1617,7 +1598,7 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 		int found_prog_name = 0;
 		/* whether program name, i.e., argv[0], is in the remaining args
 		   (this may happen with some implementations of getopt,
-		   but surely not with the one included by gengetopt) */
+		    but surely not with the one included by gengetopt) */
 
 		i = optind;
 		while (i < argc) {
@@ -1632,7 +1613,7 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 		args_info->inputs     = (char **)(malloc((args_info->inputs_num) * sizeof(char *)));
 		while (optind < argc) {
 			if (argv[optind++] != argv[0]) {
-				args_info->inputs[i++] = gengetopt_strdup(argv[optind - 1]);
+				args_info->inputs[i++] = strdup(argv[optind - 1]);
 			}
 		}
 	}
@@ -1644,5 +1625,4 @@ failure:
 	cmdline_parser_release(&local_args_info);
 	return (EXIT_FAILURE);
 }
-
 /* vim: set ft=c noet ts=8 sts=8 sw=8 tw=80 nojs spell : */

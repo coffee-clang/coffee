@@ -14,3 +14,5 @@ root
     └── dep2/      # Dependency no. 2
 
 The dependencies will be kept in the `deps/` directory. Each library will be in a subdirectory.`
+
+Always be lint-clean, using `clang-tidy`

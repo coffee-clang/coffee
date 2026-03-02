@@ -58,12 +58,17 @@ int main(int argc, char *argv[])
 	}
 	cmd_line_substring[0] = '\0';
 
+	size_t pos = 0;
 	for (int i = 0; i < args_info.inputs_num; i++) {
-		strcat(cmd_line_substring, args_info.inputs[i]);
+		const char *input = args_info.inputs[i];
+		size_t	    len	  = strlen(input);
+		memcpy(cmd_line_substring + pos, input, len);
+		pos += len;
 		if (i < args_info.inputs_num - 1) {
-			strcat(cmd_line_substring, " ");
+			cmd_line_substring[pos++] = ' ';
 		}
 	}
+	cmd_line_substring[pos] = '\0';
 
 	// Print the substring of the command line with the command and its unnamed options
 	printf("Command line substring: %s\n", cmd_line_substring);

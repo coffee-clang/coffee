@@ -1,6 +1,8 @@
 SHELL := bash
 .SHELLSFLAGS := -eu -o pipefail -c
 
+.DEFAULT_GOAL := all
+
 CC := clang
 CSTD := c23
 
@@ -33,10 +35,17 @@ TOML_OBJ := $(BIN_DIR)/toml.o
 
 OBJS := $(CORE_OBJ) $(COMMANDS_OBJ) $(MANIFEST_OBJ) $(REGISTRY_OBJ) $(PROJECT_OBJ) $(BUILD_OBJ) $(TOML_OBJ) $(BIN_DIR)/cmdline.o
 
-CFLAGS_COMMON := -g -Wall -Wextra -O2 -std=$(CSTD)
+CFLAGS_COMMON := -g -Wall -Wextra -O3 -std=$(CSTD)
 CFLAGS_COMMON += -Wshadow -Wpointer-arith -Wcast-qual -Wstrict-prototypes -Wmissing-prototypes
-CFLAGS_COMMON += -D_GNU_SOURCE
-CFLAGS_COMMON += -I$(SRC_DIR) -I$(DEPS_DIR)
+CFLAGS_COMMON += -pedantic -Wconversion -Wsign-conversion -Wunused -Wunused-function -Wunused-parameter
+CFLAGS_COMMON += -Wfloat-equal -Wundef -Wmissing-declarations -Wmissing-include-dirs -Wmultichar -Wsystem-headers
+CFLAGS_COMMON += -Wformat=2 -Wformat-security -Wnonnull
+CFLAGS_COMMON += -D_GNU_SOURCE -I$(SRC_DIR) -I$(DEPS_DIR)
+CFLAGS_COMMON += -fno-function-sections -fno-data-sections
+CFLAGS_COMMON += -fasynchronous-unwind-tables -fno-common -fdebug-macro
+CFLAGS_COMMON += -fno-delete-null-pointer-checks -fno-strict-overflow
+CFLAGS_COMMON += -fno-strict-aliasing -fwrapv
+CFLAGS_COMMON += -fno-omit-frame-pointer -fstack-protector-strong
 
 LDFLAGS := -static -lz
 
@@ -69,7 +78,7 @@ $(TARGET): $(OBJS)
 	@mkdir -p $(BIN_DIR)
 	$(CC) $(LDFLAGS) -o $@ $(OBJS)
 
-all: indent $(TARGET)
+all: format $(TARGET)
 
 $(SRC_DIR)/cmdline.c $(SRC_DIR)/cmdline.h: $(SRC_DIR)/cli.ggo
 	gengetopt -i $< --output-dir=$(SRC_DIR)/
@@ -98,17 +107,14 @@ bootstrap:
 clean:
 	rm -rf $(BIN_DIR)  $(STAMP_DIR)
 
-indent:
-	find . -name "*.c" -o -name "*.h" | xargs clang-format -i -style=file
-
 format:
 	clang-format -i $(SRC_DIR)/*.c $(SRC_DIR)/*.h $(SRC_DIR)/commands/*.c
 
-.PHONY: clean indent format tidy check bootstrap
+tidy: $(STAMPS)
 
-check: format  $(STAMPS)
+check: format tidy
 
-.PHONY: clean indent format tidy check bootstrap
+.PHONY: clean format tidy check bootstrap
 
 # Create the stamp directory
 $(STAMP_DIR):
@@ -120,8 +126,3 @@ $(STAMP_DIR)/%.c.tidy: $(SRC_DIR)/%.c | $(STAMP_DIR)
 	@echo "Linting $<..."
 	@$(TIDY) $< $(TIDY_FLAGS)
 	@touch $@
-
-# Advanced: Header Dependency Integration
-# If you have an existing build process generating .d files,
-# you can include them here so header changes trigger a re-lint.
--include $(SRCS:$(SRC_DIR)/%.c=build/%.d)

@@ -66,6 +66,9 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 # Project specific part
 
+We follow the example of [curl](https://curl.se) and [Sqlite](https://sqlite.org/). Most of the rules are taken or
+inspired by them.
+
 After each change, follow the instructions in the README.md. When those instructions conflict with AGENTS.md or the
 command specific documentation, ask for additional instructions.
 
@@ -80,4 +83,210 @@ The entire codebase MUST be lint clean.
 
 You can use the most recent C standard (C23).
 
+## Compilation
 
+The default is to produce a static binary that incorporates all dependencies and has all debug symbols. The compilation
+must be optimized for speed, we don't care about binary size.
+
+## Testing
+
+We write as many tests as we can. We run all the static code analyzer tools we can on the code – frequently. We run
+fuzzers on the code non-stop.
+
+## Readability
+
+Code should be easy to read. It should be clear. No hiding code under clever constructs, fancy macros or overloading. Easy-to-read code is easy to review, easy to debug and easy to extend.
+
+Smaller functions are easier to read and understand than longer ones, thus preferable.
+
+Code should read as if it was written by a single human. There should be a consistent and uniform code style all over,
+as that helps us read code better. Wrong or inconsistent code style is a bug. We fix all bugs we find.
+
+## Naming
+
+Try using a non-confusing naming scheme for your new functions and variable names. It does not necessarily have to mean that you should use the same as in other places of the code, just that the names should be logical, understandable and be named according to what they are used for. File-local functions should be made static. We like lower case names. 
+
+## Braces
+
+In if/while/do/for expressions, we write the open brace on the same line as the keyword and we then set the closing
+brace on the same indentation level as the initial keyword. 
+
+Do not omit the braces if they would contain only a one-line statement.
+
+For functions the opening brace should be on a separate line:
+
+## space before parentheses
+
+When writing expressions using if/while/do/for, there shall be a space between the keyword and the open parenthesis. 
+
+## Use boolean conditions
+
+Rather than test a conditional value such as a bool against TRUE or FALSE, a pointer against NULL or != NULL and an int
+against zero or not zero in if/while conditions
+
+## No assignments in conditions
+
+To increase readability and reduce complexity of conditionals, we avoid assigning variables within if/while conditions. We frown upon this style:
+
+```
+if((ptr = malloc(100)) == NULL)
+  return NULL;
+```
+
+and instead we encourage the above version to be spelled out more clearly:
+
+```
+ptr = malloc(100);
+if(!ptr)
+  return NULL;
+```
+
+## New block on a new line
+
+We never write multiple statements on the same source line, even for short if() conditions.
+
+## Space around operators
+
+Please use spaces on both sides of operators in C expressions. Postfix (), [], ->, ., ++, -- and Unary +, -, !, ~, &
+operators excluded they should have no space.
+
+## No parentheses for return values
+
+We use the 'return' statement without extra parentheses around the value:
+
+```int works(void)
+{
+  return TRUE;
+}
+```
+
+## Parentheses for sizeof arguments
+
+When using the sizeof operator in code, we prefer it to be written with parentheses around its argument:
+```
+int size = sizeof(int);
+```
+
+## Column alignment
+
+Some statements cannot be completed on a single line because the line would be too long, the statement too hard to read, or due to other style guidelines above. In such a case the statement spans multiple lines.
+
+If a continuation line is part of an expression or sub-expression then you should align on the appropriate column so that it is easy to tell what part of the statement it is. Operators should not start continuation lines. In other cases follow the 2-space indent guideline
+
+## No typedefed structs
+
+Use structs by all means, but do not typedef them. Use the struct name way of identifying them:
+
+```struct something {
+   void *valid;
+   size_t way_to_write;
+};
+struct something instance;
+```
+
+Not okay:
+
+```typedef struct {
+   void *wrong;
+   size_t way_to_write;
+} something;
+something instance;
+```
+
+## Banned functions
+
+To avoid footguns and unintended consequences we forbid the use of a number of C functions. 
+
+This is the full list of functions generally banned.
+
+```
+_access
+_fstati64
+_lseeki64
+_mbscat
+_mbsncat
+_open
+_tcscat
+_tcsdup
+_tcsncat
+_tcsncpy
+_waccess
+_wcscat
+_wcsdup
+_wcsncat
+_wfopen
+_wfreopen
+_wopen
+accept
+accept4
+access
+aprintf
+atoi
+atol
+calloc
+close
+CreateFile
+CreateFileA
+CreateFileW
+fclose
+fdopen
+fopen
+fprintf
+free
+freeaddrinfo
+freopen
+fstat
+getaddrinfo
+gets
+gmtime
+llseek
+LoadLibrary
+LoadLibraryA
+LoadLibraryEx
+LoadLibraryExA
+LoadLibraryExW
+LoadLibraryW
+localtime
+lseek
+malloc
+mbstowcs
+MoveFileEx
+MoveFileExA
+MoveFileExW
+msnprintf
+mvsnprintf
+open
+printf
+realloc
+recv
+rename
+send
+snprintf
+socket
+socketpair
+sprintf
+sscanf
+stat
+strcat
+strcpy
+strdup
+strerror
+strncat
+strncpy
+strtok
+strtok_r
+strtol
+strtoul
+vaprintf
+vfprintf
+vprintf
+vsnprintf
+vsprintf
+wcscpy
+wcsdup
+wcsncpy
+wcstombs
+WSASocket
+WSASocketA
+WSASocketW
+```
