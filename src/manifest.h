@@ -39,8 +39,16 @@ typedef struct {
 } dependencies_t;
 
 typedef struct {
+	char  *name;
+	char **deps;
+	size_t deps_count;
+} feature_def_t;
+
+typedef struct {
 	package_t      package;
 	dependencies_t dependencies;
+	feature_def_t *features;
+	size_t	       features_count;
 } manifest_t;
 
 manifest_t *manifest_parse(const char *path);

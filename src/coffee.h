@@ -43,6 +43,32 @@ typedef struct options_s {
 	char  *error_code;
 	char **inputs;
 	int    inputs_num;
+
+	// Dependency flags
+	char *pkg_version;
+	char *path;
+	char *git;
+	char *branch;
+	char *tag;
+	char *rev;
+	char *registry;
+	bool  dev;
+	bool  build_dep;
+	bool  optional;
+
+	// Build flags
+	bool  release;
+	bool  debug;
+	int   jobs;
+	char *bin;
+	char *example;
+	char *features;
+	bool  all_features;
+	bool  no_default_features;
+	char *profile;
+	char *target;
+	char *target_dir;
+	char *manifest_path;
 } options_s, options;
 
 typedef struct {

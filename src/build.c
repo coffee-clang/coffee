@@ -52,17 +52,47 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 
 	char *flags = strdup("");
 	if (opts && opts->release) {
+		free(flags);
 		flags = strdup("-O2");
 	} else if (opts && opts->debug) {
+		free(flags);
 		flags = strdup("-g");
 	} else {
+		free(flags);
 		flags = strdup("-O0 -g");
+	}
+
+	resolved_features_t *resolved = NULL;
+	if (opts && (opts->features_count > 0 || opts->all_features)) {
+		const char **requested = NULL;
+		if (opts->features_count > 0) {
+			requested = (const char **)opts->features;
+		}
+		resolved = features_resolve(manifest, requested, opts->features_count, opts->all_features,
+					    opts->no_default_features);
+
+		if (resolved) {
+			size_t dflags_count = 0;
+			char **dflags	    = features_to_compiler_flags(resolved, name, &dflags_count);
+			for (size_t i = 0; i < dflags_count; i++) {
+				size_t new_len	 = strlen(flags) + strlen(dflags[i]) + 2;
+				char  *new_flags = malloc(new_len);
+				snprintf(new_flags, new_len, "%s %s", flags, dflags[i]);
+				free(flags);
+				free(dflags[i]);
+				flags = new_flags;
+			}
+			free(dflags);
+		}
 	}
 
 	ret = snprintf(cmd, sizeof(cmd), "%s %s -o %s/%s src/*.c 2>&1", cc, flags, output_dir, name);
 	free(flags);
 
 	if (ret < 0 || (size_t)ret >= sizeof(cmd)) {
+		if (resolved) {
+			features_free(resolved);
+		}
 		return 1;
 	}
 
@@ -70,7 +100,13 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 		printf("Building: %s\n", cmd);
 	}
 
-	return system(cmd);
+	ret = system(cmd);
+
+	if (resolved) {
+		features_free(resolved);
+	}
+
+	return ret;
 }
 
 int build_run(manifest_t *manifest, build_opts_t *opts, char **args, int argc)

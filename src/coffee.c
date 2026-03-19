@@ -91,6 +91,30 @@ int main(int argc, char **argv)
 		.quiet	    = args_info.quiet_given,
 		.inputs	    = args_info.inputs,
 		.inputs_num = args_info.inputs_num,
+
+		.pkg_version = NULL,
+		.path	     = args_info.path_given ? args_info.path_arg : NULL,
+		.git	     = args_info.git_given ? args_info.git_arg : NULL,
+		.branch	     = args_info.branch_given ? args_info.branch_arg : NULL,
+		.tag	     = args_info.tag_given ? args_info.tag_arg : NULL,
+		.rev	     = args_info.rev_given ? args_info.rev_arg : NULL,
+		.registry    = args_info.registry_given ? args_info.registry_arg : NULL,
+		.dev	     = args_info.dev_given,
+		.build_dep   = args_info.build_given,
+		.optional    = args_info.optional_given,
+
+		.release	     = args_info.release_given,
+		.debug		     = args_info.debug_given,
+		.jobs		     = args_info.jobs_given ? args_info.jobs_arg : 0,
+		.bin		     = args_info.bin_given ? args_info.bin_arg : NULL,
+		.example	     = args_info.example_given ? args_info.example_arg : NULL,
+		.features	     = args_info.features_given ? args_info.features_arg : NULL,
+		.all_features	     = args_info.all_features_given,
+		.no_default_features = args_info.no_default_features_given,
+		.profile	     = args_info.profile_given ? args_info.profile_arg : NULL,
+		.target		     = args_info.target_given ? args_info.target_arg : NULL,
+		.target_dir	     = args_info.target_dir_given ? args_info.target_dir_arg : NULL,
+		.manifest_path	     = args_info.manifest_path_given ? args_info.manifest_path_arg : NULL,
 	};
 	/* printf("command_idx: %d\n", command_idx); */
 	/* printf("num commands: %d\n", lengthof(commands)); */

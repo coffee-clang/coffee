@@ -31,9 +31,12 @@ PROJECT_OBJ := $(BIN_DIR)/project.o
 BUILD_SRC := $(SRC_DIR)/build.c
 BUILD_OBJ := $(BIN_DIR)/build.o
 
+FEATURES_SRC := $(SRC_DIR)/coffee_features.c
+FEATURES_OBJ := $(BIN_DIR)/coffee_features.o
+
 TOML_OBJ := $(BIN_DIR)/toml.o
 
-OBJS := $(CORE_OBJ) $(COMMANDS_OBJ) $(MANIFEST_OBJ) $(REGISTRY_OBJ) $(PROJECT_OBJ) $(BUILD_OBJ) $(TOML_OBJ) $(BIN_DIR)/cmdline.o
+OBJS := $(CORE_OBJ) $(COMMANDS_OBJ) $(MANIFEST_OBJ) $(REGISTRY_OBJ) $(PROJECT_OBJ) $(BUILD_OBJ) $(FEATURES_OBJ) $(TOML_OBJ) $(BIN_DIR)/cmdline.o
 
 CFLAGS_COMMON := -g -Wall -Wextra -O3 -std=$(CSTD)
 CFLAGS_COMMON += -Wshadow -Wpointer-arith -Wcast-qual -Wstrict-prototypes -Wmissing-prototypes
@@ -114,7 +117,15 @@ tidy: $(STAMPS)
 
 check: format tidy
 
-.PHONY: clean format tidy check bootstrap
+test: $(TARGET)
+	@echo "Running feature system tests..."
+	@clang -g -Wall -Wextra -O3 -std=$(CSTD) -I$(SRC_DIR) -I$(DEPS_DIR) \
+		-o $(BIN_DIR)/test_features tests/test_features.c $(SRC_DIR)/manifest.c \
+		$(SRC_DIR)/coffee_features.c $(DEPS_DIR)/toml.c -static -lz
+	@$(BIN_DIR)/test_features
+	@echo "All tests passed."
+
+.PHONY: clean format tidy check bootstrap test
 
 # Create the stamp directory
 $(STAMP_DIR):

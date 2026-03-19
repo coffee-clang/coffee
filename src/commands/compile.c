@@ -1,7 +1,6 @@
 #include "../coffee.h"
 
-int64_t handle_compile(options *)
+int64_t handle_compile(options *opts)
 {
-	printf("Handling command compile \n");
-	return 0;
+	return handle_build(opts);
 }

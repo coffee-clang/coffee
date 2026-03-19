@@ -12,6 +12,21 @@ static char *strdup_or_null(const char *s)
 	return strdup(s);
 }
 
+static bool is_valid_feature_name(const char *name)
+{
+	if (!name || name[0] == '\0') {
+		return false;
+	}
+	for (size_t i = 0; name[i] != '\0'; i++) {
+		char c = name[i];
+		if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' ||
+		      c == '_')) {
+			return false;
+		}
+	}
+	return true;
+}
+
 static void free_package(package_t *pkg)
 {
 	if (pkg->name) {
@@ -50,6 +65,17 @@ static void free_package(package_t *pkg)
 		free(pkg->headers[i]);
 	}
 	free(pkg->headers);
+}
+
+static void free_feature(feature_def_t *feat)
+{
+	if (feat->name) {
+		free(feat->name);
+	}
+	for (size_t i = 0; i < feat->deps_count; i++) {
+		free(feat->deps[i]);
+	}
+	free(feat->deps);
 }
 
 static void free_dependency(dependency_t *dep)
@@ -160,6 +186,75 @@ manifest_t *manifest_parse(const char *path)
 		}
 	}
 
+	toml_table_t *features_table = toml_table_in(conf, "features");
+	if (features_table) {
+		m->features_count = 0;
+		for (int i = 0;; i++) {
+			const char *key = toml_key_in(features_table, i);
+			if (!key) {
+				break;
+			}
+			toml_array_t *arr = toml_array_in(features_table, key);
+			if (!arr) {
+				continue;
+			}
+			m->features_count++;
+		}
+
+		if (m->features_count > 0) {
+			m->features = calloc(m->features_count, sizeof(feature_def_t));
+			size_t idx  = 0;
+			for (int i = 0;; i++) {
+				const char *key = toml_key_in(features_table, i);
+				if (!key) {
+					break;
+				}
+				toml_array_t *arr = toml_array_in(features_table, key);
+				if (!arr) {
+					continue;
+				}
+				m->features[idx].name = strdup(key);
+				if (!is_valid_feature_name(m->features[idx].name)) {
+					fprintf(stderr, "Warning: Invalid feature name: %s\n", key);
+				}
+				m->features[idx].deps_count = toml_array_nelem(arr);
+				if (m->features[idx].deps_count > 0) {
+					m->features[idx].deps = calloc(m->features[idx].deps_count, sizeof(char *));
+					for (size_t j = 0; j < m->features[idx].deps_count; j++) {
+						toml_datum_t dep	 = toml_string_at(arr, j);
+						m->features[idx].deps[j] = toml_datum_to_string(dep);
+					}
+				}
+				idx++;
+			}
+		}
+	}
+
+	for (size_t i = 0; i < m->features_count; i++) {
+		for (size_t j = 0; j < m->features[i].deps_count; j++) {
+			char *dep = m->features[i].deps[j];
+			if (!dep) {
+				continue;
+			}
+			for (size_t k = 0; k < m->features_count; k++) {
+				if (k == i) {
+					continue;
+				}
+				if (m->features[k].name && strcmp(dep, m->features[k].name) == 0) {
+					for (size_t l = 0; l < m->features[k].deps_count; l++) {
+						if (m->features[k].deps[l] &&
+						    strcmp(m->features[k].deps[l], m->features[i].name) == 0) {
+							fprintf(stderr,
+								"Warning: Circular feature dependency detected: %s <-> "
+								"%s\n",
+								m->features[i].name, m->features[k].name);
+						}
+					}
+				}
+			}
+		}
+	}
+
 	toml_free(conf);
 	return m;
 }
@@ -175,6 +270,11 @@ void manifest_free(manifest_t *m)
 		free_dependency(&m->dependencies.deps[i]);
 	}
 	free(m->dependencies.deps);
+
+	for (size_t i = 0; i < m->features_count; i++) {
+		free_feature(&m->features[i]);
+	}
+	free(m->features);
 
 	free(m);
 }
@@ -236,6 +336,24 @@ int manifest_write(const char *path, manifest_t *m)
 			}
 		}
 		fprintf(fp, "]\n");
+	}
+
+	if (m->features_count > 0) {
+		fprintf(fp, "\n[features]\n");
+		for (size_t i = 0; i < m->features_count; i++) {
+			if (m->features[i].name) {
+				fprintf(fp, "%s = [", m->features[i].name);
+				for (size_t j = 0; j < m->features[i].deps_count; j++) {
+					if (j > 0) {
+						fprintf(fp, ", ");
+					}
+					if (m->features[i].deps[j]) {
+						fprintf(fp, "\"%s\"", m->features[i].deps[j]);
+					}
+				}
+				fprintf(fp, "]\n");
+			}
+		}
 	}
 
 	fclose(fp);
