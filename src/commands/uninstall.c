@@ -1,10 +1,48 @@
 #include "../coffee.h"
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-int64_t handle_uninstall(options *)
+#include <sys/stat.h>
+
+int64_t handle_uninstall(options *opts)
 {
-	printf("Removing installed binary...\n");
-	printf("This command is not yet fully implemented.\n");
+	if (opts->inputs_num < 2) {
+		fprintf(stderr, "Error: No package specified\n");
+		fprintf(stderr, "Usage: coffee uninstall <package>\n");
+		return 1;
+	}
+
+	char *package = opts->inputs[1];
+
+	const char *home = getenv("HOME");
+	if (!home) {
+		home = "/tmp";
+	}
+
+	char pkg_dir[4'096];
+	snprintf(pkg_dir, sizeof(pkg_dir), "%s/.coffee/deps/%s", home, package);
+
+	struct stat st;
+	if (stat(pkg_dir, &st) != 0) {
+		fprintf(stderr, "Error: Package '%s' is not installed\n", package);
+		return 1;
+	}
+
+	char cmd[4'096];
+	int  ret = snprintf(cmd, sizeof(cmd), "rm -rf %s", pkg_dir);
+	if (ret < 0 || (size_t)ret >= sizeof(cmd)) {
+		fprintf(stderr, "Error: Path too long\n");
+		return 1;
+	}
+
+	ret = system(cmd);
+	if (ret != 0) {
+		fprintf(stderr, "Error: Failed to remove %s\n", package);
+		return 1;
+	}
+
+	printf("Removed: %s\n", package);
 	return 0;
 }

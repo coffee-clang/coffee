@@ -71,11 +71,12 @@ int64_t handle_bench(options *opts)
 
 	printf("Running benchmarks...\n");
 
-	snprintf(cmd, sizeof(cmd), "for f in benches/*.c; do "
-				   "  echo \"Benchmarking $f\"; "
-				   "  %s -O3 %s $f -o %s/$(basename $f .c) -Isrc 2>&1 && "
-				   "  %s/$(basename $f .c); "
-				   "done",
+	snprintf(cmd, sizeof(cmd),
+		 "for f in benches/*.c; do "
+		 "  echo \"Benchmarking $f\"; "
+		 "  %s -O3 %s $f -o %s/$(basename $f .c) -Isrc 2>&1 && "
+		 "  %s/$(basename $f .c); "
+		 "done",
 		 cc, dflags, output_dir, output_dir);
 
 	int ret = system(cmd);

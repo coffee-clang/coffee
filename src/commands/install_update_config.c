@@ -2,9 +2,10 @@
 
 #include <stdio.h>
 
-int64_t handle_install_update_config(options *)
+int64_t handle_install_update_config(options *opts)
 {
-	printf("Updating configuration for installed binaries...\n");
-	printf("This command is not yet fully implemented.\n");
-	return 0;
+	(void)opts;
+
+	fprintf(stderr, "Error: 'install-update-config' is not yet supported.\n");
+	return 1;
 }

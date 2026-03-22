@@ -290,3 +290,10 @@ WSASocket
 WSASocketA
 WSASocketW
 ```
+
+## Active Technologies
+- C23 (`-std=c23`) + tomlc99 (TOML parsing), SDS (strings), zlib (static), gengetopt (CLI parsing) (001-implement-stub-commands)
+- Filesystem - `~/.coffee/deps/` for installed packages, `Coffee.toml` for manifests, `Coffee.lock` for lockfiles, `vendor/` for vendored deps (001-implement-stub-commands)
+
+## Recent Changes
+- 001-implement-stub-commands: Added C23 (`-std=c23`) + tomlc99 (TOML parsing), SDS (strings), zlib (static), gengetopt (CLI parsing)

@@ -71,11 +71,12 @@ int64_t handle_test(options *opts)
 
 	printf("Running tests...\n");
 
-	snprintf(cmd, sizeof(cmd), "for f in tests/*.c; do "
-				   "  echo \"Running test $f\"; "
-				   "  %s -g %s $f -o %s/$(basename $f .c) -Isrc 2>&1 && "
-				   "  %s/$(basename $f .c); "
-				   "done",
+	snprintf(cmd, sizeof(cmd),
+		 "for f in tests/*.c; do "
+		 "  echo \"Running test $f\"; "
+		 "  %s -g %s $f -o %s/$(basename $f .c) -Isrc 2>&1 && "
+		 "  %s/$(basename $f .c); "
+		 "done",
 		 cc, dflags, output_dir, output_dir);
 
 	int ret = system(cmd);
