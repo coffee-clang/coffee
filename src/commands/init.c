@@ -9,6 +9,15 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+static int create_dir(const char *path)
+{
+	struct stat st;
+	if (stat(path, &st) == 0) {
+		return 0;
+	}
+	return mkdir(path, 0755);
+}
+
 static int create_file(const char *path, const char *content)
 {
 	FILE *fp = fopen(path, "w");
@@ -54,21 +63,136 @@ int64_t handle_init(options *opts)
 		return 1;
 	}
 
+	/* Create canonical directory structure */
+	char include_dir[] = "include";
+	char src_dir[]	   = "src";
+	char deps_dir[]	   = "deps";
+	char tests_dir[]   = "tests";
+	char docs_dir[]	   = "docs";
+	char scripts_dir[] = "scripts";
+	char build_dir[]   = "build";
+
+	if (create_dir(include_dir) != 0) {
+		fprintf(stderr, "Error: Could not create include directory\n");
+		free(name);
+		return 1;
+	}
+
+	if (create_dir(src_dir) != 0) {
+		fprintf(stderr, "Error: Could not create src directory\n");
+		free(name);
+		return 1;
+	}
+
+	if (create_dir(deps_dir) != 0) {
+		fprintf(stderr, "Error: Could not create deps directory\n");
+		free(name);
+		return 1;
+	}
+
+	if (create_dir(tests_dir) != 0) {
+		fprintf(stderr, "Error: Could not create tests directory\n");
+		free(name);
+		return 1;
+	}
+
+	if (create_dir(docs_dir) != 0) {
+		fprintf(stderr, "Error: Could not create docs directory\n");
+		free(name);
+		return 1;
+	}
+
+	if (create_dir(scripts_dir) != 0) {
+		fprintf(stderr, "Error: Could not create scripts directory\n");
+		free(name);
+		return 1;
+	}
+
+	if (create_dir(build_dir) != 0) {
+		fprintf(stderr, "Error: Could not create build directory\n");
+		free(name);
+		return 1;
+	}
+
+	/* Create include directory for project headers */
+	char include_project_dir[4'096];
+	snprintf(include_project_dir, sizeof(include_project_dir), "include/%s", name);
+	if (create_dir(include_project_dir) != 0) {
+		fprintf(stderr, "Error: Could not create include/%s directory\n", name);
+		free(name);
+		return 1;
+	}
+
+	/* Create .gitignore */
+	char gitignore_content[] = "build/\n"
+		"target/\n"
+		"*.o\n"
+		"*.a\n"
+		"*.so\n"
+		".tidy_stamps/\n";
+	if (create_file(".gitignore", gitignore_content) != 0) {
+		fprintf(stderr, "Error: Could not create .gitignore\n");
+		free(name);
+		return 1;
+	}
+
+	/* Create LICENSE */
+	char license_content[] = "MIT License\n"
+		"\n"
+		"Copyright (c) 2024\n"
+		"\n"
+		"Permission is hereby granted, free of charge, to any person obtaining a copy\n"
+		"of this software and associated documentation files (the \"Software\"), to deal\n"
+		"in the Software without restriction, including without limitation the rights\n"
+		"to use, copy, modify, merge, publish, distribute, sublicense, and/or sell\n"
+		"copies of the Software, and to permit persons to whom the Software is\n"
+		"furnished to do so, subject to the following conditions:\n"
+		"\n"
+		"The above copyright notice and this permission notice shall be included in all\n"
+		"copies or substantial portions of the Software.\n"
+		"\n"
+		"THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\n"
+		"IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\n"
+		"FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\n"
+		"AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\n"
+		"LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\n"
+		"OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\n"
+		"SOFTWARE.\n";
+	if (create_file("LICENSE", license_content) != 0) {
+		fprintf(stderr, "Error: Could not create LICENSE\n");
+		free(name);
+		return 1;
+	}
+
+	/* Create README.md */
+	char readme_content[4'096];
+	snprintf(readme_content, sizeof(readme_content),
+			"# %s\n"
+			"\n"
+			"A modern C project.\n",
+			 name);
+	if (create_file("README.md", readme_content) != 0) {
+		fprintf(stderr, "Error: Could not create README.md\n");
+		free(name);
+		return 1;
+	}
+
+	/* Create manifest */
 	char manifest_content[4'096];
 	snprintf(manifest_content, sizeof(manifest_content),
-		 "[package]\n"
-		 "name = \"%s\"\n"
-		 "version = \"0.1.0\"\n"
-		 "edition = \"c23\"\n"
-		 "description = \"A new C project\"\n"
-		 "license = \"MIT\"\n"
-		 "\n"
-		 "[dependencies]\n"
-		 "\n"
-		 "[lib]\n"
-		 "sources = [\"src/*.c\"]\n"
-		 "headers = [\"include/*.h\"]\n",
-		 name);
+			"[package]\n"
+			"name = \"%s\"\n"
+			"version = \"0.1.0\"\n"
+			"edition = \"c23\"\n"
+			"description = \"A new C project\"\n"
+			"license = \"MIT\"\n"
+			"\n"
+			"[dependencies]\n"
+			"\n"
+			"[lib]\n"
+			"sources = [\"src/*.c\"]\n"
+			"headers = [\"include/%s/*.h\"]\n",
+			 name, name);
 
 	if (create_file(manifest_path, manifest_content) != 0) {
 		fprintf(stderr, "Error: Could not create Coffee.toml\n");
@@ -76,8 +200,59 @@ int64_t handle_init(options *opts)
 		return 1;
 	}
 
+	/* Create main.c */
+	char main_content[4'096];
+	snprintf(main_content, sizeof(main_content),
+			"#include <stdio.h>\n"
+			"\n"
+			"int main(int argc, char **argv) {\n"
+			"    printf(\"Hello, world!\\n\");\n"
+			"    return 0;\n"
+			"}\n");
+
+	if (create_file("src/main.c", main_content) != 0) {
+		fprintf(stderr, "Error: Could not create main.c\n");
+		free(name);
+		return 1;
+	}
+
+	/* Create main header */
+	char main_header_path[4'096];
+	snprintf(main_header_path, sizeof(main_header_path), "include/%s/%s.h", name, name);
+	char header_content[4'096];
+	snprintf(header_content, sizeof(header_content),
+			"#ifndef %s_H\n"
+			"#define %s_H\n"
+			"\n"
+			"// Your declarations here\n"
+			"\n"
+			"#endif // %s_H\n",
+			 name, name, name);
+	if (create_file(main_header_path, header_content) != 0) {
+		fprintf(stderr, "Error: Could not create include/%s/%s.h\n", name, name);
+		free(name);
+		return 1;
+	}
+
+	/* Create placeholder files */
+	if (create_file("docs/index.md", "# Documentation\n") != 0) {
+		fprintf(stderr, "Error: Could not create docs/index.md\n");
+		free(name);
+		return 1;
+	}
+
 	printf("Initialized C project: %s\n", name);
 	printf("  - Coffee.toml\n");
+	printf("  - .gitignore\n");
+	printf("  - LICENSE\n");
+	printf("  - README.md\n");
+	printf("  - include/%s/%s.h\n", name, name);
+	printf("  - src/main.c\n");
+	printf("  - deps/\n");
+	printf("  - tests/\n");
+	printf("  - docs/index.md\n");
+	printf("  - scripts/\n");
+	printf("  - build/\n");
 
 	free(name);
 	return 0;
