@@ -6,9 +6,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <fcntl.h>
-#include <unistd.h>
-
 static bool is_safe_package_name(const char *name)
 {
 	const char *p;
@@ -96,9 +93,10 @@ int64_t handle_add(options *opts)
 	if (!is_safe_package_name(package_name)) {
 		fprintf(stderr, "Warning: package name contains unsafe characters, skipping Makefile update\n");
 	} else {
-		int mfd = open(makefile_path, O_WRONLY | O_APPEND);
-		if (mfd >= 0) {
-			FILE *mf = fdopen(mfd, "a");
+		FILE *exist_check = fopen(makefile_path, "r");
+		if (exist_check) {
+			fclose(exist_check);
+			FILE *mf = fopen(makefile_path, "a");
 			if (mf) {
 				fprintf(mf, "\n# Dep: %s\n", package_name);
 				fprintf(mf, "CFLAGS += -Ideps/%s/include\n", package_name);
@@ -106,8 +104,6 @@ int64_t handle_add(options *opts)
 				if (fclose(mf) != 0) {
 					fprintf(stderr, "Warning: failed to write to Makefile\n");
 				}
-			} else {
-				close(mfd);
 			}
 		}
 	}

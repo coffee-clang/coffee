@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <sys/wait.h>
 #include <unistd.h>
 
 int64_t handle_build(options *opts)
@@ -47,7 +48,7 @@ int64_t handle_build(options *opts)
 			project_dir = strdup(".");
 		}
 
-		int off = snprintf(cmd, sizeof(cmd), "make -C %s", project_dir);
+		int off = snprintf(cmd, sizeof(cmd), "make -C '%s'", project_dir);
 		free(project_dir);
 
 		if (off < 0 || (size_t)off >= sizeof(cmd)) {
@@ -125,12 +126,19 @@ int64_t handle_build(options *opts)
 
 		char build_cmd[4096];
 		snprintf(build_cmd, sizeof(build_cmd), "%s build", cmd);
-		int ret = system(build_cmd);
+		int status = system(build_cmd);
 
 		free(manifest_path);
 
+		if (status == -1) {
+			fprintf(stderr, "Error: failed to run make\n");
+			return 1;
+		}
+		int ret = WEXITSTATUS(status);
 		if (ret == 0) {
 			printf("Build successful\n");
+		} else {
+			fprintf(stderr, "Build failed\n");
 		}
 		return ret;
 	}
