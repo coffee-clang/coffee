@@ -84,9 +84,14 @@ int64_t handle_add(options *opts)
 
 	/* Append dependency flags to Makefile if it exists */
 	char  *dir_end = strrchr(manifest_path, '/');
-	size_t dir_len = (size_t)(dir_end - manifest_path) + 1;
+	size_t dir_len;
 	char   makefile_path[4'096];
-	snprintf(makefile_path, sizeof(makefile_path), "%.*s/Makefile", (int)dir_len, manifest_path);
+	if (dir_end) {
+		dir_len = (size_t)(dir_end - manifest_path) + 1;
+		snprintf(makefile_path, sizeof(makefile_path), "%.*sMakefile", (int)dir_len, manifest_path);
+	} else {
+		snprintf(makefile_path, sizeof(makefile_path), "Makefile");
+	}
 
 	if (!is_safe_package_name(package_name)) {
 		fprintf(stderr, "Warning: package name contains unsafe characters, skipping Makefile update\n");
