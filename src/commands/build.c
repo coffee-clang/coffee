@@ -100,8 +100,8 @@ int64_t handle_build(options *opts)
 						for (size_t i = 0; i < dflags_count; i++) {
 							free(dflags[i]);
 						}
-						free(dflags);
 					}
+					free(dflags);
 					features_free(resolved);
 				}
 			}
@@ -114,7 +114,9 @@ int64_t handle_build(options *opts)
 		}
 
 		if ((size_t)off >= sizeof(cmd)) {
-			fprintf(stderr, "Warning: build command length exceeded, some flags omitted\n");
+			fprintf(stderr, "Error: build command too long\n");
+			free(manifest_path);
+			return 1;
 		}
 
 		if (opts->verbose) {
