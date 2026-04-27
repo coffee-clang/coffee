@@ -95,12 +95,10 @@ int64_t handle_build(options *opts)
 								off += snprintf(cmd + off, sizeof(cmd) - (size_t)off,
 										"%s%s", dflags[i],
 										(i + 1 < dflags_count) ? " " : "");
-								free(dflags[i]);
 							}
-						} else {
-							for (size_t i = 0; i < dflags_count; i++) {
-								free(dflags[i]);
-							}
+						}
+						for (size_t i = 0; i < dflags_count; i++) {
+							free(dflags[i]);
 						}
 						free(dflags);
 					}
@@ -123,7 +121,9 @@ int64_t handle_build(options *opts)
 			printf("Running: %s build\n", cmd);
 		}
 
-		int ret = system(cmd);
+		char build_cmd[4096];
+		snprintf(build_cmd, sizeof(build_cmd), "%s build", cmd);
+		int ret = system(build_cmd);
 
 		free(manifest_path);
 
