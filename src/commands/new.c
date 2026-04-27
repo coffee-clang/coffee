@@ -148,11 +148,11 @@ int64_t handle_new(options *opts)
 	char gitignore_path[4'096];
 	snprintf(gitignore_path, sizeof(gitignore_path), "%s/.gitignore", path);
 	char gitignore_content[] = "build/\n"
-		"target/\n"
-		"*.o\n"
-		"*.a\n"
-		"*.so\n"
-		".tidy_stamps/\n";
+				   "target/\n"
+				   "*.o\n"
+				   "*.a\n"
+				   "*.so\n"
+				   ".tidy_stamps/\n";
 	if (create_file(gitignore_path, gitignore_content) != 0) {
 		fprintf(stderr, "Error: Could not create .gitignore\n");
 		free(name);
@@ -163,26 +163,26 @@ int64_t handle_new(options *opts)
 	char license_path[4'096];
 	snprintf(license_path, sizeof(license_path), "%s/LICENSE", path);
 	char license_content[] = "MIT License\n"
-		"\n"
-		"Copyright (c) 2024\n"
-		"\n"
-		"Permission is hereby granted, free of charge, to any person obtaining a copy\n"
-		"of this software and associated documentation files (the \"Software\"), to deal\n"
-		"in the Software without restriction, including without limitation the rights\n"
-		"to use, copy, modify, merge, publish, distribute, sublicense, and/or sell\n"
-		"copies of the Software, and to permit persons to whom the Software is\n"
-		"furnished to do so, subject to the following conditions:\n"
-		"\n"
-		"The above copyright notice and this permission notice shall be included in all\n"
-		"copies or substantial portions of the Software.\n"
-		"\n"
-		"THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\n"
-		"IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\n"
-		"FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\n"
-		"AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\n"
-		"LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\n"
-		"OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\n"
-		"SOFTWARE.\n";
+				 "\n"
+				 "Copyright (c) 2024\n"
+				 "\n"
+				 "Permission is hereby granted, free of charge, to any person obtaining a copy\n"
+				 "of this software and associated documentation files (the \"Software\"), to deal\n"
+				 "in the Software without restriction, including without limitation the rights\n"
+				 "to use, copy, modify, merge, publish, distribute, sublicense, and/or sell\n"
+				 "copies of the Software, and to permit persons to whom the Software is\n"
+				 "furnished to do so, subject to the following conditions:\n"
+				 "\n"
+				 "The above copyright notice and this permission notice shall be included in all\n"
+				 "copies or substantial portions of the Software.\n"
+				 "\n"
+				 "THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\n"
+				 "IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\n"
+				 "FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\n"
+				 "AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\n"
+				 "LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\n"
+				 "OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\n"
+				 "SOFTWARE.\n";
 	if (create_file(license_path, license_content) != 0) {
 		fprintf(stderr, "Error: Could not create LICENSE\n");
 		free(name);
@@ -194,10 +194,10 @@ int64_t handle_new(options *opts)
 	snprintf(readme_path, sizeof(readme_path), "%s/README.md", path);
 	char readme_content[4'096];
 	snprintf(readme_content, sizeof(readme_content),
-			"# %s\n"
-			"\n"
-			"A modern C project.\n",
-			 name);
+		 "# %s\n"
+		 "\n"
+		 "A modern C project.\n",
+		 name);
 	if (create_file(readme_path, readme_content) != 0) {
 		fprintf(stderr, "Error: Could not create README.md\n");
 		free(name);
@@ -207,19 +207,19 @@ int64_t handle_new(options *opts)
 	/* Create manifest */
 	char manifest_content[4'096];
 	snprintf(manifest_content, sizeof(manifest_content),
-			"[package]\n"
-			"name = \"%s\"\n"
-			"version = \"0.1.0\"\n"
-			"edition = \"c23\"\n"
-			"description = \"A new C project\"\n"
-			"license = \"MIT\"\n"
-			"\n"
-			"[dependencies]\n"
-			"\n"
-			"[lib]\n"
-			"sources = [\"src/*.c\"]\n"
-			"headers = [\"include/%s/*.h\"]\n",
-			 name, name);
+		 "[package]\n"
+		 "name = \"%s\"\n"
+		 "version = \"0.1.0\"\n"
+		 "edition = \"c23\"\n"
+		 "description = \"A new C project\"\n"
+		 "license = \"MIT\"\n"
+		 "\n"
+		 "[dependencies]\n"
+		 "\n"
+		 "[lib]\n"
+		 "sources = [\"src/*.c\"]\n"
+		 "headers = [\"include/%s/*.h\"]\n",
+		 name, name);
 
 	if (create_file(manifest_path, manifest_content) != 0) {
 		fprintf(stderr, "Error: Could not create Coffee.toml\n");
@@ -233,12 +233,12 @@ int64_t handle_new(options *opts)
 
 	char main_content[4'096];
 	snprintf(main_content, sizeof(main_content),
-			"#include <stdio.h>\n"
-			"\n"
-			"int main(int argc, char **argv) {\n"
-			"    printf(\"Hello, world!\\n\");\n"
-			"    return 0;\n"
-			"}\n");
+		 "#include <stdio.h>\n"
+		 "\n"
+		 "int main(int argc, char **argv) {\n"
+		 "    printf(\"Hello, world!\\n\");\n"
+		 "    return 0;\n"
+		 "}\n");
 
 	if (create_file(src_main, main_content) != 0) {
 		fprintf(stderr, "Error: Could not create main.c\n");
@@ -251,13 +251,13 @@ int64_t handle_new(options *opts)
 	snprintf(main_header_path, sizeof(main_header_path), "%s/include/%s/%s.h", path, name, name);
 	char header_content[4'096];
 	snprintf(header_content, sizeof(header_content),
-			"#ifndef %s_H\n"
-			"#define %s_H\n"
-			"\n"
-			"// Your declarations here\n"
-			"\n"
-			"#endif // %s_H\n",
-			 name, name, name);
+		 "#ifndef %s_H\n"
+		 "#define %s_H\n"
+		 "\n"
+		 "// Your declarations here\n"
+		 "\n"
+		 "#endif // %s_H\n",
+		 name, name, name);
 	if (create_file(main_header_path, header_content) != 0) {
 		fprintf(stderr, "Error: Could not create include/%s/%s.h\n", name, name);
 		free(name);

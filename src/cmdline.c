@@ -13,6 +13,8 @@
 # include "config.h"
 #endif
 
+#include <stdint.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -22,6 +24,7 @@
 #endif
 
 #include "cmdline.h"
+#include "coffee.h"
 
 #include <getopt.h>
 
@@ -353,6 +356,17 @@ static void print_help_common(void)
 	}
 }
 
+void cmdline_parser_print_help(void);
+
+static void print_commands(void)
+{
+	extern command_s commands[];
+	printf("\nCommands:\n");
+	for (u64 i = 0; commands[i].name != NULL && commands[i].name[0] != '\0'; i++) {
+		printf("  %-20s %s\n", commands[i].name, commands[i].description);
+	}
+}
+
 void cmdline_parser_print_help(void)
 {
 	int i = 0;
@@ -360,6 +374,7 @@ void cmdline_parser_print_help(void)
 	while (gengetopt_args_info_help[i]) {
 		printf("%s\n", gengetopt_args_info_help[i++]);
 	}
+	print_commands();
 }
 
 void cmdline_parser_init(struct gengetopt_args_info *args_info)

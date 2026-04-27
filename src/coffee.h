@@ -77,6 +77,8 @@ typedef struct {
 	i64 (*action)(struct options_s *);
 } command_s;
 
+extern command_s commands[];
+
 /*
  * List of all available commands
  */

@@ -66,6 +66,7 @@ command_s commands[] = {
 	{.name = "vendor", .description = "Vendor all dependencies for a project locally", .action = &handle_vendor},
 	{.name = "version", .description = "Show version information", .action = &handle_version},
 	{.name = "yank", .description = "Remove a pushed crate from the index", .action = &handle_yank},
+	{.name = NULL, .description = NULL, .action = NULL},
 };
 
 int main(int argc, char **argv)
