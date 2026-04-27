@@ -336,3 +336,32 @@ void registry_free_recipes(recipe_list_t *list)
 	free(list->recipes);
 	free(list);
 }
+
+void registry_free_recipe(recipe_t *r)
+{
+	if (!r) {
+		return;
+	}
+	if (r->name) {
+		free(r->name);
+	}
+	if (r->version) {
+		free(r->version);
+	}
+	if (r->license) {
+		free(r->license);
+	}
+	if (r->repo) {
+		free(r->repo);
+	}
+	if (r->description) {
+		free(r->description);
+	}
+	if (r->download_url) {
+		free(r->download_url);
+	}
+	if (r->dependencies) {
+		free(r->dependencies);
+	}
+	free(r);
+}
