@@ -123,6 +123,13 @@ test: $(TARGET)
 		-o $(BIN_DIR)/test_features tests/test_features.c $(SRC_DIR)/manifest.c \
 		$(SRC_DIR)/coffee_features.c $(DEPS_DIR)/toml.c -static -lz
 	@$(BIN_DIR)/test_features
+	@echo ""
+	@echo "Running Makefile tests..."
+	@clang -g -Wall -Wextra -O3 -std=$(CSTD) -I$(SRC_DIR) -I$(DEPS_DIR) \
+		-o $(BIN_DIR)/test_makefile tests/test_makefile.c $(SRC_DIR)/manifest.c \
+		$(DEPS_DIR)/toml.c -static -lz
+	@$(BIN_DIR)/test_makefile
+	@echo ""
 	@echo "All tests passed."
 
 .PHONY: clean format tidy check bootstrap test
