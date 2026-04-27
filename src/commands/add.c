@@ -62,6 +62,27 @@ int64_t handle_add(options *opts)
 
 	printf("Added dependency: %s\n", package_name);
 
+	/* Append dependency flags to Makefile if it exists */
+	char *dir_end = strrchr(manifest_path, '/');
+	dir_end	      = dir_end ? dir_end : manifest_path;
+	while (dir_end > manifest_path && *dir_end == '/') {
+		dir_end--;
+	}
+	size_t dir_len = (size_t)(dir_end - manifest_path) + 1;
+	if (dir_len == 0) {
+		dir_len = 1;
+	}
+	char makefile_path[4'096];
+	snprintf(makefile_path, sizeof(makefile_path), "%.*s/Makefile", (int)dir_len, manifest_path);
+
+	FILE *mf = fopen(makefile_path, "a");
+	if (mf) {
+		fprintf(mf, "\n# Dep: %s\n", dep_str);
+		fprintf(mf, "CFLAGS += -Ideps/%s/include\n", package_name);
+		fprintf(mf, "LDFLAGS += -Ldeps/%s/lib -l%s\n", package_name, package_name);
+		fclose(mf);
+	}
+
 	manifest_free(m);
 	free(manifest_path);
 	return 0;
