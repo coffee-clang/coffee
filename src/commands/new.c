@@ -204,6 +204,40 @@ int64_t handle_new(options *opts)
 		return 1;
 	}
 
+	/* Create Makefile */
+	char makefile_path[4'096];
+	snprintf(makefile_path, sizeof(makefile_path), "%s/Makefile", path);
+	char makefile_content[4'096];
+	snprintf(makefile_content, sizeof(makefile_content),
+		 "CC ?= clang\n"
+		 "CFLAGS += -std=c23 -O3 -g\n"
+		 "CFLAGS += -Wall -Wextra -Wshadow -Wpedantic\n"
+		 "CFLAGS += -Wconversion -Wsign-conversion -Wunused\n"
+		 "CFLAGS += -Iinclude/%s\n"
+		 "\n"
+		 "TARGET := build/%s\n"
+		 "SOURCES := $(wildcard src/*.c)\n"
+		 "\n"
+		 ".PHONY: build clean format tidy\n"
+		 "\n"
+		 "build: $(SOURCES)\n"
+		 "\t$(CC) $(CFLAGS) -o $(TARGET) $(SOURCES) $(LDFLAGS)\n"
+		 "\n"
+		 "clean:\n"
+		 "\trm -rf build/\n"
+		 "\n"
+		 "format:\n"
+		 "\tclang-format -i src/*.c include/%s/*.h\n"
+		 "\n"
+		 "tidy:\n"
+		 "\tclang-tidy src/*.c -- $(CFLAGS)\n",
+		 name, name, name);
+	if (create_file(makefile_path, makefile_content) != 0) {
+		fprintf(stderr, "Error: Could not create Makefile\n");
+		free(name);
+		return 1;
+	}
+
 	/* Create manifest */
 	char manifest_content[4'096];
 	snprintf(manifest_content, sizeof(manifest_content),
@@ -278,6 +312,7 @@ int64_t handle_new(options *opts)
 	printf("  - .gitignore\n");
 	printf("  - LICENSE\n");
 	printf("  - README.md\n");
+	printf("  - Makefile\n");
 	printf("  - include/%s/%s.h\n", name, name);
 	printf("  - src/main.c\n");
 	printf("  - deps/\n");
