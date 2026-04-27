@@ -86,12 +86,21 @@ int64_t handle_build(options *opts)
 					size_t dflags_count = 0;
 					char **dflags = features_to_compiler_flags(resolved, manifest->package.name,
 										   &dflags_count);
-					if (dflags_count > 0 && (size_t)off < sizeof(cmd)) {
-						off += snprintf(cmd + off, sizeof(cmd) - (size_t)off, " CFLAGS_EXTRA=");
-						for (size_t i = 0; i < dflags_count && (size_t)off < sizeof(cmd); i++) {
-							off += snprintf(cmd + off, sizeof(cmd) - (size_t)off, "%s%s",
-									dflags[i], (i + 1 < dflags_count) ? " " : "");
-							free(dflags[i]);
+					if (dflags_count > 0) {
+						if ((size_t)off < sizeof(cmd)) {
+							off += snprintf(cmd + off, sizeof(cmd) - (size_t)off,
+									" CFLAGS_EXTRA=");
+							for (size_t i = 0;
+							     i < dflags_count && (size_t)off < sizeof(cmd); i++) {
+								off += snprintf(cmd + off, sizeof(cmd) - (size_t)off,
+										"%s%s", dflags[i],
+										(i + 1 < dflags_count) ? " " : "");
+								free(dflags[i]);
+							}
+						} else {
+							for (size_t i = 0; i < dflags_count; i++) {
+								free(dflags[i]);
+							}
 						}
 						free(dflags);
 					}
@@ -104,6 +113,10 @@ int64_t handle_build(options *opts)
 			}
 			free(features);
 			manifest_free(manifest);
+		}
+
+		if ((size_t)off >= sizeof(cmd)) {
+			fprintf(stderr, "Warning: build command length exceeded, some flags omitted\n");
 		}
 
 		if (opts->verbose) {
