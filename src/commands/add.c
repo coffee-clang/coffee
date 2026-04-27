@@ -6,7 +6,25 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <fcntl.h>
 #include <unistd.h>
+
+static bool is_safe_package_name(const char *name)
+{
+	const char *p;
+
+	if (!name || !*name) {
+		return false;
+	}
+
+	for (p = name; *p; p++) {
+		if (!((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || (*p >= '0' && *p <= '9') || *p == '_' ||
+		      *p == '-')) {
+			return false;
+		}
+	}
+	return true;
+}
 
 int64_t handle_add(options *opts)
 {
@@ -70,13 +88,22 @@ int64_t handle_add(options *opts)
 	char   makefile_path[4'096];
 	snprintf(makefile_path, sizeof(makefile_path), "%.*s/Makefile", (int)dir_len, manifest_path);
 
-	if (access(makefile_path, F_OK) == 0) {
-		FILE *mf = fopen(makefile_path, "a");
-		if (mf) {
-			fprintf(mf, "\n# Dep: %s\n", dep_str);
-			fprintf(mf, "CFLAGS += -Ideps/%s/include\n", package_name);
-			fprintf(mf, "LDFLAGS += -Ldeps/%s/lib -l%s\n", package_name, package_name);
-			fclose(mf);
+	if (!is_safe_package_name(package_name)) {
+		fprintf(stderr, "Warning: package name contains unsafe characters, skipping Makefile update\n");
+	} else {
+		int mfd = open(makefile_path, O_WRONLY | O_APPEND);
+		if (mfd >= 0) {
+			FILE *mf = fdopen(mfd, "a");
+			if (mf) {
+				fprintf(mf, "\n# Dep: %s\n", package_name);
+				fprintf(mf, "CFLAGS += -Ideps/%s/include\n", package_name);
+				fprintf(mf, "LDFLAGS += -Ldeps/%s/lib -l%s\n", package_name, package_name);
+				if (fclose(mf) != 0) {
+					fprintf(stderr, "Warning: failed to write to Makefile\n");
+				}
+			} else {
+				close(mfd);
+			}
 		}
 	}
 
