@@ -5,6 +5,12 @@
 #include "../manifest.h"
 #include "../project.h"
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <unistd.h>
+
 int64_t handle_build(options *opts)
 {
 	char *manifest_path = NULL;
@@ -18,6 +24,103 @@ int64_t handle_build(options *opts)
 		fprintf(stderr, "Error: Could not find Coffee.toml in current directory\n");
 		return 1;
 	}
+
+	/* Extract project directory from manifest path */
+	char  *dir_end = strrchr(manifest_path, '/');
+	size_t dir_len;
+	char   makefile_path[4096];
+	if (dir_end) {
+		dir_len = (size_t)(dir_end - manifest_path) + 1;
+		snprintf(makefile_path, sizeof(makefile_path), "%.*sMakefile", (int)dir_len, manifest_path);
+	} else {
+		snprintf(makefile_path, sizeof(makefile_path), "Makefile");
+	}
+
+	/* Check for Makefile */
+	if (access(makefile_path, F_OK) == 0) {
+		/* Build with make */
+		char  cmd[4096];
+		char *project_dir = NULL;
+		if (dir_end) {
+			project_dir = strndup(manifest_path, (size_t)(dir_end - manifest_path));
+		} else {
+			project_dir = strdup(".");
+		}
+
+		int off = snprintf(cmd, sizeof(cmd), "make -C %s", project_dir);
+		free(project_dir);
+
+		if (off < 0 || (size_t)off >= sizeof(cmd)) {
+			free(manifest_path);
+			return 1;
+		}
+
+		if (opts->release) {
+			off += snprintf(cmd + off, sizeof(cmd) - (size_t)off, " RELEASE=1");
+		}
+		if (opts->debug) {
+			off += snprintf(cmd + off, sizeof(cmd) - (size_t)off, " DEBUG=1");
+		}
+		if (opts->jobs > 0) {
+			off += snprintf(cmd + off, sizeof(cmd) - (size_t)off, " -j%d", opts->jobs);
+		}
+
+		/* Pass feature flags if specified */
+		manifest_t *manifest = manifest_parse(manifest_path);
+		if (manifest) {
+			char **features	      = NULL;
+			size_t features_count = 0;
+			if (opts->features) {
+				features_parse_cli(opts->features, &features, &features_count);
+			}
+
+			if (features_count > 0 || opts->all_features) {
+				const char **requested = NULL;
+				if (features_count > 0) {
+					requested = (const char **)features;
+				}
+				resolved_features_t *resolved =
+					features_resolve(manifest, requested, features_count, opts->all_features,
+							 opts->no_default_features);
+				if (resolved) {
+					size_t dflags_count = 0;
+					char **dflags = features_to_compiler_flags(resolved, manifest->package.name,
+										   &dflags_count);
+					if (dflags_count > 0) {
+						off += snprintf(cmd + off, sizeof(cmd) - (size_t)off, " CFLAGS_EXTRA=");
+						for (size_t i = 0; i < dflags_count; i++) {
+							off += snprintf(cmd + off, sizeof(cmd) - (size_t)off, "%s%s",
+									dflags[i], (i + 1 < dflags_count) ? " " : "");
+							free(dflags[i]);
+						}
+						free(dflags);
+					}
+					features_free(resolved);
+				}
+			}
+
+			for (size_t i = 0; i < features_count; i++) {
+				free(features[i]);
+			}
+			free(features);
+			manifest_free(manifest);
+		}
+
+		if (opts->verbose) {
+			printf("Running: %s build\n", cmd);
+		}
+
+		int ret = system(cmd);
+
+		free(manifest_path);
+
+		if (ret == 0) {
+			printf("Build successful\n");
+		}
+		return ret;
+	}
+
+	/* Fall back to build_project for projects without Makefile */
 
 	manifest_t *manifest = manifest_parse(manifest_path);
 	free(manifest_path);
