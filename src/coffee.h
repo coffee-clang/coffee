@@ -92,6 +92,7 @@ extern i64 handle_clean(options *);
 extern i64 handle_compile(options *);
 extern i64 handle_config(options *);
 extern i64 handle_doc(options *);
+extern i64 handle_libs(options *);
 extern i64 handle_lint(options *);
 extern i64 handle_fetch(options *);
 extern i64 handle_fix(options *);
