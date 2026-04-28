@@ -130,6 +130,11 @@ test: $(TARGET)
 		$(DEPS_DIR)/toml.c -static -lz
 	@$(BIN_DIR)/test_makefile
 	@echo ""
+	@echo "Running cflags/libs tests..."
+	@clang -g -Wall -Wextra -O3 -std=$(CSTD) \
+		-o $(BIN_DIR)/test_cflags_libs tests/test_cflags_libs.c -static -lz
+	@$(BIN_DIR)/test_cflags_libs
+	@echo ""
 	@echo "All tests passed."
 
 .PHONY: clean format tidy check bootstrap test
