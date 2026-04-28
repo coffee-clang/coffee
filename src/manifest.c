@@ -164,6 +164,46 @@ manifest_t *manifest_parse(const char *path)
 			toml_datum_t dep	   = toml_string_at(deps_arr, i);
 			m->package.dependencies[i] = toml_datum_to_string(dep);
 		}
+	} else {
+		/* Also try table format: [dependencies]\nname = "version" */
+		toml_table_t *deps_table = toml_table_in(conf, "dependencies");
+		if (deps_table) {
+			/* Count entries */
+			size_t count = 0;
+			for (int i = 0;; i++) {
+				const char *key = toml_key_in(deps_table, i);
+				if (!key) {
+					break;
+				}
+				count++;
+			}
+			m->package.dependencies_count = count;
+			m->package.dependencies	      = calloc(count, sizeof(char *));
+			size_t idx		      = 0;
+			/* Build "name = value" strings matching array format */
+			for (int i = 0; idx < count; i++) {
+				const char *key = toml_key_in(deps_table, i);
+				if (!key) {
+					break;
+				}
+				toml_datum_t val = toml_string_in(deps_table, key);
+				size_t	     len;
+				char	    *str;
+				if (val.ok) {
+					char *vstr = toml_datum_to_string(val);
+					len	   = strlen(key) + strlen(" = \"") + strlen(vstr) + 2;
+					str	   = malloc(len);
+					snprintf(str, len, "%s = \"%s\"", key, vstr);
+					free(vstr);
+				} else {
+					str = strdup(key);
+				}
+				if (str) {
+					m->package.dependencies[idx] = str;
+					idx++;
+				}
+			}
+		}
 	}
 
 	toml_array_t *sources_arr = toml_array_in(conf, "sources");
