@@ -17,7 +17,6 @@ command_s commands[] = {
 	 .action      = &handle_cflags},
 	{.name = "check", .description = "Check a local package and all of its dependencies", .action = &handle_check},
 	{.name = "clean", .description = "Remove generated artifacts", .action = &handle_clean},
-	{.name = "compile", .description = "Compile", .action = &handle_compile},
 	{.name = "config", .description = "Inspect configuration values", .action = &handle_config},
 	{.name = "d", .description = "alias: doc", .action = &handle_doc},
 	{.name = "doc", .description = "Build a package's documentation", .action = &handle_doc},

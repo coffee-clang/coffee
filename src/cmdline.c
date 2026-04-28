@@ -13,8 +13,6 @@
 # include "config.h"
 #endif
 
-#include <stdint.h>
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,7 +22,6 @@
 #endif
 
 #include "cmdline.h"
-#include "coffee.h"
 
 #include <getopt.h>
 
@@ -116,6 +113,8 @@ static int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_
 
 const char *cmdline_parser_toolchain_values[] = {"+stable", "+clang-stable", "+gcc-stable",
 						 0}; /*< Possible values for toolchain. */
+
+static char *gengetopt_strdup(const char *s);
 
 static void clear_given(struct gengetopt_args_info *args_info)
 {
@@ -356,17 +355,6 @@ static void print_help_common(void)
 	}
 }
 
-void cmdline_parser_print_help(void);
-
-static void print_commands(void)
-{
-	extern command_s commands[];
-	printf("\nCommands:\n");
-	for (u64 i = 0; commands[i].name != NULL && commands[i].name[0] != '\0'; i++) {
-		printf("  %-20s %s\n", commands[i].name, commands[i].description);
-	}
-}
-
 void cmdline_parser_print_help(void)
 {
 	int i = 0;
@@ -374,7 +362,6 @@ void cmdline_parser_print_help(void)
 	while (gengetopt_args_info_help[i]) {
 		printf("%s\n", gengetopt_args_info_help[i++]);
 	}
-	print_commands();
 }
 
 void cmdline_parser_init(struct gengetopt_args_info *args_info)
@@ -739,6 +726,22 @@ void cmdline_parser_free(struct gengetopt_args_info *args_info)
 	cmdline_parser_release(args_info);
 }
 
+/** @brief replacement of strdup, which is not standard */
+char *gengetopt_strdup(const char *s)
+{
+	char *result = 0;
+	if (!s) {
+		return result;
+	}
+
+	result = (char *)malloc(strlen(s) + 1);
+	if (result == (char *)0) {
+		return (char *)0;
+	}
+	strcpy(result, s);
+	return result;
+}
+
 int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 {
 	return cmdline_parser2(argc, argv, args_info, 0, 1, 1);
@@ -878,7 +881,7 @@ static int update_arg(void *field, char **orig_field, unsigned int *field_given,
 			if (!no_free && *string_field) {
 				free(*string_field); /* free previous string */
 			}
-			*string_field = strdup(val);
+			*string_field = gengetopt_strdup(val);
 		}
 		break;
 	default:
@@ -909,7 +912,7 @@ static int update_arg(void *field, char **orig_field, unsigned int *field_given,
 				if (*orig_field) {
 					free(*orig_field); /* free previous string */
 				}
-				*orig_field = strdup(value);
+				*orig_field = gengetopt_strdup(value);
 			}
 		}
 	};
@@ -1628,7 +1631,7 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 		args_info->inputs     = (char **)(malloc((args_info->inputs_num) * sizeof(char *)));
 		while (optind < argc) {
 			if (argv[optind++] != argv[0]) {
-				args_info->inputs[i++] = strdup(argv[optind - 1]);
+				args_info->inputs[i++] = gengetopt_strdup(argv[optind - 1]);
 			}
 		}
 	}
