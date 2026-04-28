@@ -85,6 +85,7 @@ extern command_s commands[];
 
 extern i64 handle_add(options *);
 extern i64 handle_build(options *);
+extern i64 handle_cflags(options *);
 extern i64 handle_bench(options *);
 extern i64 handle_check(options *);
 extern i64 handle_clean(options *);
