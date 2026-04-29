@@ -135,6 +135,24 @@ test: $(TARGET)
 		-o $(BIN_DIR)/test_cflags_libs tests/test_cflags_libs.c -static -lz
 	@$(BIN_DIR)/test_cflags_libs
 	@echo ""
+	@echo "Running manifest version tests..."
+	@clang -g -Wall -Wextra -O3 -std=$(CSTD) -I$(SRC_DIR) -I$(DEPS_DIR) \
+		-o $(BIN_DIR)/test_manifest_version tests/test_manifest_version.c \
+		$(SRC_DIR)/manifest.c $(DEPS_DIR)/toml.c -static -lz
+	@$(BIN_DIR)/test_manifest_version
+	@echo ""
+	@echo "Running registry versions tests..."
+	@clang -g -Wall -Wextra -O3 -std=$(CSTD) -D_GNU_SOURCE -I$(SRC_DIR) -I$(DEPS_DIR) \
+		-o $(BIN_DIR)/test_registry_versions tests/test_registry_versions.c \
+		$(SRC_DIR)/registry.c -static -lz
+	@$(BIN_DIR)/test_registry_versions
+	@echo ""
+	@echo "Running registry fetch versioned tests..."
+	@clang -g -Wall -Wextra -O3 -std=$(CSTD) -D_GNU_SOURCE -I$(SRC_DIR) -I$(DEPS_DIR) \
+		-o $(BIN_DIR)/test_registry_fetch_versioned tests/test_registry_fetch_versioned.c \
+		$(SRC_DIR)/registry.c -static -lz
+	@$(BIN_DIR)/test_registry_fetch_versioned
+	@echo ""
 	@echo "All tests passed."
 
 .PHONY: clean format tidy check bootstrap test
@@ -149,3 +167,11 @@ $(STAMP_DIR)/%.c.tidy: $(SRC_DIR)/%.c | $(STAMP_DIR)
 	@echo "Linting $<..."
 	@$(TIDY) $< $(TIDY_FLAGS)
 	@touch $@
+
+# Dep: toml
+CFLAGS += -Ideps/toml/include
+LDFLAGS += -Ldeps/toml/lib -ltoml
+
+# Dep: sds
+CFLAGS += -Ideps/sds/include
+LDFLAGS += -Ldeps/sds/lib -lsds

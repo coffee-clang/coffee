@@ -55,4 +55,13 @@ manifest_t *manifest_parse(const char *path);
 void	    manifest_free(manifest_t *m);
 int	    manifest_write(const char *path, manifest_t *m);
 
+/**
+ * Extract package name and version constraint from a dependency entry.
+ *
+ * @param entry Dependency string like "toml = \"1.0.0\"" or "sds = \"*\""
+ * @param name_out Output pointer for package name (must be freed by caller)
+ * @param version_out Output pointer for version constraint (must be freed by caller)
+ */
+void manifest_extract_dep_info(const char *entry, char **name_out, char **version_out);
+
 #endif

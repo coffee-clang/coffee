@@ -8,15 +8,25 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+const char *coffee_home_dir(void)
+{
+	static char home_dir[4'096];
+	const char *coffee_home = getenv("COFFEE_HOME");
+	if (coffee_home) {
+		snprintf(home_dir, sizeof(home_dir), "%s", coffee_home);
+	} else {
+		const char *home = getenv("HOME");
+		if (!home) {
+			home = "/tmp";
+		}
+		snprintf(home_dir, sizeof(home_dir), "%s/.coffee", home);
+	}
+	return home_dir;
+}
+
 static char *get_cache_dir(void)
 {
-	static char cache_dir[4'096];
-	const char *home = getenv("HOME");
-	if (!home) {
-		home = "/tmp";
-	}
-	snprintf(cache_dir, sizeof(cache_dir), "%s/.coffee", home);
-	return cache_dir;
+	return (char *)coffee_home_dir();
 }
 
 static char *get_index_path(void)
@@ -301,6 +311,57 @@ int registry_fetch(const char *name, const char *version, const char *dest_dir)
 	system(cmd);
 
 	return 0;
+}
+
+version_list_t *registry_get_versions(const char *name)
+{
+	if (!name || strlen(name) == 0) {
+		return NULL;
+	}
+
+	char first = tolower(name[0]);
+	char url[4'096];
+	snprintf(url, sizeof(url), REGISTRY_RAW_URL "/recipes/%c/%s/library.toml", first, name);
+
+	char *meta = fetch_url(url);
+	if (!meta) {
+		return NULL;
+	}
+
+	version_list_t *list = calloc(1, sizeof(version_list_t));
+	if (!list) {
+		free(meta);
+		return NULL;
+	}
+
+	char *version = extract_string_val(meta, "version");
+	if (version) {
+		list->versions = malloc(sizeof(char *));
+		if (list->versions) {
+			list->versions[0] = version;
+			list->count	  = 1;
+		} else {
+			free(version);
+		}
+	}
+
+	free(meta);
+	return list;
+}
+
+void registry_free_versions(version_list_t *list)
+{
+	if (!list) {
+		return;
+	}
+
+	for (size_t i = 0; i < list->count; i++) {
+		if (list->versions[i]) {
+			free(list->versions[i]);
+		}
+	}
+	free(list->versions);
+	free(list);
 }
 
 void registry_free_recipes(recipe_list_t *list)

@@ -299,6 +299,69 @@ manifest_t *manifest_parse(const char *path)
 	return m;
 }
 
+void manifest_extract_dep_info(const char *entry, char **name_out, char **version_out)
+{
+	if (!entry || !name_out || !version_out) {
+		if (name_out) {
+			*name_out = NULL;
+		}
+		if (version_out) {
+			*version_out = NULL;
+		}
+		return;
+	}
+
+	*name_out    = NULL;
+	*version_out = NULL;
+
+	const char *eq = strchr(entry, '=');
+	if (!eq) {
+		const char *end = entry + strlen(entry);
+		while (end > entry && (*(end - 1) == ' ' || *(end - 1) == '\t')) {
+			end--;
+		}
+		size_t len = (size_t)(end - entry);
+		*name_out  = malloc(len + 1);
+		if (*name_out) {
+			memcpy(*name_out, entry, len);
+			(*name_out)[len] = '\0';
+		}
+		*version_out = strdup("*");
+		return;
+	}
+
+	const char *name_end = eq - 1;
+	while (name_end > entry && (*name_end == ' ' || *name_end == '\t')) {
+		name_end--;
+	}
+	size_t name_len = (size_t)(name_end - entry + 1);
+	*name_out	= malloc(name_len + 1);
+	if (*name_out) {
+		memcpy(*name_out, entry, name_len);
+		(*name_out)[name_len] = '\0';
+	}
+
+	const char *ver_start = eq + 1;
+	while (*ver_start == ' ' || *ver_start == '\t') {
+		ver_start++;
+	}
+
+	if (*ver_start == '"') {
+		ver_start++;
+	}
+	const char *ver_end = ver_start + strlen(ver_start);
+	while (ver_end > ver_start && (*(ver_end - 1) == ' ' || *(ver_end - 1) == '\t' || *(ver_end - 1) == '"')) {
+		ver_end--;
+	}
+
+	size_t ver_len = (size_t)(ver_end - ver_start);
+	*version_out   = malloc(ver_len + 1);
+	if (*version_out) {
+		memcpy(*version_out, ver_start, ver_len);
+		(*version_out)[ver_len] = '\0';
+	}
+}
+
 void manifest_free(manifest_t *m)
 {
 	if (!m) {

@@ -10,6 +10,40 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+static int create_symlink(const char *target, const char *link_path)
+{
+	struct stat st;
+	if (lstat(link_path, &st) == 0) {
+		if (S_ISLNK(st.st_mode) || S_ISDIR(st.st_mode)) {
+			char cmd[8'192];
+			snprintf(cmd, sizeof(cmd), "rm -rf %s", link_path);
+			if (system(cmd) != 0) {
+				return -1;
+			}
+		}
+	}
+
+	char *link_copy	 = strdup(link_path);
+	char *last_slash = strrchr(link_copy, '/');
+	if (last_slash) {
+		*last_slash = '\0';
+		char cmd[8'192];
+		snprintf(cmd, sizeof(cmd), "mkdir -p %s", link_copy);
+		free(link_copy);
+		if (system(cmd) != 0) {
+			return -1;
+		}
+	} else {
+		free(link_copy);
+	}
+
+	if (symlink(target, link_path) != 0) {
+		return -1;
+	}
+
+	return 0;
+}
+
 int64_t handle_update(options *opts)
 {
 	char *manifest_path = project_find_manifest(NULL);
@@ -27,14 +61,14 @@ int64_t handle_update(options *opts)
 		return 1;
 	}
 
-	const char *cache_dir = getenv("HOME");
-	if (!cache_dir) {
-		cache_dir = "/tmp";
-	}
+	const char *coffee_home = coffee_home_dir();
+	char	    global_deps[4'096];
+	snprintf(global_deps, sizeof(global_deps), "%s/deps", coffee_home);
+	mkdir(global_deps, 0755);
 
-	char deps_dir[4'096];
-	snprintf(deps_dir, sizeof(deps_dir), "%s/.coffee/deps", cache_dir);
-	mkdir(deps_dir, 0755);
+	char project_deps[4'096];
+	snprintf(project_deps, sizeof(project_deps), ".coffee/deps");
+	mkdir(project_deps, 0755);
 
 	printf("Updating dependencies...\n");
 
@@ -46,33 +80,63 @@ int64_t handle_update(options *opts)
 	for (size_t i = 0; i < m->package.dependencies_count; i++) {
 		const char *entry = m->package.dependencies[i];
 
-		char *name   = strdup(entry);
-		char *equals = strchr(name, '=');
-		if (equals) {
-			*equals	  = '\0';
-			char *end = equals - 1;
-			while (end > name && *end == ' ') {
-				*end = '\0';
-				end--;
-			}
+		char *name		 = NULL;
+		char *version_constraint = NULL;
+		manifest_extract_dep_info(entry, &name, &version_constraint);
+
+		if (!name) {
+			continue;
 		}
 
 		if (target && strcmp(name, target) != 0) {
 			free(name);
+			free(version_constraint);
 			continue;
 		}
 
-		printf("  Updating: %s\n", name);
+		printf("  Resolving: %s (%s)\n", name, version_constraint ? version_constraint : "*");
 
-		char pkg_dir[4'096];
-		snprintf(pkg_dir, sizeof(pkg_dir), "%s/%s", deps_dir, name);
-
-		int ret = registry_fetch(name, NULL, pkg_dir);
-		if (ret != 0) {
-			fprintf(stderr, "Error: Failed to update %s\n", name);
+		version_list_t *versions = registry_get_versions(name);
+		if (!versions || versions->count == 0) {
+			fprintf(stderr, "  Error: Package '%s' not found in registry\n", name);
+			free(name);
+			free(version_constraint);
+			continue;
 		}
 
+		char *resolved_version = versions->versions[0];
+		printf("  Selected version: %s\n", resolved_version);
+
+		char cache_path[4'096];
+		snprintf(cache_path, sizeof(cache_path), "%s/%s/%s", global_deps, name, resolved_version);
+
+		char project_link_path[4'096];
+		snprintf(project_link_path, sizeof(project_link_path), "%s/%s/%s", project_deps, name,
+			 resolved_version);
+
+		int ret = registry_fetch(name, resolved_version, cache_path);
+		if (ret != 0) {
+			fprintf(stderr, "  Error: Failed to fetch %s %s\n", name, resolved_version);
+			free(name);
+			free(version_constraint);
+			registry_free_versions(versions);
+			continue;
+		}
+
+		ret = create_symlink(cache_path, project_link_path);
+		if (ret != 0) {
+			fprintf(stderr, "  Error: Failed to create symlink for %s\n", name);
+			free(name);
+			free(version_constraint);
+			registry_free_versions(versions);
+			continue;
+		}
+
+		printf("  Updated: %s@%s\n", name, resolved_version);
+
 		free(name);
+		free(version_constraint);
+		registry_free_versions(versions);
 	}
 
 	char lockfile_path[4'096];
