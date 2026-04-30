@@ -168,10 +168,4 @@ $(STAMP_DIR)/%.c.tidy: $(SRC_DIR)/%.c | $(STAMP_DIR)
 	@$(TIDY) $< $(TIDY_FLAGS)
 	@touch $@
 
-# Dep: toml
-CFLAGS += -Ideps/toml/include
-LDFLAGS += -Ldeps/toml/lib -ltoml
 
-# Dep: sds
-CFLAGS += -Ideps/sds/include
-LDFLAGS += -Ldeps/sds/lib -lsds

@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include <ctype.h>
 #include <sys/stat.h>
@@ -42,7 +43,10 @@ static int ensure_index_cached(void)
 	struct stat st;
 
 	if (stat(index_path, &st) == 0) {
-		return 0;
+		time_t now = time(NULL);
+		if (now - st.st_mtime < 300) {
+			return 0;
+		}
 	}
 
 	char *cache_dir = get_cache_dir();
@@ -50,7 +54,7 @@ static int ensure_index_cached(void)
 	snprintf(cmd, sizeof(cmd), "mkdir -p %s", cache_dir);
 	system(cmd);
 
-	snprintf(cmd, sizeof(cmd), "curl -sL \"" REGISTRY_INDEX_URL "\" | zstd -d -o %s 2>/dev/null", index_path);
+	snprintf(cmd, sizeof(cmd), "curl -sL \"" REGISTRY_INDEX_URL "\" | zstd -df -o %s 2>/dev/null", index_path);
 
 	return system(cmd);
 }
@@ -88,37 +92,56 @@ static char *fetch_url(const char *url)
 	return buffer;
 }
 
-static char *extract_string_val(const char *json, const char *key)
+static char *extract_string_val(const char *text, const char *key)
 {
-	char pattern[256];
-	snprintf(pattern, sizeof(pattern), "\"%s\"", key);
+	const char *p	   = text;
+	size_t	    keylen = strlen(key);
 
-	const char *p = strstr(json, pattern);
-	if (!p) {
-		return NULL;
-	}
-
-	p = strchr(p, ':');
-	if (!p) {
-		return NULL;
-	}
-	p++;
-
-	while (*p && (*p == ' ' || *p == '\t' || *p == '\n')) {
-		p++;
-	}
-
-	if (*p == '\"') {
-		p++;
-		const char *start = p;
-		while (*p && *p != '\"') {
+	while (*p) {
+		while (*p == ' ' || *p == '\t' || *p == '\n') {
 			p++;
 		}
-		if (p > start) {
-			char *result = malloc(p - start + 1);
-			memcpy(result, start, p - start);
-			result[p - start] = '\0';
-			return result;
+
+		const char *after_key = NULL;
+
+		if (*p == '\"') {
+			if (strncmp(p + 1, key, keylen) == 0 && p[1 + keylen] == '\"') {
+				after_key = p + 1 + keylen + 1;
+			}
+		} else if (strncmp(p, key, keylen) == 0) {
+			after_key = p + keylen;
+		}
+
+		if (after_key) {
+			while (*after_key == ' ' || *after_key == '\t') {
+				after_key++;
+			}
+			if (*after_key == ':' || *after_key == '=') {
+				after_key++;
+				while (*after_key == ' ' || *after_key == '\t') {
+					after_key++;
+				}
+				if (*after_key == '\"') {
+					after_key++;
+					const char *start = after_key;
+					while (*after_key && *after_key != '\"' && *after_key != '\n') {
+						after_key++;
+					}
+					if (*after_key == '\"' && after_key > start) {
+						char *result = malloc(after_key - start + 1);
+						memcpy(result, start, after_key - start);
+						result[after_key - start] = '\0';
+						return result;
+					}
+				}
+			}
+		}
+
+		while (*p && *p != '\n') {
+			p++;
+		}
+		if (*p == '\n') {
+			p++;
 		}
 	}
 
