@@ -1,4 +1,5 @@
 # Coffee
+
 A modern package manager for C
 
 ## Project structure
@@ -13,7 +14,6 @@ root
 ├── LICENSE
 ├── README.md
 ├── include/ <-- Public API Headers
-│ └── my_project/
 │ └── main_lib.h
 ├── src/ # source of the project
 └── deps/ # All dependencies
