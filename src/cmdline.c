@@ -101,6 +101,8 @@ const char *gengetopt_args_info_help[] = {
 	"      --no-run                  Don't run the generated binaries  (default=off)",
 	"      --no-fail-fast            Run all tests regardless of failure\n                                  "
 	"(default=off)",
+	"",
+	"",
 	0};
 
 typedef enum { ARG_NO, ARG_FLAG, ARG_STRING, ARG_INT, ARG_ENUM } cmdline_parser_arg_type;

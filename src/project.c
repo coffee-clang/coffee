@@ -8,7 +8,7 @@
 #include <libgen.h>
 #include <unistd.h>
 
-#define MAX_PATH_LEN 4'096
+#define MAX_PATH_LEN 4096
 
 static int file_exists(const char *path)
 {

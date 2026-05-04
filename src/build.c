@@ -36,7 +36,7 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 	const char *cc		   = getenv("CC") ? getenv("CC") : "clang";
 	const char *output_dir = opts && opts->target_dir ? opts->target_dir : "target/debug";
 
-	char cmd[4'096];
+	char cmd[4096];
 	int	 ret;
 
 	ret = snprintf(cmd, sizeof(cmd), "mkdir -p %s", output_dir);
@@ -119,7 +119,7 @@ int build_run(manifest_t *manifest, build_opts_t *opts, char **args, int argc)
 	const char *output_dir = opts && opts->target_dir ? opts->target_dir : "target/debug";
 	const char *name	   = manifest->package.name;
 
-	char exe_path[4'096];
+	char exe_path[4096];
 	ret = snprintf(exe_path, sizeof(exe_path), "%s/%s", output_dir, name);
 	if (ret < 0 || (size_t)ret >= sizeof(exe_path)) {
 		return 1;
@@ -130,7 +130,7 @@ int build_run(manifest_t *manifest, build_opts_t *opts, char **args, int argc)
 		return 1;
 	}
 
-	char cmd[4'096];
+	char cmd[4096];
 	ret = snprintf(cmd, sizeof(cmd), "%s", exe_path);
 	for (int i = 0; i < argc && args && (size_t)ret < sizeof(cmd) - 1; i++) {
 		size_t len = strlen(cmd);
