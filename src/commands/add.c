@@ -16,7 +16,7 @@ static bool is_safe_package_name(const char *name)
 
 	for (p = name; *p; p++) {
 		if (!((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || (*p >= '0' && *p <= '9') || *p == '_' ||
-		      *p == '-')) {
+			  *p == '-')) {
 			return false;
 		}
 	}
@@ -30,7 +30,7 @@ int64_t handle_add(options *opts)
 		return 1;
 	}
 
-	char *package_name  = opts->inputs[1];
+	char *package_name	= opts->inputs[1];
 	char *manifest_path = project_find_manifest(NULL);
 
 	if (!manifest_path) {
@@ -48,7 +48,7 @@ int64_t handle_add(options *opts)
 	// Check if dependency already exists
 	for (size_t i = 0; i < m->package.dependencies_count; i++) {
 		if (m->package.dependencies[i] &&
-		    strncmp(m->package.dependencies[i], package_name, strlen(package_name)) == 0) {
+			strncmp(m->package.dependencies[i], package_name, strlen(package_name)) == 0) {
 			printf("Dependency %s already exists\n", package_name);
 			manifest_free(m);
 			free(manifest_path);
@@ -57,13 +57,40 @@ int64_t handle_add(options *opts)
 	}
 
 	// Add new dependency
-	char dep_str[1'024];
+	char dep_str[1024];
 	if (opts->path) {
-		snprintf(dep_str, sizeof(dep_str), "%s = { path = \"%s\" }", package_name, opts->path);
+		if (opts->pkg_version) {
+			snprintf(dep_str, sizeof(dep_str), "%s = { path = \"%s\", version = \"%s\" }", package_name, opts->path,
+					 opts->pkg_version);
+		} else {
+			snprintf(dep_str, sizeof(dep_str), "%s = { path = \"%s\" }", package_name, opts->path);
+		}
 	} else if (opts->git) {
 		snprintf(dep_str, sizeof(dep_str), "%s = { git = \"%s\" }", package_name, opts->git);
 	} else {
-		snprintf(dep_str, sizeof(dep_str), "%s = \"*\"", package_name);
+		const char *version = opts->pkg_version ? opts->pkg_version : "*";
+
+		if (opts->features || opts->optional) {
+			int off = snprintf(dep_str, sizeof(dep_str), "%s = { version = \"%s\"", package_name, version);
+			if (opts->features) {
+				off += snprintf(dep_str + off, sizeof(dep_str) - off, ", features = [\"%s\"]", opts->features);
+			}
+			if (opts->optional) {
+				off += snprintf(dep_str + off, sizeof(dep_str) - off, ", optional = true");
+			}
+			snprintf(dep_str + off, sizeof(dep_str) - off, " }");
+		} else {
+			snprintf(dep_str, sizeof(dep_str), "%s = \"%s\"", package_name, version);
+		}
+	}
+
+	/* Prefix for dev/build deps */
+	if (opts->dev) {
+		size_t dep_len = strlen(dep_str);
+		snprintf(dep_str + dep_len, sizeof(dep_str) - dep_len, "  # dev");
+	} else if (opts->build_dep) {
+		size_t dep_len = strlen(dep_str);
+		snprintf(dep_str + dep_len, sizeof(dep_str) - dep_len, "  # build");
 	}
 
 	m->package.dependencies_count++;
