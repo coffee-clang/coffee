@@ -118,42 +118,59 @@ tidy: $(STAMPS)
 check: format tidy
 
 test: $(TARGET)
-	@echo "Running feature system tests..."
-	@clang -g -Wall -Wextra -O3 -std=$(CSTD) -I$(SRC_DIR) -I$(DEPS_DIR) \
-		-o $(BIN_DIR)/test_features tests/test_features.c $(SRC_DIR)/manifest.c \
-		$(SRC_DIR)/coffee_features.c $(DEPS_DIR)/toml.c -static -lz
-	@$(BIN_DIR)/test_features
-	@echo ""
-	@echo "Running Makefile tests..."
-	@clang -g -Wall -Wextra -O3 -std=$(CSTD) -I$(SRC_DIR) -I$(DEPS_DIR) \
-		-o $(BIN_DIR)/test_makefile tests/test_makefile.c $(SRC_DIR)/manifest.c \
-		$(DEPS_DIR)/toml.c -static -lz
-	@$(BIN_DIR)/test_makefile
-	@echo ""
-	@echo "Running cflags/libs tests..."
-	@clang -g -Wall -Wextra -O3 -std=$(CSTD) \
-		-o $(BIN_DIR)/test_cflags_libs tests/test_cflags_libs.c -static -lz
-	@$(BIN_DIR)/test_cflags_libs
-	@echo ""
-	@echo "Running manifest version tests..."
-	@clang -g -Wall -Wextra -O3 -std=$(CSTD) -I$(SRC_DIR) -I$(DEPS_DIR) \
-		-o $(BIN_DIR)/test_manifest_version tests/test_manifest_version.c \
-		$(SRC_DIR)/manifest.c $(DEPS_DIR)/toml.c -static -lz
-	@$(BIN_DIR)/test_manifest_version
-	@echo ""
-	@echo "Running registry versions tests..."
-	@clang -g -Wall -Wextra -O3 -std=$(CSTD) -D_GNU_SOURCE -I$(SRC_DIR) -I$(DEPS_DIR) \
-		-o $(BIN_DIR)/test_registry_versions tests/test_registry_versions.c \
-		$(SRC_DIR)/registry.c -static -lz
-	@$(BIN_DIR)/test_registry_versions
-	@echo ""
-	@echo "Running registry fetch versioned tests..."
-	@clang -g -Wall -Wextra -O3 -std=$(CSTD) -D_GNU_SOURCE -I$(SRC_DIR) -I$(DEPS_DIR) \
-		-o $(BIN_DIR)/test_registry_fetch_versioned tests/test_registry_fetch_versioned.c \
-		$(SRC_DIR)/registry.c -static -lz
-	@$(BIN_DIR)/test_registry_fetch_versioned
-	@echo ""
-	@echo "All tests passed."
+	@failed=0; \
+	for t in test_features test_makefile test_cflags_libs test_manifest_version test_registry_versions test_registry_fetch_versioned; do \
+		if [ -n "$(TEST_FILTER)" ] && [ "$$t" != "$(TEST_FILTER)" ]; then \
+			continue; \
+		fi; \
+		printf "  %-40s ... " "$$t"; \
+		case $$t in \
+		test_features) \
+			clang -g -Wall -Wextra -O3 -std=$(CSTD) -I$(SRC_DIR) -I$(DEPS_DIR) \
+				-o $(BIN_DIR)/$$t tests/$$t.c $(SRC_DIR)/manifest.c \
+				$(SRC_DIR)/coffee_features.c $(DEPS_DIR)/toml.c -static -lz >/dev/null 2>&1 && \
+			$(BIN_DIR)/$$t >/dev/null 2>&1; \
+			;; \
+		test_makefile) \
+			clang -g -Wall -Wextra -O3 -std=$(CSTD) -I$(SRC_DIR) -I$(DEPS_DIR) \
+				-o $(BIN_DIR)/$$t tests/$$t.c $(SRC_DIR)/manifest.c \
+				$(DEPS_DIR)/toml.c -static -lz >/dev/null 2>&1 && \
+			$(BIN_DIR)/$$t >/dev/null 2>&1; \
+			;; \
+		test_cflags_libs) \
+			clang -g -Wall -Wextra -O3 -std=$(CSTD) \
+				-o $(BIN_DIR)/$$t tests/$$t.c -static -lz >/dev/null 2>&1 && \
+			$(BIN_DIR)/$$t >/dev/null 2>&1; \
+			;; \
+		test_manifest_version) \
+			clang -g -Wall -Wextra -O3 -std=$(CSTD) -I$(SRC_DIR) -I$(DEPS_DIR) \
+				-o $(BIN_DIR)/$$t tests/$$t.c $(SRC_DIR)/manifest.c \
+				$(DEPS_DIR)/toml.c -static -lz >/dev/null 2>&1 && \
+			$(BIN_DIR)/$$t >/dev/null 2>&1; \
+			;; \
+		test_registry_versions) \
+			clang -g -Wall -Wextra -O3 -std=$(CSTD) -D_GNU_SOURCE -I$(SRC_DIR) -I$(DEPS_DIR) \
+				-o $(BIN_DIR)/$$t tests/$$t.c $(SRC_DIR)/registry.c -static -lz >/dev/null 2>&1 && \
+			$(BIN_DIR)/$$t >/dev/null 2>&1; \
+			;; \
+		test_registry_fetch_versioned) \
+			clang -g -Wall -Wextra -O3 -std=$(CSTD) -D_GNU_SOURCE -I$(SRC_DIR) -I$(DEPS_DIR) \
+				-o $(BIN_DIR)/$$t tests/$$t.c $(SRC_DIR)/registry.c -static -lz >/dev/null 2>&1 && \
+			$(BIN_DIR)/$$t >/dev/null 2>&1; \
+			;; \
+		esac; \
+		rc=$$?; \
+		if [ $$rc -ne 0 ]; then \
+			echo "FAIL"; \
+			failed=1; \
+		else \
+			echo "PASS"; \
+		fi; \
+	done; \
+	if [ $$failed -ne 0 ]; then \
+		exit 1; \
+	fi; \
+	echo "All tests passed."
 
 .PHONY: clean format tidy check bootstrap test
 

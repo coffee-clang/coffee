@@ -1,5 +1,4 @@
 #include "../coffee.h"
-#include "../coffee_features.h"
 #include "../manifest.h"
 #include "../project.h"
 
@@ -11,76 +10,51 @@
 
 int64_t handle_test(options *opts)
 {
-	char *manifest_path = project_find_manifest(NULL);
+	manifest_t *manifest	  = NULL;
+	char	   *manifest_path = project_find_manifest(NULL);
 
-	if (!manifest_path) {
-		fprintf(stderr, "Error: Could not find Coffee.toml in current directory\n");
-		return 1;
+	if (manifest_path) {
+		manifest = manifest_parse(manifest_path);
 	}
 
-	manifest_t *manifest = manifest_parse(manifest_path);
+	char *dir_end	  = manifest_path ? strrchr(manifest_path, '/') : NULL;
+	char *project_dir = NULL;
+	if (dir_end) {
+		project_dir = strndup(manifest_path, (size_t)(dir_end - manifest_path));
+	} else {
+		project_dir = strdup(".");
+	}
+
 	free(manifest_path);
 
-	if (!manifest) {
-		fprintf(stderr, "Error: Could not parse Coffee.toml\n");
+	char cmd[4096];
+	int	 off;
+
+	if (strcmp(project_dir, ".") == 0) {
+		off = snprintf(cmd, sizeof(cmd), "make test");
+	} else {
+		off = snprintf(cmd, sizeof(cmd), "make -C '%s' test", project_dir);
+	}
+
+	free(project_dir);
+
+	if (opts->inputs_num > 1) {
+		char *test_name = opts->inputs[1];
+		off += snprintf(cmd + off, sizeof(cmd) - off, " TEST_FILTER='%s'", test_name);
+	}
+
+	if (manifest) {
+		manifest_free(manifest);
+	}
+
+	if ((size_t)off >= sizeof(cmd)) {
+		fprintf(stderr, "Error: command too long\n");
 		return 1;
 	}
 
-	const char *cc	       = getenv("CC") ? getenv("CC") : "clang";
-	const char *output_dir = opts->target_dir ? opts->target_dir : "target/debug";
-
-	char cmd[4'096];
-	snprintf(cmd, sizeof(cmd), "mkdir -p %s", output_dir);
-	system(cmd);
-
-	if (access("tests", F_OK) != 0) {
-		printf("No tests found (no 'tests' directory)\n");
-		manifest_free(manifest);
-		return 0;
+	if (opts->verbose) {
+		printf("Running: %s\n", cmd);
 	}
 
-	char dflags[1'024] = "";
-	if (opts->features) {
-		char **features	      = NULL;
-		size_t features_count = 0;
-		features_parse_cli(opts->features, &features, &features_count);
-
-		resolved_features_t *resolved = features_resolve(manifest, (const char **)features, features_count,
-								 opts->all_features, opts->no_default_features);
-
-		if (resolved) {
-			size_t dflags_count = 0;
-			char **dflags_arr = features_to_compiler_flags(resolved, manifest->package.name, &dflags_count);
-			for (size_t i = 0; i < dflags_count; i++) {
-				size_t new_len	  = strlen(dflags) + strlen(dflags_arr[i]) + 2;
-				char  *new_dflags = malloc(new_len);
-				snprintf(new_dflags, new_len, "%s %s", dflags, dflags_arr[i]);
-				memcpy(dflags, new_dflags, new_len > sizeof(dflags) ? sizeof(dflags) : new_len);
-				free(new_dflags);
-				free(dflags_arr[i]);
-			}
-			free(dflags_arr);
-			features_free(resolved);
-		}
-
-		for (size_t i = 0; i < features_count; i++) {
-			free(features[i]);
-		}
-		free(features);
-	}
-
-	printf("Running tests...\n");
-
-	snprintf(cmd, sizeof(cmd),
-		 "for f in tests/*.c; do "
-		 "  echo \"Running test $f\"; "
-		 "  %s -g %s $f -o %s/$(basename $f .c) -Isrc 2>&1 && "
-		 "  %s/$(basename $f .c); "
-		 "done",
-		 cc, dflags, output_dir, output_dir);
-
-	int ret = system(cmd);
-
-	manifest_free(manifest);
-	return ret;
+	return system(cmd);
 }
