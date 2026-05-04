@@ -36,8 +36,8 @@ const char *gengetopt_args_info_description = "A moderm package manager for C";
 const char *gengetopt_args_info_help[] = {
 	"  -h, --help                    Print help and exit",
 	"      --version                 Print version and exit",
-	"  -v, --verbose                 Use verbose output (-vv very verbose/build.rs\n                               "
-	"   output)  (default=off)",
+	"  -v, --verbose                 Use verbose output (-vv very verbose/build.rs\n                                  "
+	"output)  (default=off)",
 	"  -q, --quiet                   Do not print cargo log messages  (default=off)",
 	"      --color=color             Coloring [possible values: auto, always, never]",
 	"      --message-format=message_format\n                                Error format [possible values: human, "
@@ -56,8 +56,8 @@ const char *gengetopt_args_info_help[] = {
 	"      --profile=profile         Build with given profile",
 	"      --target-dir=target_dir   Directory for all generated artifacts",
 	"      --unit-graph              Output build graph in JSON  (default=off)",
-	"      --ignore-rust-version     Ignore `rust-version` specification in packages\n                             "
-	"     (default=off)",
+	"      --ignore-rust-version     Ignore `rust-version` specification in packages\n                                 "
+	" (default=off)",
 	"      --timings=timings         Output build timing information",
 	"      --future-incompat-report  Outputs a future incompatibility report\n                                  "
 	"(default=off)",
@@ -80,7 +80,7 @@ const char *gengetopt_args_info_help[] = {
 	"      --optional                Mark dependency as optional  (default=off)",
 	"      --no-optional             Mark dependency as required  (default=off)",
 	"      --rename=name             Rename the dependency",
-	"  -V, --pkg-version             Version  (default=off)",
+	"  -V, --pkg-version=version     Version constraint",
 	"      --path=path               Filesystem path to local dependency",
 	"      --git=url                 Git repository location",
 	"      --branch=branch           Git branch to download",
@@ -109,225 +109,226 @@ static void clear_given(struct gengetopt_args_info *args_info);
 static void clear_args(struct gengetopt_args_info *args_info);
 
 static int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *args_info,
-				   struct cmdline_parser_params *params, const char *additional_error);
+								   struct cmdline_parser_params *params, const char *additional_error);
 
 const char *cmdline_parser_toolchain_values[] = {"+stable", "+clang-stable", "+gcc-stable",
-						 0}; /*< Possible values for toolchain. */
+												 0}; /*< Possible values for toolchain. */
 
 static char *gengetopt_strdup(const char *s);
 
 static void clear_given(struct gengetopt_args_info *args_info)
 {
-	args_info->help_given			= 0;
-	args_info->version_given		= 0;
-	args_info->verbose_given		= 0;
-	args_info->quiet_given			= 0;
-	args_info->color_given			= 0;
-	args_info->message_format_given		= 0;
-	args_info->manifest_path_given		= 0;
-	args_info->target_given			= 0;
-	args_info->debug_given			= 0;
-	args_info->release_given		= 0;
-	args_info->jobs_given			= 0;
-	args_info->bin_given			= 0;
-	args_info->example_given		= 0;
-	args_info->features_given		= 0;
-	args_info->all_features_given		= 0;
+	args_info->help_given					= 0;
+	args_info->version_given				= 0;
+	args_info->verbose_given				= 0;
+	args_info->quiet_given					= 0;
+	args_info->color_given					= 0;
+	args_info->message_format_given			= 0;
+	args_info->manifest_path_given			= 0;
+	args_info->target_given					= 0;
+	args_info->debug_given					= 0;
+	args_info->release_given				= 0;
+	args_info->jobs_given					= 0;
+	args_info->bin_given					= 0;
+	args_info->example_given				= 0;
+	args_info->features_given				= 0;
+	args_info->all_features_given			= 0;
 	args_info->no_default_features_given	= 0;
-	args_info->profile_given		= 0;
-	args_info->target_dir_given		= 0;
-	args_info->unit_graph_given		= 0;
+	args_info->profile_given				= 0;
+	args_info->target_dir_given				= 0;
+	args_info->unit_graph_given				= 0;
 	args_info->ignore_rust_version_given	= 0;
-	args_info->timings_given		= 0;
+	args_info->timings_given				= 0;
 	args_info->future_incompat_report_given = 0;
-	args_info->workspace_given		= 0;
-	args_info->exclude_given		= 0;
-	args_info->include_given		= 0;
-	args_info->lib_given			= 0;
-	args_info->package_given		= 0;
-	args_info->locked_given			= 0;
-	args_info->offline_given		= 0;
-	args_info->frozen_given			= 0;
-	args_info->config_given			= 0;
-	args_info->unstable_flags_given		= 0;
-	args_info->dev_given			= 0;
-	args_info->build_given			= 0;
-	args_info->optional_given		= 0;
-	args_info->no_optional_given		= 0;
-	args_info->rename_given			= 0;
-	args_info->pkg_version_given		= 0;
-	args_info->path_given			= 0;
-	args_info->git_given			= 0;
-	args_info->branch_given			= 0;
-	args_info->tag_given			= 0;
-	args_info->rev_given			= 0;
-	args_info->registry_given		= 0;
-	args_info->dry_run_given		= 0;
-	args_info->out_dir_given		= 0;
-	args_info->build_plan_given		= 0;
-	args_info->keep_going_given		= 0;
-	args_info->bins_given			= 0;
-	args_info->examples_given		= 0;
-	args_info->tests_given			= 0;
-	args_info->benches_given		= 0;
-	args_info->all_targets_given		= 0;
-	args_info->no_run_given			= 0;
-	args_info->no_fail_fast_given		= 0;
-	args_info->toolchain_given		= 0;
-	args_info->command_given		= 0;
+	args_info->workspace_given				= 0;
+	args_info->exclude_given				= 0;
+	args_info->include_given				= 0;
+	args_info->lib_given					= 0;
+	args_info->package_given				= 0;
+	args_info->locked_given					= 0;
+	args_info->offline_given				= 0;
+	args_info->frozen_given					= 0;
+	args_info->config_given					= 0;
+	args_info->unstable_flags_given			= 0;
+	args_info->dev_given					= 0;
+	args_info->build_given					= 0;
+	args_info->optional_given				= 0;
+	args_info->no_optional_given			= 0;
+	args_info->rename_given					= 0;
+	args_info->pkg_version_given			= 0;
+	args_info->path_given					= 0;
+	args_info->git_given					= 0;
+	args_info->branch_given					= 0;
+	args_info->tag_given					= 0;
+	args_info->rev_given					= 0;
+	args_info->registry_given				= 0;
+	args_info->dry_run_given				= 0;
+	args_info->out_dir_given				= 0;
+	args_info->build_plan_given				= 0;
+	args_info->keep_going_given				= 0;
+	args_info->bins_given					= 0;
+	args_info->examples_given				= 0;
+	args_info->tests_given					= 0;
+	args_info->benches_given				= 0;
+	args_info->all_targets_given			= 0;
+	args_info->no_run_given					= 0;
+	args_info->no_fail_fast_given			= 0;
+	args_info->toolchain_given				= 0;
+	args_info->command_given				= 0;
 }
 
 static void clear_args(struct gengetopt_args_info *args_info)
 {
 	FIX_UNUSED(args_info);
-	args_info->verbose_flag		       = 0;
-	args_info->quiet_flag		       = 0;
-	args_info->color_arg		       = NULL;
-	args_info->color_orig		       = NULL;
-	args_info->message_format_arg	       = NULL;
-	args_info->message_format_orig	       = NULL;
-	args_info->manifest_path_arg	       = NULL;
-	args_info->manifest_path_orig	       = NULL;
-	args_info->target_arg		       = NULL;
-	args_info->target_orig		       = NULL;
-	args_info->debug_flag		       = 0;
-	args_info->release_flag		       = 0;
-	args_info->jobs_orig		       = NULL;
-	args_info->bin_arg		       = NULL;
-	args_info->bin_orig		       = NULL;
-	args_info->example_arg		       = NULL;
-	args_info->example_orig		       = NULL;
-	args_info->features_arg		       = NULL;
-	args_info->features_orig	       = NULL;
-	args_info->all_features_flag	       = 0;
-	args_info->no_default_features_flag    = 0;
-	args_info->profile_arg		       = NULL;
-	args_info->profile_orig		       = NULL;
-	args_info->target_dir_arg	       = NULL;
-	args_info->target_dir_orig	       = NULL;
-	args_info->unit_graph_flag	       = 0;
-	args_info->ignore_rust_version_flag    = 0;
-	args_info->timings_arg		       = NULL;
-	args_info->timings_orig		       = NULL;
+	args_info->verbose_flag				   = 0;
+	args_info->quiet_flag				   = 0;
+	args_info->color_arg				   = NULL;
+	args_info->color_orig				   = NULL;
+	args_info->message_format_arg		   = NULL;
+	args_info->message_format_orig		   = NULL;
+	args_info->manifest_path_arg		   = NULL;
+	args_info->manifest_path_orig		   = NULL;
+	args_info->target_arg				   = NULL;
+	args_info->target_orig				   = NULL;
+	args_info->debug_flag				   = 0;
+	args_info->release_flag				   = 0;
+	args_info->jobs_orig				   = NULL;
+	args_info->bin_arg					   = NULL;
+	args_info->bin_orig					   = NULL;
+	args_info->example_arg				   = NULL;
+	args_info->example_orig				   = NULL;
+	args_info->features_arg				   = NULL;
+	args_info->features_orig			   = NULL;
+	args_info->all_features_flag		   = 0;
+	args_info->no_default_features_flag	   = 0;
+	args_info->profile_arg				   = NULL;
+	args_info->profile_orig				   = NULL;
+	args_info->target_dir_arg			   = NULL;
+	args_info->target_dir_orig			   = NULL;
+	args_info->unit_graph_flag			   = 0;
+	args_info->ignore_rust_version_flag	   = 0;
+	args_info->timings_arg				   = NULL;
+	args_info->timings_orig				   = NULL;
 	args_info->future_incompat_report_flag = 0;
-	args_info->workspace_flag	       = 0;
-	args_info->exclude_arg		       = NULL;
-	args_info->exclude_orig		       = NULL;
-	args_info->include_arg		       = NULL;
-	args_info->include_orig		       = NULL;
-	args_info->lib_flag		       = 0;
-	args_info->package_arg		       = NULL;
-	args_info->package_orig		       = NULL;
-	args_info->locked_flag		       = 0;
-	args_info->offline_flag		       = 0;
-	args_info->frozen_flag		       = 0;
-	args_info->config_arg		       = NULL;
-	args_info->config_orig		       = NULL;
-	args_info->unstable_flags_arg	       = NULL;
-	args_info->unstable_flags_orig	       = NULL;
-	args_info->dev_flag		       = 0;
-	args_info->build_flag		       = 0;
-	args_info->optional_flag	       = 0;
-	args_info->no_optional_flag	       = 0;
-	args_info->rename_arg		       = NULL;
-	args_info->rename_orig		       = NULL;
-	args_info->pkg_version_flag	       = 0;
-	args_info->path_arg		       = NULL;
-	args_info->path_orig		       = NULL;
-	args_info->git_arg		       = NULL;
-	args_info->git_orig		       = NULL;
-	args_info->branch_arg		       = NULL;
-	args_info->branch_orig		       = NULL;
-	args_info->tag_arg		       = NULL;
-	args_info->tag_orig		       = NULL;
-	args_info->rev_arg		       = NULL;
-	args_info->rev_orig		       = NULL;
-	args_info->registry_arg		       = NULL;
-	args_info->registry_orig	       = NULL;
-	args_info->dry_run_flag		       = 0;
-	args_info->out_dir_arg		       = NULL;
-	args_info->out_dir_orig		       = NULL;
-	args_info->build_plan_flag	       = 0;
-	args_info->keep_going_flag	       = 0;
-	args_info->bins_flag		       = 0;
-	args_info->examples_flag	       = 0;
-	args_info->tests_flag		       = 0;
-	args_info->benches_flag		       = 0;
-	args_info->all_targets_flag	       = 0;
-	args_info->no_run_flag		       = 0;
-	args_info->no_fail_fast_flag	       = 0;
-	args_info->toolchain_arg	       = toolchain__NULL;
-	args_info->toolchain_orig	       = NULL;
-	args_info->command_arg		       = NULL;
-	args_info->command_orig		       = NULL;
+	args_info->workspace_flag			   = 0;
+	args_info->exclude_arg				   = NULL;
+	args_info->exclude_orig				   = NULL;
+	args_info->include_arg				   = NULL;
+	args_info->include_orig				   = NULL;
+	args_info->lib_flag					   = 0;
+	args_info->package_arg				   = NULL;
+	args_info->package_orig				   = NULL;
+	args_info->locked_flag				   = 0;
+	args_info->offline_flag				   = 0;
+	args_info->frozen_flag				   = 0;
+	args_info->config_arg				   = NULL;
+	args_info->config_orig				   = NULL;
+	args_info->unstable_flags_arg		   = NULL;
+	args_info->unstable_flags_orig		   = NULL;
+	args_info->dev_flag					   = 0;
+	args_info->build_flag				   = 0;
+	args_info->optional_flag			   = 0;
+	args_info->no_optional_flag			   = 0;
+	args_info->rename_arg				   = NULL;
+	args_info->rename_orig				   = NULL;
+	args_info->pkg_version_arg			   = NULL;
+	args_info->pkg_version_orig			   = NULL;
+	args_info->path_arg					   = NULL;
+	args_info->path_orig				   = NULL;
+	args_info->git_arg					   = NULL;
+	args_info->git_orig					   = NULL;
+	args_info->branch_arg				   = NULL;
+	args_info->branch_orig				   = NULL;
+	args_info->tag_arg					   = NULL;
+	args_info->tag_orig					   = NULL;
+	args_info->rev_arg					   = NULL;
+	args_info->rev_orig					   = NULL;
+	args_info->registry_arg				   = NULL;
+	args_info->registry_orig			   = NULL;
+	args_info->dry_run_flag				   = 0;
+	args_info->out_dir_arg				   = NULL;
+	args_info->out_dir_orig				   = NULL;
+	args_info->build_plan_flag			   = 0;
+	args_info->keep_going_flag			   = 0;
+	args_info->bins_flag				   = 0;
+	args_info->examples_flag			   = 0;
+	args_info->tests_flag				   = 0;
+	args_info->benches_flag				   = 0;
+	args_info->all_targets_flag			   = 0;
+	args_info->no_run_flag				   = 0;
+	args_info->no_fail_fast_flag		   = 0;
+	args_info->toolchain_arg			   = toolchain__NULL;
+	args_info->toolchain_orig			   = NULL;
+	args_info->command_arg				   = NULL;
+	args_info->command_orig				   = NULL;
 }
 
 static void init_args_info(struct gengetopt_args_info *args_info)
 {
 
-	args_info->help_help		       = gengetopt_args_info_help[0];
-	args_info->version_help		       = gengetopt_args_info_help[1];
-	args_info->verbose_help		       = gengetopt_args_info_help[2];
-	args_info->quiet_help		       = gengetopt_args_info_help[3];
-	args_info->color_help		       = gengetopt_args_info_help[4];
-	args_info->message_format_help	       = gengetopt_args_info_help[5];
-	args_info->manifest_path_help	       = gengetopt_args_info_help[6];
-	args_info->target_help		       = gengetopt_args_info_help[7];
-	args_info->debug_help		       = gengetopt_args_info_help[8];
-	args_info->release_help		       = gengetopt_args_info_help[9];
-	args_info->jobs_help		       = gengetopt_args_info_help[10];
-	args_info->bin_help		       = gengetopt_args_info_help[11];
-	args_info->example_help		       = gengetopt_args_info_help[12];
-	args_info->features_help	       = gengetopt_args_info_help[13];
-	args_info->all_features_help	       = gengetopt_args_info_help[14];
-	args_info->no_default_features_help    = gengetopt_args_info_help[15];
-	args_info->profile_help		       = gengetopt_args_info_help[16];
-	args_info->target_dir_help	       = gengetopt_args_info_help[17];
-	args_info->unit_graph_help	       = gengetopt_args_info_help[18];
-	args_info->ignore_rust_version_help    = gengetopt_args_info_help[19];
-	args_info->timings_help		       = gengetopt_args_info_help[20];
+	args_info->help_help				   = gengetopt_args_info_help[0];
+	args_info->version_help				   = gengetopt_args_info_help[1];
+	args_info->verbose_help				   = gengetopt_args_info_help[2];
+	args_info->quiet_help				   = gengetopt_args_info_help[3];
+	args_info->color_help				   = gengetopt_args_info_help[4];
+	args_info->message_format_help		   = gengetopt_args_info_help[5];
+	args_info->manifest_path_help		   = gengetopt_args_info_help[6];
+	args_info->target_help				   = gengetopt_args_info_help[7];
+	args_info->debug_help				   = gengetopt_args_info_help[8];
+	args_info->release_help				   = gengetopt_args_info_help[9];
+	args_info->jobs_help				   = gengetopt_args_info_help[10];
+	args_info->bin_help					   = gengetopt_args_info_help[11];
+	args_info->example_help				   = gengetopt_args_info_help[12];
+	args_info->features_help			   = gengetopt_args_info_help[13];
+	args_info->all_features_help		   = gengetopt_args_info_help[14];
+	args_info->no_default_features_help	   = gengetopt_args_info_help[15];
+	args_info->profile_help				   = gengetopt_args_info_help[16];
+	args_info->target_dir_help			   = gengetopt_args_info_help[17];
+	args_info->unit_graph_help			   = gengetopt_args_info_help[18];
+	args_info->ignore_rust_version_help	   = gengetopt_args_info_help[19];
+	args_info->timings_help				   = gengetopt_args_info_help[20];
 	args_info->future_incompat_report_help = gengetopt_args_info_help[21];
-	args_info->workspace_help	       = gengetopt_args_info_help[22];
-	args_info->exclude_help		       = gengetopt_args_info_help[23];
-	args_info->include_help		       = gengetopt_args_info_help[24];
-	args_info->lib_help		       = gengetopt_args_info_help[25];
-	args_info->package_help		       = gengetopt_args_info_help[26];
-	args_info->locked_help		       = gengetopt_args_info_help[27];
-	args_info->offline_help		       = gengetopt_args_info_help[28];
-	args_info->frozen_help		       = gengetopt_args_info_help[29];
-	args_info->config_help		       = gengetopt_args_info_help[30];
-	args_info->unstable_flags_help	       = gengetopt_args_info_help[31];
-	args_info->dev_help		       = gengetopt_args_info_help[32];
-	args_info->build_help		       = gengetopt_args_info_help[33];
-	args_info->optional_help	       = gengetopt_args_info_help[34];
-	args_info->no_optional_help	       = gengetopt_args_info_help[35];
-	args_info->rename_help		       = gengetopt_args_info_help[36];
-	args_info->pkg_version_help	       = gengetopt_args_info_help[37];
-	args_info->path_help		       = gengetopt_args_info_help[38];
-	args_info->git_help		       = gengetopt_args_info_help[39];
-	args_info->branch_help		       = gengetopt_args_info_help[40];
-	args_info->tag_help		       = gengetopt_args_info_help[41];
-	args_info->rev_help		       = gengetopt_args_info_help[42];
-	args_info->registry_help	       = gengetopt_args_info_help[43];
-	args_info->dry_run_help		       = gengetopt_args_info_help[44];
-	args_info->out_dir_help		       = gengetopt_args_info_help[45];
-	args_info->build_plan_help	       = gengetopt_args_info_help[46];
-	args_info->keep_going_help	       = gengetopt_args_info_help[47];
-	args_info->bins_help		       = gengetopt_args_info_help[48];
-	args_info->examples_help	       = gengetopt_args_info_help[49];
-	args_info->tests_help		       = gengetopt_args_info_help[50];
-	args_info->benches_help		       = gengetopt_args_info_help[51];
-	args_info->all_targets_help	       = gengetopt_args_info_help[52];
-	args_info->no_run_help		       = gengetopt_args_info_help[53];
-	args_info->no_fail_fast_help	       = gengetopt_args_info_help[54];
-	args_info->toolchain_help	       = gengetopt_args_info_help[55];
-	args_info->command_help		       = gengetopt_args_info_help[56];
+	args_info->workspace_help			   = gengetopt_args_info_help[22];
+	args_info->exclude_help				   = gengetopt_args_info_help[23];
+	args_info->include_help				   = gengetopt_args_info_help[24];
+	args_info->lib_help					   = gengetopt_args_info_help[25];
+	args_info->package_help				   = gengetopt_args_info_help[26];
+	args_info->locked_help				   = gengetopt_args_info_help[27];
+	args_info->offline_help				   = gengetopt_args_info_help[28];
+	args_info->frozen_help				   = gengetopt_args_info_help[29];
+	args_info->config_help				   = gengetopt_args_info_help[30];
+	args_info->unstable_flags_help		   = gengetopt_args_info_help[31];
+	args_info->dev_help					   = gengetopt_args_info_help[32];
+	args_info->build_help				   = gengetopt_args_info_help[33];
+	args_info->optional_help			   = gengetopt_args_info_help[34];
+	args_info->no_optional_help			   = gengetopt_args_info_help[35];
+	args_info->rename_help				   = gengetopt_args_info_help[36];
+	args_info->pkg_version_help			   = gengetopt_args_info_help[37];
+	args_info->path_help				   = gengetopt_args_info_help[38];
+	args_info->git_help					   = gengetopt_args_info_help[39];
+	args_info->branch_help				   = gengetopt_args_info_help[40];
+	args_info->tag_help					   = gengetopt_args_info_help[41];
+	args_info->rev_help					   = gengetopt_args_info_help[42];
+	args_info->registry_help			   = gengetopt_args_info_help[43];
+	args_info->dry_run_help				   = gengetopt_args_info_help[44];
+	args_info->out_dir_help				   = gengetopt_args_info_help[45];
+	args_info->build_plan_help			   = gengetopt_args_info_help[46];
+	args_info->keep_going_help			   = gengetopt_args_info_help[47];
+	args_info->bins_help				   = gengetopt_args_info_help[48];
+	args_info->examples_help			   = gengetopt_args_info_help[49];
+	args_info->tests_help				   = gengetopt_args_info_help[50];
+	args_info->benches_help				   = gengetopt_args_info_help[51];
+	args_info->all_targets_help			   = gengetopt_args_info_help[52];
+	args_info->no_run_help				   = gengetopt_args_info_help[53];
+	args_info->no_fail_fast_help		   = gengetopt_args_info_help[54];
+	args_info->toolchain_help			   = gengetopt_args_info_help[55];
+	args_info->command_help				   = gengetopt_args_info_help[56];
 }
 
 void cmdline_parser_print_version(void)
 {
 	printf("%s %s\n", (strlen(CMDLINE_PARSER_PACKAGE_NAME) ? CMDLINE_PARSER_PACKAGE_NAME : CMDLINE_PARSER_PACKAGE),
-	       CMDLINE_PARSER_VERSION);
+		   CMDLINE_PARSER_VERSION);
 
 	if (strlen(gengetopt_args_info_versiontext) > 0) {
 		printf("\n%s\n", gengetopt_args_info_versiontext);
@@ -370,15 +371,15 @@ void cmdline_parser_init(struct gengetopt_args_info *args_info)
 	clear_args(args_info);
 	init_args_info(args_info);
 
-	args_info->inputs     = 0;
+	args_info->inputs	  = 0;
 	args_info->inputs_num = 0;
 }
 
 void cmdline_parser_params_init(struct cmdline_parser_params *params)
 {
 	if (params) {
-		params->override	= 0;
-		params->initialize	= 1;
+		params->override		= 0;
+		params->initialize		= 1;
 		params->check_required	= 1;
 		params->check_ambiguity = 0;
 		params->print_errors	= 1;
@@ -387,8 +388,7 @@ void cmdline_parser_params_init(struct cmdline_parser_params *params)
 
 struct cmdline_parser_params *cmdline_parser_params_create(void)
 {
-	struct cmdline_parser_params *params =
-		(struct cmdline_parser_params *)malloc(sizeof(struct cmdline_parser_params));
+	struct cmdline_parser_params *params = (struct cmdline_parser_params *)malloc(sizeof(struct cmdline_parser_params));
 	cmdline_parser_params_init(params);
 	return params;
 }
@@ -437,6 +437,8 @@ static void cmdline_parser_release(struct gengetopt_args_info *args_info)
 	free_string_field(&(args_info->unstable_flags_orig));
 	free_string_field(&(args_info->rename_arg));
 	free_string_field(&(args_info->rename_orig));
+	free_string_field(&(args_info->pkg_version_arg));
+	free_string_field(&(args_info->pkg_version_orig));
 	free_string_field(&(args_info->path_arg));
 	free_string_field(&(args_info->path_orig));
 	free_string_field(&(args_info->git_arg));
@@ -475,7 +477,7 @@ static void cmdline_parser_release(struct gengetopt_args_info *args_info)
  */
 static int check_possible_values(const char *val, const char *values[])
 {
-	int    i, found, last;
+	int	   i, found, last;
 	size_t len;
 
 	if (!val) {	   /* otherwise strlen() crashes below */
@@ -639,7 +641,7 @@ int cmdline_parser_dump(FILE *outfile, struct gengetopt_args_info *args_info)
 		write_into_file(outfile, "rename", args_info->rename_orig, 0);
 	}
 	if (args_info->pkg_version_given) {
-		write_into_file(outfile, "pkg-version", 0, 0);
+		write_into_file(outfile, "pkg-version", args_info->pkg_version_orig, 0);
 	}
 	if (args_info->path_given) {
 		write_into_file(outfile, "path", args_info->path_orig, 0);
@@ -706,7 +708,7 @@ int cmdline_parser_dump(FILE *outfile, struct gengetopt_args_info *args_info)
 int cmdline_parser_file_save(const char *filename, struct gengetopt_args_info *args_info)
 {
 	FILE *outfile;
-	int   i = 0;
+	int	  i = 0;
 
 	outfile = fopen(filename, "w");
 
@@ -748,7 +750,7 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 }
 
 int cmdline_parser_ext(int argc, char **argv, struct gengetopt_args_info *args_info,
-		       struct cmdline_parser_params *params)
+					   struct cmdline_parser_params *params)
 {
 	int result;
 	result = cmdline_parser_internal(argc, argv, args_info, params, 0);
@@ -762,16 +764,16 @@ int cmdline_parser_ext(int argc, char **argv, struct gengetopt_args_info *args_i
 }
 
 int cmdline_parser2(int argc, char **argv, struct gengetopt_args_info *args_info, int override, int initialize,
-		    int check_required)
+					int check_required)
 {
-	int			     result;
+	int							 result;
 	struct cmdline_parser_params params;
 
-	params.override	       = override;
-	params.initialize      = initialize;
+	params.override		   = override;
+	params.initialize	   = initialize;
 	params.check_required  = check_required;
 	params.check_ambiguity = 0;
-	params.print_errors    = 1;
+	params.print_errors	   = 1;
 
 	result = cmdline_parser_internal(argc, argv, args_info, &params, 0);
 
@@ -811,13 +813,13 @@ static char *package_name = 0;
  * @param additional_error possible further error specification
  */
 static int update_arg(void *field, char **orig_field, unsigned int *field_given, unsigned int *prev_given, char *value,
-		      const char *possible_values[], const char *default_value, cmdline_parser_arg_type arg_type,
-		      int check_ambiguity, int override, int no_free, int multiple_option, const char *long_opt,
-		      char short_opt, const char *additional_error)
+					  const char *possible_values[], const char *default_value, cmdline_parser_arg_type arg_type,
+					  int check_ambiguity, int override, int no_free, int multiple_option, const char *long_opt,
+					  char short_opt, const char *additional_error)
 {
 	char	   *stop_char = 0;
-	const char *val	      = value;
-	int	    found;
+	const char *val		  = value;
+	int			found;
 	char	  **string_field;
 	FIX_UNUSED(field);
 
@@ -826,11 +828,11 @@ static int update_arg(void *field, char **orig_field, unsigned int *field_given,
 
 	if (!multiple_option && prev_given && (*prev_given || (check_ambiguity && *field_given))) {
 		if (short_opt != '-') {
-			fprintf(stderr, "%s: `--%s' (`-%c') option given more than once%s\n", package_name, long_opt,
-				short_opt, (additional_error ? additional_error : ""));
+			fprintf(stderr, "%s: `--%s' (`-%c') option given more than once%s\n", package_name, long_opt, short_opt,
+					(additional_error ? additional_error : ""));
 		} else {
 			fprintf(stderr, "%s: `--%s' option given more than once%s\n", package_name, long_opt,
-				(additional_error ? additional_error : ""));
+					(additional_error ? additional_error : ""));
 		}
 		return 1; /* failure */
 	}
@@ -838,12 +840,12 @@ static int update_arg(void *field, char **orig_field, unsigned int *field_given,
 	if (possible_values && (found = check_possible_values((value ? value : default_value), possible_values)) < 0) {
 		if (short_opt != '-') {
 			fprintf(stderr, "%s: %s argument, \"%s\", for option `--%s' (`-%c')%s\n", package_name,
-				(found == -2) ? "ambiguous" : "invalid", value, long_opt, short_opt,
-				(additional_error ? additional_error : ""));
+					(found == -2) ? "ambiguous" : "invalid", value, long_opt, short_opt,
+					(additional_error ? additional_error : ""));
 		} else {
 			fprintf(stderr, "%s: %s argument, \"%s\", for option `--%s'%s\n", package_name,
-				(found == -2) ? "ambiguous" : "invalid", value, long_opt,
-				(additional_error ? additional_error : ""));
+					(found == -2) ? "ambiguous" : "invalid", value, long_opt,
+					(additional_error ? additional_error : ""));
 		}
 		return 1; /* failure */
 	}
@@ -921,11 +923,11 @@ static int update_arg(void *field, char **orig_field, unsigned int *field_given,
 }
 
 int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *args_info,
-			    struct cmdline_parser_params *params, const char *additional_error)
+							struct cmdline_parser_params *params, const char *additional_error)
 {
 	int c; /* Character of the parsed option.  */
 
-	int			   error_occurred = 0;
+	int						   error_occurred = 0;
 	struct gengetopt_args_info local_args_info;
 
 	int override;
@@ -939,7 +941,7 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 	override = params->override;
 	FIX_UNUSED(override);
 
-	initialize     = params->initialize;
+	initialize	   = params->initialize;
 	check_required = params->check_required;
 
 	/* TODO: Why is this here? It is not used anywhere. */
@@ -960,38 +962,37 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 	while (1) {
 		int option_index = 0;
 
-		static struct option long_options[] = {
-			{"help", 0, NULL, 'h'},	       {"version", 0, NULL, 0},
-			{"verbose", 0, NULL, 'v'},     {"quiet", 0, NULL, 'q'},
-			{"color", 1, NULL, 0},	       {"message-format", 1, NULL, 0},
-			{"manifest-path", 1, NULL, 0}, {"target", 1, NULL, 0},
-			{"debug", 0, NULL, 0},	       {"release", 0, NULL, 0},
-			{"jobs", 1, NULL, 'j'},	       {"bin", 1, NULL, 0},
-			{"example", 1, NULL, 0},       {"features", 1, NULL, 0},
-			{"all-features", 0, NULL, 0},  {"no-default-features", 0, NULL, 0},
-			{"profile", 1, NULL, 0},       {"target-dir", 1, NULL, 0},
-			{"unit-graph", 0, NULL, 0},    {"ignore-rust-version", 0, NULL, 0},
-			{"timings", 1, NULL, 0},       {"future-incompat-report", 0, NULL, 0},
-			{"workspace", 0, NULL, 0},     {"exclude", 1, NULL, 0},
-			{"include", 1, NULL, 0},       {"lib", 0, NULL, 0},
-			{"package", 1, NULL, 'p'},     {"locked", 0, NULL, 0},
-			{"offline", 0, NULL, 0},       {"frozen", 0, NULL, 0},
-			{"config", 1, NULL, 0},	       {"unstable-flags", 1, NULL, 'Z'},
-			{"dev", 0, NULL, 0},	       {"build", 0, NULL, 0},
-			{"optional", 0, NULL, 0},      {"no-optional", 0, NULL, 0},
-			{"rename", 1, NULL, 0},	       {"pkg-version", 0, NULL, 'V'},
-			{"path", 1, NULL, 0},	       {"git", 1, NULL, 0},
-			{"branch", 1, NULL, 0},	       {"tag", 1, NULL, 0},
-			{"rev", 1, NULL, 0},	       {"registry", 1, NULL, 0},
-			{"dry-run", 0, NULL, 0},       {"out-dir", 1, NULL, 0},
-			{"build-plan", 0, NULL, 0},    {"keep-going", 0, NULL, 0},
-			{"bins", 0, NULL, 0},	       {"examples", 0, NULL, 0},
-			{"tests", 0, NULL, 0},	       {"benches", 0, NULL, 0},
-			{"all-targets", 0, NULL, 0},   {"no-run", 0, NULL, 0},
-			{"no-fail-fast", 0, NULL, 0},  {"toolchain", 1, NULL, 0},
-			{"command", 1, NULL, 0},       {0, 0, 0, 0}};
+		static struct option long_options[] = {{"help", 0, NULL, 'h'},		  {"version", 0, NULL, 0},
+											   {"verbose", 0, NULL, 'v'},	  {"quiet", 0, NULL, 'q'},
+											   {"color", 1, NULL, 0},		  {"message-format", 1, NULL, 0},
+											   {"manifest-path", 1, NULL, 0}, {"target", 1, NULL, 0},
+											   {"debug", 0, NULL, 0},		  {"release", 0, NULL, 0},
+											   {"jobs", 1, NULL, 'j'},		  {"bin", 1, NULL, 0},
+											   {"example", 1, NULL, 0},		  {"features", 1, NULL, 0},
+											   {"all-features", 0, NULL, 0},  {"no-default-features", 0, NULL, 0},
+											   {"profile", 1, NULL, 0},		  {"target-dir", 1, NULL, 0},
+											   {"unit-graph", 0, NULL, 0},	  {"ignore-rust-version", 0, NULL, 0},
+											   {"timings", 1, NULL, 0},		  {"future-incompat-report", 0, NULL, 0},
+											   {"workspace", 0, NULL, 0},	  {"exclude", 1, NULL, 0},
+											   {"include", 1, NULL, 0},		  {"lib", 0, NULL, 0},
+											   {"package", 1, NULL, 'p'},	  {"locked", 0, NULL, 0},
+											   {"offline", 0, NULL, 0},		  {"frozen", 0, NULL, 0},
+											   {"config", 1, NULL, 0},		  {"unstable-flags", 1, NULL, 'Z'},
+											   {"dev", 0, NULL, 0},			  {"build", 0, NULL, 0},
+											   {"optional", 0, NULL, 0},	  {"no-optional", 0, NULL, 0},
+											   {"rename", 1, NULL, 0},		  {"pkg-version", 1, NULL, 'V'},
+											   {"path", 1, NULL, 0},		  {"git", 1, NULL, 0},
+											   {"branch", 1, NULL, 0},		  {"tag", 1, NULL, 0},
+											   {"rev", 1, NULL, 0},			  {"registry", 1, NULL, 0},
+											   {"dry-run", 0, NULL, 0},		  {"out-dir", 1, NULL, 0},
+											   {"build-plan", 0, NULL, 0},	  {"keep-going", 0, NULL, 0},
+											   {"bins", 0, NULL, 0},		  {"examples", 0, NULL, 0},
+											   {"tests", 0, NULL, 0},		  {"benches", 0, NULL, 0},
+											   {"all-targets", 0, NULL, 0},	  {"no-run", 0, NULL, 0},
+											   {"no-fail-fast", 0, NULL, 0},  {"toolchain", 1, NULL, 0},
+											   {"command", 1, NULL, 0},		  {0, 0, 0, 0}};
 
-		c = getopt_long(argc, argv, "hvqj:p:Z:V", long_options, &option_index);
+		c = getopt_long(argc, argv, "hvqj:p:Z:V:", long_options, &option_index);
 
 		if (c == -1) {
 			break; /* Exit from `while (1)' loop.  */
@@ -1006,8 +1007,8 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 		case 'v': /* Use verbose output (-vv very verbose/build.rs output).  */
 
 			if (update_arg((void *)&(args_info->verbose_flag), 0, &(args_info->verbose_given),
-				       &(local_args_info.verbose_given), optarg, 0, 0, ARG_FLAG, check_ambiguity,
-				       override, 1, 0, "verbose", 'v', additional_error)) {
+						   &(local_args_info.verbose_given), optarg, 0, 0, ARG_FLAG, check_ambiguity, override, 1, 0,
+						   "verbose", 'v', additional_error)) {
 				goto failure;
 			}
 
@@ -1015,26 +1016,26 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 		case 'q': /* Do not print cargo log messages.  */
 
 			if (update_arg((void *)&(args_info->quiet_flag), 0, &(args_info->quiet_given),
-				       &(local_args_info.quiet_given), optarg, 0, 0, ARG_FLAG, check_ambiguity,
-				       override, 1, 0, "quiet", 'q', additional_error)) {
+						   &(local_args_info.quiet_given), optarg, 0, 0, ARG_FLAG, check_ambiguity, override, 1, 0,
+						   "quiet", 'q', additional_error)) {
 				goto failure;
 			}
 
 			break;
 		case 'j': /* Number of parallel jobs, defaults to # of CPUs.  */
 
-			if (update_arg((void *)&(args_info->jobs_arg), &(args_info->jobs_orig),
-				       &(args_info->jobs_given), &(local_args_info.jobs_given), optarg, 0, 0, ARG_INT,
-				       check_ambiguity, override, 0, 0, "jobs", 'j', additional_error)) {
+			if (update_arg((void *)&(args_info->jobs_arg), &(args_info->jobs_orig), &(args_info->jobs_given),
+						   &(local_args_info.jobs_given), optarg, 0, 0, ARG_INT, check_ambiguity, override, 0, 0,
+						   "jobs", 'j', additional_error)) {
 				goto failure;
 			}
 
 			break;
 		case 'p': /* Package to build.  */
 
-			if (update_arg((void *)&(args_info->package_arg), &(args_info->package_orig),
-				       &(args_info->package_given), &(local_args_info.package_given), optarg, 0, 0,
-				       ARG_STRING, check_ambiguity, override, 0, 0, "package", 'p', additional_error)) {
+			if (update_arg((void *)&(args_info->package_arg), &(args_info->package_orig), &(args_info->package_given),
+						   &(local_args_info.package_given), optarg, 0, 0, ARG_STRING, check_ambiguity, override, 0, 0,
+						   "package", 'p', additional_error)) {
 				goto failure;
 			}
 
@@ -1042,18 +1043,17 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 		case 'Z': /* Unstable (nightly-only) flags.  */
 
 			if (update_arg((void *)&(args_info->unstable_flags_arg), &(args_info->unstable_flags_orig),
-				       &(args_info->unstable_flags_given), &(local_args_info.unstable_flags_given),
-				       optarg, 0, 0, ARG_STRING, check_ambiguity, override, 0, 0, "unstable-flags", 'Z',
-				       additional_error)) {
+						   &(args_info->unstable_flags_given), &(local_args_info.unstable_flags_given), optarg, 0, 0,
+						   ARG_STRING, check_ambiguity, override, 0, 0, "unstable-flags", 'Z', additional_error)) {
 				goto failure;
 			}
 
 			break;
-		case 'V': /* Version.  */
+		case 'V': /* Version constraint.  */
 
-			if (update_arg((void *)&(args_info->pkg_version_flag), 0, &(args_info->pkg_version_given),
-				       &(local_args_info.pkg_version_given), optarg, 0, 0, ARG_FLAG, check_ambiguity,
-				       override, 1, 0, "pkg-version", 'V', additional_error)) {
+			if (update_arg((void *)&(args_info->pkg_version_arg), &(args_info->pkg_version_orig),
+						   &(args_info->pkg_version_given), &(local_args_info.pkg_version_given), optarg, 0, 0,
+						   ARG_STRING, check_ambiguity, override, 0, 0, "pkg-version", 'V', additional_error)) {
 				goto failure;
 			}
 
@@ -1069,10 +1069,9 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			/* Coloring [possible values: auto, always, never].  */
 			if (strcmp(long_options[option_index].name, "color") == 0) {
 
-				if (update_arg((void *)&(args_info->color_arg), &(args_info->color_orig),
-					       &(args_info->color_given), &(local_args_info.color_given), optarg, 0, 0,
-					       ARG_STRING, check_ambiguity, override, 0, 0, "color", '-',
-					       additional_error)) {
+				if (update_arg((void *)&(args_info->color_arg), &(args_info->color_orig), &(args_info->color_given),
+							   &(local_args_info.color_given), optarg, 0, 0, ARG_STRING, check_ambiguity, override, 0,
+							   0, "color", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1080,11 +1079,10 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			/* Error format [possible values: human, json, short].  */
 			else if (strcmp(long_options[option_index].name, "message-format") == 0) {
 
-				if (update_arg((void *)&(args_info->message_format_arg),
-					       &(args_info->message_format_orig), &(args_info->message_format_given),
-					       &(local_args_info.message_format_given), optarg, 0, 0, ARG_STRING,
-					       check_ambiguity, override, 0, 0, "message-format", '-',
-					       additional_error)) {
+				if (update_arg((void *)&(args_info->message_format_arg), &(args_info->message_format_orig),
+							   &(args_info->message_format_given), &(local_args_info.message_format_given), optarg, 0,
+							   0, ARG_STRING, check_ambiguity, override, 0, 0, "message-format", '-',
+							   additional_error)) {
 					goto failure;
 				}
 
@@ -1092,11 +1090,9 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			/* Path to Cargo.toml.  */
 			else if (strcmp(long_options[option_index].name, "manifest-path") == 0) {
 
-				if (update_arg((void *)&(args_info->manifest_path_arg),
-					       &(args_info->manifest_path_orig), &(args_info->manifest_path_given),
-					       &(local_args_info.manifest_path_given), optarg, 0, 0, ARG_STRING,
-					       check_ambiguity, override, 0, 0, "manifest-path", '-',
-					       additional_error)) {
+				if (update_arg((void *)&(args_info->manifest_path_arg), &(args_info->manifest_path_orig),
+							   &(args_info->manifest_path_given), &(local_args_info.manifest_path_given), optarg, 0, 0,
+							   ARG_STRING, check_ambiguity, override, 0, 0, "manifest-path", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1104,10 +1100,9 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			/* Build for the target triple.  */
 			else if (strcmp(long_options[option_index].name, "target") == 0) {
 
-				if (update_arg((void *)&(args_info->target_arg), &(args_info->target_orig),
-					       &(args_info->target_given), &(local_args_info.target_given), optarg, 0,
-					       0, ARG_STRING, check_ambiguity, override, 0, 0, "target", '-',
-					       additional_error)) {
+				if (update_arg((void *)&(args_info->target_arg), &(args_info->target_orig), &(args_info->target_given),
+							   &(local_args_info.target_given), optarg, 0, 0, ARG_STRING, check_ambiguity, override, 0,
+							   0, "target", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1116,8 +1111,8 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			else if (strcmp(long_options[option_index].name, "debug") == 0) {
 
 				if (update_arg((void *)&(args_info->debug_flag), 0, &(args_info->debug_given),
-					       &(local_args_info.debug_given), optarg, 0, 0, ARG_FLAG, check_ambiguity,
-					       override, 1, 0, "debug", '-', additional_error)) {
+							   &(local_args_info.debug_given), optarg, 0, 0, ARG_FLAG, check_ambiguity, override, 1, 0,
+							   "debug", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1126,8 +1121,8 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			else if (strcmp(long_options[option_index].name, "release") == 0) {
 
 				if (update_arg((void *)&(args_info->release_flag), 0, &(args_info->release_given),
-					       &(local_args_info.release_given), optarg, 0, 0, ARG_FLAG,
-					       check_ambiguity, override, 1, 0, "release", '-', additional_error)) {
+							   &(local_args_info.release_given), optarg, 0, 0, ARG_FLAG, check_ambiguity, override, 1,
+							   0, "release", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1135,10 +1130,9 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			/* Build only the specified binary.  */
 			else if (strcmp(long_options[option_index].name, "bin") == 0) {
 
-				if (update_arg((void *)&(args_info->bin_arg), &(args_info->bin_orig),
-					       &(args_info->bin_given), &(local_args_info.bin_given), optarg, 0, 0,
-					       ARG_STRING, check_ambiguity, override, 0, 0, "bin", '-',
-					       additional_error)) {
+				if (update_arg((void *)&(args_info->bin_arg), &(args_info->bin_orig), &(args_info->bin_given),
+							   &(local_args_info.bin_given), optarg, 0, 0, ARG_STRING, check_ambiguity, override, 0, 0,
+							   "bin", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1147,9 +1141,8 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			else if (strcmp(long_options[option_index].name, "example") == 0) {
 
 				if (update_arg((void *)&(args_info->example_arg), &(args_info->example_orig),
-					       &(args_info->example_given), &(local_args_info.example_given), optarg, 0,
-					       0, ARG_STRING, check_ambiguity, override, 0, 0, "example", '-',
-					       additional_error)) {
+							   &(args_info->example_given), &(local_args_info.example_given), optarg, 0, 0, ARG_STRING,
+							   check_ambiguity, override, 0, 0, "example", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1158,9 +1151,8 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			else if (strcmp(long_options[option_index].name, "features") == 0) {
 
 				if (update_arg((void *)&(args_info->features_arg), &(args_info->features_orig),
-					       &(args_info->features_given), &(local_args_info.features_given), optarg,
-					       0, 0, ARG_STRING, check_ambiguity, override, 0, 0, "features", '-',
-					       additional_error)) {
+							   &(args_info->features_given), &(local_args_info.features_given), optarg, 0, 0,
+							   ARG_STRING, check_ambiguity, override, 0, 0, "features", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1168,10 +1160,9 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			/* Activate all available features.  */
 			else if (strcmp(long_options[option_index].name, "all-features") == 0) {
 
-				if (update_arg((void *)&(args_info->all_features_flag), 0,
-					       &(args_info->all_features_given), &(local_args_info.all_features_given),
-					       optarg, 0, 0, ARG_FLAG, check_ambiguity, override, 1, 0, "all-features",
-					       '-', additional_error)) {
+				if (update_arg((void *)&(args_info->all_features_flag), 0, &(args_info->all_features_given),
+							   &(local_args_info.all_features_given), optarg, 0, 0, ARG_FLAG, check_ambiguity, override,
+							   1, 0, "all-features", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1180,10 +1171,9 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			else if (strcmp(long_options[option_index].name, "no-default-features") == 0) {
 
 				if (update_arg((void *)&(args_info->no_default_features_flag), 0,
-					       &(args_info->no_default_features_given),
-					       &(local_args_info.no_default_features_given), optarg, 0, 0, ARG_FLAG,
-					       check_ambiguity, override, 1, 0, "no-default-features", '-',
-					       additional_error)) {
+							   &(args_info->no_default_features_given), &(local_args_info.no_default_features_given),
+							   optarg, 0, 0, ARG_FLAG, check_ambiguity, override, 1, 0, "no-default-features", '-',
+							   additional_error)) {
 					goto failure;
 				}
 
@@ -1192,9 +1182,8 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			else if (strcmp(long_options[option_index].name, "profile") == 0) {
 
 				if (update_arg((void *)&(args_info->profile_arg), &(args_info->profile_orig),
-					       &(args_info->profile_given), &(local_args_info.profile_given), optarg, 0,
-					       0, ARG_STRING, check_ambiguity, override, 0, 0, "profile", '-',
-					       additional_error)) {
+							   &(args_info->profile_given), &(local_args_info.profile_given), optarg, 0, 0, ARG_STRING,
+							   check_ambiguity, override, 0, 0, "profile", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1203,9 +1192,8 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			else if (strcmp(long_options[option_index].name, "target-dir") == 0) {
 
 				if (update_arg((void *)&(args_info->target_dir_arg), &(args_info->target_dir_orig),
-					       &(args_info->target_dir_given), &(local_args_info.target_dir_given),
-					       optarg, 0, 0, ARG_STRING, check_ambiguity, override, 0, 0, "target-dir",
-					       '-', additional_error)) {
+							   &(args_info->target_dir_given), &(local_args_info.target_dir_given), optarg, 0, 0,
+							   ARG_STRING, check_ambiguity, override, 0, 0, "target-dir", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1214,8 +1202,8 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			else if (strcmp(long_options[option_index].name, "unit-graph") == 0) {
 
 				if (update_arg((void *)&(args_info->unit_graph_flag), 0, &(args_info->unit_graph_given),
-					       &(local_args_info.unit_graph_given), optarg, 0, 0, ARG_FLAG,
-					       check_ambiguity, override, 1, 0, "unit-graph", '-', additional_error)) {
+							   &(local_args_info.unit_graph_given), optarg, 0, 0, ARG_FLAG, check_ambiguity, override,
+							   1, 0, "unit-graph", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1224,10 +1212,9 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			else if (strcmp(long_options[option_index].name, "ignore-rust-version") == 0) {
 
 				if (update_arg((void *)&(args_info->ignore_rust_version_flag), 0,
-					       &(args_info->ignore_rust_version_given),
-					       &(local_args_info.ignore_rust_version_given), optarg, 0, 0, ARG_FLAG,
-					       check_ambiguity, override, 1, 0, "ignore-rust-version", '-',
-					       additional_error)) {
+							   &(args_info->ignore_rust_version_given), &(local_args_info.ignore_rust_version_given),
+							   optarg, 0, 0, ARG_FLAG, check_ambiguity, override, 1, 0, "ignore-rust-version", '-',
+							   additional_error)) {
 					goto failure;
 				}
 
@@ -1236,9 +1223,8 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			else if (strcmp(long_options[option_index].name, "timings") == 0) {
 
 				if (update_arg((void *)&(args_info->timings_arg), &(args_info->timings_orig),
-					       &(args_info->timings_given), &(local_args_info.timings_given), optarg, 0,
-					       0, ARG_STRING, check_ambiguity, override, 0, 0, "timings", '-',
-					       additional_error)) {
+							   &(args_info->timings_given), &(local_args_info.timings_given), optarg, 0, 0, ARG_STRING,
+							   check_ambiguity, override, 0, 0, "timings", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1247,10 +1233,9 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			else if (strcmp(long_options[option_index].name, "future-incompat-report") == 0) {
 
 				if (update_arg((void *)&(args_info->future_incompat_report_flag), 0,
-					       &(args_info->future_incompat_report_given),
-					       &(local_args_info.future_incompat_report_given), optarg, 0, 0, ARG_FLAG,
-					       check_ambiguity, override, 1, 0, "future-incompat-report", '-',
-					       additional_error)) {
+							   &(args_info->future_incompat_report_given),
+							   &(local_args_info.future_incompat_report_given), optarg, 0, 0, ARG_FLAG, check_ambiguity,
+							   override, 1, 0, "future-incompat-report", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1259,8 +1244,8 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			else if (strcmp(long_options[option_index].name, "workspace") == 0) {
 
 				if (update_arg((void *)&(args_info->workspace_flag), 0, &(args_info->workspace_given),
-					       &(local_args_info.workspace_given), optarg, 0, 0, ARG_FLAG,
-					       check_ambiguity, override, 1, 0, "workspace", '-', additional_error)) {
+							   &(local_args_info.workspace_given), optarg, 0, 0, ARG_FLAG, check_ambiguity, override, 1,
+							   0, "workspace", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1269,9 +1254,8 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			else if (strcmp(long_options[option_index].name, "exclude") == 0) {
 
 				if (update_arg((void *)&(args_info->exclude_arg), &(args_info->exclude_orig),
-					       &(args_info->exclude_given), &(local_args_info.exclude_given), optarg, 0,
-					       0, ARG_STRING, check_ambiguity, override, 0, 0, "exclude", '-',
-					       additional_error)) {
+							   &(args_info->exclude_given), &(local_args_info.exclude_given), optarg, 0, 0, ARG_STRING,
+							   check_ambiguity, override, 0, 0, "exclude", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1280,9 +1264,8 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			else if (strcmp(long_options[option_index].name, "include") == 0) {
 
 				if (update_arg((void *)&(args_info->include_arg), &(args_info->include_orig),
-					       &(args_info->include_given), &(local_args_info.include_given), optarg, 0,
-					       0, ARG_STRING, check_ambiguity, override, 0, 0, "include", '-',
-					       additional_error)) {
+							   &(args_info->include_given), &(local_args_info.include_given), optarg, 0, 0, ARG_STRING,
+							   check_ambiguity, override, 0, 0, "include", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1290,9 +1273,8 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			/* Build only this package's library.  */
 			else if (strcmp(long_options[option_index].name, "lib") == 0) {
 
-				if (update_arg((void *)&(args_info->lib_flag), 0, &(args_info->lib_given),
-					       &(local_args_info.lib_given), optarg, 0, 0, ARG_FLAG, check_ambiguity,
-					       override, 1, 0, "lib", '-', additional_error)) {
+				if (update_arg((void *)&(args_info->lib_flag), 0, &(args_info->lib_given), &(local_args_info.lib_given),
+							   optarg, 0, 0, ARG_FLAG, check_ambiguity, override, 1, 0, "lib", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1301,8 +1283,8 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			else if (strcmp(long_options[option_index].name, "locked") == 0) {
 
 				if (update_arg((void *)&(args_info->locked_flag), 0, &(args_info->locked_given),
-					       &(local_args_info.locked_given), optarg, 0, 0, ARG_FLAG, check_ambiguity,
-					       override, 1, 0, "locked", '-', additional_error)) {
+							   &(local_args_info.locked_given), optarg, 0, 0, ARG_FLAG, check_ambiguity, override, 1, 0,
+							   "locked", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1311,8 +1293,8 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			else if (strcmp(long_options[option_index].name, "offline") == 0) {
 
 				if (update_arg((void *)&(args_info->offline_flag), 0, &(args_info->offline_given),
-					       &(local_args_info.offline_given), optarg, 0, 0, ARG_FLAG,
-					       check_ambiguity, override, 1, 0, "offline", '-', additional_error)) {
+							   &(local_args_info.offline_given), optarg, 0, 0, ARG_FLAG, check_ambiguity, override, 1,
+							   0, "offline", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1321,8 +1303,8 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			else if (strcmp(long_options[option_index].name, "frozen") == 0) {
 
 				if (update_arg((void *)&(args_info->frozen_flag), 0, &(args_info->frozen_given),
-					       &(local_args_info.frozen_given), optarg, 0, 0, ARG_FLAG, check_ambiguity,
-					       override, 1, 0, "frozen", '-', additional_error)) {
+							   &(local_args_info.frozen_given), optarg, 0, 0, ARG_FLAG, check_ambiguity, override, 1, 0,
+							   "frozen", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1330,10 +1312,9 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			/* Override a configuration value.  */
 			else if (strcmp(long_options[option_index].name, "config") == 0) {
 
-				if (update_arg((void *)&(args_info->config_arg), &(args_info->config_orig),
-					       &(args_info->config_given), &(local_args_info.config_given), optarg, 0,
-					       0, ARG_STRING, check_ambiguity, override, 0, 0, "config", '-',
-					       additional_error)) {
+				if (update_arg((void *)&(args_info->config_arg), &(args_info->config_orig), &(args_info->config_given),
+							   &(local_args_info.config_given), optarg, 0, 0, ARG_STRING, check_ambiguity, override, 0,
+							   0, "config", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1341,9 +1322,8 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			/* Add as a development dependency.  */
 			else if (strcmp(long_options[option_index].name, "dev") == 0) {
 
-				if (update_arg((void *)&(args_info->dev_flag), 0, &(args_info->dev_given),
-					       &(local_args_info.dev_given), optarg, 0, 0, ARG_FLAG, check_ambiguity,
-					       override, 1, 0, "dev", '-', additional_error)) {
+				if (update_arg((void *)&(args_info->dev_flag), 0, &(args_info->dev_given), &(local_args_info.dev_given),
+							   optarg, 0, 0, ARG_FLAG, check_ambiguity, override, 1, 0, "dev", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1352,8 +1332,8 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			else if (strcmp(long_options[option_index].name, "build") == 0) {
 
 				if (update_arg((void *)&(args_info->build_flag), 0, &(args_info->build_given),
-					       &(local_args_info.build_given), optarg, 0, 0, ARG_FLAG, check_ambiguity,
-					       override, 1, 0, "build", '-', additional_error)) {
+							   &(local_args_info.build_given), optarg, 0, 0, ARG_FLAG, check_ambiguity, override, 1, 0,
+							   "build", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1362,8 +1342,8 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			else if (strcmp(long_options[option_index].name, "optional") == 0) {
 
 				if (update_arg((void *)&(args_info->optional_flag), 0, &(args_info->optional_given),
-					       &(local_args_info.optional_given), optarg, 0, 0, ARG_FLAG,
-					       check_ambiguity, override, 1, 0, "optional", '-', additional_error)) {
+							   &(local_args_info.optional_given), optarg, 0, 0, ARG_FLAG, check_ambiguity, override, 1,
+							   0, "optional", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1371,10 +1351,9 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			/* Mark dependency as required.  */
 			else if (strcmp(long_options[option_index].name, "no-optional") == 0) {
 
-				if (update_arg((void *)&(args_info->no_optional_flag), 0,
-					       &(args_info->no_optional_given), &(local_args_info.no_optional_given),
-					       optarg, 0, 0, ARG_FLAG, check_ambiguity, override, 1, 0, "no-optional",
-					       '-', additional_error)) {
+				if (update_arg((void *)&(args_info->no_optional_flag), 0, &(args_info->no_optional_given),
+							   &(local_args_info.no_optional_given), optarg, 0, 0, ARG_FLAG, check_ambiguity, override,
+							   1, 0, "no-optional", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1382,10 +1361,9 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			/* Rename the dependency.  */
 			else if (strcmp(long_options[option_index].name, "rename") == 0) {
 
-				if (update_arg((void *)&(args_info->rename_arg), &(args_info->rename_orig),
-					       &(args_info->rename_given), &(local_args_info.rename_given), optarg, 0,
-					       0, ARG_STRING, check_ambiguity, override, 0, 0, "rename", '-',
-					       additional_error)) {
+				if (update_arg((void *)&(args_info->rename_arg), &(args_info->rename_orig), &(args_info->rename_given),
+							   &(local_args_info.rename_given), optarg, 0, 0, ARG_STRING, check_ambiguity, override, 0,
+							   0, "rename", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1393,10 +1371,9 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			/* Filesystem path to local dependency.  */
 			else if (strcmp(long_options[option_index].name, "path") == 0) {
 
-				if (update_arg((void *)&(args_info->path_arg), &(args_info->path_orig),
-					       &(args_info->path_given), &(local_args_info.path_given), optarg, 0, 0,
-					       ARG_STRING, check_ambiguity, override, 0, 0, "path", '-',
-					       additional_error)) {
+				if (update_arg((void *)&(args_info->path_arg), &(args_info->path_orig), &(args_info->path_given),
+							   &(local_args_info.path_given), optarg, 0, 0, ARG_STRING, check_ambiguity, override, 0, 0,
+							   "path", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1404,10 +1381,9 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			/* Git repository location.  */
 			else if (strcmp(long_options[option_index].name, "git") == 0) {
 
-				if (update_arg((void *)&(args_info->git_arg), &(args_info->git_orig),
-					       &(args_info->git_given), &(local_args_info.git_given), optarg, 0, 0,
-					       ARG_STRING, check_ambiguity, override, 0, 0, "git", '-',
-					       additional_error)) {
+				if (update_arg((void *)&(args_info->git_arg), &(args_info->git_orig), &(args_info->git_given),
+							   &(local_args_info.git_given), optarg, 0, 0, ARG_STRING, check_ambiguity, override, 0, 0,
+							   "git", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1415,10 +1391,9 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			/* Git branch to download.  */
 			else if (strcmp(long_options[option_index].name, "branch") == 0) {
 
-				if (update_arg((void *)&(args_info->branch_arg), &(args_info->branch_orig),
-					       &(args_info->branch_given), &(local_args_info.branch_given), optarg, 0,
-					       0, ARG_STRING, check_ambiguity, override, 0, 0, "branch", '-',
-					       additional_error)) {
+				if (update_arg((void *)&(args_info->branch_arg), &(args_info->branch_orig), &(args_info->branch_given),
+							   &(local_args_info.branch_given), optarg, 0, 0, ARG_STRING, check_ambiguity, override, 0,
+							   0, "branch", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1426,10 +1401,9 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			/* Git tag to download.  */
 			else if (strcmp(long_options[option_index].name, "tag") == 0) {
 
-				if (update_arg((void *)&(args_info->tag_arg), &(args_info->tag_orig),
-					       &(args_info->tag_given), &(local_args_info.tag_given), optarg, 0, 0,
-					       ARG_STRING, check_ambiguity, override, 0, 0, "tag", '-',
-					       additional_error)) {
+				if (update_arg((void *)&(args_info->tag_arg), &(args_info->tag_orig), &(args_info->tag_given),
+							   &(local_args_info.tag_given), optarg, 0, 0, ARG_STRING, check_ambiguity, override, 0, 0,
+							   "tag", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1437,10 +1411,9 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			/* Git commit reference to download.  */
 			else if (strcmp(long_options[option_index].name, "rev") == 0) {
 
-				if (update_arg((void *)&(args_info->rev_arg), &(args_info->rev_orig),
-					       &(args_info->rev_given), &(local_args_info.rev_given), optarg, 0, 0,
-					       ARG_STRING, check_ambiguity, override, 0, 0, "rev", '-',
-					       additional_error)) {
+				if (update_arg((void *)&(args_info->rev_arg), &(args_info->rev_orig), &(args_info->rev_given),
+							   &(local_args_info.rev_given), optarg, 0, 0, ARG_STRING, check_ambiguity, override, 0, 0,
+							   "rev", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1449,9 +1422,8 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			else if (strcmp(long_options[option_index].name, "registry") == 0) {
 
 				if (update_arg((void *)&(args_info->registry_arg), &(args_info->registry_orig),
-					       &(args_info->registry_given), &(local_args_info.registry_given), optarg,
-					       0, 0, ARG_STRING, check_ambiguity, override, 0, 0, "registry", '-',
-					       additional_error)) {
+							   &(args_info->registry_given), &(local_args_info.registry_given), optarg, 0, 0,
+							   ARG_STRING, check_ambiguity, override, 0, 0, "registry", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1460,8 +1432,8 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			else if (strcmp(long_options[option_index].name, "dry-run") == 0) {
 
 				if (update_arg((void *)&(args_info->dry_run_flag), 0, &(args_info->dry_run_given),
-					       &(local_args_info.dry_run_given), optarg, 0, 0, ARG_FLAG,
-					       check_ambiguity, override, 1, 0, "dry-run", '-', additional_error)) {
+							   &(local_args_info.dry_run_given), optarg, 0, 0, ARG_FLAG, check_ambiguity, override, 1,
+							   0, "dry-run", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1470,9 +1442,8 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			else if (strcmp(long_options[option_index].name, "out-dir") == 0) {
 
 				if (update_arg((void *)&(args_info->out_dir_arg), &(args_info->out_dir_orig),
-					       &(args_info->out_dir_given), &(local_args_info.out_dir_given), optarg, 0,
-					       0, ARG_STRING, check_ambiguity, override, 0, 0, "out-dir", '-',
-					       additional_error)) {
+							   &(args_info->out_dir_given), &(local_args_info.out_dir_given), optarg, 0, 0, ARG_STRING,
+							   check_ambiguity, override, 0, 0, "out-dir", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1481,8 +1452,8 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			else if (strcmp(long_options[option_index].name, "build-plan") == 0) {
 
 				if (update_arg((void *)&(args_info->build_plan_flag), 0, &(args_info->build_plan_given),
-					       &(local_args_info.build_plan_given), optarg, 0, 0, ARG_FLAG,
-					       check_ambiguity, override, 1, 0, "build-plan", '-', additional_error)) {
+							   &(local_args_info.build_plan_given), optarg, 0, 0, ARG_FLAG, check_ambiguity, override,
+							   1, 0, "build-plan", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1491,8 +1462,8 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			else if (strcmp(long_options[option_index].name, "keep-going") == 0) {
 
 				if (update_arg((void *)&(args_info->keep_going_flag), 0, &(args_info->keep_going_given),
-					       &(local_args_info.keep_going_given), optarg, 0, 0, ARG_FLAG,
-					       check_ambiguity, override, 1, 0, "keep-going", '-', additional_error)) {
+							   &(local_args_info.keep_going_given), optarg, 0, 0, ARG_FLAG, check_ambiguity, override,
+							   1, 0, "keep-going", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1501,8 +1472,8 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			else if (strcmp(long_options[option_index].name, "bins") == 0) {
 
 				if (update_arg((void *)&(args_info->bins_flag), 0, &(args_info->bins_given),
-					       &(local_args_info.bins_given), optarg, 0, 0, ARG_FLAG, check_ambiguity,
-					       override, 1, 0, "bins", '-', additional_error)) {
+							   &(local_args_info.bins_given), optarg, 0, 0, ARG_FLAG, check_ambiguity, override, 1, 0,
+							   "bins", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1511,8 +1482,8 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			else if (strcmp(long_options[option_index].name, "examples") == 0) {
 
 				if (update_arg((void *)&(args_info->examples_flag), 0, &(args_info->examples_given),
-					       &(local_args_info.examples_given), optarg, 0, 0, ARG_FLAG,
-					       check_ambiguity, override, 1, 0, "examples", '-', additional_error)) {
+							   &(local_args_info.examples_given), optarg, 0, 0, ARG_FLAG, check_ambiguity, override, 1,
+							   0, "examples", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1521,8 +1492,8 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			else if (strcmp(long_options[option_index].name, "tests") == 0) {
 
 				if (update_arg((void *)&(args_info->tests_flag), 0, &(args_info->tests_given),
-					       &(local_args_info.tests_given), optarg, 0, 0, ARG_FLAG, check_ambiguity,
-					       override, 1, 0, "tests", '-', additional_error)) {
+							   &(local_args_info.tests_given), optarg, 0, 0, ARG_FLAG, check_ambiguity, override, 1, 0,
+							   "tests", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1531,8 +1502,8 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			else if (strcmp(long_options[option_index].name, "benches") == 0) {
 
 				if (update_arg((void *)&(args_info->benches_flag), 0, &(args_info->benches_given),
-					       &(local_args_info.benches_given), optarg, 0, 0, ARG_FLAG,
-					       check_ambiguity, override, 1, 0, "benches", '-', additional_error)) {
+							   &(local_args_info.benches_given), optarg, 0, 0, ARG_FLAG, check_ambiguity, override, 1,
+							   0, "benches", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1540,10 +1511,9 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			/* Build all targets.  */
 			else if (strcmp(long_options[option_index].name, "all-targets") == 0) {
 
-				if (update_arg((void *)&(args_info->all_targets_flag), 0,
-					       &(args_info->all_targets_given), &(local_args_info.all_targets_given),
-					       optarg, 0, 0, ARG_FLAG, check_ambiguity, override, 1, 0, "all-targets",
-					       '-', additional_error)) {
+				if (update_arg((void *)&(args_info->all_targets_flag), 0, &(args_info->all_targets_given),
+							   &(local_args_info.all_targets_given), optarg, 0, 0, ARG_FLAG, check_ambiguity, override,
+							   1, 0, "all-targets", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1552,8 +1522,8 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			else if (strcmp(long_options[option_index].name, "no-run") == 0) {
 
 				if (update_arg((void *)&(args_info->no_run_flag), 0, &(args_info->no_run_given),
-					       &(local_args_info.no_run_given), optarg, 0, 0, ARG_FLAG, check_ambiguity,
-					       override, 1, 0, "no-run", '-', additional_error)) {
+							   &(local_args_info.no_run_given), optarg, 0, 0, ARG_FLAG, check_ambiguity, override, 1, 0,
+							   "no-run", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1561,10 +1531,9 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			/* Run all tests regardless of failure.  */
 			else if (strcmp(long_options[option_index].name, "no-fail-fast") == 0) {
 
-				if (update_arg((void *)&(args_info->no_fail_fast_flag), 0,
-					       &(args_info->no_fail_fast_given), &(local_args_info.no_fail_fast_given),
-					       optarg, 0, 0, ARG_FLAG, check_ambiguity, override, 1, 0, "no-fail-fast",
-					       '-', additional_error)) {
+				if (update_arg((void *)&(args_info->no_fail_fast_flag), 0, &(args_info->no_fail_fast_given),
+							   &(local_args_info.no_fail_fast_given), optarg, 0, 0, ARG_FLAG, check_ambiguity, override,
+							   1, 0, "no-fail-fast", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1573,9 +1542,9 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			else if (strcmp(long_options[option_index].name, "toolchain") == 0) {
 
 				if (update_arg((void *)&(args_info->toolchain_arg), &(args_info->toolchain_orig),
-					       &(args_info->toolchain_given), &(local_args_info.toolchain_given),
-					       optarg, cmdline_parser_toolchain_values, 0, ARG_ENUM, check_ambiguity,
-					       override, 0, 0, "toolchain", '-', additional_error)) {
+							   &(args_info->toolchain_given), &(local_args_info.toolchain_given), optarg,
+							   cmdline_parser_toolchain_values, 0, ARG_ENUM, check_ambiguity, override, 0, 0,
+							   "toolchain", '-', additional_error)) {
 					goto failure;
 				}
 
@@ -1584,9 +1553,8 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 			else if (strcmp(long_options[option_index].name, "command") == 0) {
 
 				if (update_arg((void *)&(args_info->command_arg), &(args_info->command_orig),
-					       &(args_info->command_given), &(local_args_info.command_given), optarg, 0,
-					       0, ARG_STRING, check_ambiguity, override, 0, 0, "command", '-',
-					       additional_error)) {
+							   &(args_info->command_given), &(local_args_info.command_given), optarg, 0, 0, ARG_STRING,
+							   check_ambiguity, override, 0, 0, "command", '-', additional_error)) {
 					goto failure;
 				}
 			}
@@ -1598,7 +1566,7 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 
 		default: /* bug: option not considered.  */
 			fprintf(stderr, "%s: option unknown: %c%s\n", CMDLINE_PARSER_PACKAGE, c,
-				(additional_error ? additional_error : ""));
+					(additional_error ? additional_error : ""));
 			abort();
 		} /* switch */
 	} /* while */
@@ -1612,11 +1580,11 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 	}
 
 	if (optind < argc) {
-		int i		    = 0;
+		int i				= 0;
 		int found_prog_name = 0;
 		/* whether program name, i.e., argv[0], is in the remaining args
 		   (this may happen with some implementations of getopt,
-		    but surely not with the one included by gengetopt) */
+			but surely not with the one included by gengetopt) */
 
 		i = optind;
 		while (i < argc) {
@@ -1628,7 +1596,7 @@ int cmdline_parser_internal(int argc, char **argv, struct gengetopt_args_info *a
 		i = 0;
 
 		args_info->inputs_num = argc - optind - found_prog_name;
-		args_info->inputs     = (char **)(malloc((args_info->inputs_num) * sizeof(char *)));
+		args_info->inputs	  = (char **)(malloc((args_info->inputs_num) * sizeof(char *)));
 		while (optind < argc) {
 			if (argv[optind++] != argv[0]) {
 				args_info->inputs[i++] = gengetopt_strdup(argv[optind - 1]);
