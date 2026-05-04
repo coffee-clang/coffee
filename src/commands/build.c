@@ -69,7 +69,7 @@ int64_t handle_build(options *opts)
 		/* Pass feature flags if specified */
 		manifest_t *manifest = manifest_parse(manifest_path);
 		if (manifest) {
-			char **features	      = NULL;
+			char **features		  = NULL;
 			size_t features_count = 0;
 			if (opts->features) {
 				features_parse_cli(opts->features, &features, &features_count);
@@ -80,22 +80,17 @@ int64_t handle_build(options *opts)
 				if (features_count > 0) {
 					requested = (const char **)features;
 				}
-				resolved_features_t *resolved =
-					features_resolve(manifest, requested, features_count, opts->all_features,
-							 opts->no_default_features);
+				resolved_features_t *resolved = features_resolve(manifest, requested, features_count,
+																 opts->all_features, opts->no_default_features);
 				if (resolved) {
 					size_t dflags_count = 0;
-					char **dflags = features_to_compiler_flags(resolved, manifest->package.name,
-										   &dflags_count);
+					char **dflags		= features_to_compiler_flags(resolved, manifest->package.name, &dflags_count);
 					if (dflags_count > 0) {
 						if ((size_t)off < sizeof(cmd)) {
-							off += snprintf(cmd + off, sizeof(cmd) - (size_t)off,
-									" CFLAGS_EXTRA=");
-							for (size_t i = 0;
-							     i < dflags_count && (size_t)off < sizeof(cmd); i++) {
-								off += snprintf(cmd + off, sizeof(cmd) - (size_t)off,
-										"%s%s", dflags[i],
-										(i + 1 < dflags_count) ? " " : "");
+							off += snprintf(cmd + off, sizeof(cmd) - (size_t)off, " CFLAGS_EXTRA=");
+							for (size_t i = 0; i < dflags_count && (size_t)off < sizeof(cmd); i++) {
+								off += snprintf(cmd + off, sizeof(cmd) - (size_t)off, "%s%s", dflags[i],
+												(i + 1 < dflags_count) ? " " : "");
 							}
 						}
 						for (size_t i = 0; i < dflags_count; i++) {
@@ -121,12 +116,10 @@ int64_t handle_build(options *opts)
 		}
 
 		if (opts->verbose) {
-			printf("Running: %s build\n", cmd);
+			printf("Running: %s\n", cmd);
 		}
 
-		char build_cmd[4096];
-		snprintf(build_cmd, sizeof(build_cmd), "%s build", cmd);
-		int status = system(build_cmd);
+		int status = system(cmd);
 
 		free(manifest_path);
 
@@ -153,22 +146,22 @@ int64_t handle_build(options *opts)
 		return 1;
 	}
 
-	char **features	      = NULL;
+	char **features		  = NULL;
 	size_t features_count = 0;
 	if (opts->features) {
 		features_parse_cli(opts->features, &features, &features_count);
 	}
 
 	build_opts_t build_opts = {
-		.verbose	     = opts->verbose,
-		.release	     = opts->release,
-		.debug		     = opts->debug,
-		.target		     = opts->target,
-		.target_dir	     = opts->target_dir,
-		.jobs		     = opts->jobs > 0 ? opts->jobs : 1,
-		.features	     = features,
-		.features_count	     = features_count,
-		.all_features	     = opts->all_features,
+		.verbose			 = opts->verbose,
+		.release			 = opts->release,
+		.debug				 = opts->debug,
+		.target				 = opts->target,
+		.target_dir			 = opts->target_dir,
+		.jobs				 = opts->jobs > 0 ? opts->jobs : 1,
+		.features			 = features,
+		.features_count		 = features_count,
+		.all_features		 = opts->all_features,
 		.no_default_features = opts->no_default_features,
 	};
 
