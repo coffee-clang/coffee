@@ -115,6 +115,7 @@ int main(int argc, char **argv)
 		.target				 = args_info.target_given ? args_info.target_arg : NULL,
 		.target_dir			 = args_info.target_dir_given ? args_info.target_dir_arg : NULL,
 		.manifest_path		 = args_info.manifest_path_given ? args_info.manifest_path_arg : NULL,
+		.lib				 = args_info.lib_given,
 	};
 	/* printf("command_idx: %d\n", command_idx); */
 	/* printf("num commands: %d\n", lengthof(commands)); */

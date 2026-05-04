@@ -29,20 +29,20 @@ typedef char	  byte;
 typedef ptrdiff_t size;
 typedef size_t	  usize;
 
-#define countof(a)   (size)(sizeof(a) / sizeof(*(a)))
-#define lengthof(s)  (countof(s) - 1)
+#define countof(a)	 (size)(sizeof(a) / sizeof(*(a)))
+#define lengthof(s)	 (countof(s) - 1)
 #define new(a, t, n) (t *)alloc(a, sizeof(t), _Alignof(t), n)
 
 typedef struct options_s {
 	bool   verbose;
 	bool   verbose2;
 	bool   quiet;
-	i64    color;
+	i64	   color;
 	bool   locked;
 	bool   offline;
 	char  *error_code;
 	char **inputs;
-	int    inputs_num;
+	int	   inputs_num;
 
 	// Dependency flags
 	char *pkg_version;
@@ -59,7 +59,7 @@ typedef struct options_s {
 	// Build flags
 	bool  release;
 	bool  debug;
-	int   jobs;
+	int	  jobs;
 	char *bin;
 	char *example;
 	char *features;
@@ -69,6 +69,7 @@ typedef struct options_s {
 	char *target;
 	char *target_dir;
 	char *manifest_path;
+	bool  lib;
 } options_s, options;
 
 typedef struct {

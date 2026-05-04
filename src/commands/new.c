@@ -30,7 +30,7 @@ static int create_file(const char *path, const char *content)
 
 static char *get_name_from_path(const char *path)
 {
-	const char *name       = path;
+	const char *name	   = path;
 	char	   *last_slash = strrchr(path, '/');
 	if (last_slash) {
 		name = last_slash + 1;
@@ -148,11 +148,11 @@ int64_t handle_new(options *opts)
 	char gitignore_path[4'096];
 	snprintf(gitignore_path, sizeof(gitignore_path), "%s/.gitignore", path);
 	char gitignore_content[] = "build/\n"
-				   "target/\n"
-				   "*.o\n"
-				   "*.a\n"
-				   "*.so\n"
-				   ".tidy_stamps/\n";
+							   "target/\n"
+							   "*.o\n"
+							   "*.a\n"
+							   "*.so\n"
+							   ".tidy_stamps/\n";
 	if (create_file(gitignore_path, gitignore_content) != 0) {
 		fprintf(stderr, "Error: Could not create .gitignore\n");
 		free(name);
@@ -163,26 +163,26 @@ int64_t handle_new(options *opts)
 	char license_path[4'096];
 	snprintf(license_path, sizeof(license_path), "%s/LICENSE", path);
 	char license_content[] = "MIT License\n"
-				 "\n"
-				 "Copyright (c) 2024\n"
-				 "\n"
-				 "Permission is hereby granted, free of charge, to any person obtaining a copy\n"
-				 "of this software and associated documentation files (the \"Software\"), to deal\n"
-				 "in the Software without restriction, including without limitation the rights\n"
-				 "to use, copy, modify, merge, publish, distribute, sublicense, and/or sell\n"
-				 "copies of the Software, and to permit persons to whom the Software is\n"
-				 "furnished to do so, subject to the following conditions:\n"
-				 "\n"
-				 "The above copyright notice and this permission notice shall be included in all\n"
-				 "copies or substantial portions of the Software.\n"
-				 "\n"
-				 "THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\n"
-				 "IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\n"
-				 "FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\n"
-				 "AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\n"
-				 "LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\n"
-				 "OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\n"
-				 "SOFTWARE.\n";
+							 "\n"
+							 "Copyright (c) 2024\n"
+							 "\n"
+							 "Permission is hereby granted, free of charge, to any person obtaining a copy\n"
+							 "of this software and associated documentation files (the \"Software\"), to deal\n"
+							 "in the Software without restriction, including without limitation the rights\n"
+							 "to use, copy, modify, merge, publish, distribute, sublicense, and/or sell\n"
+							 "copies of the Software, and to permit persons to whom the Software is\n"
+							 "furnished to do so, subject to the following conditions:\n"
+							 "\n"
+							 "The above copyright notice and this permission notice shall be included in all\n"
+							 "copies or substantial portions of the Software.\n"
+							 "\n"
+							 "THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\n"
+							 "IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\n"
+							 "FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\n"
+							 "AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\n"
+							 "LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\n"
+							 "OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\n"
+							 "SOFTWARE.\n";
 	if (create_file(license_path, license_content) != 0) {
 		fprintf(stderr, "Error: Could not create LICENSE\n");
 		free(name);
@@ -194,10 +194,10 @@ int64_t handle_new(options *opts)
 	snprintf(readme_path, sizeof(readme_path), "%s/README.md", path);
 	char readme_content[4'096];
 	snprintf(readme_content, sizeof(readme_content),
-		 "# %s\n"
-		 "\n"
-		 "A modern C project.\n",
-		 name);
+			 "# %s\n"
+			 "\n"
+			 "A modern C project.\n",
+			 name);
 	if (create_file(readme_path, readme_content) != 0) {
 		fprintf(stderr, "Error: Could not create README.md\n");
 		free(name);
@@ -209,29 +209,29 @@ int64_t handle_new(options *opts)
 	snprintf(makefile_path, sizeof(makefile_path), "%s/Makefile", path);
 	char makefile_content[4'096];
 	snprintf(makefile_content, sizeof(makefile_content),
-		 "CC ?= clang\n"
-		 "CFLAGS += -std=c23 -O3 -g\n"
-		 "CFLAGS += -Wall -Wextra -Wshadow -Wpedantic\n"
-		 "CFLAGS += -Wconversion -Wsign-conversion -Wunused\n"
-		 "CFLAGS += -Iinclude/%s\n"
-		 "\n"
-		 "TARGET := build/%s\n"
-		 "SOURCES := $(wildcard src/*.c)\n"
-		 "\n"
-		 ".PHONY: build clean format tidy\n"
-		 "\n"
-		 "build: $(SOURCES)\n"
-		 "\t$(CC) $(CFLAGS) -o $(TARGET) $(SOURCES) $(LDFLAGS)\n"
-		 "\n"
-		 "clean:\n"
-		 "\trm -rf build/\n"
-		 "\n"
-		 "format:\n"
-		 "\tclang-format -i src/*.c include/%s/*.h\n"
-		 "\n"
-		 "tidy:\n"
-		 "\tclang-tidy src/*.c -- $(CFLAGS)\n",
-		 name, name, name);
+			 "CC ?= clang\n"
+			 "CFLAGS += -std=c23 -O3 -g\n"
+			 "CFLAGS += -Wall -Wextra -Wshadow -Wpedantic\n"
+			 "CFLAGS += -Wconversion -Wsign-conversion -Wunused\n"
+			 "CFLAGS += -Iinclude/%s\n"
+			 "\n"
+			 "TARGET := build/%s\n"
+			 "SOURCES := $(wildcard src/*.c)\n"
+			 "\n"
+			 ".PHONY: build clean format tidy\n"
+			 "\n"
+			 "build: $(SOURCES)\n"
+			 "\t$(CC) $(CFLAGS) -o $(TARGET) $(SOURCES) $(LDFLAGS)\n"
+			 "\n"
+			 "clean:\n"
+			 "\trm -rf build/\n"
+			 "\n"
+			 "format:\n"
+			 "\tclang-format -i src/*.c include/%s/*.h\n"
+			 "\n"
+			 "tidy:\n"
+			 "\tclang-tidy src/*.c -- $(CFLAGS)\n",
+			 name, name, name);
 	if (create_file(makefile_path, makefile_content) != 0) {
 		fprintf(stderr, "Error: Could not create Makefile\n");
 		free(name);
@@ -241,19 +241,19 @@ int64_t handle_new(options *opts)
 	/* Create manifest */
 	char manifest_content[4'096];
 	snprintf(manifest_content, sizeof(manifest_content),
-		 "[package]\n"
-		 "name = \"%s\"\n"
-		 "version = \"0.1.0\"\n"
-		 "edition = \"c23\"\n"
-		 "description = \"A new C project\"\n"
-		 "license = \"MIT\"\n"
-		 "\n"
-		 "[dependencies]\n"
-		 "\n"
-		 "[lib]\n"
-		 "sources = [\"src/*.c\"]\n"
-		 "headers = [\"include/%s/*.h\"]\n",
-		 name, name);
+			 "[package]\n"
+			 "name = \"%s\"\n"
+			 "version = \"0.1.0\"\n"
+			 "edition = \"c23\"\n"
+			 "description = \"A new C project\"\n"
+			 "license = \"MIT\"\n"
+			 "\n"
+			 "[dependencies]\n"
+			 "\n"
+			 "[lib]\n"
+			 "sources = [\"src/*.c\"]\n"
+			 "headers = [\"include/%s/*.h\"]\n",
+			 name, name);
 
 	if (create_file(manifest_path, manifest_content) != 0) {
 		fprintf(stderr, "Error: Could not create Coffee.toml\n");
@@ -267,12 +267,12 @@ int64_t handle_new(options *opts)
 
 	char main_content[4'096];
 	snprintf(main_content, sizeof(main_content),
-		 "#include <stdio.h>\n"
-		 "\n"
-		 "int main(int argc, char **argv) {\n"
-		 "    printf(\"Hello, world!\\n\");\n"
-		 "    return 0;\n"
-		 "}\n");
+			 "#include <stdio.h>\n"
+			 "\n"
+			 "int main(int argc, char **argv) {\n"
+			 "    printf(\"Hello, world!\\n\");\n"
+			 "    return 0;\n"
+			 "}\n");
 
 	if (create_file(src_main, main_content) != 0) {
 		fprintf(stderr, "Error: Could not create main.c\n");
@@ -285,17 +285,121 @@ int64_t handle_new(options *opts)
 	snprintf(main_header_path, sizeof(main_header_path), "%s/include/%s/%s.h", path, name, name);
 	char header_content[4'096];
 	snprintf(header_content, sizeof(header_content),
-		 "#ifndef %s_H\n"
-		 "#define %s_H\n"
-		 "\n"
-		 "// Your declarations here\n"
-		 "\n"
-		 "#endif // %s_H\n",
-		 name, name, name);
+			 "#ifndef %s_H\n"
+			 "#define %s_H\n"
+			 "\n"
+			 "// Your declarations here\n"
+			 "\n"
+			 "#endif // %s_H\n",
+			 name, name, name);
 	if (create_file(main_header_path, header_content) != 0) {
 		fprintf(stderr, "Error: Could not create include/%s/%s.h\n", name, name);
 		free(name);
 		return 1;
+	}
+
+	if (opts->lib) {
+		/* Library mode: lib.c, library Makefile, [lib] manifest */
+		char src_lib[4096];
+		snprintf(src_lib, sizeof(src_lib), "%s/lib.c", src_dir);
+
+		char lib_content[4096];
+		snprintf(lib_content, sizeof(lib_content),
+				 "#include \"%s/%s.h\"\n"
+				 "\n"
+				 "int add(int a, int b)\n"
+				 "{\n"
+				 "    return a + b;\n"
+				 "}\n",
+				 name, name);
+
+		if (create_file(src_lib, lib_content) != 0) {
+			fprintf(stderr, "Error: Could not create lib.c\n");
+			free(name);
+			return 1;
+		}
+
+		/* Library Makefile — builds static library */
+		char makefile_content[4096];
+		snprintf(makefile_content, sizeof(makefile_content),
+				 "CC ?= clang\n"
+				 "CFLAGS += -std=c23 -O3 -g\n"
+				 "CFLAGS += -Wall -Wextra -Wshadow -Wpedantic\n"
+				 "CFLAGS += -Wconversion -Wsign-conversion -Wunused\n"
+				 "CFLAGS += -Iinclude/%s\n"
+				 "\n"
+				 "AR ?= ar\n"
+				 "ARFLAGS := rcs\n"
+				 "\n"
+				 "TARGET := build/lib%s.a\n"
+				 "SOURCES := $(wildcard src/*.c)\n"
+				 "OBJECTS := $(SOURCES:src/%.c=build/%.o)\n"
+				 "\n"
+				 ".PHONY: build clean format tidy\n"
+				 "\n"
+				 "build: $(TARGET)\n"
+				 "\n"
+				 "$(TARGET): $(OBJECTS)\n"
+				 "\t$(AR) $(ARFLAGS) $@ $^\n"
+				 "\n"
+				 "build/%.o: src/%.c\n"
+				 "\t$(CC) $(CFLAGS) -c $< -o $@\n"
+				 "\n"
+				 "clean:\n"
+				 "\trm -rf build/\n"
+				 "\n"
+				 "format:\n"
+				 "\tclang-format -i src/*.c include/%s/*.h\n"
+				 "\n"
+				 "tidy:\n"
+				 "\tclang-tidy src/*.c -- $(CFLAGS)\n",
+				 name, name, name);
+
+		if (create_file(makefile_path, makefile_content) != 0) {
+			fprintf(stderr, "Error: Could not create Makefile\n");
+			free(name);
+			return 1;
+		}
+
+		/* Library manifest with [lib] section */
+		char manifest_content[4096];
+		snprintf(manifest_content, sizeof(manifest_content),
+				 "[package]\n"
+				 "name = \"%s\"\n"
+				 "version = \"0.1.0\"\n"
+				 "edition = \"c23\"\n"
+				 "description = \"A new C project\"\n"
+				 "license = \"MIT\"\n"
+				 "\n"
+				 "[dependencies]\n"
+				 "\n"
+				 "[lib]\n"
+				 "sources = [\"src/*.c\"]\n"
+				 "headers = [\"include/%s/*.h\"]\n",
+				 name, name);
+
+		if (create_file(manifest_path, manifest_content) != 0) {
+			fprintf(stderr, "Error: Could not create Coffee.toml\n");
+			free(name);
+			return 1;
+		}
+
+		printf("Created new C library: %s\n", name);
+		printf("  - Coffee.toml\n");
+		printf("  - .gitignore\n");
+		printf("  - LICENSE\n");
+		printf("  - README.md\n");
+		printf("  - Makefile\n");
+		printf("  - include/%s/%s.h\n", name, name);
+		printf("  - src/lib.c\n");
+		printf("  - deps/\n");
+		printf("  - tests/\n");
+		printf("  - docs/index.md\n");
+		printf("  - scripts/\n");
+		printf("  - build/\n");
+
+		free(name);
+		return 0;
 	}
 
 	/* Create placeholder files */
