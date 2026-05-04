@@ -61,7 +61,7 @@ int64_t handle_install_update(options *opts)
 		return 0;
 	}
 
-	int	       count = 0;
+	int			   count = 0;
 	struct dirent *entry;
 	while ((entry = readdir(dir)) != NULL) {
 		if (entry->d_name[0] == '.') {

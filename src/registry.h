@@ -30,12 +30,12 @@ typedef struct {
 const char *coffee_home_dir(void);
 
 recipe_list_t *registry_search(const char *query);
-recipe_t      *registry_get(const char *name);
-int	       registry_fetch(const char *name, const char *version, const char *dest_dir);
-void	       registry_free_recipes(recipe_list_t *list);
-void	       registry_free_recipe(recipe_t *r);
+recipe_t	  *registry_get(const char *name);
+int			   registry_fetch(const char *name, const char *version, const char *dest_dir);
+void		   registry_free_recipes(recipe_list_t *list);
+void		   registry_free_recipe(recipe_t *r);
 
 version_list_t *registry_get_versions(const char *name);
-void		registry_free_versions(version_list_t *list);
+void			registry_free_versions(version_list_t *list);
 
 #endif

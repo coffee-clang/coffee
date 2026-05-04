@@ -65,7 +65,7 @@ static int scan_dir_for_dep(const char *dirpath, const char *dep_name)
 		return 0;
 	}
 
-	int	       found = 0;
+	int			   found = 0;
 	struct dirent *entry;
 	while ((entry = readdir(dir)) != NULL) {
 		if (entry->d_name[0] == '.') {
@@ -125,7 +125,7 @@ int64_t handle_machete(options *opts)
 	for (size_t i = 0; i < m->package.dependencies_count; i++) {
 		const char *entry = m->package.dependencies[i];
 
-		char *name   = strdup(entry);
+		char *name	 = strdup(entry);
 		char *equals = strchr(name, '=');
 		if (equals) {
 			*equals	  = '\0';

@@ -41,7 +41,7 @@ static int analyze_file(const char *filepath, int *file_count, int *issue_count)
 	(*file_count)++;
 
 	char line[4'096];
-	int  line_num = 0;
+	int	 line_num = 0;
 	while (fgets(line, sizeof(line), fp)) {
 		line_num++;
 		char *p = line;
@@ -58,8 +58,7 @@ static int analyze_file(const char *filepath, int *file_count, int *issue_count)
 					*end	  = '\0';
 					FILE *inc = fopen(start, "r");
 					if (!inc) {
-						printf("  %s:%d: warning: included file '%s' not found\n", filepath,
-						       line_num, start);
+						printf("  %s:%d: warning: included file '%s' not found\n", filepath, line_num, start);
 						(*issue_count)++;
 					} else {
 						fclose(inc);

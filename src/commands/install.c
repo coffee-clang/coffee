@@ -69,7 +69,7 @@ int64_t handle_install(options *opts)
 	printf("Installing package: %s@%s\n", package, version);
 
 	const char *coffee_home = coffee_home_dir();
-	char	    global_deps[4'096];
+	char		global_deps[4'096];
 	snprintf(global_deps, sizeof(global_deps), "%s/deps", coffee_home);
 	mkdir(global_deps, 0755);
 

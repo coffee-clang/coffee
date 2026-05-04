@@ -12,7 +12,7 @@ void print_usage()
 int main(int argc, char *argv[])
 {
 	struct gengetopt_args_info args_info;
-	int			   parse_result = cmdline_parser(argc, argv, &args_info);
+	int						   parse_result = cmdline_parser(argc, argv, &args_info);
 	if (parse_result != 0) {
 		// Error messages are printed by the generated parser.
 		exit(1);
@@ -23,11 +23,11 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 	// The first unnamed argument is treated as the command
-	char	   *command	       = args_info.inputs[0];
-	const char *allowed_commands[] = {"build", "run",  "test",    "check",	 "doc",	   "bench",
-					  "new",   "init", "publish", "install", "update", "search"};
-	int	    allowed	       = 0;
-	int	    allowed_count      = sizeof(allowed_commands) / sizeof(allowed_commands[0]);
+	char	   *command			   = args_info.inputs[0];
+	const char *allowed_commands[] = {"build", "run",  "test",	  "check",	 "doc",	   "bench",
+									  "new",   "init", "publish", "install", "update", "search"};
+	int			allowed			   = 0;
+	int			allowed_count	   = sizeof(allowed_commands) / sizeof(allowed_commands[0]);
 	for (int i = 0; i < allowed_count; i++) {
 		if (strcmp(command, allowed_commands[i]) == 0) {
 			allowed = 1;
@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
 	size_t pos = 0;
 	for (int i = 0; i < args_info.inputs_num; i++) {
 		const char *input = args_info.inputs[i];
-		size_t	    len	  = strlen(input);
+		size_t		len	  = strlen(input);
 		memcpy(cmd_line_substring + pos, input, len);
 		pos += len;
 		if (i < args_info.inputs_num - 1) {

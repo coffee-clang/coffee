@@ -12,7 +12,7 @@ typedef struct {
 	bool   debug;
 	char  *target;
 	char  *target_dir;
-	int    jobs;
+	int	   jobs;
 	char **features;
 	size_t features_count;
 	bool   all_features;

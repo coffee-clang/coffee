@@ -34,8 +34,7 @@ int64_t handle_metadata(options *)
 
 	printf("  \"dependencies\": [\n");
 	for (size_t i = 0; i < m->package.dependencies_count; i++) {
-		printf("    \"%s\"%s\n", m->package.dependencies[i],
-		       (i < m->package.dependencies_count - 1) ? "," : "");
+		printf("    \"%s\"%s\n", m->package.dependencies[i], (i < m->package.dependencies_count - 1) ? "," : "");
 	}
 	printf("  ]\n");
 	printf("}\n");

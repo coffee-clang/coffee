@@ -33,11 +33,11 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 		return 1;
 	}
 
-	const char *cc	       = getenv("CC") ? getenv("CC") : "clang";
+	const char *cc		   = getenv("CC") ? getenv("CC") : "clang";
 	const char *output_dir = opts && opts->target_dir ? opts->target_dir : "target/debug";
 
 	char cmd[4'096];
-	int  ret;
+	int	 ret;
 
 	ret = snprintf(cmd, sizeof(cmd), "mkdir -p %s", output_dir);
 	if (ret < 0 || (size_t)ret >= sizeof(cmd)) {
@@ -68,12 +68,12 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 		if (opts->features_count > 0) {
 			requested = (const char **)opts->features;
 		}
-		resolved = features_resolve(manifest, requested, opts->features_count, opts->all_features,
-					    opts->no_default_features);
+		resolved =
+			features_resolve(manifest, requested, opts->features_count, opts->all_features, opts->no_default_features);
 
 		if (resolved) {
 			size_t dflags_count = 0;
-			char **dflags	    = features_to_compiler_flags(resolved, name, &dflags_count);
+			char **dflags		= features_to_compiler_flags(resolved, name, &dflags_count);
 			for (size_t i = 0; i < dflags_count; i++) {
 				size_t new_len	 = strlen(flags) + strlen(dflags[i]) + 2;
 				char  *new_flags = malloc(new_len);
@@ -117,7 +117,7 @@ int build_run(manifest_t *manifest, build_opts_t *opts, char **args, int argc)
 	}
 
 	const char *output_dir = opts && opts->target_dir ? opts->target_dir : "target/debug";
-	const char *name       = manifest->package.name;
+	const char *name	   = manifest->package.name;
 
 	char exe_path[4'096];
 	ret = snprintf(exe_path, sizeof(exe_path), "%s/%s", output_dir, name);
@@ -134,7 +134,7 @@ int build_run(manifest_t *manifest, build_opts_t *opts, char **args, int argc)
 	ret = snprintf(cmd, sizeof(cmd), "%s", exe_path);
 	for (int i = 0; i < argc && args && (size_t)ret < sizeof(cmd) - 1; i++) {
 		size_t len = strlen(cmd);
-		ret	   = snprintf(cmd + len, sizeof(cmd) - len, " %s", args[i]);
+		ret		   = snprintf(cmd + len, sizeof(cmd) - len, " %s", args[i]);
 	}
 
 	return system(cmd);

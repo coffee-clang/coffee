@@ -21,27 +21,27 @@ int64_t handle_run(options *opts)
 		return 1;
 	}
 
-	char **features	      = NULL;
+	char **features		  = NULL;
 	size_t features_count = 0;
 	if (opts->features) {
 		features_parse_cli(opts->features, &features, &features_count);
 	}
 
 	build_opts_t build_opts = {
-		.verbose	     = opts->verbose,
-		.release	     = opts->release,
-		.debug		     = opts->debug,
-		.target		     = opts->target,
-		.target_dir	     = opts->target_dir,
-		.jobs		     = opts->jobs > 0 ? opts->jobs : 1,
-		.features	     = features,
-		.features_count	     = features_count,
-		.all_features	     = opts->all_features,
+		.verbose			 = opts->verbose,
+		.release			 = opts->release,
+		.debug				 = opts->debug,
+		.target				 = opts->target,
+		.target_dir			 = opts->target_dir,
+		.jobs				 = opts->jobs > 0 ? opts->jobs : 1,
+		.features			 = features,
+		.features_count		 = features_count,
+		.all_features		 = opts->all_features,
 		.no_default_features = opts->no_default_features,
 	};
 
 	char **args = NULL;
-	int    argc = 0;
+	int	   argc = 0;
 	if (opts->inputs_num > 1) {
 		args = &opts->inputs[1];
 		argc = opts->inputs_num - 1;

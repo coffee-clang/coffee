@@ -13,8 +13,7 @@ int64_t handle_doc(options *)
 	if (access("Doxyfile", F_OK) == 0) {
 		int ret = system("doxygen");
 		if (ret != 0) {
-			fprintf(stderr,
-				"Error: Documentation generation failed. Please ensure 'doxygen' is installed.\n");
+			fprintf(stderr, "Error: Documentation generation failed. Please ensure 'doxygen' is installed.\n");
 			return 1;
 		}
 	} else {

@@ -20,7 +20,7 @@ static void report_deps(manifest_t *m)
 	for (size_t i = 0; i < m->package.dependencies_count; i++) {
 		const char *entry = m->package.dependencies[i];
 
-		char *name   = strdup(entry);
+		char *name	 = strdup(entry);
 		char *equals = strchr(name, '=');
 		if (equals) {
 			*equals	  = '\0';
@@ -50,7 +50,7 @@ static void report_audit(manifest_t *m)
 	for (size_t i = 0; i < m->package.dependencies_count; i++) {
 		const char *entry = m->package.dependencies[i];
 
-		char *name   = strdup(entry);
+		char *name	 = strdup(entry);
 		char *equals = strchr(name, '=');
 		if (equals) {
 			*equals	  = '\0';

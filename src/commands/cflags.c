@@ -38,10 +38,10 @@ static void append_cflags_for_pkg(const char *name, char *buf, size_t bufsz, siz
 	char toml_path[4096];
 	snprintf(toml_path, sizeof(toml_path), "%s/library.toml", dir);
 
-	int   found = 0;
-	FILE *fp    = fopen(toml_path, "r");
+	int	  found = 0;
+	FILE *fp	= fopen(toml_path, "r");
 	if (fp) {
-		char	      errbuf[256];
+		char		  errbuf[256];
 		toml_table_t *conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
 		if (conf) {
 			toml_array_t *inc = toml_array_in(conf, "include");

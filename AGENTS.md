@@ -9,6 +9,7 @@ Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-s
 **Don't assume. Don't hide confusion. Surface tradeoffs.**
 
 Before implementing:
+
 - State your assumptions explicitly. If uncertain, ask.
 - If multiple interpretations exist, present them - don't pick silently.
 - If a simpler approach exists, say so. Push back when warranted.
@@ -31,12 +32,14 @@ Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, sim
 **Touch only what you must. Clean up only your own mess.**
 
 When editing existing code:
+
 - Don't "improve" adjacent code, comments, or formatting.
 - Don't refactor things that aren't broken.
 - Match existing style, even if you'd do it differently.
 - If you notice unrelated dead code, mention it - don't delete it.
 
 When your changes create orphans:
+
 - Remove imports/variables/functions that YOUR changes made unused.
 - Don't remove pre-existing dead code unless asked.
 
@@ -47,11 +50,13 @@ The test: Every changed line should trace directly to the user's request.
 **Define success criteria. Loop until verified.**
 
 Transform tasks into verifiable goals:
+
 - "Add validation" → "Write tests for invalid inputs, then make them pass"
 - "Fix the bug" → "Write a test that reproduces it, then make it pass"
 - "Refactor X" → "Ensure tests pass before and after"
 
 For multi-step tasks, state a brief plan:
+
 ```
 1. [Step] → verify: [check]
 2. [Step] → verify: [check]
@@ -104,12 +109,12 @@ as that helps us read code better. Wrong or inconsistent code style is a bug. We
 
 ## Naming
 
-Try using a non-confusing naming scheme for your new functions and variable names. It does not necessarily have to mean that you should use the same as in other places of the code, just that the names should be logical, understandable and be named according to what they are used for. File-local functions should be made static. We like lower case names. 
+Try using a non-confusing naming scheme for your new functions and variable names. It does not necessarily have to mean that you should use the same as in other places of the code, just that the names should be logical, understandable and be named according to what they are used for. File-local functions should be made static. We like lower case names.
 
 ## Braces
 
 In if/while/do/for expressions, we write the open brace on the same line as the keyword and we then set the closing
-brace on the same indentation level as the initial keyword. 
+brace on the same indentation level as the initial keyword.
 
 Never omit the braces.
 
@@ -117,7 +122,7 @@ For functions the opening brace should be on a separate line:
 
 ## space before parentheses
 
-When writing expressions using if/while/do/for, there shall be a space between the keyword and the open parenthesis. 
+When writing expressions using if/while/do/for, there shall be a space between the keyword and the open parenthesis.
 
 ## Use boolean conditions
 
@@ -163,6 +168,7 @@ We use the 'return' statement without extra parentheses around the value:
 ## Parentheses for sizeof arguments
 
 When using the sizeof operator in code, we prefer it to be written with parentheses around its argument:
+
 ```
 int size = sizeof(int);
 ```
@@ -195,7 +201,7 @@ something instance;
 
 ## Banned functions
 
-To avoid footguns and unintended consequences we forbid the use of a number of C functions. 
+To avoid footguns and unintended consequences we forbid the use of a number of C functions.
 
 This is the full list of functions generally banned.
 
@@ -291,9 +297,6 @@ WSASocketA
 WSASocketW
 ```
 
-## Active Technologies
-- C23 (`-std=c23`) + tomlc99 (TOML parsing), SDS (strings), zlib (static), gengetopt (CLI parsing) (001-implement-stub-commands)
-- Filesystem - `~/.coffee/deps/` for installed packages, `Coffee.toml` for manifests, `Coffee.lock` for lockfiles, `vendor/` for vendored deps (001-implement-stub-commands)
+### Configuration or convention
 
-## Recent Changes
-- 001-implement-stub-commands: Added C23 (`-std=c23`) + tomlc99 (TOML parsing), SDS (strings), zlib (static), gengetopt (CLI parsing)
+All parameters must be obtained from the `Coffee.toml` file.

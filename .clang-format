@@ -3,9 +3,9 @@
 
 # --- Indentation ---
 UseTab: Always
-IndentWidth: 8
-TabWidth: 8
-ContinuationIndentWidth: 8
+IndentWidth: 4
+TabWidth: 4
+ContinuationIndentWidth: 4
 ColumnLimit: 120
 
 # --- Bracing & Control ---

@@ -14,7 +14,7 @@ int64_t handle_fix(options *)
 
 	if (ret != 0) {
 		fprintf(stderr, "Error: Automatic fix failed. Please ensure 'clang-tidy' is installed and your code is "
-				"mostly valid.\n");
+						"mostly valid.\n");
 		return 1;
 	}
 
