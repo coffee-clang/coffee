@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <glob.h>
+
 static int validate_manifest(manifest_t *m)
 {
 	int errors = 0;
@@ -59,7 +61,7 @@ int64_t handle_check(options *opts)
 	const char *cc = getenv("CC") ? getenv("CC") : "clang";
 
 	/* Build include flags */
-	char   inc_flags[4096] = "-Isrc -Iinclude -I.";
+	char   inc_flags[4096] = "-Ideps -Isrc -Iinclude -I.";
 	size_t off			   = strlen(inc_flags);
 
 	if (m->package.name) {
@@ -85,7 +87,13 @@ int64_t handle_check(options *opts)
 			off += snprintf(cmd + off, sizeof(cmd) - off, " %s", m->package.headers[i]);
 		}
 	} else {
-		off += snprintf(cmd + off, sizeof(cmd) - off, " include/**/*.h");
+		glob_t globbuf;
+		if (glob("include/**/*.h", 0, NULL, &globbuf) == 0) {
+			for (size_t i = 0; i < globbuf.gl_pathc && off < sizeof(cmd); i++) {
+				off += snprintf(cmd + off, sizeof(cmd) - off, " %s", globbuf.gl_pathv[i]);
+			}
+			globfree(&globbuf);
+		}
 	}
 
 	off += snprintf(cmd + off, sizeof(cmd) - off, " 2>&1");
