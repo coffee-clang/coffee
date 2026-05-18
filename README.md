@@ -8,6 +8,7 @@ We enforce a canonical structure on each project.
 
 ### Directory structure
 
+```
 root
 ├── Coffee.toml <-- Project manifest
 ├── .gitignore
@@ -25,6 +26,8 @@ root
 ├── docs/ <-- Doxygen/Markdown documentation
 ├── scripts/ <-- Utility scripts (bash/python)
 └── build/ <-- Artifacts (ignored by Git)
+```
+
 
 The dependencies will be kept in the `deps/` directory. Each library will be in a subdirectory.`
 
