@@ -1,0 +1,21 @@
+[book]
+title = "Coffee"
+description = "A modern package manager for C"
+authors = ["Gianluca Della Vedova"]
+language = "en"
+src = "docs"
+
+[build]
+build-dir = "book"
+create-missing = false
+
+[output.html]
+default-theme = "ayu"
+preferred-dark-theme = "ayu"
+no-section-label = true
+theme = "docs/theme"
+additional-css = ["docs/theme/coffee.css"]
+
+# The CSS @import-remote approach means fonts, logo, and brand styles
+# are pulled live from coffee-clang.github.io at page-load time.
+# For offline builds, run: scripts/fetch-docs-assets.sh
