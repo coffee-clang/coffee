@@ -7,32 +7,32 @@
 static int tests_passed = 0;
 static int tests_failed = 0;
 
-#define TEST(name)                              \
-	do {                                    \
+#define TEST(name)                      \
+	do {                                \
 		printf("Testing %s... ", name); \
 	} while (0)
-#define PASS()                    \
-	do {                      \
+#define PASS()            \
+	do {                  \
 		printf("PASS\n"); \
 		tests_passed++;   \
 	} while (0)
-#define FAIL(msg)                          \
-	do {                               \
+#define FAIL(msg)                  \
+	do {                           \
 		printf("FAIL: %s\n", msg); \
 		tests_failed++;            \
 	} while (0)
-#define ASSERT(cond, msg)                    \
-	do {                                 \
-		if (!(cond)) {               \
-			FAIL(msg);           \
-			return;              \
-		}                            \
+#define ASSERT(cond, msg) \
+	do {                  \
+		if (!(cond)) {    \
+			FAIL(msg);    \
+			return;       \
+		}                 \
 	} while (0)
 
 static void test_extract_exact_version(void)
 {
 	TEST("exact version");
-	char *name    = NULL;
+	char *name	  = NULL;
 	char *version = NULL;
 
 	manifest_extract_dep_info("toml = \"1.0.0\"", &name, &version);
@@ -48,7 +48,7 @@ static void test_extract_exact_version(void)
 static void test_extract_wildcard(void)
 {
 	TEST("wildcard version");
-	char *name    = NULL;
+	char *name	  = NULL;
 	char *version = NULL;
 
 	manifest_extract_dep_info("sds = \"*\"", &name, &version);
@@ -64,7 +64,7 @@ static void test_extract_wildcard(void)
 static void test_extract_range(void)
 {
 	TEST("range version");
-	char *name    = NULL;
+	char *name	  = NULL;
 	char *version = NULL;
 
 	manifest_extract_dep_info("json = \">=2.0\"", &name, &version);
@@ -80,7 +80,7 @@ static void test_extract_range(void)
 static void test_extract_no_version(void)
 {
 	TEST("no version (wildcard default)");
-	char *name    = NULL;
+	char *name	  = NULL;
 	char *version = NULL;
 
 	manifest_extract_dep_info("mylib", &name, &version);
@@ -96,7 +96,7 @@ static void test_extract_no_version(void)
 static void test_extract_null_input(void)
 {
 	TEST("NULL entry");
-	char *name    = (char *)0xdeadbeef;
+	char *name	  = (char *)0xdeadbeef;
 	char *version = (char *)0xdeadbeef;
 
 	manifest_extract_dep_info(NULL, &name, &version);

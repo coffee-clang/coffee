@@ -10,26 +10,26 @@
 static int tests_passed = 0;
 static int tests_failed = 0;
 
-#define TEST(name)                              \
-	do {                                    \
+#define TEST(name)                      \
+	do {                                \
 		printf("Testing %s... ", name); \
 	} while (0)
-#define PASS()                    \
-	do {                      \
+#define PASS()            \
+	do {                  \
 		printf("PASS\n"); \
 		tests_passed++;   \
 	} while (0)
-#define FAIL(msg)                          \
-	do {                               \
+#define FAIL(msg)                  \
+	do {                           \
 		printf("FAIL: %s\n", msg); \
 		tests_failed++;            \
 	} while (0)
-#define ASSERT(cond, msg)          \
-	do {                       \
-		if (!(cond)) {     \
-			FAIL(msg); \
-			return 0;  \
-		}                  \
+#define ASSERT(cond, msg) \
+	do {                  \
+		if (!(cond)) {    \
+			FAIL(msg);    \
+			return 0;     \
+		}                 \
 	} while (0)
 
 static int test_makefile_is_created(void)
@@ -94,7 +94,7 @@ static int test_dep_appended_to_makefile(void)
 	TEST("dependency is appended to Makefile");
 
 	const char *tmp_make = "/tmp/coffee-makefile-add-test.mk";
-	FILE	   *fp	     = fopen(tmp_make, "w");
+	FILE	   *fp		 = fopen(tmp_make, "w");
 	ASSERT(fp, "could not create test Makefile");
 	fprintf(fp, "CC ?= clang\n");
 	fprintf(fp, "build:\n");
@@ -177,8 +177,7 @@ static int test_safe_package_name(void)
 		const char *p = valid[i];
 		while (*p) {
 			int c = (unsigned char)*p;
-			if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' ||
-			      c == '-')) {
+			if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-')) {
 				FAIL("valid name should pass validation");
 				return 0;
 			}
@@ -189,11 +188,10 @@ static int test_safe_package_name(void)
 	const char *invalid[] = {"bad name", "bad$name", "bad;name", "bad\nname", "$(shell)", NULL};
 	for (int i = 0; invalid[i]; i++) {
 		const char *p	  = invalid[i];
-		int	    found = 0;
+		int			found = 0;
 		while (*p && !found) {
 			int c = (unsigned char)*p;
-			if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' ||
-			      c == '-')) {
+			if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-')) {
 				found = 1;
 			}
 			p++;

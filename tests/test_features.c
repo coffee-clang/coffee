@@ -8,26 +8,26 @@
 static int tests_passed = 0;
 static int tests_failed = 0;
 
-#define TEST(name)                              \
-	do {                                    \
+#define TEST(name)                      \
+	do {                                \
 		printf("Testing %s... ", name); \
 	} while (0)
-#define PASS()                    \
-	do {                      \
+#define PASS()            \
+	do {                  \
 		printf("PASS\n"); \
 		tests_passed++;   \
 	} while (0)
-#define FAIL(msg)                          \
-	do {                               \
+#define FAIL(msg)                  \
+	do {                           \
 		printf("FAIL: %s\n", msg); \
 		tests_failed++;            \
 	} while (0)
-#define ASSERT(cond, msg)          \
-	do {                       \
-		if (!(cond)) {     \
-			FAIL(msg); \
-			return 0;  \
-		}                  \
+#define ASSERT(cond, msg) \
+	do {                  \
+		if (!(cond)) {    \
+			FAIL(msg);    \
+			return 0;     \
+		}                 \
 	} while (0)
 
 static int test_feature_parse(void)
@@ -49,8 +49,8 @@ static int test_feature_parse(void)
 	ASSERT(m != NULL, "manifest_parse returned NULL");
 	ASSERT(m->features_count == 3, "expected 3 features");
 	ASSERT(strcmp(m->features[0].name, "default") == 0 || strcmp(m->features[0].name, "json") == 0 ||
-		       strcmp(m->features[0].name, "logging") == 0,
-	       "unexpected feature name");
+			   strcmp(m->features[0].name, "logging") == 0,
+		   "unexpected feature name");
 
 	manifest_free(m);
 	PASS();
@@ -75,7 +75,7 @@ static int test_feature_resolve(void)
 	manifest_t *m = manifest_parse("/tmp/coffee-features-test.toml");
 	ASSERT(m != NULL, "manifest_parse returned NULL");
 
-	const char	    *requested[] = {"json"};
+	const char			*requested[] = {"json"};
 	resolved_features_t *resolved	 = features_resolve(m, requested, 1, false, false);
 	ASSERT(resolved != NULL, "features_resolve returned NULL");
 	ASSERT(features_is_enabled(resolved, "test", "json"), "json should be enabled");
@@ -210,7 +210,7 @@ static int test_compiler_flags(void)
 	manifest_t *m = manifest_parse("/tmp/coffee-features-test.toml");
 	ASSERT(m != NULL, "manifest_parse returned NULL");
 
-	const char	    *requested[] = {"json", "advanced-logging"};
+	const char			*requested[] = {"json", "advanced-logging"};
 	resolved_features_t *resolved	 = features_resolve(m, requested, 2, false, false);
 	ASSERT(resolved != NULL, "features_resolve returned NULL");
 
@@ -257,7 +257,7 @@ static int test_transitive_features(void)
 	manifest_t *m = manifest_parse("/tmp/coffee-features-test.toml");
 	ASSERT(m != NULL, "manifest_parse returned NULL");
 
-	const char	    *requested[] = {"json"};
+	const char			*requested[] = {"json"};
 	resolved_features_t *resolved	 = features_resolve(m, requested, 1, false, false);
 	ASSERT(resolved != NULL, "features_resolve returned NULL");
 	ASSERT(features_is_enabled(resolved, "test", "json"), "json should be enabled");

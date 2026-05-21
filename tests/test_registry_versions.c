@@ -7,26 +7,26 @@
 static int tests_passed = 0;
 static int tests_failed = 0;
 
-#define TEST(name)                              \
-	do {                                    \
+#define TEST(name)                      \
+	do {                                \
 		printf("Testing %s... ", name); \
 	} while (0)
-#define PASS()                    \
-	do {                      \
+#define PASS()            \
+	do {                  \
 		printf("PASS\n"); \
 		tests_passed++;   \
 	} while (0)
-#define FAIL(msg)                          \
-	do {                               \
+#define FAIL(msg)                  \
+	do {                           \
 		printf("FAIL: %s\n", msg); \
 		tests_failed++;            \
 	} while (0)
-#define ASSERT(cond, msg)                    \
-	do {                                 \
-		if (!(cond)) {               \
-			FAIL(msg);           \
-			return;              \
-		}                            \
+#define ASSERT(cond, msg) \
+	do {                  \
+		if (!(cond)) {    \
+			FAIL(msg);    \
+			return;       \
+		}                 \
 	} while (0)
 
 static void test_get_versions_structure(void)
