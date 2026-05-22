@@ -13,8 +13,8 @@ jobs:
 
       - name: Install clang-tools
         run: |
-          apt-get update && \
-          apt-get install -y clang-format clang-tidy
+          sudo apt-get update && \
+          sudo apt-get install -y clang-format clang-tidy
 
       - name: Stash uncommitted changes
         run: git stash
