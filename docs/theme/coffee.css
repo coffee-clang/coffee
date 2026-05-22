@@ -1,3 +1,15 @@
 @import url("https://coffee-clang.github.io/normalize.css");
 @import url("https://coffee-clang.github.io/brand.css");
 @import url("https://coffee-clang.github.io/mdbook.css");
+
+/* ================================================================
+   Sidebar below header
+   The logo-container + mainmenu sit above the sidebar in the DOM.
+   The sidebar's default fixed top:0 makes it overlap the header.
+   ================================================================ */
+
+.sidebar {
+    top: 145px !important;
+    bottom: auto !important;
+    height: calc(100vh - 145px) !important;
+}

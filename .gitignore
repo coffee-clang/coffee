@@ -6,3 +6,4 @@
 *.so
 .tidy_stamps/
 /deps/
+/bin/coffee
