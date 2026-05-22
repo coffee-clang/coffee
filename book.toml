@@ -22,6 +22,5 @@ editable = false
 runnable = false
 line-numbers = false
 
-# The CSS @import-remote approach means fonts, logo, and brand styles
-# are pulled live from coffee-clang.github.io at page-load time.
-# For offline builds, run: scripts/fetch-docs-assets.sh
+# Brand styles, fonts, and icons are loaded remotely from coffee-clang.github.io
+# at page-load time. The local mdbook default CSS provides fallback styling.

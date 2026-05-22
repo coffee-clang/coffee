@@ -32,8 +32,6 @@
         <!-- Brand overrides for mdbook theme (load after defaults to override) -->
         <link rel="stylesheet" href="https://coffee-clang.github.io/mdbook.css">
 
-        <!-- Fonts -->
-        <link rel="stylesheet" href="{{ path_to_root }}FontAwesome/css/font-awesome.css">
         {{#if copy_fonts}}
         <link rel="stylesheet" href="{{ path_to_root }}fonts/fonts.css">
         {{/if}}
@@ -47,7 +45,7 @@
         <link rel="stylesheet" href="{{ ../path_to_root }}{{ this }}">
         {{/each}}
     </head>
-    <body>
+    <body class="sidebar-visible no-js">
         <!-- Provide site root to javascript -->
         <script>
             var path_to_root = "{{ path_to_root }}";
@@ -101,38 +99,7 @@
             body.classList.add("sidebar-" + sidebar);
         </script>
 
-        <!-- Menu bar with org navigation -->
-        <nav class="menu-bar" id="menu-bar">
-            <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
-                <i class="fa fa-bars"></i>
-            </label>
-            <a href="https://coffee-clang.github.io/">Home</a>
-            <a href="https://coffee-clang.github.io/cup">Cup</a>
-            <a href="https://coffee-clang.github.io/coffee">Coffee</a>
-            <a href="https://coffee-clang.github.io/recipes/">Recipes</a>
-            <a href="https://github.com/coffee-clang">GitHub</a>
-            {{#if search_enabled}}
-            <div class="menu-bar-right">
-                <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
-                    <i class="fa fa-search"></i>
-                </button>
-            </div>
-            {{/if}}
-        </nav>
-
-        {{#if search_enabled}}
-        <div id="search-wrapper" class="hidden">
-            <form id="searchbar-outer" class="searchbar-outer">
-                <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
-            </form>
-            <div id="searchresults-outer" class="searchresults-outer hidden">
-                <div id="searchresults-header" class="searchresults-header"></div>
-                <ul id="searchresults">
-                </ul>
-            </div>
-        </div>
-        {{/if}}
-
+        <!-- Sidebar -->
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
                 {{#toc}}{{/toc}}
@@ -162,16 +129,56 @@
             }
         </script>
 
-        <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
-        <script>
-            document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
-            document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
-            Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
-                link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
-            });
-        </script>
-
         <div id="page-wrapper" class="page-wrapper">
+
+            <!-- Menu bar with org navigation and sidebar toggle -->
+            <nav class="menu-bar" id="menu-bar">
+                <div class="menu-left">
+                    <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                        <span class="hamburger-icon">
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                        </span>
+                    </label>
+                    {{#if search_enabled}}
+                    <button id="search-toggle" class="icon-button" type="button" title="Search" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                        <span class="search-icon">&#x1F50D;</span>
+                    </button>
+                    {{/if}}
+                </div>
+                <div class="menu-center">
+                    <a href="https://coffee-clang.github.io/">Home</a>
+                    <a href="https://coffee-clang.github.io/cup">Cup</a>
+                    <a href="https://coffee-clang.github.io/coffee">Coffee</a>
+                    <a href="https://coffee-clang.github.io/recipes/">Recipes</a>
+                    <a href="https://github.com/coffee-clang">GitHub</a>
+                </div>
+                <div class="menu-right"></div>
+            </nav>
+
+            {{#if search_enabled}}
+            <div id="search-wrapper" class="hidden">
+                <form id="searchbar-outer" class="searchbar-outer">
+                    <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                </form>
+                <div id="searchresults-outer" class="searchresults-outer hidden">
+                    <div id="searchresults-header" class="searchresults-header"></div>
+                    <ul id="searchresults">
+                    </ul>
+                </div>
+            </div>
+            {{/if}}
+
+            <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+            <script>
+                document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                    link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                });
+            </script>
+
             <div class="content">
                 <main>
                     {{{ content }}}

@@ -1,8 +1,2 @@
 /* Remote brand styles are loaded via <link> in the template head.
    This file contains coffee-docs-specific overrides only. */
-
-/* Sidebar below the menu-bar */
-.sidebar {
-    top: 40px !important;
-    height: calc(100vh - 40px) !important;
-}
