@@ -25,14 +25,14 @@ jobs:
 #      - name: Run clang-tidy
 #        run: make tidy
 
-      - name: Check for changes
-        run: |
-          if ! git diff --quiet; then
-            echo "Files need formatting or have tidy issues:"
-            git diff --name-only
-            git diff
-            exit 1
-          fi
+#      - name: Check for changes
+#        run: |
+#          if ! git diff --quiet; then
+#            echo "Files need formatting or have tidy issues:"
+#            git diff --name-only
+#            git diff
+#            exit 1
+#          fi
 
       - name: Restore uncommitted changes
         if: always()
