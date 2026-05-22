@@ -23,5 +23,5 @@ coffee install cjson
 
 - Fetches package metadata from recipes repo
 - Downloads library.toml and install.sh
-- Stores in ~/.coffee/deps/<package>/
+- Stores in `~/.coffee/deps/<package>/`
 - Registry index is cached at ~/.coffee/packages.json
