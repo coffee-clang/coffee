@@ -47,6 +47,7 @@ jobs:
           TARGET="docs/theme/remote"
           BASE="https://coffee-clang.github.io"
           FONTS_BASE="https://coffee-clang.github.io/fonts/fira-code"
+          curl -s -o docs/theme/theme.hbs https://github.com/coffee-clang/coffee-clang.github.io/raw/refs/heads/main/theme/index.hbs 
 
       - name: Build with mdBook
         run: ./mdbook build
