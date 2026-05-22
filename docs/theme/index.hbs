@@ -23,6 +23,13 @@
         <!-- Brand stylesheets loaded remotely from coffee-clang.github.io -->
         <link rel="stylesheet" href="https://coffee-clang.github.io/normalize.css">
         <link rel="stylesheet" href="https://coffee-clang.github.io/brand.css">
+
+        <!-- Default mdbook styles (local fallback for remote mdbook.css) -->
+        <link rel="stylesheet" href="{{ path_to_root }}css/variables.css">
+        <link rel="stylesheet" href="{{ path_to_root }}css/general.css">
+        <link rel="stylesheet" href="{{ path_to_root }}css/chrome.css">
+
+        <!-- Brand overrides for mdbook theme (load after defaults to override) -->
         <link rel="stylesheet" href="https://coffee-clang.github.io/mdbook.css">
 
         <!-- Fonts -->
