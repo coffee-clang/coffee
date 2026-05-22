@@ -16,9 +16,6 @@ jobs:
           sudo apt-get update && \
           sudo apt-get install -y clang-format clang-tidy
 
-      - name: Stash uncommitted changes
-        run: git stash
-
       - name: Run clang-format
         run: make format
 
@@ -33,7 +30,3 @@ jobs:
 #            git diff
 #            exit 1
 #          fi
-
-      - name: Restore uncommitted changes
-        if: always()
-        run: git stash pop
