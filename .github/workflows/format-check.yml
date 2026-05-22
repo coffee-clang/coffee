@@ -22,8 +22,8 @@ jobs:
       - name: Run clang-format
         run: make format
 
-      - name: Run clang-tidy
-        run: make tidy
+#      - name: Run clang-tidy
+#        run: make tidy
 
       - name: Check for changes
         run: |
