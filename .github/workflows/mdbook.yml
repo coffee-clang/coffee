@@ -43,8 +43,7 @@ jobs:
         id: pages
         uses: actions/configure-pages@v5
       - name: Fetch remote assets (CSS, logo, fonts) for offline docs build
-        run: |
-          curl -s -o docs/theme/index.hbs https://github.com/coffee-clang/coffee-clang.github.io/raw/refs/heads/main/theme/index.hbs
+        run: make docs-assets
 
       - name: Build with mdBook
         run: ./mdbook build

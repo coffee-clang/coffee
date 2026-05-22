@@ -59,6 +59,8 @@ DEPS_TOML_H_URL := https://raw.githubusercontent.com/cktan/tomlc99/master/toml.h
 DEPS_SDS_URL := https://raw.githubusercontent.com/antirez/sds/master/sds.h
 DEPS_SDSALLOC_URL := https://raw.githubusercontent.com/antirez/sds/master/sdsalloc.h
 
+MDBOOK := $(if $(wildcard ./mdbook),./mdbook,mdbook)
+
 TIDY := clang-tidy
 TIDY_FLAGS = -- -std=$(CSTD) -D_GNU_SOURCE -I$(SRC_DIR) -I$(DEPS_DIR)
 STAMP_DIR = .tidy_stamps
@@ -81,7 +83,7 @@ $(TARGET): $(OBJS)
 	@mkdir -p $(BIN_DIR)
 	$(CC) $(LDFLAGS) -o $@ $(OBJS)
 
-all: format $(TARGET)
+all: format $(TARGET) docs
 
 $(SRC_DIR)/cmdline.c $(SRC_DIR)/cmdline.h: $(SRC_DIR)/cli.ggo
 	gengetopt -i $< --output-dir=$(SRC_DIR)/
@@ -172,9 +174,20 @@ test: $(TARGET)
 	fi; \
 	echo "All tests passed."
 
-.PHONY: clean format tidy check bootstrap test
+.PHONY: clean format tidy check bootstrap test docs-assets docs serve
 
-# Create the stamp directory
+docs-assets:
+	@echo "Fetching remote docs theme assets..."
+	@./scripts/fetch-docs-assets.sh
+
+docs: docs-assets
+	@echo "Building docs website..."
+	@$(MDBOOK) build
+	@echo "Docs built to book/"
+
+serve: docs-assets
+	$(MDBOOK) serve
+
 $(STAMP_DIR):
 	mkdir -p $(STAMP_DIR)
 
