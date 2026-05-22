@@ -44,10 +44,7 @@ jobs:
         uses: actions/configure-pages@v5
       - name: Fetch remote assets (CSS, logo, fonts) for offline docs build
         run: |
-          TARGET="docs/theme/remote"
-          BASE="https://coffee-clang.github.io"
-          FONTS_BASE="https://coffee-clang.github.io/fonts/fira-code"
-          curl -s -o docs/theme/theme.hbs https://github.com/coffee-clang/coffee-clang.github.io/raw/refs/heads/main/theme/index.hbs 
+          curl -s -o docs/theme/index.hbs https://github.com/coffee-clang/coffee-clang.github.io/raw/refs/heads/main/theme/index.hbs
           curl -s -o docs/theme/normalize.css https://github.com/coffee-clang/coffee-clang.github.io/raw/refs/heads/main/theme/normalize.css
           curl -s -o docs/theme/brand.css https://github.com/coffee-clang/coffee-clang.github.io/raw/refs/heads/main/theme/brand.css
           curl -s -o docs/theme/mdbook.css https://github.com/coffee-clang/coffee-clang.github.io/raw/refs/heads/main/theme/mdbook.css
