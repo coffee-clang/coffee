@@ -1,6 +1,12 @@
-# Coffee
-
-A modern package manager for C.
+<div class="logo-container">
+  <div class="logo">
+    <img src="https://coffee-clang.github.io/logo.svg" alt="Coffee logo" width="120" height="120">
+  </div>
+  <div class="tagline">
+    <h1>Coffee</h1>
+    <p>A modern package manager for C.</p>
+  </div>
+</div>
 
 Coffee is a package manager and build system for C projects. It manages dependencies,
 orchestrates builds, and provides a consistent workflow — inspired by Cargo, but built
