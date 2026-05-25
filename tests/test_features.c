@@ -1,39 +1,13 @@
 #include "../src/coffee_features.h"
 #include "../src/manifest.h"
+#include "test_framework.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-static int tests_passed = 0;
-static int tests_failed = 0;
-
-#define TEST(name)                      \
-	do {                                \
-		printf("Testing %s... ", name); \
-	} while (0)
-#define PASS()            \
-	do {                  \
-		printf("PASS\n"); \
-		tests_passed++;   \
-	} while (0)
-#define FAIL(msg)                  \
-	do {                           \
-		printf("FAIL: %s\n", msg); \
-		tests_failed++;            \
-	} while (0)
-#define ASSERT(cond, msg) \
-	do {                  \
-		if (!(cond)) {    \
-			FAIL(msg);    \
-			return 0;     \
-		}                 \
-	} while (0)
-
-static int test_feature_parse(void)
+TEST(feature_parse)
 {
-	TEST("feature parsing from Coffee.toml");
-
 	FILE *fp = fopen("/tmp/coffee-features-test.toml", "w");
 	ASSERT(fp != NULL, "could not create test file");
 
@@ -54,13 +28,10 @@ static int test_feature_parse(void)
 
 	manifest_free(m);
 	PASS();
-	return 1;
 }
 
-static int test_feature_resolve(void)
+TEST(feature_resolve)
 {
-	TEST("feature resolution");
-
 	FILE *fp = fopen("/tmp/coffee-features-test.toml", "w");
 	ASSERT(fp != NULL, "could not create test file");
 
@@ -83,13 +54,10 @@ static int test_feature_resolve(void)
 	features_free(resolved);
 	manifest_free(m);
 	PASS();
-	return 1;
 }
 
-static int test_feature_resolve_all(void)
+TEST(feature_resolve_all)
 {
-	TEST("all_features flag");
-
 	FILE *fp = fopen("/tmp/coffee-features-test.toml", "w");
 	ASSERT(fp != NULL, "could not create test file");
 
@@ -113,13 +81,10 @@ static int test_feature_resolve_all(void)
 	features_free(resolved);
 	manifest_free(m);
 	PASS();
-	return 1;
 }
 
-static int test_feature_default(void)
+TEST(feature_default)
 {
-	TEST("default features");
-
 	FILE *fp = fopen("/tmp/coffee-features-test.toml", "w");
 	ASSERT(fp != NULL, "could not create test file");
 
@@ -142,13 +107,10 @@ static int test_feature_default(void)
 	features_free(resolved);
 	manifest_free(m);
 	PASS();
-	return 1;
 }
 
-static int test_feature_no_default(void)
+TEST(feature_no_default)
 {
-	TEST("--no-default-features");
-
 	FILE *fp = fopen("/tmp/coffee-features-test.toml", "w");
 	ASSERT(fp != NULL, "could not create test file");
 
@@ -169,13 +131,10 @@ static int test_feature_no_default(void)
 	features_free(resolved);
 	manifest_free(m);
 	PASS();
-	return 1;
 }
 
-static int test_cli_parsing(void)
+TEST(cli_parsing)
 {
-	TEST("CLI feature parsing");
-
 	char **features = NULL;
 	size_t count	= 0;
 	features_parse_cli("json,xml,logging", &features, &count);
@@ -190,13 +149,10 @@ static int test_cli_parsing(void)
 	free(features);
 
 	PASS();
-	return 1;
 }
 
-static int test_compiler_flags(void)
+TEST(compiler_flags)
 {
-	TEST("compiler flag generation");
-
 	FILE *fp = fopen("/tmp/coffee-features-test.toml", "w");
 	ASSERT(fp != NULL, "could not create test file");
 
@@ -238,13 +194,10 @@ static int test_compiler_flags(void)
 	features_free(resolved);
 	manifest_free(m);
 	PASS();
-	return 1;
 }
 
-static int test_transitive_features(void)
+TEST(transitive_features)
 {
-	TEST("transitive feature resolution");
-
 	FILE *fp = fopen("/tmp/coffee-features-test.toml", "w");
 	ASSERT(fp != NULL, "could not create test file");
 
@@ -266,25 +219,16 @@ static int test_transitive_features(void)
 	features_free(resolved);
 	manifest_free(m);
 	PASS();
-	return 1;
 }
 
-int main(void)
+void coffee_register_features_tests(void)
 {
-	printf("=== Feature System Tests ===\n\n");
-
-	test_feature_parse();
-	test_feature_resolve();
-	test_feature_resolve_all();
-	test_feature_default();
-	test_feature_no_default();
-	test_cli_parsing();
-	test_compiler_flags();
-	test_transitive_features();
-
-	printf("\n=== Results: %d passed, %d failed ===\n", tests_passed, tests_failed);
-
-	remove("/tmp/coffee-features-test.toml");
-
-	return tests_failed > 0 ? 1 : 0;
+	TEST_REGISTER(feature_parse);
+	TEST_REGISTER(feature_resolve);
+	TEST_REGISTER(feature_resolve_all);
+	TEST_REGISTER(feature_default);
+	TEST_REGISTER(feature_no_default);
+	TEST_REGISTER(cli_parsing);
+	TEST_REGISTER(compiler_flags);
+	TEST_REGISTER(transitive_features);
 }

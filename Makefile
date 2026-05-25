@@ -67,6 +67,13 @@ STAMP_DIR = .tidy_stamps
 SRCS = $(wildcard $(SRC_DIR)/*.c)
 STAMPS = $(patsubst $(SRC_DIR)/%.c, $(STAMP_DIR)/%.c.tidy, $(SRCS))
 
+# Test runner
+TEST_SRCS := $(wildcard tests/*.c)
+TEST_OBJS := $(TEST_SRCS:tests/%.c=$(BIN_DIR)/tests/%.o)
+
+# All support objects for the test runner (everything except coffee.o which has main())
+TEST_SUPPORT_OBJS := $(filter-out $(CORE_OBJ), $(COMMANDS_OBJ) $(MANIFEST_OBJ) $(REGISTRY_OBJ) $(PROJECT_OBJ) $(BUILD_OBJ) $(FEATURES_OBJ) $(TOML_OBJ) $(BIN_DIR)/cmdline.o)
+
 $(BIN_DIR)/%.o: $(SRC_DIR)/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS_COMMON) -c $< -o $@
@@ -78,6 +85,21 @@ $(BIN_DIR)/cmdline.o: $(SRC_DIR)/cmdline.c
 $(BIN_DIR)/toml.o: $(DEPS_DIR)/toml.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS_COMMON) -c $< -o $@
+
+# Test object files
+$(BIN_DIR)/tests/%.o: tests/%.c tests/test_framework.h
+	@mkdir -p $(BIN_DIR)/tests
+	$(CC) $(CFLAGS_COMMON) -Itests -c $< -o $@
+
+# coffee.o for test runner (without main())
+$(BIN_DIR)/tests/coffee_test_runner.o: $(SRC_DIR)/coffee.c
+	@mkdir -p $(BIN_DIR)/tests
+	$(CC) $(CFLAGS_COMMON) -DCOFFEE_TEST_RUNNER -c $< -o $@
+
+# Test runner binary
+$(BIN_DIR)/tests/runner: $(TEST_OBJS) $(TEST_SUPPORT_OBJS) $(BIN_DIR)/tests/coffee_test_runner.o
+	@mkdir -p $(BIN_DIR)/tests
+	$(CC) $(LDFLAGS) -o $@ $^
 
 $(TARGET): $(OBJS)
 	@mkdir -p $(BIN_DIR)
@@ -110,69 +132,21 @@ bootstrap:
 	@echo "Dependencies ready."
 
 clean:
-	rm -rf $(BIN_DIR)  $(STAMP_DIR)
+	rm -rf $(BIN_DIR) $(STAMP_DIR)
 
 format:
-	clang-format -i $(SRC_DIR)/*.c $(SRC_DIR)/*.h $(SRC_DIR)/commands/*.c
+	clang-format -i $(SRC_DIR)/*.c $(SRC_DIR)/*.h $(SRC_DIR)/commands/*.c tests/*.c tests/*.h
 
 tidy: $(STAMPS)
 
 check: format tidy
 
-test: $(TARGET)
-	@failed=0; \
-	for t in test_features test_makefile test_cflags_libs test_manifest_version test_registry_versions test_registry_fetch_versioned; do \
-		if [ -n "$(TEST_FILTER)" ] && [ "$$t" != "$(TEST_FILTER)" ]; then \
-			continue; \
-		fi; \
-		printf "  %-40s ... " "$$t"; \
-		case $$t in \
-		test_features) \
-			clang -g -Wall -Wextra -O3 -std=$(CSTD) -I$(SRC_DIR) -I$(DEPS_DIR) \
-				-o $(BIN_DIR)/$$t tests/$$t.c $(SRC_DIR)/manifest.c \
-				$(SRC_DIR)/coffee_features.c $(DEPS_DIR)/toml.c -static -lz >/dev/null 2>&1 && \
-			$(BIN_DIR)/$$t >/dev/null 2>&1; \
-			;; \
-		test_makefile) \
-			clang -g -Wall -Wextra -O3 -std=$(CSTD) -I$(SRC_DIR) -I$(DEPS_DIR) \
-				-o $(BIN_DIR)/$$t tests/$$t.c $(SRC_DIR)/manifest.c \
-				$(DEPS_DIR)/toml.c -static -lz >/dev/null 2>&1 && \
-			$(BIN_DIR)/$$t >/dev/null 2>&1; \
-			;; \
-		test_cflags_libs) \
-			clang -g -Wall -Wextra -O3 -std=$(CSTD) \
-				-o $(BIN_DIR)/$$t tests/$$t.c -static -lz >/dev/null 2>&1 && \
-			$(BIN_DIR)/$$t >/dev/null 2>&1; \
-			;; \
-		test_manifest_version) \
-			clang -g -Wall -Wextra -O3 -std=$(CSTD) -I$(SRC_DIR) -I$(DEPS_DIR) \
-				-o $(BIN_DIR)/$$t tests/$$t.c $(SRC_DIR)/manifest.c \
-				$(DEPS_DIR)/toml.c -static -lz >/dev/null 2>&1 && \
-			$(BIN_DIR)/$$t >/dev/null 2>&1; \
-			;; \
-		test_registry_versions) \
-			clang -g -Wall -Wextra -O3 -std=$(CSTD) -D_GNU_SOURCE -I$(SRC_DIR) -I$(DEPS_DIR) \
-				-o $(BIN_DIR)/$$t tests/$$t.c $(SRC_DIR)/registry.c -static -lz >/dev/null 2>&1 && \
-			$(BIN_DIR)/$$t >/dev/null 2>&1; \
-			;; \
-		test_registry_fetch_versioned) \
-			clang -g -Wall -Wextra -O3 -std=$(CSTD) -D_GNU_SOURCE -I$(SRC_DIR) -I$(DEPS_DIR) \
-				-o $(BIN_DIR)/$$t tests/$$t.c $(SRC_DIR)/registry.c -static -lz >/dev/null 2>&1 && \
-			$(BIN_DIR)/$$t >/dev/null 2>&1; \
-			;; \
-		esac; \
-		rc=$$?; \
-		if [ $$rc -ne 0 ]; then \
-			echo "FAIL"; \
-			failed=1; \
-		else \
-			echo "PASS"; \
-		fi; \
-	done; \
-	if [ $$failed -ne 0 ]; then \
-		exit 1; \
-	fi; \
-	echo "All tests passed."
+test: $(TARGET) $(BIN_DIR)/tests/runner
+	@if [ -n "$(TEST_FILTER)" ]; then \
+		$(BIN_DIR)/tests/runner "$(TEST_FILTER)"; \
+	else \
+		$(BIN_DIR)/tests/runner; \
+	fi
 
 .PHONY: clean format tidy check bootstrap test docs-assets docs serve
 

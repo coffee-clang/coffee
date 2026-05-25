@@ -1,34 +1,11 @@
+#include "test_framework.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include <sys/stat.h>
 #include <unistd.h>
-
-static int tests_passed = 0;
-static int tests_failed = 0;
-
-#define TEST(name)                      \
-	do {                                \
-		printf("Testing %s... ", name); \
-	} while (0)
-#define PASS()            \
-	do {                  \
-		printf("PASS\n"); \
-		tests_passed++;   \
-	} while (0)
-#define FAIL(msg)                  \
-	do {                           \
-		printf("FAIL: %s\n", msg); \
-		tests_failed++;            \
-	} while (0)
-#define ASSERT(cond, msg) \
-	do {                  \
-		if (!(cond)) {    \
-			FAIL(msg);    \
-			return 0;     \
-		}                 \
-	} while (0)
 
 static void create_file(const char *path, const char *content)
 {
@@ -39,14 +16,12 @@ static void create_file(const char *path, const char *content)
 	}
 }
 
-static int test_pkg_dir_exists(void)
+TEST(pkg_dir_exists)
 {
-	TEST("pkg directory is resolved correctly");
-
 	const char *home = getenv("HOME");
 	ASSERT(home, "HOME not set");
 
-	char pkgdir[4'096];
+	char pkgdir[4096];
 	snprintf(pkgdir, sizeof(pkgdir), "%s/.coffee/deps/test-pkg", home);
 
 	mkdir(pkgdir, 0755);
@@ -54,21 +29,18 @@ static int test_pkg_dir_exists(void)
 	ASSERT(access(pkgdir, F_OK) == 0, "pkg directory should exist");
 
 	PASS();
-	return 1;
 }
 
-static int test_library_toml_with_include(void)
+TEST(library_toml_with_include)
 {
-	TEST("library.toml include key is read correctly");
-
 	const char *home = getenv("HOME");
 	ASSERT(home, "HOME not set");
 
-	char pkgdir[4'096];
+	char pkgdir[4096];
 	snprintf(pkgdir, sizeof(pkgdir), "%s/.coffee/deps/test-pkg", home);
 	mkdir(pkgdir, 0755);
 
-	char toml_path[4'096];
+	char toml_path[4096];
 	snprintf(toml_path, sizeof(toml_path), "%s/library.toml", pkgdir);
 
 	create_file(toml_path, "title = \"test-pkg\"\n"
@@ -86,21 +58,18 @@ static int test_library_toml_with_include(void)
 	ASSERT(strstr(buf, "src/include"), "library.toml missing second include path");
 
 	PASS();
-	return 1;
 }
 
-static int test_library_toml_with_libname(void)
+TEST(library_toml_with_libname)
 {
-	TEST("library.toml libname key is read correctly");
-
 	const char *home = getenv("HOME");
 	ASSERT(home, "HOME not set");
 
-	char pkgdir[4'096];
+	char pkgdir[4096];
 	snprintf(pkgdir, sizeof(pkgdir), "%s/.coffee/deps/test-pkg", home);
 	mkdir(pkgdir, 0755);
 
-	char toml_path[4'096];
+	char toml_path[4096];
 	snprintf(toml_path, sizeof(toml_path), "%s/library.toml", pkgdir);
 
 	create_file(toml_path, "title = \"test-pkg\"\n"
@@ -119,29 +88,26 @@ static int test_library_toml_with_libname(void)
 	ASSERT(strstr(buf, "lib = ["), "library.toml missing lib key");
 
 	PASS();
-	return 1;
 }
 
-static int test_fallback_no_keys(void)
+TEST(fallback_no_keys)
 {
-	TEST("fallback when library.toml has no include/lib keys");
-
 	const char *home = getenv("HOME");
 	ASSERT(home, "HOME not set");
 
-	char pkgdir[4'096];
+	char pkgdir[4096];
 	snprintf(pkgdir, sizeof(pkgdir), "%s/.coffee/deps/test-nokeys", home);
 	mkdir(pkgdir, 0755);
 
-	char incdir[4'096];
+	char incdir[4096];
 	snprintf(incdir, sizeof(incdir), "%s/include", pkgdir);
 	mkdir(incdir, 0755);
 
-	char libdir[4'096];
+	char libdir[4096];
 	snprintf(libdir, sizeof(libdir), "%s/lib", pkgdir);
 	mkdir(libdir, 0755);
 
-	char toml_path[4'096];
+	char toml_path[4096];
 	snprintf(toml_path, sizeof(toml_path), "%s/library.toml", pkgdir);
 	create_file(toml_path, "title = \"test-nokeys\"\n"
 						   "version = \"1.0\"\n");
@@ -150,35 +116,26 @@ static int test_fallback_no_keys(void)
 	ASSERT(access(libdir, F_OK) == 0, "fallback lib dir should exist");
 
 	PASS();
-	return 1;
 }
 
-static int test_pkg_not_installed(void)
+TEST(pkg_not_installed)
 {
-	TEST("uninstalled package is skipped");
-
 	const char *home = getenv("HOME");
 	ASSERT(home, "HOME not set");
 
-	char pkgdir[4'096];
+	char pkgdir[4096];
 	snprintf(pkgdir, sizeof(pkgdir), "%s/.coffee/deps/nonexistent-pkg", home);
 
 	ASSERT(access(pkgdir, F_OK) != 0, "nonexistent package dir should not exist");
 
 	PASS();
-	return 1;
 }
 
-int main(void)
+void coffee_register_cflags_libs_tests(void)
 {
-	printf("=== Running cflags/libs Tests ===\n\n");
-
-	test_pkg_dir_exists();
-	test_library_toml_with_include();
-	test_library_toml_with_libname();
-	test_fallback_no_keys();
-	test_pkg_not_installed();
-
-	printf("\n=== Results: %d passed, %d failed ===\n", tests_passed, tests_failed);
-	return tests_failed > 0 ? 1 : 0;
+	TEST_REGISTER(pkg_dir_exists);
+	TEST_REGISTER(library_toml_with_include);
+	TEST_REGISTER(library_toml_with_libname);
+	TEST_REGISTER(fallback_no_keys);
+	TEST_REGISTER(pkg_not_installed);
 }

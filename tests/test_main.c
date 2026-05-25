@@ -1,0 +1,58 @@
+/*
+ * Test runner entry point.
+ *
+ * When adding a new test file, add a forward declaration and call
+ * its coffee_register_tests() function below.
+ */
+
+#include "test_framework.h"
+
+/* Forward declarations for all test file registration functions */
+void coffee_register_features_tests(void);
+void coffee_register_makefile_tests(void);
+void coffee_register_cflags_libs_tests(void);
+void coffee_register_manifest_version_tests(void);
+void coffee_register_registry_versions_tests(void);
+void coffee_register_registry_fetch_versioned_tests(void);
+void coffee_register_stubs_tests(void);
+void coffee_register_framework_tests(void);
+
+int main(int argc, char **argv)
+{
+	const char *filter = NULL;
+
+	/* Parse --test and --verbose from argv */
+	int verbose = 0;
+	for (int i = 1; i < argc; i++) {
+		if (strcmp(argv[i], "--verbose") == 0 || strcmp(argv[i], "-v") == 0) {
+			verbose = 1;
+		} else if (strcmp(argv[i], "--test") == 0 && i + 1 < argc) {
+			filter = argv[++i];
+		} else if (filter == NULL && argv[i][0] != '-') {
+			/* First non-flag argument is the filter */
+			filter = argv[i];
+		}
+	}
+
+	/* Register all tests */
+	coffee_register_features_tests();
+	coffee_register_makefile_tests();
+	coffee_register_cflags_libs_tests();
+	coffee_register_manifest_version_tests();
+	coffee_register_registry_versions_tests();
+	coffee_register_registry_fetch_versioned_tests();
+	coffee_register_stubs_tests();
+	coffee_register_framework_tests();
+
+	if (verbose) {
+		printf("Registered %u tests\n", test_framework_count);
+	}
+
+	printf("=== Coffee Test Suite ===\n\n");
+
+	int result = test_framework_run(filter);
+
+	test_framework_summary();
+
+	return result;
+}

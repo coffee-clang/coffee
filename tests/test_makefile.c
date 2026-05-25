@@ -1,5 +1,6 @@
 #include "../src/coffee.h"
 #include "../src/manifest.h"
+#include "test_framework.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,35 +8,8 @@
 
 #include <sys/stat.h>
 
-static int tests_passed = 0;
-static int tests_failed = 0;
-
-#define TEST(name)                      \
-	do {                                \
-		printf("Testing %s... ", name); \
-	} while (0)
-#define PASS()            \
-	do {                  \
-		printf("PASS\n"); \
-		tests_passed++;   \
-	} while (0)
-#define FAIL(msg)                  \
-	do {                           \
-		printf("FAIL: %s\n", msg); \
-		tests_failed++;            \
-	} while (0)
-#define ASSERT(cond, msg) \
-	do {                  \
-		if (!(cond)) {    \
-			FAIL(msg);    \
-			return 0;     \
-		}                 \
-	} while (0)
-
-static int test_makefile_is_created(void)
+TEST(makefile_is_created)
 {
-	TEST("makefile is created with expected content");
-
 	const char *test_dir = "/tmp/coffee-makefile-project";
 	mkdir(test_dir, 0755);
 
@@ -86,13 +60,10 @@ static int test_makefile_is_created(void)
 	ASSERT(strstr(buf, "tidy:") != NULL, "Makefile missing tidy target");
 
 	PASS();
-	return 1;
 }
 
-static int test_dep_appended_to_makefile(void)
+TEST(dep_appended_to_makefile)
 {
-	TEST("dependency is appended to Makefile");
-
 	const char *tmp_make = "/tmp/coffee-makefile-add-test.mk";
 	FILE	   *fp		 = fopen(tmp_make, "w");
 	ASSERT(fp, "could not create test Makefile");
@@ -122,13 +93,10 @@ static int test_dep_appended_to_makefile(void)
 
 	remove(tmp_make);
 	PASS();
-	return 1;
 }
 
-static int test_build_finds_makefile(void)
+TEST(build_finds_makefile)
 {
-	TEST("build detects Makefile in project dir");
-
 	const char *tmp_dir = "/tmp/coffee-build-test";
 	mkdir(tmp_dir, 0755);
 
@@ -146,13 +114,10 @@ static int test_build_finds_makefile(void)
 	fclose(fp);
 
 	PASS();
-	return 1;
 }
 
-static int test_add_skips_when_no_makefile(void)
+TEST(add_skips_when_no_makefile)
 {
-	TEST("add does not create Makefile when none exists");
-
 	const char *fake_makefile = "/tmp/coffee-no-makefile-test/Makefile";
 	remove(fake_makefile);
 
@@ -165,13 +130,10 @@ static int test_add_skips_when_no_makefile(void)
 	}
 
 	PASS();
-	return 1;
 }
 
-static int test_safe_package_name(void)
+TEST(safe_package_name)
 {
-	TEST("safe package names are validated");
-
 	const char *valid[] = {"mylib", "my_lib", "my-lib", "mylib123", "MyLib", NULL};
 	for (int i = 0; valid[i]; i++) {
 		const char *p = valid[i];
@@ -200,19 +162,13 @@ static int test_safe_package_name(void)
 	}
 
 	PASS();
-	return 1;
 }
 
-int main(void)
+void coffee_register_makefile_tests(void)
 {
-	printf("=== Running Makefile Tests ===\n\n");
-
-	test_makefile_is_created();
-	test_dep_appended_to_makefile();
-	test_build_finds_makefile();
-	test_add_skips_when_no_makefile();
-	test_safe_package_name();
-
-	printf("\n=== Results: %d passed, %d failed ===\n", tests_passed, tests_failed);
-	return tests_failed > 0 ? 1 : 0;
+	TEST_REGISTER(makefile_is_created);
+	TEST_REGISTER(dep_appended_to_makefile);
+	TEST_REGISTER(build_finds_makefile);
+	TEST_REGISTER(add_skips_when_no_makefile);
+	TEST_REGISTER(safe_package_name);
 }

@@ -1,37 +1,12 @@
 #include "../src/manifest.h"
+#include "test_framework.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-static int tests_passed = 0;
-static int tests_failed = 0;
-
-#define TEST(name)                      \
-	do {                                \
-		printf("Testing %s... ", name); \
-	} while (0)
-#define PASS()            \
-	do {                  \
-		printf("PASS\n"); \
-		tests_passed++;   \
-	} while (0)
-#define FAIL(msg)                  \
-	do {                           \
-		printf("FAIL: %s\n", msg); \
-		tests_failed++;            \
-	} while (0)
-#define ASSERT(cond, msg) \
-	do {                  \
-		if (!(cond)) {    \
-			FAIL(msg);    \
-			return;       \
-		}                 \
-	} while (0)
-
-static void test_extract_exact_version(void)
+TEST(extract_exact_version)
 {
-	TEST("exact version");
 	char *name	  = NULL;
 	char *version = NULL;
 
@@ -45,9 +20,8 @@ static void test_extract_exact_version(void)
 	PASS();
 }
 
-static void test_extract_wildcard(void)
+TEST(extract_wildcard)
 {
-	TEST("wildcard version");
 	char *name	  = NULL;
 	char *version = NULL;
 
@@ -61,9 +35,8 @@ static void test_extract_wildcard(void)
 	PASS();
 }
 
-static void test_extract_range(void)
+TEST(extract_range)
 {
-	TEST("range version");
 	char *name	  = NULL;
 	char *version = NULL;
 
@@ -77,9 +50,8 @@ static void test_extract_range(void)
 	PASS();
 }
 
-static void test_extract_no_version(void)
+TEST(extract_no_version)
 {
-	TEST("no version (wildcard default)");
 	char *name	  = NULL;
 	char *version = NULL;
 
@@ -93,9 +65,8 @@ static void test_extract_no_version(void)
 	PASS();
 }
 
-static void test_extract_null_input(void)
+TEST(extract_null_input)
 {
-	TEST("NULL entry");
 	char *name	  = (char *)0xdeadbeef;
 	char *version = (char *)0xdeadbeef;
 
@@ -105,14 +76,11 @@ static void test_extract_null_input(void)
 	PASS();
 }
 
-int main(void)
+void coffee_register_manifest_version_tests(void)
 {
-	test_extract_exact_version();
-	test_extract_wildcard();
-	test_extract_range();
-	test_extract_no_version();
-	test_extract_null_input();
-
-	printf("\nResults: %d passed, %d failed\n", tests_passed, tests_failed);
-	return tests_failed > 0 ? 1 : 0;
+	TEST_REGISTER(extract_exact_version);
+	TEST_REGISTER(extract_wildcard);
+	TEST_REGISTER(extract_range);
+	TEST_REGISTER(extract_no_version);
+	TEST_REGISTER(extract_null_input);
 }
