@@ -1,16 +1,46 @@
 #include "../coffee.h"
+#include "../manifest.h"
+#include "../project.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-int64_t handle_lint(options *)
+int64_t handle_lint(options *opts)
 {
 	printf("Linting source code...\n");
 
-	// Use find to get all .c files in src and tests
-	// and run clang-tidy on them.
-	int ret = system("find src tests -name \"*.c\" | xargs clang-tidy --quiet -- -Isrc 2>/dev/null");
+	char *manifest_path = project_find_manifest(NULL);
+	if (!manifest_path) {
+		fprintf(stderr, "Error: Could not find Coffee.toml\n");
+		return 1;
+	}
+
+	manifest_t *m = manifest_parse(manifest_path);
+	free(manifest_path);
+
+	char inc_flags[4096] = "-Isrc";
+	if (m) {
+		int off = snprintf(inc_flags, sizeof(inc_flags), "-Isrc -Iinclude -I. -Ideps");
+		if (m->package.name) {
+			off += snprintf(inc_flags + off, sizeof(inc_flags) - (size_t)off, " -Iinclude/%s", m->package.name);
+		}
+	}
+
+	const char *tidy_opts = opts->fix ? "--fix" : "";
+	char		cmd[8192];
+	snprintf(cmd, sizeof(cmd), "find src tests -name \"*.c\" | xargs clang-tidy %s --quiet -- %s 2>/dev/null",
+			 tidy_opts, inc_flags);
+
+	if (opts->verbose) {
+		printf("Running: %s\n", cmd);
+	}
+
+	int ret = system(cmd);
+
+	if (m) {
+		manifest_free(m);
+	}
 
 	if (ret != 0) {
 		fprintf(stderr, "Error: Linting failed. Please ensure 'clang-tidy' is installed.\n");

@@ -8,6 +8,15 @@
 
 #include <unistd.h>
 
+static int build_include_flags(manifest_t *m, char *buf, size_t buf_size)
+{
+	int off = snprintf(buf, buf_size, "-Isrc -Iinclude -I. -Ideps");
+	if (m->package.name) {
+		off += snprintf(buf + off, buf_size - (size_t)off, " -Iinclude/%s", m->package.name);
+	}
+	return off;
+}
+
 int64_t handle_bench(options *opts)
 {
 	char *manifest_path = project_find_manifest(NULL);
@@ -15,6 +24,8 @@ int64_t handle_bench(options *opts)
 		fprintf(stderr, "Error: Could not find Coffee.toml\n");
 		return 1;
 	}
+
+	manifest_t *m = manifest_parse(manifest_path);
 
 	char *dir_end	  = strrchr(manifest_path, '/');
 	char *project_dir = NULL;
@@ -26,12 +37,22 @@ int64_t handle_bench(options *opts)
 
 	free(manifest_path);
 
+	char inc_flags[2048] = "";
+	if (m) {
+		build_include_flags(m, inc_flags, sizeof(inc_flags));
+	}
+
 	char cmd[4096];
+	int	 off;
 
 	if (strcmp(project_dir, ".") == 0) {
-		snprintf(cmd, sizeof(cmd), "make bench");
+		off = snprintf(cmd, sizeof(cmd), "make bench INC_FLAGS='%s'", inc_flags);
 	} else {
-		snprintf(cmd, sizeof(cmd), "make -C '%s' bench", project_dir);
+		off = snprintf(cmd, sizeof(cmd), "make -C '%s' bench INC_FLAGS='%s'", project_dir, inc_flags);
+	}
+
+	if (opts->verbose) {
+		off += snprintf(cmd + off, sizeof(cmd) - (size_t)off, " VERBOSE=1");
 	}
 
 	free(project_dir);
@@ -40,5 +61,17 @@ int64_t handle_bench(options *opts)
 		printf("Running: %s\n", cmd);
 	}
 
-	return system(cmd);
+	int ret = system(cmd);
+
+	if (m) {
+		manifest_free(m);
+	}
+
+	if (ret != 0) {
+		fprintf(stderr, "Error: bench failed\n");
+		return 1;
+	}
+
+	printf("Bench complete.\n");
+	return 0;
 }

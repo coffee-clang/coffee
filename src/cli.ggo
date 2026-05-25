@@ -56,6 +56,7 @@ option  "benches" - "Build all bench targets" flag off
 option  "all-targets" - "Build all targets" flag off
 option  "no-run" - "Don't run the generated binaries" flag off
 option  "no-fail-fast" - "Run all tests regardless of failure" flag off
+option "fix" - "Fix warnings automatically" flag off
 
 # The last two options are actually used to have a suitable ENUM that makes it easier to validate
 # the values given for the toolchain and command

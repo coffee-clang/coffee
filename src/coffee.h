@@ -70,6 +70,7 @@ typedef struct options_s {
 	char *target_dir;
 	char *manifest_path;
 	bool  lib;
+	bool  fix;
 } options_s, options;
 
 typedef struct {

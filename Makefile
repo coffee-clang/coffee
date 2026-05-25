@@ -148,6 +148,22 @@ test: $(TARGET) $(BIN_DIR)/tests/runner
 		$(BIN_DIR)/tests/runner; \
 	fi
 
+# Benchmark targets
+BENCH_SRCS := $(wildcard bench/*.c)
+BENCH_BINS := $(patsubst bench/%.c, $(BIN_DIR)/bench/%, $(BENCH_SRCS))
+
+$(BIN_DIR)/bench/%: bench/%.c $(TARGET)
+	@mkdir -p $(BIN_DIR)/bench
+	$(CC) $(CFLAGS_COMMON) $(INC_FLAGS) -o $@ $<
+
+bench: $(BENCH_BINS)
+	@echo "Running benchmarks..."
+	@for b in $(BENCH_BINS); do \
+		echo "=== $$(basename $$b) ==="; \
+		time ./$$b; \
+		echo; \
+	done
+
 .PHONY: clean format tidy check bootstrap test docs-assets docs serve
 
 docs-assets:

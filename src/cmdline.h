@@ -180,6 +180,8 @@ struct gengetopt_args_info {
 	const char *no_run_help;	   /**< @brief Don't run the generated binaries help description.  */
 	int			no_fail_fast_flag; /**< @brief Run all tests regardless of failure (default=off).  */
 	const char *no_fail_fast_help; /**< @brief Run all tests regardless of failure help description.  */
+	int			fix_flag;		   /**< @brief Fix warnings automatically (default=off).  */
+	const char *fix_help;		   /**< @brief Fix warnings automatically help description.  */
 	enum enum_toolchain toolchain_arg;	/**< @brief Toolchain used.  */
 	char			   *toolchain_orig; /**< @brief Toolchain used original value given at command line.  */
 	const char		   *toolchain_help; /**< @brief Toolchain used help description.  */
@@ -242,6 +244,7 @@ struct gengetopt_args_info {
 	unsigned int all_targets_given;			   /**< @brief Whether all-targets was given.  */
 	unsigned int no_run_given;				   /**< @brief Whether no-run was given.  */
 	unsigned int no_fail_fast_given;		   /**< @brief Whether no-fail-fast was given.  */
+	unsigned int fix_given;					   /**< @brief Whether fix was given.  */
 	unsigned int toolchain_given;			   /**< @brief Whether toolchain was given.  */
 	unsigned int command_given;				   /**< @brief Whether command was given.  */
 
