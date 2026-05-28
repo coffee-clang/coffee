@@ -1,5 +1,19 @@
-Checks: 'clang-analyzer-*,performance-*,readability-*,bugprone-*,misc-*,c11*,-modernize-*,-readability-identifier-length,bugprone-assignment-in-if-condition,readability-sizeof-expression,-misc-no-recursion,-readability-suspicious-call-argument,-bugprone-multi-level-implicit-pointer-conversion,-clang-analyzer-optin.performance.Padding,-clang-analyzer-optin.portability.UnixAPI'
-WarningsAsErrors: ''
+Checks: '
+  -*,
+  clang-analyzer-*,
+  bugprone-*,
+  cert-*,
+  performance-*,
+  readability-*,
+  misc-*,
+  -modernize-*,
+  -readability-identifier-length,
+  -readability-magic-numbers,
+  -readability-function-cognitive-complexity,
+  readability-implicit-bool-conversion,
+  readability-use-concise-preprocessor-directives
+'
+WarningsAsErrors: 'clang-analyzer-*,bugprone-*,cert-*'
 FormatStyle: file
 HeaderFilterRegex: 'src/([^./][^/]*/)?[^./]+\.[ch]'
 CheckOptions:

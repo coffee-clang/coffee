@@ -43,7 +43,7 @@ CFLAGS_COMMON += -Wshadow -Wpointer-arith -Wcast-qual -Wstrict-prototypes -Wmiss
 CFLAGS_COMMON += -pedantic -Wconversion -Wsign-conversion -Wunused -Wunused-function -Wunused-parameter
 CFLAGS_COMMON += -Wfloat-equal -Wundef -Wmissing-declarations -Wmissing-include-dirs -Wmultichar -Wsystem-headers
 CFLAGS_COMMON += -Wformat=2 -Wformat-security -Wnonnull
-CFLAGS_COMMON += -D_GNU_SOURCE -I$(SRC_DIR) -I$(DEPS_DIR)
+CFLAGS_COMMON += -D_GNU_SOURCE -I$(SRC_DIR) -isystem$(DEPS_DIR) -isystem$(DEPS_DIR)/toml
 CFLAGS_COMMON += -fno-function-sections -fno-data-sections
 CFLAGS_COMMON += -fasynchronous-unwind-tables -fno-common -fdebug-macro
 CFLAGS_COMMON += -fno-delete-null-pointer-checks -fno-strict-overflow
@@ -62,10 +62,12 @@ DEPS_SDSALLOC_URL := https://raw.githubusercontent.com/antirez/sds/master/sdsall
 MDBOOK := $(if $(wildcard ./mdbook),./mdbook,mdbook)
 
 TIDY := clang-tidy
-TIDY_FLAGS = -- -std=$(CSTD) -D_GNU_SOURCE -I$(SRC_DIR) -I$(DEPS_DIR)
+TIDY_FLAGS = -- -std=$(CSTD) -D_GNU_SOURCE -I$(SRC_DIR) -isystem$(DEPS_DIR) -isystem$(DEPS_DIR)/toml
 STAMP_DIR = .tidy_stamps
-SRCS = $(wildcard $(SRC_DIR)/*.c)
-STAMPS = $(patsubst $(SRC_DIR)/%.c, $(STAMP_DIR)/%.c.tidy, $(SRCS))
+SRCS = $(filter-out $(SRC_DIR)/cmdline.c, $(wildcard $(SRC_DIR)/*.c))
+COMMANDS_SRCS = $(wildcard $(SRC_DIR)/commands/*.c)
+ALL_SRCS = $(SRCS) $(COMMANDS_SRCS)
+STAMPS = $(patsubst $(SRC_DIR)/%.c, $(STAMP_DIR)/%.c.tidy, $(ALL_SRCS))
 
 # Test runner
 TEST_SRCS := $(wildcard tests/*.c)
@@ -82,7 +84,7 @@ $(BIN_DIR)/cmdline.o: $(SRC_DIR)/cmdline.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS_COMMON) -c $< -o $@
 
-$(BIN_DIR)/toml.o: $(DEPS_DIR)/toml.c
+$(BIN_DIR)/toml.o: $(DEPS_DIR)/toml/toml.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS_COMMON) -c $< -o $@
 
@@ -111,15 +113,15 @@ $(SRC_DIR)/cmdline.c $(SRC_DIR)/cmdline.h: $(SRC_DIR)/cli.ggo
 	gengetopt -i $< --output-dir=$(SRC_DIR)/
 
 bootstrap:
-	@mkdir -p $(DEPS_DIR)/sds
+	@mkdir -p $(DEPS_DIR)/sds $(DEPS_DIR)/toml
 	@echo "Checking dependencies..."
-	@if [ ! -f $(DEPS_DIR)/toml.c ]; then \
-		echo "Downloading toml.c..."; \
-		curl -fsSL $(DEPS_TOML_URL) -o $(DEPS_DIR)/toml.c; \
+	@if [ ! -f $(DEPS_DIR)/toml/toml.c ]; then \
+		echo "Downloading toml/toml.c..."; \
+		curl -fsSL $(DEPS_TOML_URL) -o $(DEPS_DIR)/toml/toml.c; \
 	fi
-	@if [ ! -f $(DEPS_DIR)/toml.h ]; then \
-		echo "Downloading toml.h..."; \
-		curl -fsSL $(DEPS_TOML_H_URL) -o $(DEPS_DIR)/toml.h; \
+	@if [ ! -f $(DEPS_DIR)/toml/toml.h ]; then \
+		echo "Downloading toml/toml.h..."; \
+		curl -fsSL $(DEPS_TOML_H_URL) -o $(DEPS_DIR)/toml/toml.h; \
 	fi
 	@if [ ! -f $(DEPS_DIR)/sds/sds.h ]; then \
 		echo "Downloading sds.h..."; \
@@ -184,6 +186,7 @@ $(STAMP_DIR):
 # The Linting Rule
 # Note: This will now re-run if the .c file OR any included .h file changes
 $(STAMP_DIR)/%.c.tidy: $(SRC_DIR)/%.c | $(STAMP_DIR)
+	@mkdir -p $(dir $@)
 	@echo "Linting $<..."
 	@$(TIDY) $< $(TIDY_FLAGS)
 	@touch $@

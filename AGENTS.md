@@ -86,7 +86,16 @@ When planning or implementing any subcommand, read the corresponding markdown fi
 Coding style is strictly enforced by calling clang-format and clang-tidy after each change.
 The entire codebase MUST be lint clean.
 
-You can use the most recent C standard (C23).
+You can use the most recent C standard (C23). This means:
+
+- use nullptr and avoid NULL
+- use Checked Integer Arithmetic (<stdckdint.h>)
+- use [[nodiscard]] when possible
+
+Follow the options in .clang-tidy. You cannot modify that file.
+You cannot have `NOLINT` in the `.c` and `.h` files.
+
+We follow the [curl conventions](https://curl.se/dev/code-style.html), except for the fact that we are a C23 project.
 
 ## Compilation
 
@@ -297,6 +306,13 @@ WSASocketA
 WSASocketW
 ```
 
+Follow the indication of `make tidy`, the program must be clean of warnings.
+
 ### Configuration or convention
 
 All parameters must be obtained from the `Coffee.toml` file.
+
+## Types and objects
+
+- binary data are stored as array of `unsigned char`
+- use https://github.com/antirez/sds for managing strings
