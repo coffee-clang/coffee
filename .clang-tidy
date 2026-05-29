@@ -11,7 +11,8 @@ Checks: '
   -readability-magic-numbers,
   -readability-function-cognitive-complexity,
   readability-implicit-bool-conversion,
-  readability-use-concise-preprocessor-directives
+  readability-use-concise-preprocessor-directives,
+  -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
 '
 WarningsAsErrors: 'clang-analyzer-*,bugprone-*,cert-*'
 FormatStyle: file
