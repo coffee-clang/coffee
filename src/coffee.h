@@ -1,7 +1,6 @@
 #ifndef COFFEE_H_
 #define COFFEE_H_
 
-#define _GNU_SOURCE
 #include "../deps/sds/sds.h"
 #include "../deps/sds/sdsalloc.h"
 #include "cmdline.h"
