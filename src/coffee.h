@@ -34,43 +34,44 @@ typedef size_t	  usize;
 #define new(a, t, n) (t *)alloc(a, sizeof(t), _Alignof(t), n)
 
 typedef struct options_s {
-	bool   verbose;
-	bool   verbose2;
-	bool   quiet;
-	i64	   color;
-	bool   locked;
-	bool   offline;
+	// Pointer fields
 	char  *error_code;
 	char **inputs;
-	int	   inputs_num;
+	char  *pkg_version;
+	char  *path;
+	char  *git;
+	char  *branch;
+	char  *tag;
+	char  *rev;
+	char  *registry;
+	char  *bin;
+	char  *example;
+	char  *features;
+	char  *profile;
+	char  *target;
+	char  *target_dir;
+	char  *manifest_path;
 
-	// Dependency flags
-	char *pkg_version;
-	char *path;
-	char *git;
-	char *branch;
-	char *tag;
-	char *rev;
-	char *registry;
-	bool  dev;
-	bool  build_dep;
-	bool  optional;
+	// Integer fields
+	i64 color;
+	int inputs_num;
+	int jobs;
 
-	// Build flags
-	bool  release;
-	bool  debug;
-	int	  jobs;
-	char *bin;
-	char *example;
-	char *features;
-	bool  all_features;
-	bool  no_default_features;
-	char *profile;
-	char *target;
-	char *target_dir;
-	char *manifest_path;
-	bool  lib;
-	bool  fix;
+	// Boolean fields
+	bool verbose;
+	bool verbose2;
+	bool quiet;
+	bool locked;
+	bool offline;
+	bool dev;
+	bool build_dep;
+	bool optional;
+	bool release;
+	bool debug;
+	bool all_features;
+	bool no_default_features;
+	bool lib;
+	bool fix;
 } options_s, options;
 
 typedef struct {
