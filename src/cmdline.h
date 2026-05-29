@@ -22,7 +22,7 @@ extern "C" {
 
 enum enum_toolchain {
 	toolchain__NULL			  = -1,
-	toolchain_arg_PLUS_stable = 0,
+	toolchain_arg_PLUS_stable,
 	toolchain_arg_PLUS_clangMINUS_stable,
 	toolchain_arg_PLUS_gccMINUS_stable
 };
