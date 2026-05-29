@@ -14,10 +14,10 @@ static void print_transitive_json(const char *name, const char *version, int dep
 		return;
 	}
 
-	char *ver = version ? strdup(version) : NULL;
+	char *ver = version != nullptr ? strdup(version) : NULL;
 	printf("{\n");
 	printf("  \"name\": \"%s\",\n", name);
-	printf("  \"version\": \"%s\"", ver ? ver : "?");
+	printf("  \"version\": \"%s\"", ver != nullptr ? ver : "?");
 	free(ver);
 
 	if (depth < max_depth) {
@@ -42,7 +42,7 @@ static void print_transitive_json(const char *name, const char *version, int dep
 					size_t len = (size_t)(p - start);
 					if (len > 0) {
 						const char *slash	 = (const char *)memchr(start, '/', len);
-						size_t		name_len = slash ? (size_t)(slash - start) : len;
+						size_t		name_len = slash != nullptr ? (size_t)(slash - start) : len;
 						dep_names			 = realloc(dep_names, (dep_count + 1) * sizeof(char *));
 						dep_names[dep_count] = malloc(name_len + 1);
 						memcpy(dep_names[dep_count], start, name_len);
@@ -95,11 +95,11 @@ int64_t handle_metadata(options *)
 
 	printf("{\n");
 	printf("  \"package\": {\n");
-	printf("    \"name\": \"%s\",\n", m->package.name ? m->package.name : "");
-	printf("    \"version\": \"%s\",\n", m->package.version ? m->package.version : "");
-	printf("    \"edition\": \"%s\",\n", m->package.edition ? m->package.edition : "");
-	printf("    \"description\": \"%s\",\n", m->package.description ? m->package.description : "");
-	printf("    \"license\": \"%s\"\n", m->package.license ? m->package.license : "");
+	printf("    \"name\": \"%s\",\n", m->package.name != nullptr ? m->package.name : "");
+	printf("    \"version\": \"%s\",\n", m->package.version != nullptr ? m->package.version : "");
+	printf("    \"edition\": \"%s\",\n", m->package.edition != nullptr ? m->package.edition : "");
+	printf("    \"description\": \"%s\",\n", m->package.description != nullptr ? m->package.description : "");
+	printf("    \"license\": \"%s\"\n", m->package.license != nullptr ? m->package.license : "");
 	printf("  },\n");
 
 	/* Resolved features */

@@ -31,9 +31,9 @@ int64_t handle_search(options *opts)
 
 	for (size_t i = 0; i < list->count; i++) {
 		recipe_t   *r		= &list->recipes[i];
-		const char *name	= r->name ? r->name : "-";
-		const char *version = r->version ? r->version : "-";
-		const char *desc	= r->description ? r->description : "";
+		const char *name	= r->name != nullptr ? r->name : "-";
+		const char *version = r->version != nullptr ? r->version : "-";
+		const char *desc	= r->description != nullptr ? r->description : "";
 
 		if (strlen(desc) > 50) {
 			printf("%-20s %-10s %.50s...\n", name, version, desc);

@@ -58,7 +58,7 @@ int64_t handle_check(options *opts)
 
 	printf("Checking source code for syntax errors...\n");
 
-	const char *cc = getenv("CC") ? getenv("CC") : "clang";
+	const char *cc = getenv("CC") != nullptr ? getenv("CC") : "clang";
 
 	/* Build include flags */
 	char   inc_flags[4096] = "-Ideps -Isrc -Iinclude -I.";

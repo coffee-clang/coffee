@@ -63,7 +63,7 @@ static void report_audit(manifest_t *m)
 
 		recipe_t *r = registry_get(name);
 		if (r) {
-			printf("  %-20s OK (latest: %s)\n", name, r->version ? r->version : "?");
+			printf("  %-20s OK (latest: %s)\n", name, r->version != nullptr ? r->version : "?");
 			registry_free_recipe(r);
 		} else {
 			printf("  %-20s WARNING: not found in registry\n", name);

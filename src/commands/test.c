@@ -18,7 +18,7 @@ int64_t handle_test(options *opts)
 		manifest = manifest_parse(manifest_path);
 	}
 
-	char *dir_end	 = manifest_path ? strrchr(manifest_path, '/') : NULL;
+	char *dir_end	 = manifest_path != nullptr ? strrchr(manifest_path, '/') : NULL;
 	bool  in_project = 0;
 	char  project_dir[4096];
 

@@ -201,7 +201,7 @@ int64_t handle_update(options *opts)
 			continue;
 		}
 
-		printf("  Resolving: %s (%s)\n", name, version_constraint ? version_constraint : "*");
+		printf("  Resolving: %s (%s)\n", name, version_constraint != nullptr ? version_constraint : "*");
 
 		version_list_t *versions = registry_get_versions(name);
 		if (!versions || versions->count == 0) {

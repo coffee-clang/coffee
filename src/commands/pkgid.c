@@ -23,8 +23,8 @@ int64_t handle_pkgid(options *)
 		return 1;
 	}
 
-	const char *name	= m->package.name ? m->package.name : "project";
-	const char *version = m->package.version ? m->package.version : "0.1.0";
+	const char *name	= m->package.name != nullptr ? m->package.name : "project";
+	const char *version = m->package.version != nullptr ? m->package.version : "0.1.0";
 
 	printf("%s:%s\n", name, version);
 

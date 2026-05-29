@@ -135,8 +135,12 @@ When writing expressions using if/while/do/for, there shall be a space between t
 
 ## Use boolean conditions
 
-Rather than test a conditional value such as a bool against TRUE or FALSE, a pointer against NULL or != NULL and an int
-against zero or not zero in if/while conditions
+Use a test agains `nullptr` instead of a pointer against NULL or 0.
+This means that
+
+`if (ptr)` is not good style
+
+`if (ptr != nullptr)` is good style
 
 ## No assignments in conditions
 
@@ -151,7 +155,7 @@ and instead we encourage the above version to be spelled out more clearly:
 
 ```
 ptr = malloc(100);
-if(!ptr)
+if(ptr == nullptr)
   return NULL;
 ```
 

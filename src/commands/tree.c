@@ -33,7 +33,7 @@ static void parse_dep_list(const char *input, char ***out_names, size_t *out_cou
 		size_t len = (size_t)(p - start);
 		if (len > 0) {
 			const char *slash	 = (const char *)memchr(start, '/', len);
-			size_t		name_len = slash ? (size_t)(slash - start) : len;
+			size_t		name_len = slash != nullptr ? (size_t)(slash - start) : len;
 
 			*out_names				 = realloc(*out_names, (*out_count + 1) * sizeof(char *));
 			(*out_names)[*out_count] = malloc(name_len + 1);
@@ -52,8 +52,8 @@ static void print_transitive(const char *name, const char *version, const char *
 	}
 
 	const char *connector = is_last ? "└── " : "├── ";
-	char	   *ver		  = version ? strdup(version) : NULL;
-	printf("%s%s%s v%s\n", prefix, connector, name ? name : "?", ver ? ver : "?");
+	char	   *ver		  = version != nullptr ? strdup(version) : NULL;
+	printf("%s%s%s v%s\n", prefix, connector, name != nullptr ? name : "?", ver != nullptr ? ver : "?");
 	free(ver);
 
 	if (depth >= max_depth) {
@@ -101,8 +101,8 @@ int64_t handle_tree(options *)
 		return 1;
 	}
 
-	const char *name	= m->package.name ? m->package.name : "project";
-	const char *version = m->package.version ? m->package.version : "0.1.0";
+	const char *name	= m->package.name != nullptr ? m->package.name : "project";
+	const char *version = m->package.version != nullptr ? m->package.version : "0.1.0";
 
 	printf("%s v%s\n", name, version);
 

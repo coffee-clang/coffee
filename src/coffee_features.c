@@ -52,7 +52,7 @@ resolved_features_t *features_resolve(manifest_t *root, const char **requested, 
 		return NULL;
 	}
 
-	feature_set_t *root_set = get_or_create_set(rf, root->package.name ? root->package.name : "root");
+	feature_set_t *root_set = get_or_create_set(rf, root->package.name != nullptr ? root->package.name : "root");
 
 	if (all_features) {
 		for (size_t i = 0; i < root->features_count; i++) {

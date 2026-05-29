@@ -50,10 +50,13 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 		return 1;
 	}
 
-	const char *cc		   = getenv("CC") ? getenv("CC") : "clang";
-	const char *output_dir = opts && opts->target_dir ? opts->target_dir : "target/debug";
+	const char *cc		   = getenv("CC") != nullptr ? getenv("CC") : "clang";
+	const char *output_dir = opts != nullptr && opts->target_dir != nullptr ? opts->target_dir : "target/debug";
 
-	bool verbose = opts && opts->verbose;
+	bool verbose = false;
+	if (opts != nullptr) {
+		verbose = opts->verbose;
+	}
 
 	char *mkdir_argv[] = {(char *)"mkdir", (char *)"-p", (char *)output_dir, NULL};
 	int	  ret		   = run_command(mkdir_argv, verbose);
@@ -63,20 +66,27 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 
 	const char *name = manifest->package.name;
 
-	char *flags = strdup("");
-	if (opts && opts->release) {
-		free(flags);
-		flags = strdup("-O2");
-	} else if (opts && opts->debug) {
-		free(flags);
-		flags = strdup("-g");
-	} else {
-		free(flags);
-		flags = strdup("-O0 -g");
+	const char *flags_str = "-O0 -g";
+	if (opts != nullptr) {
+		if (opts->release) {
+			flags_str = "-O2";
+		} else if (opts->debug) {
+			flags_str = "-g";
+		}
 	}
+	char *flags = strdup(flags_str);
 
-	resolved_features_t *resolved = NULL;
-	if (opts && (opts->features_count > 0 || opts->all_features)) {
+	resolved_features_t *resolved	  = NULL;
+	bool				 has_features = false;
+	if (opts != nullptr) {
+		if (opts->features_count > 0) {
+			has_features = true;
+		}
+		if (opts->all_features) {
+			has_features = true;
+		}
+	}
+	if (has_features) {
 		const char **requested = NULL;
 		if (opts->features_count > 0) {
 			requested = (const char **)opts->features;
@@ -180,7 +190,7 @@ int build_run(manifest_t *manifest, build_opts_t *opts, char **args, int argc)
 		return ret;
 	}
 
-	const char *output_dir = opts && opts->target_dir ? opts->target_dir : "target/debug";
+	const char *output_dir = opts != nullptr && opts->target_dir != nullptr ? opts->target_dir : "target/debug";
 	const char *name	   = manifest->package.name;
 
 	char exe_path[4096];
@@ -194,7 +204,7 @@ int build_run(manifest_t *manifest, build_opts_t *opts, char **args, int argc)
 		return 1;
 	}
 
-	int	   total	= 1 + (args ? argc : 0) + 1;
+	int	   total	= 1 + (args != nullptr ? argc : 0) + 1;
 	char **run_argv = (char **)malloc(sizeof(char *) * (size_t)total);
 	if (!run_argv) {
 		return 1;
@@ -207,8 +217,11 @@ int build_run(manifest_t *manifest, build_opts_t *opts, char **args, int argc)
 	}
 	run_argv[idx] = NULL;
 
-	bool verbose = opts && opts->verbose;
-	ret			 = run_command(run_argv, verbose);
+	bool verbose = false;
+	if (opts != nullptr) {
+		verbose = opts->verbose;
+	}
+	ret = run_command(run_argv, verbose);
 	free((void *)run_argv);
 	return ret;
 }

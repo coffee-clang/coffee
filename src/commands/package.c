@@ -28,8 +28,8 @@ int64_t handle_package(options *)
 
 	printf("Packaging project...\n");
 
-	const char *name	= m->package.name ? m->package.name : "project";
-	const char *version = m->package.version ? m->package.version : "0.1.0";
+	const char *name	= m->package.name != nullptr ? m->package.name : "project";
+	const char *version = m->package.version != nullptr ? m->package.version : "0.1.0";
 
 	char package_dir[] = "target/package";
 	mkdir("target", 0755);

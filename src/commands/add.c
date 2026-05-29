@@ -68,7 +68,7 @@ int64_t handle_add(options *opts)
 	} else if (opts->git) {
 		snprintf(dep_str, sizeof(dep_str), "%s = { git = \"%s\" }", package_name, opts->git);
 	} else {
-		const char *version = opts->pkg_version ? opts->pkg_version : "*";
+		const char *version = opts->pkg_version != nullptr ? opts->pkg_version : "*";
 
 		if (opts->features || opts->optional) {
 			int off = snprintf(dep_str, sizeof(dep_str), "%s = { version = \"%s\"", package_name, version);
