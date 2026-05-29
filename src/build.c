@@ -1,15 +1,26 @@
 #include "build.h"
 
+#include <stdbool.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include <glob.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
-static int run_command(char **argv)
+static int run_command(char **argv, bool verbose)
 {
+	if (verbose) {
+		printf("Running:");
+		for (char **a = argv; *a; a++) {
+			printf(" %s", *a);
+		}
+		printf("\n");
+	}
+
 	pid_t pid = fork();
 
 	if (pid == 0) {
@@ -19,7 +30,13 @@ static int run_command(char **argv)
 	} else if (pid > 0) {
 		int status;
 		waitpid(pid, &status, 0);
-		return WEXITSTATUS(status);
+		if (WIFEXITED(status)) {
+			return WEXITSTATUS(status);
+		}
+		if (verbose) {
+			(void)fprintf(stderr, "Command terminated abnormally (signal %d)\n", WTERMSIG(status));
+		}
+		return 1;
 	}
 
 	perror("fork");
@@ -36,14 +53,10 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 	const char *cc		   = getenv("CC") ? getenv("CC") : "clang";
 	const char *output_dir = opts && opts->target_dir ? opts->target_dir : "target/debug";
 
-	char cmd[4096];
-	int	 ret;
+	bool verbose = opts && opts->verbose;
 
-	ret = snprintf(cmd, sizeof(cmd), "mkdir -p %s", output_dir);
-	if (ret < 0 || (size_t)ret >= sizeof(cmd)) {
-		return 1;
-	}
-	ret = system(cmd);
+	char *mkdir_argv[] = {(char *)"mkdir", (char *)"-p", (char *)output_dir, NULL};
+	int	  ret		   = run_command(mkdir_argv, verbose);
 	if (ret != 0) {
 		return 1;
 	}
@@ -86,21 +99,72 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 		}
 	}
 
-	ret = snprintf(cmd, sizeof(cmd), "%s %s -o %s/%s src/*.c 2>&1", cc, flags, output_dir, name);
-	free(flags);
-
-	if (ret < 0 || (size_t)ret >= sizeof(cmd)) {
+	glob_t globbuf;
+	ret = glob("src/*.c", 0, NULL, &globbuf);
+	if (ret != 0) {
+		(void)fprintf(stderr, "Error: No source files found in src/*.c\n");
+		free(flags);
 		if (resolved) {
 			features_free(resolved);
 		}
 		return 1;
 	}
 
-	if (opts && opts->verbose) {
-		printf("Building: %s\n", cmd);
+	char outpath[4096];
+	ret = snprintf(outpath, sizeof(outpath), "%s/%s", output_dir, name);
+	if (ret < 0 || (size_t)ret >= sizeof(outpath)) {
+		free(flags);
+		globfree(&globbuf);
+		if (resolved) {
+			features_free(resolved);
+		}
+		return 1;
 	}
 
-	ret = system(cmd);
+	int max_tokens = 1;
+	for (const char *p = flags; *p; p++) {
+		if (*p == ' ') {
+			max_tokens++;
+		}
+	}
+
+	int	   argc_total	 = 1 + max_tokens + 2 + (int)globbuf.gl_pathc + 1;
+	char **compiler_argv = (char **)malloc(sizeof(char *) * (size_t)argc_total);
+	if (!compiler_argv) {
+		free(flags);
+		globfree(&globbuf);
+		if (resolved) {
+			features_free(resolved);
+		}
+		return 1;
+	}
+
+	int idx				 = 0;
+	compiler_argv[idx++] = (char *)cc;
+
+	char *flags_copy = strdup(flags);
+	char *saveptr;
+	char *token = strtok_r(flags_copy, " ", &saveptr);
+	while (token) {
+		compiler_argv[idx++] = token;
+		token				 = strtok_r(NULL, " ", &saveptr);
+	}
+
+	compiler_argv[idx++] = (char *)"-o";
+	compiler_argv[idx++] = outpath;
+
+	for (size_t i = 0; i < globbuf.gl_pathc; i++) {
+		compiler_argv[idx++] = globbuf.gl_pathv[i];
+	}
+	compiler_argv[idx] = NULL;
+
+	free(flags);
+
+	ret = run_command(compiler_argv, verbose);
+
+	free(flags_copy);
+	free((void *)compiler_argv);
+	globfree(&globbuf);
 
 	if (resolved) {
 		features_free(resolved);
@@ -130,12 +194,21 @@ int build_run(manifest_t *manifest, build_opts_t *opts, char **args, int argc)
 		return 1;
 	}
 
-	char cmd[4096];
-	ret = snprintf(cmd, sizeof(cmd), "%s", exe_path);
-	for (int i = 0; i < argc && args && (size_t)ret < sizeof(cmd) - 1; i++) {
-		size_t len = strlen(cmd);
-		ret		   = snprintf(cmd + len, sizeof(cmd) - len, " %s", args[i]);
+	int	   total	= 1 + (args ? argc : 0) + 1;
+	char **run_argv = (char **)malloc(sizeof(char *) * (size_t)total);
+	if (!run_argv) {
+		return 1;
 	}
 
-	return system(cmd);
+	int idx			= 0;
+	run_argv[idx++] = exe_path;
+	for (int i = 0; i < argc && args; i++) {
+		run_argv[idx++] = args[i];
+	}
+	run_argv[idx] = NULL;
+
+	bool verbose = opts && opts->verbose;
+	ret			 = run_command(run_argv, verbose);
+	free((void *)run_argv);
+	return ret;
 }
