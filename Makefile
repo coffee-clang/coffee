@@ -52,8 +52,6 @@ CFLAGS_COMMON += -fno-omit-frame-pointer -fstack-protector-strong
 
 LDFLAGS := -static -lz
 
-CMDLINE_GEN := cmdline.c cmdline.h
-
 DEPS_TOML_URL := https://raw.githubusercontent.com/cktan/tomlc99/master/toml.c
 DEPS_TOML_H_URL := https://raw.githubusercontent.com/cktan/tomlc99/master/toml.h
 DEPS_SDS_URL := https://raw.githubusercontent.com/antirez/sds/master/sds.h
@@ -108,9 +106,6 @@ $(TARGET): $(OBJS)
 	$(CC) $(LDFLAGS) -o $@ $(OBJS)
 
 all: format $(TARGET) docs
-
-$(SRC_DIR)/cmdline.c $(SRC_DIR)/cmdline.h: $(SRC_DIR)/cli.ggo
-	gengetopt -i $< --output-dir=$(SRC_DIR)/
 
 bootstrap:
 	@mkdir -p $(DEPS_DIR)/sds $(DEPS_DIR)/toml

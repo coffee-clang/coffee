@@ -45,5 +45,3 @@ ifneq "$(MAKECMDGOALS)" "clean"
 -include ${T_SOURCES:.c=.d}
 endif
 
-cmdline.c cmdline.h: cli.ggo
-	gengetopt -i $< --output-dir=./
