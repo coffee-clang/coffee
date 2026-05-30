@@ -7,7 +7,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-int64_t handle_login(options *)
+int64_t handle_login(options *opts)
 {
 	char token[1'024];
 

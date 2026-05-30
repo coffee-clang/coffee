@@ -85,7 +85,7 @@ static void print_transitive(const char *name, const char *version, const char *
 	registry_free_recipe(recipe);
 }
 
-int64_t handle_tree(options *)
+int64_t handle_tree(options *opts)
 {
 	char *manifest_path = project_find_manifest(NULL);
 	if (!manifest_path) {

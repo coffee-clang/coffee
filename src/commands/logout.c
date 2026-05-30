@@ -6,7 +6,7 @@
 
 #include <unistd.h>
 
-int64_t handle_logout(options *)
+int64_t handle_logout(options *opts)
 {
 	const char *home = getenv("HOME");
 	if (!home) {

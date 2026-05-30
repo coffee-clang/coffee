@@ -9,7 +9,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-int64_t handle_package(options *)
+int64_t handle_package(options *opts)
 {
 	char *manifest_path = project_find_manifest(NULL);
 

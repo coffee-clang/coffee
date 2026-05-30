@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-int64_t handle_fmt(options *)
+int64_t handle_fmt(options *opts)
 {
 	printf("Formatting source code...\n");
 

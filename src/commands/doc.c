@@ -6,7 +6,7 @@
 
 #include <unistd.h>
 
-int64_t handle_doc(options *)
+int64_t handle_doc(options *opts)
 {
 	printf("Generating documentation...\n");
 

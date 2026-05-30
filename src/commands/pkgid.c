@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-int64_t handle_pkgid(options *)
+int64_t handle_pkgid(options *opts)
 {
 	char *manifest_path = project_find_manifest(NULL);
 

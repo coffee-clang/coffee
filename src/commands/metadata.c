@@ -76,7 +76,7 @@ static void print_transitive_json(const char *name, const char *version, int dep
 	printf("\n}");
 }
 
-int64_t handle_metadata(options *)
+int64_t handle_metadata(options *opts)
 {
 	char *manifest_path = project_find_manifest(NULL);
 

@@ -10,7 +10,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-int64_t handle_fetch(options *)
+int64_t handle_fetch(options *opts)
 {
 	char *manifest_path = project_find_manifest(NULL);
 

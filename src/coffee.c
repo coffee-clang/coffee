@@ -98,7 +98,7 @@ int main(int argc, char **argv)
 		.verbose2	= args_info.verbose_given,
 		.quiet		= args_info.quiet_given,
 		.inputs		= args_info.inputs,
-		.inputs_num = args_info.inputs_num,
+		.inputs_num = (int)args_info.inputs_num,
 
 		.pkg_version = args_info.pkg_version_given ? args_info.pkg_version_arg : NULL,
 		.path		 = args_info.path_given ? args_info.path_arg : NULL,

@@ -43,7 +43,7 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 	// Build a substring from the command and all unnamed options (values)
-	int total_length = 0;
+	size_t total_length = 0;
 	for (int i = 0; i < args_info.inputs_num; i++) {
 		total_length += strlen(args_info.inputs[i]);
 		if (i < args_info.inputs_num - 1) {

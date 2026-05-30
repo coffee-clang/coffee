@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-int64_t handle_config(options *)
+int64_t handle_config(options *opts)
 {
 	printf("Coffee configuration:\n\n");
 	printf("Environment variables:\n");

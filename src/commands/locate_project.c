@@ -8,7 +8,7 @@
 
 #include <unistd.h>
 
-int64_t handle_locate_project(options *)
+int64_t handle_locate_project(options *opts)
 {
 	char *manifest_path = project_find_manifest(NULL);
 
