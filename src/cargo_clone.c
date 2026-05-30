@@ -24,8 +24,8 @@ int main(int argc, char *argv[])
 	}
 	// The first unnamed argument is treated as the command
 	char	   *command			   = args_info.inputs[0];
-	const char *allowed_commands[] = {"build", "run",  "test",	  "check",	 "doc",	   "bench",
-									  "new",   "init", "publish", "install", "update", "search"};
+	const char *allowed_commands[] = { "build", "run",	"test",	   "check",	  "doc",	"bench",
+									   "new",	"init", "publish", "install", "update", "search" };
 	int			allowed			   = 0;
 	int			allowed_count	   = sizeof(allowed_commands) / sizeof(allowed_commands[0]);
 	for (int i = 0; i < allowed_count; i++) {

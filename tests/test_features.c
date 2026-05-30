@@ -46,7 +46,7 @@ TEST(feature_resolve)
 	manifest_t *m = manifest_parse("/tmp/coffee-features-test.toml");
 	ASSERT(m != NULL, "manifest_parse returned NULL");
 
-	const char			*requested[] = {"json"};
+	const char			*requested[] = { "json" };
 	resolved_features_t *resolved	 = features_resolve(m, requested, 1, false, false);
 	ASSERT(resolved != NULL, "features_resolve returned NULL");
 	ASSERT(features_is_enabled(resolved, "test", "json"), "json should be enabled");
@@ -166,7 +166,7 @@ TEST(compiler_flags)
 	manifest_t *m = manifest_parse("/tmp/coffee-features-test.toml");
 	ASSERT(m != NULL, "manifest_parse returned NULL");
 
-	const char			*requested[] = {"json", "advanced-logging"};
+	const char			*requested[] = { "json", "advanced-logging" };
 	resolved_features_t *resolved	 = features_resolve(m, requested, 2, false, false);
 	ASSERT(resolved != NULL, "features_resolve returned NULL");
 
@@ -210,7 +210,7 @@ TEST(transitive_features)
 	manifest_t *m = manifest_parse("/tmp/coffee-features-test.toml");
 	ASSERT(m != NULL, "manifest_parse returned NULL");
 
-	const char			*requested[] = {"json"};
+	const char			*requested[] = { "json" };
 	resolved_features_t *resolved	 = features_resolve(m, requested, 1, false, false);
 	ASSERT(resolved != NULL, "features_resolve returned NULL");
 	ASSERT(features_is_enabled(resolved, "test", "json"), "json should be enabled");

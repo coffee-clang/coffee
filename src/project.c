@@ -15,7 +15,7 @@ static int file_exists(const char *path)
 	return access(path, F_OK) == 0;
 }
 
-char *project_find_manifest(const char *start_dir)
+sds *project_find_manifest(sds start_dir)
 {
 	char  cwd[MAX_PATH_LEN];
 	char *dir;
@@ -56,12 +56,12 @@ char *project_find_manifest(const char *start_dir)
 	}
 }
 
-manifest_t *project_load_manifest(const char *path)
+manifest_t *project_load_manifest(sds path)
 {
 	return manifest_parse(path);
 }
 
-char *project_get_name(manifest_t *m)
+sds *project_get_name(manifest_t *m)
 {
 	if (!m || !m->package.name) {
 		return NULL;

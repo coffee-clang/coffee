@@ -40,8 +40,8 @@ static feature_set_t *get_or_create_set(resolved_features_t *rf, const char *pac
 	return &rf->packages[rf->package_count - 1];
 }
 
-resolved_features_t *features_resolve(manifest_t *root, const char **requested, size_t requested_count,
-									  bool all_features, bool no_default_features)
+resolved_features_t *features_resolve(manifest_t *root, sds *requested, size_t requested_count, bool all_features,
+									  bool no_default_features)
 {
 	if (!root) {
 		return NULL;
@@ -122,7 +122,7 @@ void features_free(resolved_features_t *rf)
 	free(rf);
 }
 
-bool features_is_enabled(resolved_features_t *rf, const char *package, const char *feature)
+bool features_is_enabled(resolved_features_t *rf, sds package, sds feature)
 {
 	if (!rf || !package || !feature) {
 		return false;
@@ -135,7 +135,7 @@ bool features_is_enabled(resolved_features_t *rf, const char *package, const cha
 	return false;
 }
 
-char **features_to_compiler_flags(resolved_features_t *rf, const char *package, size_t *out_count)
+sds *features_to_compiler_flags(resolved_features_t *rf, sds package, size_t *out_count)
 {
 	if (!rf || !package || !out_count) {
 		return NULL;
@@ -187,7 +187,7 @@ char **features_to_compiler_flags(resolved_features_t *rf, const char *package, 
 	return flags;
 }
 
-void features_parse_cli(const char *cli_string, char ***out_features, size_t *out_count)
+void features_parse_cli(sds cli_string, sds ***out_features, size_t *out_count)
 {
 	if (!cli_string || !out_features || !out_count) {
 		*out_features = NULL;

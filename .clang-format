@@ -5,8 +5,8 @@
 # (aligned with AGENTS.md rules).  Git's explicit defaults are adopted
 # for settings coffee left implicit, to prevent version-dependent drift.
 
-Language: Cpp
-Standard: c23
+#Language: Cpp
+#Standard: c23
 
 # --- Indentation ---
 UseTab: Always

@@ -134,7 +134,7 @@ TEST(add_skips_when_no_makefile)
 
 TEST(safe_package_name)
 {
-	const char *valid[] = {"mylib", "my_lib", "my-lib", "mylib123", "MyLib", NULL};
+	const char *valid[] = { "mylib", "my_lib", "my-lib", "mylib123", "MyLib", NULL };
 	for (int i = 0; valid[i]; i++) {
 		const char *p = valid[i];
 		while (*p) {
@@ -147,7 +147,7 @@ TEST(safe_package_name)
 		}
 	}
 
-	const char *invalid[] = {"bad name", "bad$name", "bad;name", "bad\nname", "$(shell)", NULL};
+	const char *invalid[] = { "bad name", "bad$name", "bad;name", "bad\nname", "$(shell)", NULL };
 	for (int i = 0; invalid[i]; i++) {
 		const char *p	  = invalid[i];
 		int			found = 0;

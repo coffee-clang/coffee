@@ -58,7 +58,7 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 		verbose = opts->verbose;
 	}
 
-	char *mkdir_argv[] = {(char *)"mkdir", (char *)"-p", (char *)output_dir, NULL};
+	char *mkdir_argv[] = { (char *)"mkdir", (char *)"-p", (char *)output_dir, NULL };
 	int	  ret		   = run_command(mkdir_argv, verbose);
 	if (ret != 0) {
 		return 1;
@@ -139,7 +139,7 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 	}
 
 	int	   argc_total	 = 1 + max_tokens + 2 + (int)globbuf.gl_pathc + 1;
-	char **compiler_argv = (char **)malloc(sizeof(char *) * (size_t)argc_total);
+	char **compiler_argv = (char **)malloc(sizeof(char *) * ((size_t)argc_total + 1));
 	if (!compiler_argv) {
 		free(flags);
 		globfree(&globbuf);

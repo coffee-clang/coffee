@@ -110,7 +110,7 @@ static char *toml_datum_to_string(toml_datum_t datum)
 	return datum.u.s;
 }
 
-manifest_t *manifest_parse(const char *path)
+manifest_t *manifest_parse(sds path)
 {
 	FILE *fp = fopen(path, "r");
 	if (!fp) {
@@ -380,7 +380,7 @@ void manifest_free(manifest_t *m)
 	free(m);
 }
 
-int manifest_write(const char *path, manifest_t *m)
+int manifest_write(sds path, manifest_t *m)
 {
 	FILE *fp = fopen(path, "w");
 	if (!fp) {

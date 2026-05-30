@@ -9,7 +9,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-const char *coffee_home_dir(void)
+sds coffee_home_dir(void)
 {
 	static char home_dir[4096];
 	const char *coffee_home = getenv("COFFEE_HOME");
@@ -206,7 +206,7 @@ static recipe_list_t *parse_package_list(const char *json)
 	return list;
 }
 
-recipe_list_t *registry_search(const char *query)
+recipe_list_t *registry_search(sds query)
 {
 	if (ensure_index_cached() != 0) {
 		recipe_list_t *empty = calloc(1, sizeof(recipe_list_t));
@@ -276,7 +276,7 @@ recipe_list_t *registry_search(const char *query)
 	return filtered;
 }
 
-recipe_t *registry_get(const char *name)
+recipe_t *registry_get(sds name)
 {
 	if (!name || strlen(name) == 0) {
 		return NULL;
@@ -308,7 +308,7 @@ recipe_t *registry_get(const char *name)
 	return r;
 }
 
-int registry_fetch(const char *name, const char *version, const char *dest_dir)
+int registry_fetch(sds name, sds version, sds dest_dir)
 {
 	if (!name || !dest_dir) {
 		return -1;
@@ -336,7 +336,7 @@ int registry_fetch(const char *name, const char *version, const char *dest_dir)
 	return 0;
 }
 
-version_list_t *registry_get_versions(const char *name)
+version_list_t *registry_get_versions(sds name)
 {
 	if (!name || strlen(name) == 0) {
 		return NULL;
