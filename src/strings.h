@@ -37,6 +37,7 @@
 
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 /**
  * @brief Format text and write it to an arbitrary stream.
@@ -59,7 +60,9 @@ static inline void fprintf_safe(FILE *stream, const char *fmt, ...)
 	va_start(ap, fmt);
 	sds str = sdscatvprintf(sdsempty(), fmt, ap);
 	va_end(ap);
-	fputs(str, stream);
+	if (fputs(str, stream) == EOF) {
+		exit(1);
+	}
 	sdsfree(str);
 }
 
