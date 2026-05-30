@@ -28,19 +28,19 @@ static bool semver_parse(const char *s, semver_t *v)
 
 	const char *p = s;
 	while (*p >= '0' && *p <= '9') {
-		v->major = v->major * 10 + (*p - '0');
+		v->major = (v->major * 10) + (*p - '0');
 		p++;
 	}
 	if (*p == '.') {
 		p++;
 		while (*p >= '0' && *p <= '9') {
-			v->minor = v->minor * 10 + (*p - '0');
+			v->minor = (v->minor * 10) + (*p - '0');
 			p++;
 		}
 		if (*p == '.') {
 			p++;
 			while (*p >= '0' && *p <= '9') {
-				v->patch = v->patch * 10 + (*p - '0');
+				v->patch = (v->patch * 10) + (*p - '0');
 				p++;
 			}
 		}
@@ -84,7 +84,7 @@ static bool semver_match(const char *constraint, const char *version)
 		if (!semver_parse(p + 1, &con)) {
 			return false;
 		}
-		return ver.major == con.major && ver.minor >= con.minor;
+		return (ver.major == con.major && ver.minor >= con.minor) != 0;
 	}
 	if (strncmp(p, ">=", 2) == 0) {
 		if (!semver_parse(p + 2, &con)) {

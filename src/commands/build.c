@@ -56,10 +56,10 @@ int64_t handle_build(options *opts)
 			return 1;
 		}
 
-		if (opts->release && (size_t)off < sizeof(cmd)) {
+		if ((int)opts->release && (size_t)off < sizeof(cmd)) {
 			off += snprintf_safe(cmd + off, sizeof(cmd) - (size_t)off, " RELEASE=1");
 		}
-		if (opts->debug && (size_t)off < sizeof(cmd)) {
+		if ((int)opts->debug && (size_t)off < sizeof(cmd)) {
 			off += snprintf_safe(cmd + off, sizeof(cmd) - (size_t)off, " DEBUG=1");
 		}
 		if (opts->jobs > 0 && (size_t)off < sizeof(cmd)) {
@@ -75,7 +75,7 @@ int64_t handle_build(options *opts)
 				features_parse_cli(opts->features, &features, &features_count);
 			}
 
-			if (features_count > 0 || opts->all_features) {
+			if (features_count > 0 || (int)opts->all_features) {
 				const char **requested = NULL;
 				if (features_count > 0) {
 					requested = (const char **)features;

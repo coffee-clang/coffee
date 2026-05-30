@@ -51,7 +51,7 @@ static void print_transitive(const char *name, const char *version, const char *
 		return;
 	}
 
-	const char *connector = is_last ? "└── " : "├── ";
+	const char *connector = (int)is_last ? "└── " : "├── ";
 	char	   *ver		  = version != nullptr ? strdup(version) : NULL;
 	printf("%s%s%s v%s\n", prefix, connector, name != nullptr ? name : "?", ver != nullptr ? ver : "?");
 	free(ver);
@@ -65,8 +65,8 @@ static void print_transitive(const char *name, const char *version, const char *
 		return;
 	}
 
-	char *child_prefix = malloc(strlen(prefix) + strlen(is_last ? "    " : "│   ") + 1);
-	sprintf(child_prefix, "%s%s", prefix, is_last ? "    " : "│   ");
+	char *child_prefix = malloc(strlen(prefix) + strlen((int)is_last ? "    " : "│   ") + 1);
+	sprintf(child_prefix, "%s%s", prefix, (int)is_last ? "    " : "│   ");
 
 	char **dep_names = NULL;
 	size_t dep_count = 0;

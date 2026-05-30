@@ -1,10 +1,9 @@
 #include "cmdline.h"
+#include "strings.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include "strings.h"
 
 void print_usage()
 {

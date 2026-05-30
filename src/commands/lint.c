@@ -27,7 +27,7 @@ int64_t handle_lint(options *opts)
 		}
 	}
 
-	const char *tidy_opts = opts->fix ? "--fix" : "";
+	const char *tidy_opts = (int)opts->fix ? "--fix" : "";
 	char		cmd[8192];
 	snprintf_safe(cmd, sizeof(cmd), "find src tests -name \"*.c\" | xargs clang-tidy %s --quiet -- %s 2>/dev/null",
 				  tidy_opts, inc_flags);

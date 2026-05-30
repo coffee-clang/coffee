@@ -7,13 +7,13 @@
 
 #include "cmdline.h"
 
+#include "strings.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include <getopt.h>
-
-#include "strings.h"
 
 /* ------------------------------------------------------------------ */
 /*  Toolchain values                                                  */

@@ -1,10 +1,10 @@
 #include "manifest.h"
 
+#include "strings.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include "strings.h"
 
 static char *strdup_or_null(const char *s)
 {

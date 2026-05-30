@@ -70,7 +70,7 @@ int64_t handle_add(options *opts)
 	} else {
 		const char *version = opts->pkg_version != nullptr ? opts->pkg_version : "*";
 
-		if (opts->features || opts->optional) {
+		if (opts->features || (int)opts->optional) {
 			int off = snprintf_safe(dep_str, sizeof(dep_str), "%s = { version = \"%s\"", package_name, version);
 			if (opts->features) {
 				off += snprintf_safe(dep_str + off, sizeof(dep_str) - off, ", features = [\"%s\"]", opts->features);

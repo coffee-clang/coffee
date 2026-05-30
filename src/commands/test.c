@@ -19,7 +19,7 @@ int64_t handle_test(options *opts)
 	}
 
 	char *dir_end	 = manifest_path != nullptr ? strrchr(manifest_path, '/') : NULL;
-	bool  in_project = 0;
+	bool  in_project = false;
 	char  project_dir[4096];
 
 	if (dir_end) {
@@ -29,7 +29,7 @@ int64_t handle_test(options *opts)
 		}
 		memccpy(project_dir, manifest_path, '\0', len);
 		project_dir[len] = '\0';
-		in_project		 = 1;
+		in_project		 = true;
 	} else {
 		project_dir[0] = '.';
 		project_dir[1] = '\0';
