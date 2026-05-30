@@ -1,5 +1,7 @@
 #include "build.h"
 
+#include "strings.h"
+
 #include <stdbool.h>
 
 #include <stdio.h>
@@ -105,7 +107,7 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 				free(dflags[i]);
 				flags = new_flags;
 			}
-			free(dflags);
+			free((void *)dflags);
 		}
 	}
 

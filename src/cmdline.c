@@ -13,6 +13,8 @@
 
 #include <getopt.h>
 
+#include "strings.h"
+
 /* ------------------------------------------------------------------ */
 /*  Toolchain values                                                  */
 /* ------------------------------------------------------------------ */
@@ -394,7 +396,7 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 				char *end;
 				long  val = strtol(optarg, &end, 10);
 				if (end == optarg || *end != '\0' || val < 0 || val > 2147483647) {
-					fprintf(stderr, "coffee: invalid numeric value: %s\n", optarg);
+					fprintf_safe(stderr, "coffee: invalid numeric value: %s\n", optarg);
 					cmdline_parser_free(args_info);
 					return 1;
 				}
@@ -407,7 +409,7 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 			free_string(&args_info->package_arg);
 			args_info->package_arg = safe_strdup(optarg);
 			if (!args_info->package_arg) {
-				fprintf(stderr, "coffee: out of memory\n");
+				fprintf_safe(stderr, "coffee: out of memory\n");
 				cmdline_parser_free(args_info);
 				return 1;
 			}
@@ -418,7 +420,7 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 			free_string(&args_info->unstable_flags_arg);
 			args_info->unstable_flags_arg = safe_strdup(optarg);
 			if (!args_info->unstable_flags_arg) {
-				fprintf(stderr, "coffee: out of memory\n");
+				fprintf_safe(stderr, "coffee: out of memory\n");
 				cmdline_parser_free(args_info);
 				return 1;
 			}
@@ -429,7 +431,7 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 			free_string(&args_info->pkg_version_arg);
 			args_info->pkg_version_arg = safe_strdup(optarg);
 			if (!args_info->pkg_version_arg) {
-				fprintf(stderr, "coffee: out of memory\n");
+				fprintf_safe(stderr, "coffee: out of memory\n");
 				cmdline_parser_free(args_info);
 				return 1;
 			}
@@ -441,7 +443,7 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 			free_string(&args_info->color_arg);
 			args_info->color_arg = safe_strdup(optarg);
 			if (!args_info->color_arg) {
-				fprintf(stderr, "coffee: out of memory\n");
+				fprintf_safe(stderr, "coffee: out of memory\n");
 				cmdline_parser_free(args_info);
 				return 1;
 			}
@@ -452,7 +454,7 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 			free_string(&args_info->message_format_arg);
 			args_info->message_format_arg = safe_strdup(optarg);
 			if (!args_info->message_format_arg) {
-				fprintf(stderr, "coffee: out of memory\n");
+				fprintf_safe(stderr, "coffee: out of memory\n");
 				cmdline_parser_free(args_info);
 				return 1;
 			}
@@ -463,7 +465,7 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 			free_string(&args_info->manifest_path_arg);
 			args_info->manifest_path_arg = safe_strdup(optarg);
 			if (!args_info->manifest_path_arg) {
-				fprintf(stderr, "coffee: out of memory\n");
+				fprintf_safe(stderr, "coffee: out of memory\n");
 				cmdline_parser_free(args_info);
 				return 1;
 			}
@@ -474,7 +476,7 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 			free_string(&args_info->target_arg);
 			args_info->target_arg = safe_strdup(optarg);
 			if (!args_info->target_arg) {
-				fprintf(stderr, "coffee: out of memory\n");
+				fprintf_safe(stderr, "coffee: out of memory\n");
 				cmdline_parser_free(args_info);
 				return 1;
 			}
@@ -495,7 +497,7 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 			free_string(&args_info->bin_arg);
 			args_info->bin_arg = safe_strdup(optarg);
 			if (!args_info->bin_arg) {
-				fprintf(stderr, "coffee: out of memory\n");
+				fprintf_safe(stderr, "coffee: out of memory\n");
 				cmdline_parser_free(args_info);
 				return 1;
 			}
@@ -506,7 +508,7 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 			free_string(&args_info->example_arg);
 			args_info->example_arg = safe_strdup(optarg);
 			if (!args_info->example_arg) {
-				fprintf(stderr, "coffee: out of memory\n");
+				fprintf_safe(stderr, "coffee: out of memory\n");
 				cmdline_parser_free(args_info);
 				return 1;
 			}
@@ -517,7 +519,7 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 			free_string(&args_info->features_arg);
 			args_info->features_arg = safe_strdup(optarg);
 			if (!args_info->features_arg) {
-				fprintf(stderr, "coffee: out of memory\n");
+				fprintf_safe(stderr, "coffee: out of memory\n");
 				cmdline_parser_free(args_info);
 				return 1;
 			}
@@ -538,7 +540,7 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 			free_string(&args_info->profile_arg);
 			args_info->profile_arg = safe_strdup(optarg);
 			if (!args_info->profile_arg) {
-				fprintf(stderr, "coffee: out of memory\n");
+				fprintf_safe(stderr, "coffee: out of memory\n");
 				cmdline_parser_free(args_info);
 				return 1;
 			}
@@ -549,7 +551,7 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 			free_string(&args_info->target_dir_arg);
 			args_info->target_dir_arg = safe_strdup(optarg);
 			if (!args_info->target_dir_arg) {
-				fprintf(stderr, "coffee: out of memory\n");
+				fprintf_safe(stderr, "coffee: out of memory\n");
 				cmdline_parser_free(args_info);
 				return 1;
 			}
@@ -570,7 +572,7 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 			free_string(&args_info->timings_arg);
 			args_info->timings_arg = safe_strdup(optarg);
 			if (!args_info->timings_arg) {
-				fprintf(stderr, "coffee: out of memory\n");
+				fprintf_safe(stderr, "coffee: out of memory\n");
 				cmdline_parser_free(args_info);
 				return 1;
 			}
@@ -591,7 +593,7 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 			free_string(&args_info->exclude_arg);
 			args_info->exclude_arg = safe_strdup(optarg);
 			if (!args_info->exclude_arg) {
-				fprintf(stderr, "coffee: out of memory\n");
+				fprintf_safe(stderr, "coffee: out of memory\n");
 				cmdline_parser_free(args_info);
 				return 1;
 			}
@@ -602,7 +604,7 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 			free_string(&args_info->include_arg);
 			args_info->include_arg = safe_strdup(optarg);
 			if (!args_info->include_arg) {
-				fprintf(stderr, "coffee: out of memory\n");
+				fprintf_safe(stderr, "coffee: out of memory\n");
 				cmdline_parser_free(args_info);
 				return 1;
 			}
@@ -633,7 +635,7 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 			free_string(&args_info->config_arg);
 			args_info->config_arg = safe_strdup(optarg);
 			if (!args_info->config_arg) {
-				fprintf(stderr, "coffee: out of memory\n");
+				fprintf_safe(stderr, "coffee: out of memory\n");
 				cmdline_parser_free(args_info);
 				return 1;
 			}
@@ -664,7 +666,7 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 			free_string(&args_info->rename_arg);
 			args_info->rename_arg = safe_strdup(optarg);
 			if (!args_info->rename_arg) {
-				fprintf(stderr, "coffee: out of memory\n");
+				fprintf_safe(stderr, "coffee: out of memory\n");
 				cmdline_parser_free(args_info);
 				return 1;
 			}
@@ -675,7 +677,7 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 			free_string(&args_info->path_arg);
 			args_info->path_arg = safe_strdup(optarg);
 			if (!args_info->path_arg) {
-				fprintf(stderr, "coffee: out of memory\n");
+				fprintf_safe(stderr, "coffee: out of memory\n");
 				cmdline_parser_free(args_info);
 				return 1;
 			}
@@ -686,7 +688,7 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 			free_string(&args_info->git_arg);
 			args_info->git_arg = safe_strdup(optarg);
 			if (!args_info->git_arg) {
-				fprintf(stderr, "coffee: out of memory\n");
+				fprintf_safe(stderr, "coffee: out of memory\n");
 				cmdline_parser_free(args_info);
 				return 1;
 			}
@@ -697,7 +699,7 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 			free_string(&args_info->branch_arg);
 			args_info->branch_arg = safe_strdup(optarg);
 			if (!args_info->branch_arg) {
-				fprintf(stderr, "coffee: out of memory\n");
+				fprintf_safe(stderr, "coffee: out of memory\n");
 				cmdline_parser_free(args_info);
 				return 1;
 			}
@@ -708,7 +710,7 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 			free_string(&args_info->tag_arg);
 			args_info->tag_arg = safe_strdup(optarg);
 			if (!args_info->tag_arg) {
-				fprintf(stderr, "coffee: out of memory\n");
+				fprintf_safe(stderr, "coffee: out of memory\n");
 				cmdline_parser_free(args_info);
 				return 1;
 			}
@@ -719,7 +721,7 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 			free_string(&args_info->rev_arg);
 			args_info->rev_arg = safe_strdup(optarg);
 			if (!args_info->rev_arg) {
-				fprintf(stderr, "coffee: out of memory\n");
+				fprintf_safe(stderr, "coffee: out of memory\n");
 				cmdline_parser_free(args_info);
 				return 1;
 			}
@@ -730,7 +732,7 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 			free_string(&args_info->registry_arg);
 			args_info->registry_arg = safe_strdup(optarg);
 			if (!args_info->registry_arg) {
-				fprintf(stderr, "coffee: out of memory\n");
+				fprintf_safe(stderr, "coffee: out of memory\n");
 				cmdline_parser_free(args_info);
 				return 1;
 			}
@@ -746,7 +748,7 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 			free_string(&args_info->out_dir_arg);
 			args_info->out_dir_arg = safe_strdup(optarg);
 			if (!args_info->out_dir_arg) {
-				fprintf(stderr, "coffee: out of memory\n");
+				fprintf_safe(stderr, "coffee: out of memory\n");
 				cmdline_parser_free(args_info);
 				return 1;
 			}
@@ -808,12 +810,12 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 				int idx;
 				int rc = check_enum_value(optarg, cmdline_parser_toolchain_values, &idx);
 				if (rc == -2) {
-					fprintf(stderr, "coffee: ambiguous argument \"%s\" for --toolchain\n", optarg);
+					fprintf_safe(stderr, "coffee: ambiguous argument \"%s\" for --toolchain\n", optarg);
 					cmdline_parser_free(args_info);
 					return 1;
 				}
 				if (rc == -1) {
-					fprintf(stderr, "coffee: invalid argument \"%s\" for --toolchain\n", optarg);
+					fprintf_safe(stderr, "coffee: invalid argument \"%s\" for --toolchain\n", optarg);
 					cmdline_parser_free(args_info);
 					return 1;
 				}
@@ -826,7 +828,7 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 			free_string(&args_info->command_arg);
 			args_info->command_arg = safe_strdup(optarg);
 			if (!args_info->command_arg) {
-				fprintf(stderr, "coffee: out of memory\n");
+				fprintf_safe(stderr, "coffee: out of memory\n");
 				cmdline_parser_free(args_info);
 				return 1;
 			}
@@ -838,7 +840,7 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 			return 1;
 
 		default:
-			fprintf(stderr, "coffee: unknown option (bug)\n");
+			fprintf_safe(stderr, "coffee: unknown option (bug)\n");
 			cmdline_parser_free(args_info);
 			return 1;
 		}
@@ -849,14 +851,14 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 		unsigned remaining = (unsigned)(argc - optind);
 		args_info->inputs  = (char **)malloc((size_t)(remaining) * sizeof(char *));
 		if (!args_info->inputs) {
-			fprintf(stderr, "coffee: out of memory\n");
+			fprintf_safe(stderr, "coffee: out of memory\n");
 			cmdline_parser_free(args_info);
 			return 1;
 		}
 		for (unsigned i = 0; i < remaining; i++) {
 			args_info->inputs[i] = safe_strdup(argv[optind + (int)i]);
 			if (!args_info->inputs[i]) {
-				fprintf(stderr, "coffee: out of memory\n");
+				fprintf_safe(stderr, "coffee: out of memory\n");
 				cmdline_parser_free(args_info);
 				return 1;
 			}

@@ -10,7 +10,7 @@ int64_t handle_logout(options *)
 {
 	const char *home = getenv("HOME");
 	if (!home) {
-		fprintf(stderr, "Error: HOME environment variable not set.\n");
+		fprintf_safe(stderr, "Error: HOME environment variable not set.\n");
 		return 1;
 	}
 
@@ -25,7 +25,7 @@ int64_t handle_logout(options *)
 	if (unlink(cred_path) == 0) {
 		printf("Successfully logged out. Removed credentials from %s\n", cred_path);
 	} else {
-		fprintf(stderr, "Error: Could not remove credentials from %s\n", cred_path);
+		fprintf_safe(stderr, "Error: Could not remove credentials from %s\n", cred_path);
 		return 1;
 	}
 

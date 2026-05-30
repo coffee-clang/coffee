@@ -12,7 +12,7 @@ int64_t handle_lint(options *opts)
 
 	char *manifest_path = project_find_manifest(NULL);
 	if (!manifest_path) {
-		fprintf(stderr, "Error: Could not find Coffee.toml\n");
+		fprintf_safe(stderr, "Error: Could not find Coffee.toml\n");
 		return 1;
 	}
 
@@ -43,7 +43,7 @@ int64_t handle_lint(options *opts)
 	}
 
 	if (ret != 0) {
-		fprintf(stderr, "Error: Linting failed. Please ensure 'clang-tidy' is installed.\n");
+		fprintf_safe(stderr, "Error: Linting failed. Please ensure 'clang-tidy' is installed.\n");
 		return 1;
 	}
 

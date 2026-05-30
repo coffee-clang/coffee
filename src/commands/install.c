@@ -47,8 +47,8 @@ static int create_symlink(const char *target, const char *link_path)
 int64_t handle_install(options *opts)
 {
 	if (opts->inputs_num < 2) {
-		fprintf(stderr, "Error: Package name required\n");
-		fprintf(stderr, "Usage: coffee install <package> [version]\n");
+		fprintf_safe(stderr, "Error: Package name required\n");
+		fprintf_safe(stderr, "Usage: coffee install <package> [version]\n");
 		return 1;
 	}
 
@@ -61,7 +61,7 @@ int64_t handle_install(options *opts)
 			version = strdup(versions->versions[0]);
 			registry_free_versions(versions);
 		} else {
-			fprintf(stderr, "Error: Package '%s' not found in registry\n", package);
+			fprintf_safe(stderr, "Error: Package '%s' not found in registry\n", package);
 			return 1;
 		}
 	}
@@ -78,8 +78,8 @@ int64_t handle_install(options *opts)
 
 	int ret = registry_fetch(package, version, cache_path);
 	if (ret != 0) {
-		fprintf(stderr, "Error: Failed to install %s\n", package);
-		fprintf(stderr, "Package not found in registry\n");
+		fprintf_safe(stderr, "Error: Failed to install %s\n", package);
+		fprintf_safe(stderr, "Package not found in registry\n");
 		free(version);
 		return 1;
 	}
@@ -95,7 +95,7 @@ int64_t handle_install(options *opts)
 
 		ret = create_symlink(cache_path, project_link_path);
 		if (ret != 0) {
-			fprintf(stderr, "Warning: Failed to create project symlink\n");
+			fprintf_safe(stderr, "Warning: Failed to create project symlink\n");
 		} else {
 			printf("Linked to project: %s\n", project_link_path);
 		}

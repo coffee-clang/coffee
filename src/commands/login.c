@@ -13,13 +13,13 @@ int64_t handle_login(options *)
 
 	printf("Enter your API token for the Coffee registry: ");
 	if (scanf("%1023s", token) != 1) {
-		fprintf(stderr, "Error reading token.\n");
+		fprintf_safe(stderr, "Error reading token.\n");
 		return 1;
 	}
 
 	const char *home = getenv("HOME");
 	if (!home) {
-		fprintf(stderr, "Error: HOME environment variable not set.\n");
+		fprintf_safe(stderr, "Error: HOME environment variable not set.\n");
 		return 1;
 	}
 
@@ -32,11 +32,11 @@ int64_t handle_login(options *)
 
 	FILE *fp = fopen(cred_path, "w");
 	if (!fp) {
-		fprintf(stderr, "Error: Could not save credentials to %s\n", cred_path);
+		fprintf_safe(stderr, "Error: Could not save credentials to %s\n", cred_path);
 		return 1;
 	}
 
-	fprintf(fp, "token = \"%s\"\n", token);
+	fprintf_safe(fp, "token = \"%s\"\n", token);
 	fclose(fp);
 
 	printf("Successfully logged in. Credentials saved to %s\n", cred_path);

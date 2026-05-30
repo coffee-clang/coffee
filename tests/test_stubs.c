@@ -110,7 +110,7 @@ TEST(report_unknown_type)
 {
 	FILE *fp = fopen("/tmp/coffee-report-test.toml", "w");
 	ASSERT(fp != NULL, "could not create test file");
-	fprintf(fp, "[package]\nname = \"test\"\nversion = \"1.0\"\n");
+	fprintf_safe(fp, "[package]\nname = \"test\"\nversion = \"1.0\"\n");
 	fclose(fp);
 
 	/* Can't test with real manifest easily, just test the command compiles */

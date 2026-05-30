@@ -1,5 +1,7 @@
 #include "test_framework.h"
 
+#include "../src/strings.h"
+
 /* Global test registry */
 test_entry_t test_framework_tests[TEST_FRAMEWORK_MAX_TESTS];
 unsigned int test_framework_count = 0;
@@ -12,7 +14,7 @@ static int tests_failed = 0;
 void test_framework_register(const char *name, test_func_t func)
 {
 	if (test_framework_count >= TEST_FRAMEWORK_MAX_TESTS) {
-		fprintf(stderr, "Error: too many tests (max %d)\n", TEST_FRAMEWORK_MAX_TESTS);
+		fprintf_safe(stderr, "Error: too many tests (max %d)\n", TEST_FRAMEWORK_MAX_TESTS);
 		return;
 	}
 	test_framework_tests[test_framework_count].name = name;

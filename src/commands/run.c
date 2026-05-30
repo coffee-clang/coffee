@@ -9,7 +9,7 @@ int64_t handle_run(options *opts)
 	char *manifest_path = project_find_manifest(NULL);
 
 	if (!manifest_path) {
-		fprintf(stderr, "Error: Could not find Coffee.toml in current directory\n");
+		fprintf_safe(stderr, "Error: Could not find Coffee.toml in current directory\n");
 		return 1;
 	}
 
@@ -17,7 +17,7 @@ int64_t handle_run(options *opts)
 	free(manifest_path);
 
 	if (!manifest) {
-		fprintf(stderr, "Error: Could not parse Coffee.toml\n");
+		fprintf_safe(stderr, "Error: Could not parse Coffee.toml\n");
 		return 1;
 	}
 

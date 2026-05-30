@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "strings.h"
+
 static char *strdup_or_null(const char *s)
 {
 	if (s == NULL) {
@@ -254,7 +256,7 @@ manifest_t *manifest_parse(sds path)
 				}
 				m->features[idx].name = strdup(key);
 				if (!is_valid_feature_name(m->features[idx].name)) {
-					fprintf(stderr, "Warning: Invalid feature name: %s\n", key);
+					fprintf_safe(stderr, "Warning: Invalid feature name: %s\n", key);
 				}
 				m->features[idx].deps_count = toml_array_nelem(arr);
 				if (m->features[idx].deps_count > 0) {
@@ -282,10 +284,10 @@ manifest_t *manifest_parse(sds path)
 				if (m->features[k].name && strcmp(dep, m->features[k].name) == 0) {
 					for (size_t l = 0; l < m->features[k].deps_count; l++) {
 						if (m->features[k].deps[l] && strcmp(m->features[k].deps[l], m->features[i].name) == 0) {
-							fprintf(stderr,
-									"Warning: Circular feature dependency detected: %s <-> "
-									"%s\n",
-									m->features[i].name, m->features[k].name);
+							fprintf_safe(stderr,
+										 "Warning: Circular feature dependency detected: %s <-> "
+										 "%s\n",
+										 m->features[i].name, m->features[k].name);
 						}
 					}
 				}
@@ -387,72 +389,72 @@ int manifest_write(sds path, manifest_t *m)
 		return -1;
 	}
 
-	fprintf(fp, "[package]\n");
+	fprintf_safe(fp, "[package]\n");
 	if (m->package.name) {
-		fprintf(fp, "name = \"%s\"\n", m->package.name);
+		fprintf_safe(fp, "name = \"%s\"\n", m->package.name);
 	}
 	if (m->package.version) {
-		fprintf(fp, "version = \"%s\"\n", m->package.version);
+		fprintf_safe(fp, "version = \"%s\"\n", m->package.version);
 	}
 	if (m->package.edition) {
-		fprintf(fp, "edition = \"%s\"\n", m->package.edition);
+		fprintf_safe(fp, "edition = \"%s\"\n", m->package.edition);
 	}
 	if (m->package.description) {
-		fprintf(fp, "description = \"%s\"\n", m->package.description);
+		fprintf_safe(fp, "description = \"%s\"\n", m->package.description);
 	}
 	if (m->package.license) {
-		fprintf(fp, "license = \"%s\"\n", m->package.license);
+		fprintf_safe(fp, "license = \"%s\"\n", m->package.license);
 	}
 	if (m->package.repository) {
-		fprintf(fp, "repository = \"%s\"\n", m->package.repository);
+		fprintf_safe(fp, "repository = \"%s\"\n", m->package.repository);
 	}
 	if (m->package.authors) {
-		fprintf(fp, "authors = \"%s\"\n", m->package.authors);
+		fprintf_safe(fp, "authors = \"%s\"\n", m->package.authors);
 	}
 
 	if (m->package.dependencies_count > 0) {
-		fprintf(fp, "\n[dependencies]\n");
+		fprintf_safe(fp, "\n[dependencies]\n");
 		for (size_t i = 0; i < m->package.dependencies_count; i++) {
 			if (m->package.dependencies[i]) {
-				fprintf(fp, "%s\n", m->package.dependencies[i]);
+				fprintf_safe(fp, "%s\n", m->package.dependencies[i]);
 			}
 		}
 	}
 
 	if (m->package.sources_count > 0) {
-		fprintf(fp, "\nsources = [\n");
+		fprintf_safe(fp, "\nsources = [\n");
 		for (size_t i = 0; i < m->package.sources_count; i++) {
 			if (m->package.sources[i]) {
-				fprintf(fp, "  \"%s\",\n", m->package.sources[i]);
+				fprintf_safe(fp, "  \"%s\",\n", m->package.sources[i]);
 			}
 		}
-		fprintf(fp, "]\n");
+		fprintf_safe(fp, "]\n");
 	}
 
 	if (m->package.headers_count > 0) {
-		fprintf(fp, "\nheaders = [\n");
+		fprintf_safe(fp, "\nheaders = [\n");
 		for (size_t i = 0; i < m->package.headers_count; i++) {
 			if (m->package.headers[i]) {
-				fprintf(fp, "  \"%s\",\n", m->package.headers[i]);
+				fprintf_safe(fp, "  \"%s\",\n", m->package.headers[i]);
 			}
 		}
-		fprintf(fp, "]\n");
+		fprintf_safe(fp, "]\n");
 	}
 
 	if (m->features_count > 0) {
-		fprintf(fp, "\n[features]\n");
+		fprintf_safe(fp, "\n[features]\n");
 		for (size_t i = 0; i < m->features_count; i++) {
 			if (m->features[i].name) {
-				fprintf(fp, "%s = [", m->features[i].name);
+				fprintf_safe(fp, "%s = [", m->features[i].name);
 				for (size_t j = 0; j < m->features[i].deps_count; j++) {
 					if (j > 0) {
-						fprintf(fp, ", ");
+						fprintf_safe(fp, ", ");
 					}
 					if (m->features[i].deps[j]) {
-						fprintf(fp, "\"%s\"", m->features[i].deps[j]);
+						fprintf_safe(fp, "\"%s\"", m->features[i].deps[j]);
 					}
 				}
-				fprintf(fp, "]\n");
+				fprintf_safe(fp, "]\n");
 			}
 		}
 	}

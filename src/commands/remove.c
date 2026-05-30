@@ -9,7 +9,7 @@
 int64_t handle_remove(options *opts)
 {
 	if (opts->inputs_num < 2) {
-		fprintf(stderr, "Error: No package specified\n");
+		fprintf_safe(stderr, "Error: No package specified\n");
 		return 1;
 	}
 
@@ -17,13 +17,13 @@ int64_t handle_remove(options *opts)
 	char *manifest_path = project_find_manifest(NULL);
 
 	if (!manifest_path) {
-		fprintf(stderr, "Error: Could not find Coffee.toml in current directory or any parent directory\n");
+		fprintf_safe(stderr, "Error: Could not find Coffee.toml in current directory or any parent directory\n");
 		return 1;
 	}
 
 	manifest_t *m = manifest_parse(manifest_path);
 	if (!m) {
-		fprintf(stderr, "Error: Could not parse manifest at %s\n", manifest_path);
+		fprintf_safe(stderr, "Error: Could not parse manifest at %s\n", manifest_path);
 		free(manifest_path);
 		return 1;
 	}
@@ -44,14 +44,14 @@ int64_t handle_remove(options *opts)
 	}
 
 	if (!found) {
-		fprintf(stderr, "Error: Dependency %s not found in manifest\n", package_name);
+		fprintf_safe(stderr, "Error: Dependency %s not found in manifest\n", package_name);
 		manifest_free(m);
 		free(manifest_path);
 		return 1;
 	}
 
 	if (manifest_write(manifest_path, m) != 0) {
-		fprintf(stderr, "Error: Could not write manifest at %s\n", manifest_path);
+		fprintf_safe(stderr, "Error: Could not write manifest at %s\n", manifest_path);
 		manifest_free(m);
 		free(manifest_path);
 		return 1;

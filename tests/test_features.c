@@ -6,17 +6,19 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../src/strings.h"
+
 TEST(feature_parse)
 {
 	FILE *fp = fopen("/tmp/coffee-features-test.toml", "w");
 	ASSERT(fp != NULL, "could not create test file");
 
-	fprintf(fp, "[package]\n");
-	fprintf(fp, "name = \"test\"\n\n");
-	fprintf(fp, "[features]\n");
-	fprintf(fp, "json = [\"serde_json\"]\n");
-	fprintf(fp, "logging = [\"log/info\"]\n");
-	fprintf(fp, "default = [\"json\"]\n");
+	fprintf_safe(fp, "[package]\n");
+	fprintf_safe(fp, "name = \"test\"\n\n");
+	fprintf_safe(fp, "[features]\n");
+	fprintf_safe(fp, "json = [\"serde_json\"]\n");
+	fprintf_safe(fp, "logging = [\"log/info\"]\n");
+	fprintf_safe(fp, "default = [\"json\"]\n");
 	fclose(fp);
 
 	manifest_t *m = manifest_parse("/tmp/coffee-features-test.toml");
@@ -35,12 +37,12 @@ TEST(feature_resolve)
 	FILE *fp = fopen("/tmp/coffee-features-test.toml", "w");
 	ASSERT(fp != NULL, "could not create test file");
 
-	fprintf(fp, "[package]\n");
-	fprintf(fp, "name = \"test\"\n\n");
-	fprintf(fp, "[features]\n");
-	fprintf(fp, "json = [\"serde_json\"]\n");
-	fprintf(fp, "logging = [\"log/info\"]\n");
-	fprintf(fp, "default = [\"json\"]\n");
+	fprintf_safe(fp, "[package]\n");
+	fprintf_safe(fp, "name = \"test\"\n\n");
+	fprintf_safe(fp, "[features]\n");
+	fprintf_safe(fp, "json = [\"serde_json\"]\n");
+	fprintf_safe(fp, "logging = [\"log/info\"]\n");
+	fprintf_safe(fp, "default = [\"json\"]\n");
 	fclose(fp);
 
 	manifest_t *m = manifest_parse("/tmp/coffee-features-test.toml");
@@ -61,12 +63,12 @@ TEST(feature_resolve_all)
 	FILE *fp = fopen("/tmp/coffee-features-test.toml", "w");
 	ASSERT(fp != NULL, "could not create test file");
 
-	fprintf(fp, "[package]\n");
-	fprintf(fp, "name = \"test\"\n\n");
-	fprintf(fp, "[features]\n");
-	fprintf(fp, "json = []\n");
-	fprintf(fp, "xml = []\n");
-	fprintf(fp, "logging = []\n");
+	fprintf_safe(fp, "[package]\n");
+	fprintf_safe(fp, "name = \"test\"\n\n");
+	fprintf_safe(fp, "[features]\n");
+	fprintf_safe(fp, "json = []\n");
+	fprintf_safe(fp, "xml = []\n");
+	fprintf_safe(fp, "logging = []\n");
 	fclose(fp);
 
 	manifest_t *m = manifest_parse("/tmp/coffee-features-test.toml");
@@ -88,12 +90,12 @@ TEST(feature_default)
 	FILE *fp = fopen("/tmp/coffee-features-test.toml", "w");
 	ASSERT(fp != NULL, "could not create test file");
 
-	fprintf(fp, "[package]\n");
-	fprintf(fp, "name = \"test\"\n\n");
-	fprintf(fp, "[features]\n");
-	fprintf(fp, "json = []\n");
-	fprintf(fp, "xml = []\n");
-	fprintf(fp, "default = [\"json\"]\n");
+	fprintf_safe(fp, "[package]\n");
+	fprintf_safe(fp, "name = \"test\"\n\n");
+	fprintf_safe(fp, "[features]\n");
+	fprintf_safe(fp, "json = []\n");
+	fprintf_safe(fp, "xml = []\n");
+	fprintf_safe(fp, "default = [\"json\"]\n");
 	fclose(fp);
 
 	manifest_t *m = manifest_parse("/tmp/coffee-features-test.toml");
@@ -114,11 +116,11 @@ TEST(feature_no_default)
 	FILE *fp = fopen("/tmp/coffee-features-test.toml", "w");
 	ASSERT(fp != NULL, "could not create test file");
 
-	fprintf(fp, "[package]\n");
-	fprintf(fp, "name = \"test\"\n\n");
-	fprintf(fp, "[features]\n");
-	fprintf(fp, "json = []\n");
-	fprintf(fp, "default = [\"json\"]\n");
+	fprintf_safe(fp, "[package]\n");
+	fprintf_safe(fp, "name = \"test\"\n\n");
+	fprintf_safe(fp, "[features]\n");
+	fprintf_safe(fp, "json = []\n");
+	fprintf_safe(fp, "default = [\"json\"]\n");
 	fclose(fp);
 
 	manifest_t *m = manifest_parse("/tmp/coffee-features-test.toml");
@@ -156,11 +158,11 @@ TEST(compiler_flags)
 	FILE *fp = fopen("/tmp/coffee-features-test.toml", "w");
 	ASSERT(fp != NULL, "could not create test file");
 
-	fprintf(fp, "[package]\n");
-	fprintf(fp, "name = \"test\"\n\n");
-	fprintf(fp, "[features]\n");
-	fprintf(fp, "json = []\n");
-	fprintf(fp, "advanced-logging = []\n");
+	fprintf_safe(fp, "[package]\n");
+	fprintf_safe(fp, "name = \"test\"\n\n");
+	fprintf_safe(fp, "[features]\n");
+	fprintf_safe(fp, "json = []\n");
+	fprintf_safe(fp, "advanced-logging = []\n");
 	fclose(fp);
 
 	manifest_t *m = manifest_parse("/tmp/coffee-features-test.toml");
@@ -201,10 +203,10 @@ TEST(transitive_features)
 	FILE *fp = fopen("/tmp/coffee-features-test.toml", "w");
 	ASSERT(fp != NULL, "could not create test file");
 
-	fprintf(fp, "[package]\n");
-	fprintf(fp, "name = \"test\"\n\n");
-	fprintf(fp, "[features]\n");
-	fprintf(fp, "json = [\"log/info\"]\n");
+	fprintf_safe(fp, "[package]\n");
+	fprintf_safe(fp, "name = \"test\"\n\n");
+	fprintf_safe(fp, "[features]\n");
+	fprintf_safe(fp, "json = [\"log/info\"]\n");
 	fclose(fp);
 
 	manifest_t *m = manifest_parse("/tmp/coffee-features-test.toml");

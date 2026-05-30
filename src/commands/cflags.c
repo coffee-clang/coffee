@@ -92,7 +92,7 @@ int64_t handle_cflags(options *opts)
 	} else {
 		char *manifest_path = project_find_manifest(NULL);
 		if (!manifest_path) {
-			fprintf(stderr, "Error: Could not find Coffee.toml\n");
+			fprintf_safe(stderr, "Error: Could not find Coffee.toml\n");
 			return 1;
 		}
 
@@ -100,7 +100,7 @@ int64_t handle_cflags(options *opts)
 		free(manifest_path);
 
 		if (!m) {
-			fprintf(stderr, "Error: Could not parse Coffee.toml\n");
+			fprintf_safe(stderr, "Error: Could not parse Coffee.toml\n");
 			return 1;
 		}
 

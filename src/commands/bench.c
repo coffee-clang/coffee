@@ -21,7 +21,7 @@ int64_t handle_bench(options *opts)
 {
 	char *manifest_path = project_find_manifest(NULL);
 	if (!manifest_path) {
-		fprintf(stderr, "Error: Could not find Coffee.toml\n");
+		fprintf_safe(stderr, "Error: Could not find Coffee.toml\n");
 		return 1;
 	}
 
@@ -68,7 +68,7 @@ int64_t handle_bench(options *opts)
 	}
 
 	if (ret != 0) {
-		fprintf(stderr, "Error: bench failed\n");
+		fprintf_safe(stderr, "Error: bench failed\n");
 		return 1;
 	}
 

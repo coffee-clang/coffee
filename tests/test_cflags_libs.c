@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../src/strings.h"
+
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -11,7 +13,7 @@ static void create_file(const char *path, const char *content)
 {
 	FILE *fp = fopen(path, "w");
 	if (fp) {
-		fprintf(fp, "%s", content);
+		fprintf_safe(fp, "%s", content);
 		fclose(fp);
 	}
 }

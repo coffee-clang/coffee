@@ -111,7 +111,7 @@ int64_t handle_miri(options *opts)
 	char *manifest_path = project_find_manifest(NULL);
 
 	if (!manifest_path) {
-		fprintf(stderr, "Error: Could not find Coffee.toml\n");
+		fprintf_safe(stderr, "Error: Could not find Coffee.toml\n");
 		return 1;
 	}
 
@@ -119,7 +119,7 @@ int64_t handle_miri(options *opts)
 	free(manifest_path);
 
 	if (!m) {
-		fprintf(stderr, "Error: Could not parse Coffee.toml\n");
+		fprintf_safe(stderr, "Error: Could not parse Coffee.toml\n");
 		return 1;
 	}
 
@@ -133,7 +133,7 @@ int64_t handle_miri(options *opts)
 	scan_directory(".", &file_count, &issue_count);
 
 	if (file_count == 0) {
-		fprintf(stderr, "Error: No source files found.\n");
+		fprintf_safe(stderr, "Error: No source files found.\n");
 		return 1;
 	}
 

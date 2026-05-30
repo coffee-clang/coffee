@@ -23,7 +23,7 @@ static int create_file(const char *path, const char *content)
 	if (!fp) {
 		return -1;
 	}
-	fprintf(fp, "%s", content);
+	fprintf_safe(fp, "%s", content);
 	fclose(fp);
 	return 0;
 }
@@ -61,7 +61,7 @@ int64_t handle_new(options *opts)
 
 	if (strcmp(path, ".") != 0) {
 		if (create_dir(path) != 0) {
-			fprintf(stderr, "Error: Could not create project directory\n");
+			fprintf_safe(stderr, "Error: Could not create project directory\n");
 			return 1;
 		}
 	}
@@ -70,7 +70,7 @@ int64_t handle_new(options *opts)
 	snprintf_safe(manifest_path, sizeof(manifest_path), "%s/Coffee.toml", path);
 
 	if (access(manifest_path, F_OK) == 0) {
-		fprintf(stderr, "Error: Project already exists at %s\n", path);
+		fprintf_safe(stderr, "Error: Project already exists at %s\n", path);
 		return 1;
 	}
 
@@ -94,43 +94,43 @@ int64_t handle_new(options *opts)
 	snprintf_safe(build_dir, sizeof(build_dir), "%s/build", path);
 
 	if (create_dir(include_dir) != 0) {
-		fprintf(stderr, "Error: Could not create include directory\n");
+		fprintf_safe(stderr, "Error: Could not create include directory\n");
 		free(name);
 		return 1;
 	}
 
 	if (create_dir(src_dir) != 0) {
-		fprintf(stderr, "Error: Could not create src directory\n");
+		fprintf_safe(stderr, "Error: Could not create src directory\n");
 		free(name);
 		return 1;
 	}
 
 	if (create_dir(deps_dir) != 0) {
-		fprintf(stderr, "Error: Could not create deps directory\n");
+		fprintf_safe(stderr, "Error: Could not create deps directory\n");
 		free(name);
 		return 1;
 	}
 
 	if (create_dir(tests_dir) != 0) {
-		fprintf(stderr, "Error: Could not create tests directory\n");
+		fprintf_safe(stderr, "Error: Could not create tests directory\n");
 		free(name);
 		return 1;
 	}
 
 	if (create_dir(docs_dir) != 0) {
-		fprintf(stderr, "Error: Could not create docs directory\n");
+		fprintf_safe(stderr, "Error: Could not create docs directory\n");
 		free(name);
 		return 1;
 	}
 
 	if (create_dir(scripts_dir) != 0) {
-		fprintf(stderr, "Error: Could not create scripts directory\n");
+		fprintf_safe(stderr, "Error: Could not create scripts directory\n");
 		free(name);
 		return 1;
 	}
 
 	if (create_dir(build_dir) != 0) {
-		fprintf(stderr, "Error: Could not create build directory\n");
+		fprintf_safe(stderr, "Error: Could not create build directory\n");
 		free(name);
 		return 1;
 	}
@@ -139,7 +139,7 @@ int64_t handle_new(options *opts)
 	char include_project_dir[4'096];
 	snprintf_safe(include_project_dir, sizeof(include_project_dir), "%s/include/%s", path, name);
 	if (create_dir(include_project_dir) != 0) {
-		fprintf(stderr, "Error: Could not create include/%s directory\n", name);
+		fprintf_safe(stderr, "Error: Could not create include/%s directory\n", name);
 		free(name);
 		return 1;
 	}
@@ -154,7 +154,7 @@ int64_t handle_new(options *opts)
 							   "*.so\n"
 							   ".tidy_stamps/\n";
 	if (create_file(gitignore_path, gitignore_content) != 0) {
-		fprintf(stderr, "Error: Could not create .gitignore\n");
+		fprintf_safe(stderr, "Error: Could not create .gitignore\n");
 		free(name);
 		return 1;
 	}
@@ -184,7 +184,7 @@ int64_t handle_new(options *opts)
 							 "OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\n"
 							 "SOFTWARE.\n";
 	if (create_file(license_path, license_content) != 0) {
-		fprintf(stderr, "Error: Could not create LICENSE\n");
+		fprintf_safe(stderr, "Error: Could not create LICENSE\n");
 		free(name);
 		return 1;
 	}
@@ -199,7 +199,7 @@ int64_t handle_new(options *opts)
 				  "A modern C project.\n",
 				  name);
 	if (create_file(readme_path, readme_content) != 0) {
-		fprintf(stderr, "Error: Could not create README.md\n");
+		fprintf_safe(stderr, "Error: Could not create README.md\n");
 		free(name);
 		return 1;
 	}
@@ -233,7 +233,7 @@ int64_t handle_new(options *opts)
 				  "\tclang-tidy src/*.c -- $(CFLAGS)\n",
 				  name, name, name);
 	if (create_file(makefile_path, makefile_content) != 0) {
-		fprintf(stderr, "Error: Could not create Makefile\n");
+		fprintf_safe(stderr, "Error: Could not create Makefile\n");
 		free(name);
 		return 1;
 	}
@@ -256,7 +256,7 @@ int64_t handle_new(options *opts)
 				  name, name);
 
 	if (create_file(manifest_path, manifest_content) != 0) {
-		fprintf(stderr, "Error: Could not create Coffee.toml\n");
+		fprintf_safe(stderr, "Error: Could not create Coffee.toml\n");
 		free(name);
 		return 1;
 	}
@@ -275,7 +275,7 @@ int64_t handle_new(options *opts)
 				  "}\n");
 
 	if (create_file(src_main, main_content) != 0) {
-		fprintf(stderr, "Error: Could not create main.c\n");
+		fprintf_safe(stderr, "Error: Could not create main.c\n");
 		free(name);
 		return 1;
 	}
@@ -293,7 +293,7 @@ int64_t handle_new(options *opts)
 				  "#endif // %s_H\n",
 				  name, name, name);
 	if (create_file(main_header_path, header_content) != 0) {
-		fprintf(stderr, "Error: Could not create include/%s/%s.h\n", name, name);
+		fprintf_safe(stderr, "Error: Could not create include/%s/%s.h\n", name, name);
 		free(name);
 		return 1;
 	}
@@ -314,7 +314,7 @@ int64_t handle_new(options *opts)
 					  name, name);
 
 		if (create_file(src_lib, lib_content) != 0) {
-			fprintf(stderr, "Error: Could not create lib.c\n");
+			fprintf_safe(stderr, "Error: Could not create lib.c\n");
 			free(name);
 			return 1;
 		}
@@ -356,7 +356,7 @@ int64_t handle_new(options *opts)
 					  name, name, name);
 
 		if (create_file(makefile_path, makefile_content) != 0) {
-			fprintf(stderr, "Error: Could not create Makefile\n");
+			fprintf_safe(stderr, "Error: Could not create Makefile\n");
 			free(name);
 			return 1;
 		}
@@ -379,7 +379,7 @@ int64_t handle_new(options *opts)
 					  name, name);
 
 		if (create_file(manifest_path, manifest_content) != 0) {
-			fprintf(stderr, "Error: Could not create Coffee.toml\n");
+			fprintf_safe(stderr, "Error: Could not create Coffee.toml\n");
 			free(name);
 			return 1;
 		}
@@ -406,7 +406,7 @@ int64_t handle_new(options *opts)
 	char docs_placeholder_path[4'096];
 	snprintf_safe(docs_placeholder_path, sizeof(docs_placeholder_path), "%s/docs/index.md", path);
 	if (create_file(docs_placeholder_path, "# Documentation\n") != 0) {
-		fprintf(stderr, "Error: Could not create docs/index.md\n");
+		fprintf_safe(stderr, "Error: Could not create docs/index.md\n");
 		free(name);
 		return 1;
 	}

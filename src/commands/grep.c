@@ -7,7 +7,7 @@
 int64_t handle_grep(options *opts)
 {
 	if (opts->inputs_num < 2) {
-		fprintf(stderr, "Error: Pattern to search for not specified.\n");
+		fprintf_safe(stderr, "Error: Pattern to search for not specified.\n");
 		return 1;
 	}
 

@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "strings.h"
+
 void print_usage()
 {
 	cmdline_parser_print_help();
@@ -35,7 +37,7 @@ int main(int argc, char *argv[])
 		}
 	}
 	if (!allowed) {
-		fprintf(stderr, "Unknown command: %s\n", command);
+		fprintf_safe(stderr, "Unknown command: %s\n", command);
 		print_usage();
 		cmdline_parser_free(&args_info);
 		exit(1);
@@ -52,7 +54,7 @@ int main(int argc, char *argv[])
 
 	char *cmd_line_substring = (char *)malloc(total_length * sizeof(char));
 	if (cmd_line_substring == NULL) {
-		fprintf(stderr, "Memory allocation error\n");
+		fprintf_safe(stderr, "Memory allocation error\n");
 		cmdline_parser_free(&args_info);
 		exit(1);
 	}

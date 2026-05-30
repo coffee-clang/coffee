@@ -35,7 +35,7 @@ int64_t handle_install_update(options *opts)
 		snprintf_safe(pkg_dir, sizeof(pkg_dir), "%s/%s", deps_dir, target);
 
 		if (stat(pkg_dir, &st) != 0) {
-			fprintf(stderr, "Error: Package '%s' is not installed\n", target);
+			fprintf_safe(stderr, "Error: Package '%s' is not installed\n", target);
 			return 1;
 		}
 
@@ -47,7 +47,7 @@ int64_t handle_install_update(options *opts)
 
 		int ret = registry_fetch(target, NULL, pkg_dir);
 		if (ret != 0) {
-			fprintf(stderr, "Error: Failed to update %s\n", target);
+			fprintf_safe(stderr, "Error: Failed to update %s\n", target);
 			return 1;
 		}
 
@@ -79,7 +79,7 @@ int64_t handle_install_update(options *opts)
 
 		int ret = registry_fetch(entry->d_name, NULL, pkg_dir);
 		if (ret != 0) {
-			fprintf(stderr, "Error: Failed to update %s\n", entry->d_name);
+			fprintf_safe(stderr, "Error: Failed to update %s\n", entry->d_name);
 		} else {
 			printf("Updated: %s\n", entry->d_name);
 		}

@@ -19,28 +19,28 @@ TEST(makefile_is_created)
 	FILE *fp = fopen(make_path, "w");
 	ASSERT(fp, "could not create test Makefile");
 
-	fprintf(fp, "CC ?= clang\n");
-	fprintf(fp, "CFLAGS += -std=c23 -O3 -g\n");
-	fprintf(fp, "CFLAGS += -Wall -Wextra -Wshadow -Wpedantic\n");
-	fprintf(fp, "CFLAGS += -Wconversion -Wsign-conversion -Wunused\n");
-	fprintf(fp, "CFLAGS += -Iinclude/test_project\n");
-	fprintf(fp, "\n");
-	fprintf(fp, "TARGET := build/test_project\n");
-	fprintf(fp, "SOURCES := $(wildcard src/*.c)\n");
-	fprintf(fp, "\n");
-	fprintf(fp, ".PHONY: build clean format tidy\n");
-	fprintf(fp, "\n");
-	fprintf(fp, "build: $(SOURCES)\n");
-	fprintf(fp, "\t$(CC) $(CFLAGS) -o $(TARGET) $(SOURCES) $(LDFLAGS)\n");
-	fprintf(fp, "\n");
-	fprintf(fp, "clean:\n");
-	fprintf(fp, "\trm -rf build/\n");
-	fprintf(fp, "\n");
-	fprintf(fp, "format:\n");
-	fprintf(fp, "\tclang-format -i src/*.c include/test_project/*.h\n");
-	fprintf(fp, "\n");
-	fprintf(fp, "tidy:\n");
-	fprintf(fp, "\tclang-tidy src/*.c -- $(CFLAGS)\n");
+	fprintf_safe(fp, "CC ?= clang\n");
+	fprintf_safe(fp, "CFLAGS += -std=c23 -O3 -g\n");
+	fprintf_safe(fp, "CFLAGS += -Wall -Wextra -Wshadow -Wpedantic\n");
+	fprintf_safe(fp, "CFLAGS += -Wconversion -Wsign-conversion -Wunused\n");
+	fprintf_safe(fp, "CFLAGS += -Iinclude/test_project\n");
+	fprintf_safe(fp, "\n");
+	fprintf_safe(fp, "TARGET := build/test_project\n");
+	fprintf_safe(fp, "SOURCES := $(wildcard src/*.c)\n");
+	fprintf_safe(fp, "\n");
+	fprintf_safe(fp, ".PHONY: build clean format tidy\n");
+	fprintf_safe(fp, "\n");
+	fprintf_safe(fp, "build: $(SOURCES)\n");
+	fprintf_safe(fp, "\t$(CC) $(CFLAGS) -o $(TARGET) $(SOURCES) $(LDFLAGS)\n");
+	fprintf_safe(fp, "\n");
+	fprintf_safe(fp, "clean:\n");
+	fprintf_safe(fp, "\trm -rf build/\n");
+	fprintf_safe(fp, "\n");
+	fprintf_safe(fp, "format:\n");
+	fprintf_safe(fp, "\tclang-format -i src/*.c include/test_project/*.h\n");
+	fprintf_safe(fp, "\n");
+	fprintf_safe(fp, "tidy:\n");
+	fprintf_safe(fp, "\tclang-tidy src/*.c -- $(CFLAGS)\n");
 	fclose(fp);
 
 	fp = fopen(make_path, "r");
@@ -67,16 +67,16 @@ TEST(dep_appended_to_makefile)
 	const char *tmp_make = "/tmp/coffee-makefile-add-test.mk";
 	FILE	   *fp		 = fopen(tmp_make, "w");
 	ASSERT(fp, "could not create test Makefile");
-	fprintf(fp, "CC ?= clang\n");
-	fprintf(fp, "build:\n");
-	fprintf(fp, "\t$(CC) -o test src/*.c\n");
+	fprintf_safe(fp, "CC ?= clang\n");
+	fprintf_safe(fp, "build:\n");
+	fprintf_safe(fp, "\t$(CC) -o test src/*.c\n");
 	fclose(fp);
 
 	fp = fopen(tmp_make, "a");
 	ASSERT(fp, "could not append to test Makefile");
-	fprintf(fp, "\n# Dep: mylib\n");
-	fprintf(fp, "CFLAGS += -Ideps/mylib/include\n");
-	fprintf(fp, "LDFLAGS += -Ldeps/mylib/lib -lmylib\n");
+	fprintf_safe(fp, "\n# Dep: mylib\n");
+	fprintf_safe(fp, "CFLAGS += -Ideps/mylib/include\n");
+	fprintf_safe(fp, "LDFLAGS += -Ldeps/mylib/lib -lmylib\n");
 	fclose(fp);
 
 	fp = fopen(tmp_make, "r");
@@ -104,9 +104,9 @@ TEST(build_finds_makefile)
 	snprintf(make_path, sizeof(make_path), "%s/Makefile", tmp_dir);
 	FILE *fp = fopen(make_path, "w");
 	ASSERT(fp, "could not create Makefile");
-	fprintf(fp, "CC ?= clang\n");
-	fprintf(fp, "build:\n");
-	fprintf(fp, "\t@echo built\n");
+	fprintf_safe(fp, "CC ?= clang\n");
+	fprintf_safe(fp, "build:\n");
+	fprintf_safe(fp, "\t@echo built\n");
 	fclose(fp);
 
 	fp = fopen(make_path, "r");

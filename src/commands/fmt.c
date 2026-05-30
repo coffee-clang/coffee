@@ -13,7 +13,7 @@ int64_t handle_fmt(options *)
 	int ret = system("find src tests -name \"*.c\" -o -name \"*.h\" | xargs clang-format -i 2>/dev/null");
 
 	if (ret != 0) {
-		fprintf(stderr, "Error: Formatting failed. Please ensure 'clang-format' is installed.\n");
+		fprintf_safe(stderr, "Error: Formatting failed. Please ensure 'clang-format' is installed.\n");
 		return 1;
 	}
 

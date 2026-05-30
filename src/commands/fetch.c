@@ -15,7 +15,7 @@ int64_t handle_fetch(options *)
 	char *manifest_path = project_find_manifest(NULL);
 
 	if (!manifest_path) {
-		fprintf(stderr, "Error: Could not find Coffee.toml\n");
+		fprintf_safe(stderr, "Error: Could not find Coffee.toml\n");
 		return 1;
 	}
 
@@ -23,7 +23,7 @@ int64_t handle_fetch(options *)
 	free(manifest_path);
 
 	if (!m) {
-		fprintf(stderr, "Error: Could not parse manifest\n");
+		fprintf_safe(stderr, "Error: Could not parse manifest\n");
 		return 1;
 	}
 
@@ -62,7 +62,7 @@ int64_t handle_fetch(options *)
 
 		int ret = registry_fetch(name, NULL, pkg_dir);
 		if (ret != 0) {
-			fprintf(stderr, "Error: Failed to fetch %s\n", name);
+			fprintf_safe(stderr, "Error: Failed to fetch %s\n", name);
 		}
 
 		free(name);

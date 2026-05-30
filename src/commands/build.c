@@ -22,7 +22,7 @@ int64_t handle_build(options *opts)
 	}
 
 	if (!manifest_path) {
-		fprintf(stderr, "Error: Could not find Coffee.toml in current directory\n");
+		fprintf_safe(stderr, "Error: Could not find Coffee.toml in current directory\n");
 		return 1;
 	}
 
@@ -110,7 +110,7 @@ int64_t handle_build(options *opts)
 		}
 
 		if ((size_t)off >= sizeof(cmd)) {
-			fprintf(stderr, "Error: build command too long\n");
+			fprintf_safe(stderr, "Error: build command too long\n");
 			free(manifest_path);
 			return 1;
 		}
@@ -124,14 +124,14 @@ int64_t handle_build(options *opts)
 		free(manifest_path);
 
 		if (status == -1) {
-			fprintf(stderr, "Error: failed to run make\n");
+			fprintf_safe(stderr, "Error: failed to run make\n");
 			return 1;
 		}
 		int ret = WEXITSTATUS(status);
 		if (ret == 0) {
 			printf("Build successful\n");
 		} else {
-			fprintf(stderr, "Build failed\n");
+			fprintf_safe(stderr, "Build failed\n");
 		}
 		return ret;
 	}
@@ -142,7 +142,7 @@ int64_t handle_build(options *opts)
 	free(manifest_path);
 
 	if (!manifest) {
-		fprintf(stderr, "Error: Could not parse Coffee.toml\n");
+		fprintf_safe(stderr, "Error: Could not parse Coffee.toml\n");
 		return 1;
 	}
 
