@@ -14,9 +14,9 @@ int64_t handle_vendor(options *opts)
 {
 	(void)opts;
 
-	char *manifest_path = project_find_manifest(NULL);
+	char *manifest_path = project_find_manifest(nullptr);
 
-	if (!manifest_path) {
+	if (manifest_path == nullptr) {
 		fprintf_safe(stderr, "Error: Could not find Coffee.toml\n");
 		return 1;
 	}
@@ -24,7 +24,7 @@ int64_t handle_vendor(options *opts)
 	manifest_t *m = manifest_parse(manifest_path);
 	free(manifest_path);
 
-	if (!m) {
+	if (m == nullptr) {
 		fprintf_safe(stderr, "Error: Could not parse Coffee.toml\n");
 		return 1;
 	}
@@ -60,7 +60,7 @@ int64_t handle_vendor(options *opts)
 
 		mkdir(dest_dir, 0755);
 
-		int ret = registry_fetch(name, NULL, dest_dir);
+		int ret = registry_fetch(name, nullptr, dest_dir);
 		if (ret != 0) {
 			fprintf_safe(stderr, "Error: Failed to vendor %s\n", name);
 		}

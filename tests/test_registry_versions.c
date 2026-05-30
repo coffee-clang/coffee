@@ -20,8 +20,8 @@ TEST(get_versions_structure)
 		PASS();
 	}
 
-	ASSERT(versions->versions != NULL, "versions array is NULL");
-	ASSERT(versions->versions[0] != NULL, "first version is NULL");
+	ASSERT(versions->versions != nullptr, "versions array is nullptr");
+	ASSERT(versions->versions[0] != nullptr, "first version is nullptr");
 	printf("(%zu versions: %s) ", versions->count, versions->versions[0]);
 
 	registry_free_versions(versions);
@@ -46,21 +46,21 @@ TEST(get_versions_nonexistent)
 
 TEST(get_versions_null)
 {
-	version_list_t *versions = registry_get_versions(NULL);
-	ASSERT(versions == NULL, "should return NULL for NULL name");
+	version_list_t *versions = registry_get_versions(nullptr);
+	ASSERT(versions == nullptr, "should return nullptr for nullptr name");
 	PASS();
 }
 
 TEST(get_versions_empty)
 {
 	version_list_t *versions = registry_get_versions("");
-	ASSERT(versions == NULL, "should return NULL for empty name");
+	ASSERT(versions == nullptr, "should return nullptr for empty name");
 	PASS();
 }
 
 TEST(free_versions_null)
 {
-	registry_free_versions(NULL);
+	registry_free_versions(nullptr);
 	PASS();
 }
 

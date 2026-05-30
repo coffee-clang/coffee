@@ -9,7 +9,7 @@
 int64_t handle_logout(options *opts)
 {
 	const char *home = getenv("HOME");
-	if (!home) {
+	if (home == nullptr) {
 		fprintf_safe(stderr, "Error: HOME environment variable not set.\n");
 		return 1;
 	}

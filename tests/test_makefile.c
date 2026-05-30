@@ -51,13 +51,13 @@ TEST(makefile_is_created)
 	buf[len]   = '\0';
 	fclose(fp);
 
-	ASSERT(strstr(buf, "CC ?= clang") != NULL, "Makefile missing CC");
-	ASSERT(strstr(buf, "CFLAGS += -std=c23") != NULL, "Makefile missing C standard");
-	ASSERT(strstr(buf, "CFLAGS += -Iinclude/") != NULL, "Makefile missing include path");
-	ASSERT(strstr(buf, "build: $(SOURCES)") != NULL, "Makefile missing build target");
-	ASSERT(strstr(buf, "clean:") != NULL, "Makefile missing clean target");
-	ASSERT(strstr(buf, "format:") != NULL, "Makefile missing format target");
-	ASSERT(strstr(buf, "tidy:") != NULL, "Makefile missing tidy target");
+	ASSERT(strstr(buf, "CC ?= clang") != nullptr, "Makefile missing CC");
+	ASSERT(strstr(buf, "CFLAGS += -std=c23") != nullptr, "Makefile missing C standard");
+	ASSERT(strstr(buf, "CFLAGS += -Iinclude/") != nullptr, "Makefile missing include path");
+	ASSERT(strstr(buf, "build: $(SOURCES)") != nullptr, "Makefile missing build target");
+	ASSERT(strstr(buf, "clean:") != nullptr, "Makefile missing clean target");
+	ASSERT(strstr(buf, "format:") != nullptr, "Makefile missing format target");
+	ASSERT(strstr(buf, "tidy:") != nullptr, "Makefile missing tidy target");
 
 	PASS();
 }
@@ -86,10 +86,10 @@ TEST(dep_appended_to_makefile)
 	buf[len]   = '\0';
 	fclose(fp);
 
-	ASSERT(strstr(buf, "# Dep: mylib") != NULL, "Makefile missing dep comment");
-	ASSERT(strstr(buf, "-Ideps/mylib/include") != NULL, "Makefile missing include path");
-	ASSERT(strstr(buf, "-Ldeps/mylib/lib") != NULL, "Makefile missing library path");
-	ASSERT(strstr(buf, "-lmylib") != NULL, "Makefile missing link flag");
+	ASSERT(strstr(buf, "# Dep: mylib") != nullptr, "Makefile missing dep comment");
+	ASSERT(strstr(buf, "-Ideps/mylib/include") != nullptr, "Makefile missing include path");
+	ASSERT(strstr(buf, "-Ldeps/mylib/lib") != nullptr, "Makefile missing library path");
+	ASSERT(strstr(buf, "-lmylib") != nullptr, "Makefile missing link flag");
 
 	remove(tmp_make);
 	PASS();
@@ -134,7 +134,7 @@ TEST(add_skips_when_no_makefile)
 
 TEST(safe_package_name)
 {
-	const char *valid[] = { "mylib", "my_lib", "my-lib", "mylib123", "MyLib", NULL };
+	const char *valid[] = { "mylib", "my_lib", "my-lib", "mylib123", "MyLib", nullptr };
 	for (int i = 0; valid[i]; i++) {
 		const char *p = valid[i];
 		while (*p) {
@@ -147,7 +147,7 @@ TEST(safe_package_name)
 		}
 	}
 
-	const char *invalid[] = { "bad name", "bad$name", "bad;name", "bad\nname", "$(shell)", NULL };
+	const char *invalid[] = { "bad name", "bad$name", "bad;name", "bad\nname", "$(shell)", nullptr };
 	for (int i = 0; invalid[i]; i++) {
 		const char *p	  = invalid[i];
 		int			found = 0;

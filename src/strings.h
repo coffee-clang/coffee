@@ -85,7 +85,7 @@ static inline void fprintf_safe(FILE *stream, const char *fmt, ...)
  *
  * Builds the output string with sdscatfmt(3), then copies up to
  * size-1 characters into buf and NUL-terminates.  Behaviour mirrors
- * C11 snprintf(3): if buf is NULL or size is 0, no data is written
+ * C11 snprintf(3): if buf is nullptr or size is 0, no data is written
  * but the length that *would* have been written is still returned.
  *
  * This is a macro so that sdscatfmt(3) can receive the variadic
@@ -93,7 +93,7 @@ static inline void fprintf_safe(FILE *stream, const char *fmt, ...)
  * The heavy lifting is delegated to the helper function
  * snprintf_copy_to_buf().
  *
- * @param buf   Destination buffer (may be NULL when size is 0).
+ * @param buf   Destination buffer (may be nullptr when size is 0).
  * @param size  Capacity of buf in bytes.
  * @param ...   sdscatfmt(3)-style format string and arguments.
  * @return      The number of characters that would have been written

@@ -12,12 +12,12 @@
 static char *pkg_dir(const char *name)
 {
 	const char *home = getenv("HOME");
-	if (!home) {
+	if (home == nullptr) {
 		home = "/tmp";
 	}
 	char *dir = malloc(strlen(home) + strlen("/.coffee/deps/") + strlen(name) + 1);
-	if (!dir) {
-		return NULL;
+	if (dir == nullptr) {
+		return nullptr;
 	}
 	snprintf_safe(dir, strlen(home) + strlen("/.coffee/deps/") + strlen(name) + 1, "%s/.coffee/deps/%s", home, name);
 	return dir;
@@ -26,7 +26,7 @@ static char *pkg_dir(const char *name)
 static void append_libs_for_pkg(const char *name, char *buf, size_t bufsz, size_t *off)
 {
 	char *dir = pkg_dir(name);
-	if (!dir) {
+	if (dir == nullptr) {
 		return;
 	}
 
@@ -112,8 +112,8 @@ int64_t handle_libs(options *opts)
 	if (opts->inputs_num > 1) {
 		append_libs_for_pkg(opts->inputs[1], buf, sizeof(buf), &off);
 	} else {
-		char *manifest_path = project_find_manifest(NULL);
-		if (!manifest_path) {
+		char *manifest_path = project_find_manifest(nullptr);
+		if (manifest_path == nullptr) {
 			fprintf_safe(stderr, "Error: Could not find Coffee.toml\n");
 			return 1;
 		}
@@ -121,14 +121,14 @@ int64_t handle_libs(options *opts)
 		manifest_t *m = manifest_parse(manifest_path);
 		free(manifest_path);
 
-		if (!m) {
+		if (m == nullptr) {
 			fprintf_safe(stderr, "Error: Could not parse Coffee.toml\n");
 			return 1;
 		}
 
 		for (size_t i = 0; i < m->package.dependencies_count; i++) {
 			char *dep = m->package.dependencies[i];
-			if (!dep) {
+			if (dep == nullptr) {
 				continue;
 			}
 

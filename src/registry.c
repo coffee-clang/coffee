@@ -17,7 +17,7 @@ sds coffee_home_dir(void)
 		snprintf_safe(home_dir, sizeof(home_dir), "%s", coffee_home);
 	} else {
 		const char *home = getenv("HOME");
-		if (!home) {
+		if (home == nullptr) {
 			home = "/tmp";
 		}
 		snprintf_safe(home_dir, sizeof(home_dir), "%s/.coffee", home);
@@ -43,7 +43,7 @@ static int ensure_index_cached(void)
 	struct stat st;
 
 	if (stat(index_path, &st) == 0) {
-		time_t now = time(NULL);
+		time_t now = time(nullptr);
 		if (now - st.st_mtime < 300) {
 			return 0;
 		}
@@ -65,8 +65,8 @@ static char *fetch_url(const char *url)
 	snprintf_safe(cmd, sizeof(cmd), "curl -sL \"%s\" 2>/dev/null", url);
 
 	FILE *fp = popen(cmd, "r");
-	if (!fp) {
-		return NULL;
+	if (fp == nullptr) {
+		return nullptr;
 	}
 
 	char *buffer = malloc(1);
@@ -77,10 +77,10 @@ static char *fetch_url(const char *url)
 	while (fgets(buf, sizeof(buf), fp)) {
 		size_t len	  = strlen(buf);
 		char  *newbuf = realloc(buffer, total + len + 1);
-		if (!newbuf) {
+		if (newbuf == nullptr) {
 			free(buffer);
 			pclose(fp);
-			return NULL;
+			return nullptr;
 		}
 		buffer = newbuf;
 		memccpy(buffer + total, buf, '\0', len);
@@ -97,12 +97,12 @@ static char *extract_string_val(const char *text, const char *key)
 	const char *p	   = text;
 	size_t		keylen = strlen(key);
 
-	while (*p) {
+	while (*p != '\0') {
 		while (*p == ' ' || *p == '\t' || *p == '\n') {
 			p++;
 		}
 
-		const char *after_key = NULL;
+		const char *after_key = nullptr;
 
 		if (*p == '\"') {
 			if (strncmp(p + 1, key, keylen) == 0 && p[1 + keylen] == '\"') {
@@ -124,7 +124,7 @@ static char *extract_string_val(const char *text, const char *key)
 				if (*after_key == '\"') {
 					after_key++;
 					const char *start = after_key;
-					while (*after_key && *after_key != '\"' && *after_key != '\n') {
+					while (*after_key != '\0' && *after_key != '\"' && *after_key != '\n') {
 						after_key++;
 					}
 					if (*after_key == '\"' && after_key > start) {
@@ -137,7 +137,7 @@ static char *extract_string_val(const char *text, const char *key)
 			}
 		}
 
-		while (*p && *p != '\n') {
+		while (*p != '\0' && *p != '\n') {
 			p++;
 		}
 		if (*p == '\n') {
@@ -145,21 +145,21 @@ static char *extract_string_val(const char *text, const char *key)
 		}
 	}
 
-	return NULL;
+	return nullptr;
 }
 
 static recipe_list_t *parse_package_list(const char *json)
 {
 	recipe_list_t *list = calloc(1, sizeof(recipe_list_t));
-	if (!list) {
-		return NULL;
+	if (list == nullptr) {
+		return nullptr;
 	}
 
 	const char *p			= json;
 	int			brace_count = 0;
-	const char *obj_start	= NULL;
+	const char *obj_start	= nullptr;
 
-	while (*p) {
+	while (*p != '\0') {
 		if (*p == '{') {
 			const char *q = p + 1;
 			while (*q == ' ' || *q == '\n' || *q == '\t') {
@@ -197,7 +197,7 @@ static recipe_list_t *parse_package_list(const char *json)
 					list->recipes[list->count++] = new_r;
 				}
 				free(obj);
-				obj_start = NULL;
+				obj_start = nullptr;
 			}
 		}
 		p++;
@@ -215,7 +215,7 @@ recipe_list_t *registry_search(sds query)
 
 	char *index_path = get_index_path();
 	FILE *fp		 = fopen(index_path, "r");
-	if (!fp) {
+	if (fp == nullptr) {
 		recipe_list_t *empty = calloc(1, sizeof(recipe_list_t));
 		return empty;
 	}
@@ -232,12 +232,12 @@ recipe_list_t *registry_search(sds query)
 	recipe_list_t *all = parse_package_list(json);
 	free(json);
 
-	if (!query || strlen(query) == 0) {
+	if (query == nullptr || strlen(query) == 0) {
 		return all;
 	}
 
 	recipe_list_t *filtered = calloc(1, sizeof(recipe_list_t));
-	if (!filtered) {
+	if (filtered == nullptr) {
 		return all;
 	}
 
@@ -245,7 +245,7 @@ recipe_list_t *registry_search(sds query)
 		recipe_t *r		= &all->recipes[i];
 		int		  match = 0;
 
-		if (r->name && strcasestr(r->name, query)) {
+		if (r->name != nullptr && strcasestr(r->name, query)) {
 			match = 1;
 		}
 		if (r->description && strcasestr(r->description, query)) {
@@ -278,8 +278,8 @@ recipe_list_t *registry_search(sds query)
 
 recipe_t *registry_get(sds name)
 {
-	if (!name || strlen(name) == 0) {
-		return NULL;
+	if (name == nullptr || strlen(name) == 0) {
+		return nullptr;
 	}
 
 	char first = tolower(name[0]);
@@ -287,14 +287,14 @@ recipe_t *registry_get(sds name)
 	snprintf_safe(url, sizeof(url), REGISTRY_RAW_URL "/recipes/%c/%s/library.toml", first, name);
 
 	char *meta = fetch_url(url);
-	if (!meta) {
-		return NULL;
+	if (meta == nullptr) {
+		return nullptr;
 	}
 
 	recipe_t *r = calloc(1, sizeof(recipe_t));
-	if (!r) {
+	if (r == nullptr) {
 		free(meta);
-		return NULL;
+		return nullptr;
 	}
 
 	r->name			= strdup(name);
@@ -310,7 +310,7 @@ recipe_t *registry_get(sds name)
 
 int registry_fetch(sds name, sds version, sds dest_dir)
 {
-	if (!name || !dest_dir) {
+	if (name == nullptr || !dest_dir) {
 		return -1;
 	}
 
@@ -338,8 +338,8 @@ int registry_fetch(sds name, sds version, sds dest_dir)
 
 version_list_t *registry_get_versions(sds name)
 {
-	if (!name || strlen(name) == 0) {
-		return NULL;
+	if (name == nullptr || strlen(name) == 0) {
+		return nullptr;
 	}
 
 	char first = tolower(name[0]);
@@ -347,14 +347,14 @@ version_list_t *registry_get_versions(sds name)
 	snprintf_safe(url, sizeof(url), REGISTRY_RAW_URL "/recipes/%c/%s/library.toml", first, name);
 
 	char *meta = fetch_url(url);
-	if (!meta) {
-		return NULL;
+	if (meta == nullptr) {
+		return nullptr;
 	}
 
 	version_list_t *list = calloc(1, sizeof(version_list_t));
-	if (!list) {
+	if (list == nullptr) {
 		free(meta);
-		return NULL;
+		return nullptr;
 	}
 
 	char *version = extract_string_val(meta, "version");
@@ -374,7 +374,7 @@ version_list_t *registry_get_versions(sds name)
 
 void registry_free_versions(version_list_t *list)
 {
-	if (!list) {
+	if (list == nullptr) {
 		return;
 	}
 
@@ -389,7 +389,7 @@ void registry_free_versions(version_list_t *list)
 
 void registry_free_recipes(recipe_list_t *list)
 {
-	if (!list) {
+	if (list == nullptr) {
 		return;
 	}
 
@@ -423,7 +423,7 @@ void registry_free_recipes(recipe_list_t *list)
 
 void registry_free_recipe(recipe_t *r)
 {
-	if (!r) {
+	if (r == nullptr) {
 		return;
 	}
 	if (r->name) {

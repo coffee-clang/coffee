@@ -3,14 +3,14 @@
 
 TEST(framework_registers_test)
 {
-	const char *found = NULL;
+	const char *found = nullptr;
 	for (unsigned int i = 0; i < test_framework_count; i++) {
 		if (strcmp(test_framework_tests[i].name, "framework_registers_test") == 0) {
 			found = test_framework_tests[i].name;
 			break;
 		}
 	}
-	ASSERT(found != NULL, "test should be registered");
+	ASSERT(found != nullptr, "test should be registered");
 	PASS();
 }
 

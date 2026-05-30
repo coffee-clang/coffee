@@ -14,14 +14,14 @@
 
 int64_t handle_build(options *opts)
 {
-	char *manifest_path = NULL;
+	char *manifest_path = nullptr;
 	if (opts->manifest_path) {
 		manifest_path = strdup(opts->manifest_path);
 	} else {
-		manifest_path = project_find_manifest(NULL);
+		manifest_path = project_find_manifest(nullptr);
 	}
 
-	if (!manifest_path) {
+	if (manifest_path == nullptr) {
 		fprintf_safe(stderr, "Error: Could not find Coffee.toml in current directory\n");
 		return 1;
 	}
@@ -41,7 +41,7 @@ int64_t handle_build(options *opts)
 	if (access(makefile_path, F_OK) == 0) {
 		/* Build with make */
 		char  cmd[4096];
-		char *project_dir = NULL;
+		char *project_dir = nullptr;
 		if (dir_end) {
 			project_dir = strndup(manifest_path, (size_t)(dir_end - manifest_path));
 		} else {
@@ -69,14 +69,14 @@ int64_t handle_build(options *opts)
 		/* Pass feature flags if specified */
 		manifest_t *manifest = manifest_parse(manifest_path);
 		if (manifest) {
-			char **features		  = NULL;
+			char **features		  = nullptr;
 			size_t features_count = 0;
 			if (opts->features) {
 				features_parse_cli(opts->features, &features, &features_count);
 			}
 
 			if (features_count > 0 || (int)opts->all_features) {
-				const char **requested = NULL;
+				const char **requested = nullptr;
 				if (features_count > 0) {
 					requested = (const char **)features;
 				}
@@ -141,12 +141,12 @@ int64_t handle_build(options *opts)
 	manifest_t *manifest = manifest_parse(manifest_path);
 	free(manifest_path);
 
-	if (!manifest) {
+	if (manifest == nullptr) {
 		fprintf_safe(stderr, "Error: Could not parse Coffee.toml\n");
 		return 1;
 	}
 
-	char **features		  = NULL;
+	char **features		  = nullptr;
 	size_t features_count = 0;
 	if (opts->features) {
 		features_parse_cli(opts->features, &features, &features_count);

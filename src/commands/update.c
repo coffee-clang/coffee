@@ -18,7 +18,7 @@ typedef struct {
 
 static bool semver_parse(const char *s, semver_t *v)
 {
-	if (!s || *s == '\0') {
+	if (s == nullptr || *s == '\0') {
 		return false;
 	}
 
@@ -60,14 +60,14 @@ static int semver_cmp(semver_t a, semver_t b)
 	return a.patch - b.patch;
 }
 
-static bool semver_match(const char *constraint, const char *version)
+static bool semver_match(const char *constraint, const char *candidate)
 {
-	if (!constraint || strcmp(constraint, "*") == 0) {
+	if (constraint == nullptr || strcmp(constraint, "*") == 0) {
 		return true;
 	}
 
 	semver_t ver;
-	if (!semver_parse(version, &ver)) {
+	if (!semver_parse(candidate, &ver)) {
 		return false;
 	}
 
@@ -84,7 +84,7 @@ static bool semver_match(const char *constraint, const char *version)
 		if (!semver_parse(p + 1, &con)) {
 			return false;
 		}
-		return (ver.major == con.major && ver.minor >= con.minor) != 0;
+		return (bool)(ver.major == con.major && ver.minor >= con.minor);
 	}
 	if (strncmp(p, ">=", 2) == 0) {
 		if (!semver_parse(p + 2, &con)) {
@@ -153,9 +153,9 @@ static int create_symlink(const char *target, const char *link_path)
 
 int64_t handle_update(options *opts)
 {
-	char *manifest_path = project_find_manifest(NULL);
+	char *manifest_path = project_find_manifest(nullptr);
 
-	if (!manifest_path) {
+	if (manifest_path == nullptr) {
 		fprintf_safe(stderr, "Error: Could not find Coffee.toml\n");
 		return 1;
 	}
@@ -163,7 +163,7 @@ int64_t handle_update(options *opts)
 	manifest_t *m = manifest_parse(manifest_path);
 	free(manifest_path);
 
-	if (!m) {
+	if (m == nullptr) {
 		fprintf_safe(stderr, "Error: Could not parse Coffee.toml\n");
 		return 1;
 	}
@@ -179,7 +179,7 @@ int64_t handle_update(options *opts)
 
 	printf("Updating dependencies...\n");
 
-	char *target = NULL;
+	char *target = nullptr;
 	if (opts->inputs_num > 1) {
 		target = opts->inputs[1];
 	}
@@ -187,15 +187,15 @@ int64_t handle_update(options *opts)
 	for (size_t i = 0; i < m->package.dependencies_count; i++) {
 		const char *entry = m->package.dependencies[i];
 
-		char *name				 = NULL;
-		char *version_constraint = NULL;
+		char *name				 = nullptr;
+		char *version_constraint = nullptr;
 		manifest_extract_dep_info(entry, &name, &version_constraint);
 
-		if (!name) {
+		if (name == nullptr) {
 			continue;
 		}
 
-		if (target && strcmp(name, target) != 0) {
+		if (target != nullptr && strcmp(name, target) != 0) {
 			free(name);
 			free(version_constraint);
 			continue;
@@ -204,7 +204,7 @@ int64_t handle_update(options *opts)
 		printf("  Resolving: %s (%s)\n", name, version_constraint != nullptr ? version_constraint : "*");
 
 		version_list_t *versions = registry_get_versions(name);
-		if (!versions || versions->count == 0) {
+		if (versions == nullptr || versions->count == 0) {
 			fprintf_safe(stderr, "  Error: Package '%s' not found in registry\n", name);
 			free(name);
 			free(version_constraint);
@@ -213,7 +213,7 @@ int64_t handle_update(options *opts)
 
 		char *resolved_version = versions->versions[0];
 
-		if (version_constraint && strcmp(version_constraint, "*") != 0) {
+		if (version_constraint != nullptr && strcmp(version_constraint, "*") != 0) {
 			if (!semver_match(version_constraint, resolved_version)) {
 				fprintf_safe(stderr, "  Warning: No version of '%s' matches constraint '%s' (latest is %s)\n", name,
 							 version_constraint, resolved_version);

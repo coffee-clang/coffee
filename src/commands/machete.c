@@ -34,7 +34,7 @@ static int file_is_source(const char *name)
 static int scan_file_for_include(const char *filepath, const char *dep_name)
 {
 	FILE *fp = fopen(filepath, "r");
-	if (!fp) {
+	if (fp == nullptr) {
 		return 0;
 	}
 
@@ -61,13 +61,13 @@ static int scan_file_for_include(const char *filepath, const char *dep_name)
 static int scan_dir_for_dep(const char *dirpath, const char *dep_name)
 {
 	DIR *dir = opendir(dirpath);
-	if (!dir) {
+	if (dir == nullptr) {
 		return 0;
 	}
 
 	int			   found = 0;
 	struct dirent *entry;
-	while ((entry = readdir(dir)) != NULL) {
+	while ((entry = readdir(dir)) != nullptr) {
 		if (entry->d_name[0] == '.') {
 			continue;
 		}
@@ -99,9 +99,9 @@ int64_t handle_machete(options *opts)
 {
 	(void)opts;
 
-	char *manifest_path = project_find_manifest(NULL);
+	char *manifest_path = project_find_manifest(nullptr);
 
-	if (!manifest_path) {
+	if (manifest_path == nullptr) {
 		fprintf_safe(stderr, "Error: Could not find Coffee.toml\n");
 		return 1;
 	}
@@ -109,7 +109,7 @@ int64_t handle_machete(options *opts)
 	manifest_t *m = manifest_parse(manifest_path);
 	free(manifest_path);
 
-	if (!m) {
+	if (m == nullptr) {
 		fprintf_safe(stderr, "Error: Could not parse Coffee.toml\n");
 		return 1;
 	}

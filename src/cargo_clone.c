@@ -52,7 +52,7 @@ int main(int argc, char *argv[])
 	total_length += 1; // for null terminator
 
 	char *cmd_line_substring = (char *)malloc(total_length * sizeof(char));
-	if (cmd_line_substring == NULL) {
+	if (cmd_line_substring == nullptr) {
 		fprintf_safe(stderr, "Memory allocation error\n");
 		cmdline_parser_free(&args_info);
 		exit(1);

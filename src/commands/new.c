@@ -20,7 +20,7 @@ static int create_dir(const char *path)
 static int create_file(const char *path, const char *content)
 {
 	FILE *fp = fopen(path, "w");
-	if (!fp) {
+	if (fp == nullptr) {
 		return -1;
 	}
 	fprintf_safe(fp, "%s", content);
@@ -35,7 +35,7 @@ static char *get_name_from_path(const char *path)
 	if (last_slash) {
 		name = last_slash + 1;
 	}
-	if (!name || strlen(name) == 0) {
+	if (name == nullptr || strlen(name) == 0) {
 		name = "project";
 	}
 	char *result = strdup(name);
@@ -49,13 +49,13 @@ static char *get_name_from_path(const char *path)
 
 int64_t handle_new(options *opts)
 {
-	char *path = NULL;
+	char *path = nullptr;
 
 	if (opts->inputs_num > 1) {
 		path = opts->inputs[1];
 	}
 
-	if (!path || strlen(path) == 0) {
+	if (path == nullptr || strlen(path) == 0) {
 		path = ".";
 	}
 

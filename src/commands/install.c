@@ -53,11 +53,11 @@ int64_t handle_install(options *opts)
 	}
 
 	char *package = opts->inputs[1];
-	char *version = (opts->inputs_num > 2) ? strdup(opts->inputs[2]) : NULL;
+	char *version = (opts->inputs_num > 2) ? strdup(opts->inputs[2]) : nullptr;
 
-	if (!version) {
+	if (version == nullptr) {
 		version_list_t *versions = registry_get_versions(package);
-		if (versions && versions->count > 0) {
+		if (versions != nullptr && versions->count > 0) {
 			version = strdup(versions->versions[0]);
 			registry_free_versions(versions);
 		} else {
@@ -84,7 +84,7 @@ int64_t handle_install(options *opts)
 		return 1;
 	}
 
-	char *manifest_path = project_find_manifest(NULL);
+	char *manifest_path = project_find_manifest(nullptr);
 	if (manifest_path) {
 		char project_deps[4'096];
 		snprintf_safe(project_deps, sizeof(project_deps), ".coffee/deps");

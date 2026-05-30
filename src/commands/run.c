@@ -6,9 +6,9 @@
 
 int64_t handle_run(options *opts)
 {
-	char *manifest_path = project_find_manifest(NULL);
+	char *manifest_path = project_find_manifest(nullptr);
 
-	if (!manifest_path) {
+	if (manifest_path == nullptr) {
 		fprintf_safe(stderr, "Error: Could not find Coffee.toml in current directory\n");
 		return 1;
 	}
@@ -16,12 +16,12 @@ int64_t handle_run(options *opts)
 	manifest_t *manifest = manifest_parse(manifest_path);
 	free(manifest_path);
 
-	if (!manifest) {
+	if (manifest == nullptr) {
 		fprintf_safe(stderr, "Error: Could not parse Coffee.toml\n");
 		return 1;
 	}
 
-	char **features		  = NULL;
+	char **features		  = nullptr;
 	size_t features_count = 0;
 	if (opts->features) {
 		features_parse_cli(opts->features, &features, &features_count);
@@ -40,7 +40,7 @@ int64_t handle_run(options *opts)
 		.no_default_features = opts->no_default_features,
 	};
 
-	char **args = NULL;
+	char **args = nullptr;
 	int	   argc = 0;
 	if (opts->inputs_num > 1) {
 		args = &opts->inputs[1];

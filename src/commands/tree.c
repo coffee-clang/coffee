@@ -9,24 +9,24 @@
 
 static void parse_dep_list(const char *input, char ***out_names, size_t *out_count)
 {
-	*out_names = NULL;
+	*out_names = nullptr;
 	*out_count = 0;
 
-	if (!input) {
+	if (input == nullptr) {
 		return;
 	}
 
 	const char *p = input;
-	while (*p) {
+	while (*p != '\0') {
 		while (*p == ' ' || *p == ',') {
 			p++;
 		}
-		if (!*p) {
+		if (*p == '\0') {
 			break;
 		}
 
 		const char *start = p;
-		while (*p && *p != ',' && *p != ' ') {
+		while (*p != '\0' && *p != ',' && *p != ' ') {
 			p++;
 		}
 
@@ -52,7 +52,7 @@ static void print_transitive(const char *name, const char *version, const char *
 	}
 
 	const char *connector = (int)is_last ? "└── " : "├── ";
-	char	   *ver		  = version != nullptr ? strdup(version) : NULL;
+	char	   *ver		  = version != nullptr ? strdup(version) : nullptr;
 	printf("%s%s%s v%s\n", prefix, connector, name != nullptr ? name : "?", ver != nullptr ? ver : "?");
 	free(ver);
 
@@ -61,19 +61,19 @@ static void print_transitive(const char *name, const char *version, const char *
 	}
 
 	recipe_t *recipe = registry_get(name);
-	if (!recipe) {
+	if (recipe == nullptr) {
 		return;
 	}
 
 	char *child_prefix = malloc(strlen(prefix) + strlen((int)is_last ? "    " : "│   ") + 1);
 	sprintf(child_prefix, "%s%s", prefix, (int)is_last ? "    " : "│   ");
 
-	char **dep_names = NULL;
+	char **dep_names = nullptr;
 	size_t dep_count = 0;
 	parse_dep_list(recipe->dependencies, &dep_names, &dep_count);
 
 	for (size_t i = 0; i < dep_count; i++) {
-		print_transitive(dep_names[i], NULL, child_prefix, i == dep_count - 1, depth + 1, max_depth);
+		print_transitive(dep_names[i], nullptr, child_prefix, i == dep_count - 1, depth + 1, max_depth);
 	}
 
 	for (size_t i = 0; i < dep_count; i++) {
@@ -87,8 +87,8 @@ static void print_transitive(const char *name, const char *version, const char *
 
 int64_t handle_tree(options *opts)
 {
-	char *manifest_path = project_find_manifest(NULL);
-	if (!manifest_path) {
+	char *manifest_path = project_find_manifest(nullptr);
+	if (manifest_path == nullptr) {
 		fprintf_safe(stderr, "Error: Could not find Coffee.toml\n");
 		return 1;
 	}
@@ -96,7 +96,7 @@ int64_t handle_tree(options *opts)
 	manifest_t *m = manifest_parse(manifest_path);
 	free(manifest_path);
 
-	if (!m) {
+	if (m == nullptr) {
 		fprintf_safe(stderr, "Error: Could not parse manifest\n");
 		return 1;
 	}
@@ -108,11 +108,11 @@ int64_t handle_tree(options *opts)
 
 	for (size_t i = 0; i < m->package.dependencies_count; i++) {
 		const char *entry		= m->package.dependencies[i];
-		char	   *dep_name	= NULL;
-		char	   *dep_version = NULL;
+		char	   *dep_name	= nullptr;
+		char	   *dep_version = nullptr;
 		manifest_extract_dep_info(entry, &dep_name, &dep_version);
 
-		if (!dep_name) {
+		if (dep_name == nullptr) {
 			continue;
 		}
 

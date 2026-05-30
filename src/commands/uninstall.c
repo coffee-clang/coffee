@@ -17,7 +17,7 @@ int64_t handle_uninstall(options *opts)
 	char *package = opts->inputs[1];
 
 	const char *home = getenv("HOME");
-	if (!home) {
+	if (home == nullptr) {
 		home = "/tmp";
 	}
 

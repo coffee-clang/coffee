@@ -27,7 +27,7 @@ static int test_matches_filter(const char *test_name, const char *filter)
 	if (!filter || filter[0] == '\0') {
 		return 1; /* No filter = match all */
 	}
-	return strstr(test_name, filter) != NULL;
+	return strstr(test_name, filter) != nullptr;
 }
 
 int test_framework_run(const char *filter)

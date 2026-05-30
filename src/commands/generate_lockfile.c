@@ -11,9 +11,9 @@
 
 int64_t handle_generate_lockfile(options *opts)
 {
-	char *manifest_path = project_find_manifest(NULL);
+	char *manifest_path = project_find_manifest(nullptr);
 
-	if (!manifest_path) {
+	if (manifest_path == nullptr) {
 		fprintf_safe(stderr, "Error: Could not find Coffee.toml\n");
 		return 1;
 	}
@@ -21,7 +21,7 @@ int64_t handle_generate_lockfile(options *opts)
 	manifest_t *manifest = manifest_parse(manifest_path);
 	free(manifest_path);
 
-	if (!manifest) {
+	if (manifest == nullptr) {
 		fprintf_safe(stderr, "Error: Could not parse Coffee.toml\n");
 		return 1;
 	}
@@ -29,7 +29,7 @@ int64_t handle_generate_lockfile(options *opts)
 	char lockfile_path[4'096];
 	snprintf_safe(lockfile_path, sizeof(lockfile_path), "Coffee.lock");
 
-	char **features		  = NULL;
+	char **features		  = nullptr;
 	size_t features_count = 0;
 	if (opts->features) {
 		features_parse_cli(opts->features, &features, &features_count);
@@ -48,7 +48,7 @@ int64_t handle_generate_lockfile(options *opts)
 	printf("Generating lockfile: %s\n", lockfile_path);
 
 	FILE *fp = fopen(lockfile_path, "w");
-	if (!fp) {
+	if (fp == nullptr) {
 		fprintf_safe(stderr, "Error: Could not create %s\n", lockfile_path);
 		if (resolved) {
 			features_free(resolved);
@@ -69,10 +69,10 @@ int64_t handle_generate_lockfile(options *opts)
 		fprintf_safe(fp, "version = \"%s\"\n", manifest->package.version);
 	}
 
-	if (resolved && resolved->package_count > 0) {
+	if (resolved != nullptr && resolved->package_count > 0) {
 		fprintf_safe(fp, "\n[features]\n");
 		for (size_t i = 0; i < resolved->package_count; i++) {
-			if (resolved->package_names[i] && resolved->packages[i].count > 0) {
+			if (resolved->package_names[i] != nullptr && resolved->packages[i].count > 0) {
 				fprintf_safe(fp, "%s = [", resolved->package_names[i]);
 				for (size_t j = 0; j < resolved->packages[i].count; j++) {
 					if (j > 0) {

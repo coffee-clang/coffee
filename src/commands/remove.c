@@ -14,15 +14,15 @@ int64_t handle_remove(options *opts)
 	}
 
 	char *package_name	= opts->inputs[1];
-	char *manifest_path = project_find_manifest(NULL);
+	char *manifest_path = project_find_manifest(nullptr);
 
-	if (!manifest_path) {
+	if (manifest_path == nullptr) {
 		fprintf_safe(stderr, "Error: Could not find Coffee.toml in current directory or any parent directory\n");
 		return 1;
 	}
 
 	manifest_t *m = manifest_parse(manifest_path);
-	if (!m) {
+	if (m == nullptr) {
 		fprintf_safe(stderr, "Error: Could not parse manifest at %s\n", manifest_path);
 		free(manifest_path);
 		return 1;
@@ -87,7 +87,7 @@ int64_t handle_remove(options *opts)
 			if (dep_start) {
 				char *dep_end = dep_start;
 				int	  lines	  = 0;
-				while (*dep_end && lines < 4) {
+				while (*dep_end != '\0' && lines < 4) {
 					if (*dep_end == '\n') {
 						lines++;
 					}
@@ -107,7 +107,7 @@ int64_t handle_remove(options *opts)
 					fwrite(dep_end, 1, after_len, mf);
 					fclose(mf);
 					printf("  Cleaned up Makefile section for %s\n", package_name);
-					mf = NULL; /* Prevent double-close */
+					mf = nullptr; /* Prevent double-close */
 				}
 			}
 			free(content);

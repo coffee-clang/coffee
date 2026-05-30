@@ -12,21 +12,21 @@ static int validate_manifest(manifest_t *m)
 {
 	int errors = 0;
 
-	if (!m->package.name) {
+	if (m->package.name == nullptr) {
 		fprintf_safe(stderr, "Error: [package] name is required\n");
 		errors++;
 	}
-	if (!m->package.version) {
+	if (m->package.version == nullptr) {
 		fprintf_safe(stderr, "Error: [package] version is required\n");
 		errors++;
 	}
-	if (!m->package.edition) {
+	if (m->package.edition == nullptr) {
 		fprintf_safe(stderr, "Warning: [package] edition not set, defaulting to c23\n");
 	}
-	if (!m->package.description) {
+	if (m->package.description == nullptr) {
 		fprintf_safe(stderr, "Warning: [package] description not set\n");
 	}
-	if (!m->package.license) {
+	if (m->package.license == nullptr) {
 		fprintf_safe(stderr, "Warning: [package] license not set\n");
 	}
 
@@ -35,8 +35,8 @@ static int validate_manifest(manifest_t *m)
 
 int64_t handle_check(options *opts)
 {
-	char *manifest_path = project_find_manifest(NULL);
-	if (!manifest_path) {
+	char *manifest_path = project_find_manifest(nullptr);
+	if (manifest_path == nullptr) {
 		fprintf_safe(stderr, "Error: Could not find Coffee.toml\n");
 		return 1;
 	}
@@ -44,7 +44,7 @@ int64_t handle_check(options *opts)
 	manifest_t *m = manifest_parse(manifest_path);
 	free(manifest_path);
 
-	if (!m) {
+	if (m == nullptr) {
 		fprintf_safe(stderr, "Error: Could not parse Coffee.toml\n");
 		return 1;
 	}
@@ -88,7 +88,7 @@ int64_t handle_check(options *opts)
 		}
 	} else {
 		glob_t globbuf;
-		if (glob("include/**/*.h", 0, NULL, &globbuf) == 0) {
+		if (glob("include/**/*.h", 0, nullptr, &globbuf) == 0) {
 			for (size_t i = 0; i < globbuf.gl_pathc && off < sizeof(cmd); i++) {
 				off += snprintf_safe(cmd + off, sizeof(cmd) - off, " %s", globbuf.gl_pathv[i]);
 			}

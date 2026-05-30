@@ -7,13 +7,13 @@
 
 int64_t handle_search(options *opts)
 {
-	char *query = NULL;
+	char *query = nullptr;
 
 	if (opts->inputs_num > 1) {
 		query = opts->inputs[1];
 	}
 
-	if (!query) {
+	if (query == nullptr) {
 		query = "";
 	}
 
@@ -21,7 +21,7 @@ int64_t handle_search(options *opts)
 
 	recipe_list_t *list = registry_search(query);
 
-	if (!list || list->count == 0) {
+	if (list == nullptr || list->count == 0) {
 		printf("No packages found.\n");
 		return 0;
 	}

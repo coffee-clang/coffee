@@ -7,13 +7,13 @@
 
 TEST(extract_exact_version)
 {
-	char *name	  = NULL;
-	char *version = NULL;
+	char *name	  = nullptr;
+	char *version = nullptr;
 
 	manifest_extract_dep_info("toml = \"1.0.0\"", &name, &version);
-	ASSERT(name != NULL, "name is NULL");
+	ASSERT(name != nullptr, "name is nullptr");
 	ASSERT(strcmp(name, "toml") == 0, "name mismatch");
-	ASSERT(version != NULL, "version is NULL");
+	ASSERT(version != nullptr, "version is nullptr");
 	ASSERT(strcmp(version, "1.0.0") == 0, "version mismatch");
 	free(name);
 	free(version);
@@ -22,13 +22,13 @@ TEST(extract_exact_version)
 
 TEST(extract_wildcard)
 {
-	char *name	  = NULL;
-	char *version = NULL;
+	char *name	  = nullptr;
+	char *version = nullptr;
 
 	manifest_extract_dep_info("sds = \"*\"", &name, &version);
-	ASSERT(name != NULL, "name is NULL");
+	ASSERT(name != nullptr, "name is nullptr");
 	ASSERT(strcmp(name, "sds") == 0, "name mismatch");
-	ASSERT(version != NULL, "version is NULL");
+	ASSERT(version != nullptr, "version is nullptr");
 	ASSERT(strcmp(version, "*") == 0, "version mismatch");
 	free(name);
 	free(version);
@@ -37,13 +37,13 @@ TEST(extract_wildcard)
 
 TEST(extract_range)
 {
-	char *name	  = NULL;
-	char *version = NULL;
+	char *name	  = nullptr;
+	char *version = nullptr;
 
 	manifest_extract_dep_info("json = \">=2.0\"", &name, &version);
-	ASSERT(name != NULL, "name is NULL");
+	ASSERT(name != nullptr, "name is nullptr");
 	ASSERT(strcmp(name, "json") == 0, "name mismatch");
-	ASSERT(version != NULL, "version is NULL");
+	ASSERT(version != nullptr, "version is nullptr");
 	ASSERT(strcmp(version, ">=2.0") == 0, "version mismatch");
 	free(name);
 	free(version);
@@ -52,13 +52,13 @@ TEST(extract_range)
 
 TEST(extract_no_version)
 {
-	char *name	  = NULL;
-	char *version = NULL;
+	char *name	  = nullptr;
+	char *version = nullptr;
 
 	manifest_extract_dep_info("mylib", &name, &version);
-	ASSERT(name != NULL, "name is NULL");
+	ASSERT(name != nullptr, "name is nullptr");
 	ASSERT(strcmp(name, "mylib") == 0, "name mismatch");
-	ASSERT(version != NULL, "version is NULL");
+	ASSERT(version != nullptr, "version is nullptr");
 	ASSERT(strcmp(version, "*") == 0, "version should default to *");
 	free(name);
 	free(version);
@@ -70,9 +70,9 @@ TEST(extract_null_input)
 	char *name	  = (char *)0xdeadbeef;
 	char *version = (char *)0xdeadbeef;
 
-	manifest_extract_dep_info(NULL, &name, &version);
-	ASSERT(name == NULL, "name should be NULL for NULL entry");
-	ASSERT(version == NULL, "version should be NULL for NULL entry");
+	manifest_extract_dep_info(nullptr, &name, &version);
+	ASSERT(name == nullptr, "name should be nullptr for nullptr entry");
+	ASSERT(version == nullptr, "version should be nullptr for nullptr entry");
 	PASS();
 }
 

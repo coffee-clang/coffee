@@ -19,8 +19,8 @@ static int build_include_flags(manifest_t *m, char *buf, size_t buf_size)
 
 int64_t handle_bench(options *opts)
 {
-	char *manifest_path = project_find_manifest(NULL);
-	if (!manifest_path) {
+	char *manifest_path = project_find_manifest(nullptr);
+	if (manifest_path == nullptr) {
 		fprintf_safe(stderr, "Error: Could not find Coffee.toml\n");
 		return 1;
 	}
@@ -28,7 +28,7 @@ int64_t handle_bench(options *opts)
 	manifest_t *m = manifest_parse(manifest_path);
 
 	char *dir_end	  = strrchr(manifest_path, '/');
-	char *project_dir = NULL;
+	char *project_dir = nullptr;
 	if (dir_end) {
 		project_dir = strndup(manifest_path, (size_t)(dir_end - manifest_path));
 	} else {

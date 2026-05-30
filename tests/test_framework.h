@@ -66,7 +66,7 @@ void test_framework_register(const char *name, test_func_t func);
 
 /* --- Runner API --- */
 
-/* Run all registered tests matching filter (NULL or "" = all) */
+/* Run all registered tests matching filter (nullptr or "" = all) */
 int test_framework_run(const char *filter);
 
 /* Print summary of all results */

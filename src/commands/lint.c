@@ -10,8 +10,8 @@ int64_t handle_lint(options *opts)
 {
 	printf("Linting source code...\n");
 
-	char *manifest_path = project_find_manifest(NULL);
-	if (!manifest_path) {
+	char *manifest_path = project_find_manifest(nullptr);
+	if (manifest_path == nullptr) {
 		fprintf_safe(stderr, "Error: Could not find Coffee.toml\n");
 		return 1;
 	}

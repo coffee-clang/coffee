@@ -18,7 +18,7 @@ int64_t handle_login(options *opts)
 	}
 
 	const char *home = getenv("HOME");
-	if (!home) {
+	if (home == nullptr) {
 		fprintf_safe(stderr, "Error: HOME environment variable not set.\n");
 		return 1;
 	}
@@ -31,7 +31,7 @@ int64_t handle_login(options *opts)
 	snprintf_safe(cred_path, sizeof(cred_path), "%s/credentials", coffee_dir);
 
 	FILE *fp = fopen(cred_path, "w");
-	if (!fp) {
+	if (fp == nullptr) {
 		fprintf_safe(stderr, "Error: Could not save credentials to %s\n", cred_path);
 		return 1;
 	}

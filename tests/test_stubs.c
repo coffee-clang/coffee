@@ -109,7 +109,7 @@ TEST(uninstall_not_installed)
 TEST(report_unknown_type)
 {
 	FILE *fp = fopen("/tmp/coffee-report-test.toml", "w");
-	ASSERT(fp != NULL, "could not create test file");
+	ASSERT(fp != nullptr, "could not create test file");
 	fprintf_safe(fp, "[package]\nname = \"test\"\nversion = \"1.0\"\n");
 	fclose(fp);
 

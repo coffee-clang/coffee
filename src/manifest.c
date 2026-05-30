@@ -8,15 +8,15 @@
 
 static char *strdup_or_null(const char *s)
 {
-	if (s == NULL) {
-		return NULL;
+	if (s == nullptr) {
+		return nullptr;
 	}
 	return strdup(s);
 }
 
 static bool is_valid_feature_name(const char *name)
 {
-	if (!name || name[0] == '\0') {
+	if (name == nullptr || name[0] == '\0') {
 		return false;
 	}
 	for (size_t i = 0; name[i] != '\0'; i++) {
@@ -107,7 +107,7 @@ static void free_dependency(dependency_t *dep)
 static char *toml_datum_to_string(toml_datum_t datum)
 {
 	if (!datum.ok) {
-		return NULL;
+		return nullptr;
 	}
 	return datum.u.s;
 }
@@ -115,22 +115,22 @@ static char *toml_datum_to_string(toml_datum_t datum)
 manifest_t *manifest_parse(sds path)
 {
 	FILE *fp = fopen(path, "r");
-	if (!fp) {
-		return NULL;
+	if (fp == nullptr) {
+		return nullptr;
 	}
 
 	char		  errbuf[256];
 	toml_table_t *conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
 	fclose(fp);
 
-	if (!conf) {
-		return NULL;
+	if (conf == nullptr) {
+		return nullptr;
 	}
 
 	manifest_t *m = calloc(1, sizeof(manifest_t));
-	if (!m) {
+	if (m == nullptr) {
 		toml_free(conf);
-		return NULL;
+		return nullptr;
 	}
 
 	toml_table_t *pkg = toml_table_in(conf, "package");
@@ -173,7 +173,7 @@ manifest_t *manifest_parse(sds path)
 			size_t count = 0;
 			for (int i = 0;; i++) {
 				const char *key = toml_key_in(deps_table, i);
-				if (!key) {
+				if (key == nullptr) {
 					break;
 				}
 				count++;
@@ -184,7 +184,7 @@ manifest_t *manifest_parse(sds path)
 			/* Build "name = value" strings matching array format */
 			for (int i = 0; idx < count; i++) {
 				const char *key = toml_key_in(deps_table, i);
-				if (!key) {
+				if (key == nullptr) {
 					break;
 				}
 				toml_datum_t val = toml_string_in(deps_table, key);
@@ -232,11 +232,11 @@ manifest_t *manifest_parse(sds path)
 		m->features_count = 0;
 		for (int i = 0;; i++) {
 			const char *key = toml_key_in(features_table, i);
-			if (!key) {
+			if (key == nullptr) {
 				break;
 			}
 			toml_array_t *arr = toml_array_in(features_table, key);
-			if (!arr) {
+			if (arr == nullptr) {
 				continue;
 			}
 			m->features_count++;
@@ -247,11 +247,11 @@ manifest_t *manifest_parse(sds path)
 			size_t idx	= 0;
 			for (int i = 0;; i++) {
 				const char *key = toml_key_in(features_table, i);
-				if (!key) {
+				if (key == nullptr) {
 					break;
 				}
 				toml_array_t *arr = toml_array_in(features_table, key);
-				if (!arr) {
+				if (arr == nullptr) {
 					continue;
 				}
 				m->features[idx].name = strdup(key);
@@ -274,16 +274,17 @@ manifest_t *manifest_parse(sds path)
 	for (size_t i = 0; i < m->features_count; i++) {
 		for (size_t j = 0; j < m->features[i].deps_count; j++) {
 			char *dep = m->features[i].deps[j];
-			if (!dep) {
+			if (dep == nullptr) {
 				continue;
 			}
 			for (size_t k = 0; k < m->features_count; k++) {
 				if (k == i) {
 					continue;
 				}
-				if (m->features[k].name && strcmp(dep, m->features[k].name) == 0) {
+				if (m->features[k].name != nullptr && strcmp(dep, m->features[k].name) == 0) {
 					for (size_t l = 0; l < m->features[k].deps_count; l++) {
-						if (m->features[k].deps[l] && strcmp(m->features[k].deps[l], m->features[i].name) == 0) {
+						if (m->features[k].deps[l] != nullptr &&
+							strcmp(m->features[k].deps[l], m->features[i].name) == 0) {
 							fprintf_safe(stderr,
 										 "Warning: Circular feature dependency detected: %s <-> "
 										 "%s\n",
@@ -301,21 +302,21 @@ manifest_t *manifest_parse(sds path)
 
 void manifest_extract_dep_info(const char *entry, char **name_out, char **version_out)
 {
-	if (!entry || !name_out || !version_out) {
+	if (entry == nullptr || !name_out || !version_out) {
 		if (name_out) {
-			*name_out = NULL;
+			*name_out = nullptr;
 		}
 		if (version_out) {
-			*version_out = NULL;
+			*version_out = nullptr;
 		}
 		return;
 	}
 
-	*name_out	 = NULL;
-	*version_out = NULL;
+	*name_out	 = nullptr;
+	*version_out = nullptr;
 
 	const char *eq = strchr(entry, '=');
-	if (!eq) {
+	if (eq == nullptr) {
 		const char *end = entry + strlen(entry);
 		while (end > entry && (*(end - 1) == ' ' || *(end - 1) == '\t')) {
 			end--;
@@ -364,7 +365,7 @@ void manifest_extract_dep_info(const char *entry, char **name_out, char **versio
 
 void manifest_free(manifest_t *m)
 {
-	if (!m) {
+	if (m == nullptr) {
 		return;
 	}
 	free_package(&m->package);
@@ -385,7 +386,7 @@ void manifest_free(manifest_t *m)
 int manifest_write(sds path, manifest_t *m)
 {
 	FILE *fp = fopen(path, "w");
-	if (!fp) {
+	if (fp == nullptr) {
 		return -1;
 	}
 

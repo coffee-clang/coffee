@@ -75,9 +75,9 @@ static void report_audit(manifest_t *m)
 
 int64_t handle_report(options *opts)
 {
-	char *manifest_path = project_find_manifest(NULL);
+	char *manifest_path = project_find_manifest(nullptr);
 
-	if (!manifest_path) {
+	if (manifest_path == nullptr) {
 		fprintf_safe(stderr, "Error: Could not find Coffee.toml\n");
 		return 1;
 	}
@@ -85,17 +85,17 @@ int64_t handle_report(options *opts)
 	manifest_t *m = manifest_parse(manifest_path);
 	free(manifest_path);
 
-	if (!m) {
+	if (m == nullptr) {
 		fprintf_safe(stderr, "Error: Could not parse Coffee.toml\n");
 		return 1;
 	}
 
-	char *type = NULL;
+	char *type = nullptr;
 	if (opts->inputs_num > 1) {
 		type = opts->inputs[1];
 	}
 
-	if (!type || strcmp(type, "deps") == 0) {
+	if (type == nullptr || strcmp(type, "deps") == 0) {
 		report_deps(m);
 	} else if (strcmp(type, "audit") == 0) {
 		report_audit(m);

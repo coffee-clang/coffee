@@ -99,7 +99,7 @@ static int	 check_enum_value(const char *val, const char *values[], int *out_ind
 
 void cmdline_parser_init(struct gengetopt_args_info *args_info)
 {
-	if (!args_info) {
+	if (args_info == nullptr) {
 		return;
 	}
 
@@ -124,7 +124,7 @@ static void free_string(char **s)
 
 void cmdline_parser_free(struct gengetopt_args_info *args_info)
 {
-	if (!args_info) {
+	if (args_info == nullptr) {
 		return;
 	}
 
@@ -172,13 +172,13 @@ void cmdline_parser_free(struct gengetopt_args_info *args_info)
 
 static char *safe_strdup(const char *s)
 {
-	if (!s) {
+	if (s == nullptr) {
 		return nullptr;
 	}
 
 	size_t len = strlen(s);
 	char  *p   = (char *)malloc(len + 1);
-	if (!p) {
+	if (p == nullptr) {
 		return nullptr;
 	}
 	memccpy(p, s, '\0', len + 1);
@@ -192,7 +192,7 @@ static char *safe_strdup(const char *s)
 
 static int check_enum_value(const char *val, const char *values[], int *out_index)
 {
-	if (!val || !values) {
+	if (val == nullptr || !values) {
 		return -1;
 	}
 
@@ -359,7 +359,7 @@ static const struct option long_options[] = { { "help", no_argument, 0, 'h' },
 
 int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 {
-	if (!args_info) {
+	if (args_info == nullptr) {
 		return 1;
 	}
 

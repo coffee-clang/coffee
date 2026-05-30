@@ -47,7 +47,7 @@ static int run_command(char **argv, bool verbose)
 
 int build_project(manifest_t *manifest, build_opts_t *opts)
 {
-	if (!manifest || !manifest->package.name) {
+	if (manifest == nullptr || manifest->package.name == nullptr) {
 		fprintf_safe(stderr, "Error: No valid manifest found\n");
 		return 1;
 	}
@@ -60,7 +60,7 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 		verbose = opts->verbose;
 	}
 
-	char *mkdir_argv[] = { (char *)"mkdir", (char *)"-p", (char *)output_dir, NULL };
+	char *mkdir_argv[] = { (char *)"mkdir", (char *)"-p", (char *)output_dir, nullptr };
 	int	  ret		   = run_command(mkdir_argv, verbose);
 	if (ret != 0) {
 		return 1;
@@ -78,7 +78,7 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 	}
 	char *flags = strdup(flags_str);
 
-	resolved_features_t *resolved	  = NULL;
+	resolved_features_t *resolved	  = nullptr;
 	bool				 has_features = false;
 	if (opts != nullptr) {
 		if (opts->features_count > 0) {
@@ -89,7 +89,7 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 		}
 	}
 	if (has_features) {
-		const char **requested = NULL;
+		const char **requested = nullptr;
 		if (opts->features_count > 0) {
 			requested = (const char **)opts->features;
 		}
@@ -112,7 +112,7 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 	}
 
 	glob_t globbuf;
-	ret = glob("src/*.c", 0, NULL, &globbuf);
+	ret = glob("src/*.c", 0, nullptr, &globbuf);
 	if (ret != 0) {
 		fprintf_safe(stderr, "Error: No source files found in src/*.c\n");
 		free(flags);
@@ -134,7 +134,7 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 	}
 
 	int max_tokens = 1;
-	for (const char *p = flags; *p; p++) {
+	for (const char *p = flags; *p != '\0'; p++) {
 		if (*p == ' ') {
 			max_tokens++;
 		}
@@ -142,7 +142,7 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 
 	int	   argc_total	 = 1 + max_tokens + 2 + (int)globbuf.gl_pathc + 1;
 	char **compiler_argv = (char **)malloc(sizeof(char *) * ((size_t)argc_total + 1));
-	if (!compiler_argv) {
+	if (compiler_argv == nullptr) {
 		free(flags);
 		globfree(&globbuf);
 		if (resolved) {
@@ -159,7 +159,7 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 	char *token = strtok_r(flags_copy, " ", &saveptr);
 	while (token) {
 		compiler_argv[idx++] = token;
-		token				 = strtok_r(NULL, " ", &saveptr);
+		token				 = strtok_r(nullptr, " ", &saveptr);
 	}
 
 	compiler_argv[idx++] = (char *)"-o";
@@ -168,7 +168,7 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 	for (size_t i = 0; i < globbuf.gl_pathc; i++) {
 		compiler_argv[idx++] = globbuf.gl_pathv[i];
 	}
-	compiler_argv[idx] = NULL;
+	compiler_argv[idx] = nullptr;
 
 	free(flags);
 
@@ -208,7 +208,7 @@ int build_run(manifest_t *manifest, build_opts_t *opts, char **args, int argc)
 
 	int	   total	= 1 + (args != nullptr ? argc : 0) + 1;
 	char **run_argv = (char **)malloc(sizeof(char *) * (size_t)total);
-	if (!run_argv) {
+	if (run_argv == nullptr) {
 		return 1;
 	}
 
@@ -217,7 +217,7 @@ int build_run(manifest_t *manifest, build_opts_t *opts, char **args, int argc)
 	for (int i = 0; i < argc && args; i++) {
 		run_argv[idx++] = args[i];
 	}
-	run_argv[idx] = NULL;
+	run_argv[idx] = nullptr;
 
 	bool verbose = false;
 	if (opts != nullptr) {

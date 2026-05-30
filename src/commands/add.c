@@ -10,7 +10,7 @@ static bool is_safe_package_name(const char *name)
 {
 	const char *p;
 
-	if (!name || !*name) {
+	if (name == nullptr || !*name) {
 		return false;
 	}
 
@@ -31,15 +31,15 @@ int64_t handle_add(options *opts)
 	}
 
 	char *package_name	= opts->inputs[1];
-	char *manifest_path = project_find_manifest(NULL);
+	char *manifest_path = project_find_manifest(nullptr);
 
-	if (!manifest_path) {
+	if (manifest_path == nullptr) {
 		fprintf_safe(stderr, "Error: Could not find Coffee.toml in current directory or any parent directory\n");
 		return 1;
 	}
 
 	manifest_t *m = manifest_parse(manifest_path);
-	if (!m) {
+	if (m == nullptr) {
 		fprintf_safe(stderr, "Error: Could not parse manifest at %s\n", manifest_path);
 		free(manifest_path);
 		return 1;
@@ -47,7 +47,7 @@ int64_t handle_add(options *opts)
 
 	// Check if dependency already exists
 	for (size_t i = 0; i < m->package.dependencies_count; i++) {
-		if (m->package.dependencies[i] &&
+		if (m->package.dependencies[i] != nullptr &&
 			strncmp(m->package.dependencies[i], package_name, strlen(package_name)) == 0) {
 			printf("Dependency %s already exists\n", package_name);
 			manifest_free(m);
@@ -70,7 +70,7 @@ int64_t handle_add(options *opts)
 	} else {
 		const char *version = opts->pkg_version != nullptr ? opts->pkg_version : "*";
 
-		if (opts->features || (int)opts->optional) {
+		if (opts->features != nullptr || (int)opts->optional) {
 			int off = snprintf_safe(dep_str, sizeof(dep_str), "%s = { version = \"%s\"", package_name, version);
 			if (opts->features) {
 				off += snprintf_safe(dep_str + off, sizeof(dep_str) - off, ", features = [\"%s\"]", opts->features);

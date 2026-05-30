@@ -10,15 +10,15 @@
 
 int64_t handle_locate_project(options *opts)
 {
-	char *manifest_path = project_find_manifest(NULL);
+	char *manifest_path = project_find_manifest(nullptr);
 
-	if (!manifest_path) {
+	if (manifest_path == nullptr) {
 		fprintf_safe(stderr, "Error: Could not find Coffee.toml\n");
 		return 1;
 	}
 
 	char abs_path[PATH_MAX];
-	if (realpath(manifest_path, abs_path) == NULL) {
+	if (realpath(manifest_path, abs_path) == nullptr) {
 		fprintf_safe(stderr, "Error: Could not resolve absolute path for manifest\n");
 		free(manifest_path);
 		return 1;

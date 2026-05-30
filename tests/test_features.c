@@ -10,7 +10,7 @@
 TEST(feature_parse)
 {
 	FILE *fp = fopen("/tmp/coffee-features-test.toml", "w");
-	ASSERT(fp != NULL, "could not create test file");
+	ASSERT(fp != nullptr, "could not create test file");
 
 	fprintf_safe(fp, "[package]\n");
 	fprintf_safe(fp, "name = \"test\"\n\n");
@@ -21,7 +21,7 @@ TEST(feature_parse)
 	fclose(fp);
 
 	manifest_t *m = manifest_parse("/tmp/coffee-features-test.toml");
-	ASSERT(m != NULL, "manifest_parse returned NULL");
+	ASSERT(m != nullptr, "manifest_parse returned nullptr");
 	ASSERT(m->features_count == 3, "expected 3 features");
 	ASSERT(strcmp(m->features[0].name, "default") == 0 || strcmp(m->features[0].name, "json") == 0 ||
 			   strcmp(m->features[0].name, "logging") == 0,
@@ -34,7 +34,7 @@ TEST(feature_parse)
 TEST(feature_resolve)
 {
 	FILE *fp = fopen("/tmp/coffee-features-test.toml", "w");
-	ASSERT(fp != NULL, "could not create test file");
+	ASSERT(fp != nullptr, "could not create test file");
 
 	fprintf_safe(fp, "[package]\n");
 	fprintf_safe(fp, "name = \"test\"\n\n");
@@ -45,11 +45,11 @@ TEST(feature_resolve)
 	fclose(fp);
 
 	manifest_t *m = manifest_parse("/tmp/coffee-features-test.toml");
-	ASSERT(m != NULL, "manifest_parse returned NULL");
+	ASSERT(m != nullptr, "manifest_parse returned nullptr");
 
 	const char			*requested[] = { "json" };
 	resolved_features_t *resolved	 = features_resolve(m, requested, 1, false, false);
-	ASSERT(resolved != NULL, "features_resolve returned NULL");
+	ASSERT(resolved != nullptr, "features_resolve returned nullptr");
 	ASSERT(features_is_enabled(resolved, "test", "json"), "json should be enabled");
 
 	features_free(resolved);
@@ -60,7 +60,7 @@ TEST(feature_resolve)
 TEST(feature_resolve_all)
 {
 	FILE *fp = fopen("/tmp/coffee-features-test.toml", "w");
-	ASSERT(fp != NULL, "could not create test file");
+	ASSERT(fp != nullptr, "could not create test file");
 
 	fprintf_safe(fp, "[package]\n");
 	fprintf_safe(fp, "name = \"test\"\n\n");
@@ -71,10 +71,10 @@ TEST(feature_resolve_all)
 	fclose(fp);
 
 	manifest_t *m = manifest_parse("/tmp/coffee-features-test.toml");
-	ASSERT(m != NULL, "manifest_parse returned NULL");
+	ASSERT(m != nullptr, "manifest_parse returned nullptr");
 
-	resolved_features_t *resolved = features_resolve(m, NULL, 0, true, false);
-	ASSERT(resolved != NULL, "features_resolve returned NULL");
+	resolved_features_t *resolved = features_resolve(m, nullptr, 0, true, false);
+	ASSERT(resolved != nullptr, "features_resolve returned nullptr");
 	ASSERT(features_is_enabled(resolved, "test", "json"), "json should be enabled");
 	ASSERT(features_is_enabled(resolved, "test", "xml"), "xml should be enabled");
 	ASSERT(features_is_enabled(resolved, "test", "logging"), "logging should be enabled");
@@ -87,7 +87,7 @@ TEST(feature_resolve_all)
 TEST(feature_default)
 {
 	FILE *fp = fopen("/tmp/coffee-features-test.toml", "w");
-	ASSERT(fp != NULL, "could not create test file");
+	ASSERT(fp != nullptr, "could not create test file");
 
 	fprintf_safe(fp, "[package]\n");
 	fprintf_safe(fp, "name = \"test\"\n\n");
@@ -98,10 +98,10 @@ TEST(feature_default)
 	fclose(fp);
 
 	manifest_t *m = manifest_parse("/tmp/coffee-features-test.toml");
-	ASSERT(m != NULL, "manifest_parse returned NULL");
+	ASSERT(m != nullptr, "manifest_parse returned nullptr");
 
-	resolved_features_t *resolved = features_resolve(m, NULL, 0, false, false);
-	ASSERT(resolved != NULL, "features_resolve returned NULL");
+	resolved_features_t *resolved = features_resolve(m, nullptr, 0, false, false);
+	ASSERT(resolved != nullptr, "features_resolve returned nullptr");
 	ASSERT(features_is_enabled(resolved, "test", "json"), "json should be enabled as default");
 	ASSERT(!features_is_enabled(resolved, "test", "xml"), "xml should NOT be enabled by default");
 
@@ -113,7 +113,7 @@ TEST(feature_default)
 TEST(feature_no_default)
 {
 	FILE *fp = fopen("/tmp/coffee-features-test.toml", "w");
-	ASSERT(fp != NULL, "could not create test file");
+	ASSERT(fp != nullptr, "could not create test file");
 
 	fprintf_safe(fp, "[package]\n");
 	fprintf_safe(fp, "name = \"test\"\n\n");
@@ -123,10 +123,10 @@ TEST(feature_no_default)
 	fclose(fp);
 
 	manifest_t *m = manifest_parse("/tmp/coffee-features-test.toml");
-	ASSERT(m != NULL, "manifest_parse returned NULL");
+	ASSERT(m != nullptr, "manifest_parse returned nullptr");
 
-	resolved_features_t *resolved = features_resolve(m, NULL, 0, false, true);
-	ASSERT(resolved != NULL, "features_resolve returned NULL");
+	resolved_features_t *resolved = features_resolve(m, nullptr, 0, false, true);
+	ASSERT(resolved != nullptr, "features_resolve returned nullptr");
 	ASSERT(!features_is_enabled(resolved, "test", "json"), "json should NOT be enabled with --no-default-features");
 
 	features_free(resolved);
@@ -136,7 +136,7 @@ TEST(feature_no_default)
 
 TEST(cli_parsing)
 {
-	char **features = NULL;
+	char **features = nullptr;
 	size_t count	= 0;
 	features_parse_cli("json,xml,logging", &features, &count);
 	ASSERT(count == 3, "expected 3 features");
@@ -155,7 +155,7 @@ TEST(cli_parsing)
 TEST(compiler_flags)
 {
 	FILE *fp = fopen("/tmp/coffee-features-test.toml", "w");
-	ASSERT(fp != NULL, "could not create test file");
+	ASSERT(fp != nullptr, "could not create test file");
 
 	fprintf_safe(fp, "[package]\n");
 	fprintf_safe(fp, "name = \"test\"\n\n");
@@ -165,15 +165,15 @@ TEST(compiler_flags)
 	fclose(fp);
 
 	manifest_t *m = manifest_parse("/tmp/coffee-features-test.toml");
-	ASSERT(m != NULL, "manifest_parse returned NULL");
+	ASSERT(m != nullptr, "manifest_parse returned nullptr");
 
 	const char			*requested[] = { "json", "advanced-logging" };
 	resolved_features_t *resolved	 = features_resolve(m, requested, 2, false, false);
-	ASSERT(resolved != NULL, "features_resolve returned NULL");
+	ASSERT(resolved != nullptr, "features_resolve returned nullptr");
 
 	size_t flags_count = 0;
 	char **flags	   = features_to_compiler_flags(resolved, "test", &flags_count);
-	ASSERT(flags != NULL, "features_to_compiler_flags returned NULL");
+	ASSERT(flags != nullptr, "features_to_compiler_flags returned nullptr");
 	ASSERT(flags_count == 2, "expected 2 flags");
 
 	int found_json	  = 0;
@@ -200,7 +200,7 @@ TEST(compiler_flags)
 TEST(transitive_features)
 {
 	FILE *fp = fopen("/tmp/coffee-features-test.toml", "w");
-	ASSERT(fp != NULL, "could not create test file");
+	ASSERT(fp != nullptr, "could not create test file");
 
 	fprintf_safe(fp, "[package]\n");
 	fprintf_safe(fp, "name = \"test\"\n\n");
@@ -209,11 +209,11 @@ TEST(transitive_features)
 	fclose(fp);
 
 	manifest_t *m = manifest_parse("/tmp/coffee-features-test.toml");
-	ASSERT(m != NULL, "manifest_parse returned NULL");
+	ASSERT(m != nullptr, "manifest_parse returned nullptr");
 
 	const char			*requested[] = { "json" };
 	resolved_features_t *resolved	 = features_resolve(m, requested, 1, false, false);
-	ASSERT(resolved != NULL, "features_resolve returned NULL");
+	ASSERT(resolved != nullptr, "features_resolve returned nullptr");
 	ASSERT(features_is_enabled(resolved, "test", "json"), "json should be enabled");
 	ASSERT(features_is_enabled(resolved, "log", "info"), "log/info should be enabled transitively");
 

@@ -12,7 +12,7 @@
 int64_t handle_install_update(options *opts)
 {
 	const char *home = getenv("HOME");
-	if (!home) {
+	if (home == nullptr) {
 		home = "/tmp";
 	}
 
@@ -25,7 +25,7 @@ int64_t handle_install_update(options *opts)
 		return 0;
 	}
 
-	char *target = NULL;
+	char *target = nullptr;
 	if (opts->inputs_num > 1) {
 		target = opts->inputs[1];
 	}
@@ -45,7 +45,7 @@ int64_t handle_install_update(options *opts)
 		snprintf_safe(cmd, sizeof(cmd), "rm -rf %s", pkg_dir);
 		system(cmd);
 
-		int ret = registry_fetch(target, NULL, pkg_dir);
+		int ret = registry_fetch(target, nullptr, pkg_dir);
 		if (ret != 0) {
 			fprintf_safe(stderr, "Error: Failed to update %s\n", target);
 			return 1;
@@ -56,14 +56,14 @@ int64_t handle_install_update(options *opts)
 	}
 
 	DIR *dir = opendir(deps_dir);
-	if (!dir) {
+	if (dir == nullptr) {
 		printf("No packages to update.\n");
 		return 0;
 	}
 
 	int			   count = 0;
 	struct dirent *entry;
-	while ((entry = readdir(dir)) != NULL) {
+	while ((entry = readdir(dir)) != nullptr) {
 		if (entry->d_name[0] == '.') {
 			continue;
 		}
@@ -77,7 +77,7 @@ int64_t handle_install_update(options *opts)
 		snprintf_safe(cmd, sizeof(cmd), "rm -rf %s", pkg_dir);
 		system(cmd);
 
-		int ret = registry_fetch(entry->d_name, NULL, pkg_dir);
+		int ret = registry_fetch(entry->d_name, nullptr, pkg_dir);
 		if (ret != 0) {
 			fprintf_safe(stderr, "Error: Failed to update %s\n", entry->d_name);
 		} else {

@@ -10,11 +10,11 @@
 
 static void print_transitive_json(const char *name, const char *version, int depth, int max_depth)
 {
-	if (depth > max_depth || !name) {
+	if (depth > max_depth || name == nullptr) {
 		return;
 	}
 
-	char *ver = version != nullptr ? strdup(version) : NULL;
+	char *ver = version != nullptr ? strdup(version) : nullptr;
 	printf("{\n");
 	printf("  \"name\": \"%s\",\n", name);
 	printf("  \"version\": \"%s\"", ver != nullptr ? ver : "?");
@@ -23,20 +23,20 @@ static void print_transitive_json(const char *name, const char *version, int dep
 	if (depth < max_depth) {
 		recipe_t *recipe = registry_get(name);
 		if (recipe) {
-			char **dep_names = NULL;
+			char **dep_names = nullptr;
 			size_t dep_count = 0;
 
 			if (recipe->dependencies) {
 				const char *p = recipe->dependencies;
-				while (*p) {
+				while (*p != '\0') {
 					while (*p == ' ' || *p == ',') {
 						p++;
 					}
-					if (!*p) {
+					if (*p == '\0') {
 						break;
 					}
 					const char *start = p;
-					while (*p && *p != ',' && *p != ' ') {
+					while (*p != '\0' && *p != ',' && *p != ' ') {
 						p++;
 					}
 					size_t len = (size_t)(p - start);
@@ -56,7 +56,7 @@ static void print_transitive_json(const char *name, const char *version, int dep
 				printf(",\n  \"dependencies\": [\n");
 				for (size_t i = 0; i < dep_count; i++) {
 					printf("    ");
-					print_transitive_json(dep_names[i], NULL, depth + 1, max_depth);
+					print_transitive_json(dep_names[i], nullptr, depth + 1, max_depth);
 					if (i < dep_count - 1) {
 						printf(",");
 					}
@@ -78,9 +78,9 @@ static void print_transitive_json(const char *name, const char *version, int dep
 
 int64_t handle_metadata(options *opts)
 {
-	char *manifest_path = project_find_manifest(NULL);
+	char *manifest_path = project_find_manifest(nullptr);
 
-	if (!manifest_path) {
+	if (manifest_path == nullptr) {
 		fprintf_safe(stderr, "Error: Could not find Coffee.toml\n");
 		return 1;
 	}
@@ -88,7 +88,7 @@ int64_t handle_metadata(options *opts)
 	manifest_t *m = manifest_parse(manifest_path);
 	free(manifest_path);
 
-	if (!m) {
+	if (m == nullptr) {
 		fprintf_safe(stderr, "Error: Could not parse manifest\n");
 		return 1;
 	}
@@ -103,14 +103,14 @@ int64_t handle_metadata(options *opts)
 	printf("  },\n");
 
 	/* Resolved features */
-	resolved_features_t *rf = NULL;
+	resolved_features_t *rf = nullptr;
 	if (m->features_count > 0) {
-		rf = features_resolve(m, NULL, 0, false, false);
+		rf = features_resolve(m, nullptr, 0, false, false);
 	}
-	if (rf && rf->package_count > 0) {
+	if (rf != nullptr && rf->package_count > 0) {
 		printf("  \"features\": {\n");
 		for (size_t i = 0; i < rf->package_count; i++) {
-			if (!rf->package_names[i]) {
+			if (rf->package_names[i] == nullptr) {
 				continue;
 			}
 			printf("    \"%s\": [", rf->package_names[i]);
@@ -137,8 +137,8 @@ int64_t handle_metadata(options *opts)
 		printf(",\n  \"transitive_deps\": [\n");
 		for (size_t i = 0; i < m->package.dependencies_count; i++) {
 			const char *entry	 = m->package.dependencies[i];
-			char	   *dep_name = NULL;
-			char	   *dep_ver	 = NULL;
+			char	   *dep_name = nullptr;
+			char	   *dep_ver	 = nullptr;
 			manifest_extract_dep_info(entry, &dep_name, &dep_ver);
 
 			if (dep_name) {

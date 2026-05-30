@@ -7,7 +7,7 @@
 static bool feature_in_set(feature_set_t *fs, const char *name)
 {
 	for (size_t i = 0; i < fs->count; i++) {
-		if (fs->names[i] && strcmp(fs->names[i], name) == 0) {
+		if (fs->names[i] != nullptr && strcmp(fs->names[i], name) == 0) {
 			return true;
 		}
 	}
@@ -27,14 +27,14 @@ static void feature_set_add(feature_set_t *fs, const char *name)
 static feature_set_t *get_or_create_set(resolved_features_t *rf, const char *package)
 {
 	for (size_t i = 0; i < rf->package_count; i++) {
-		if (rf->package_names[i] && strcmp(rf->package_names[i], package) == 0) {
+		if (rf->package_names[i] != nullptr && strcmp(rf->package_names[i], package) == 0) {
 			return &rf->packages[i];
 		}
 	}
 	rf->package_names					  = realloc(rf->package_names, (rf->package_count + 1) * sizeof(char *));
 	rf->packages						  = realloc(rf->packages, (rf->package_count + 1) * sizeof(feature_set_t));
 	rf->package_names[rf->package_count]  = strdup(package);
-	rf->packages[rf->package_count].names = NULL;
+	rf->packages[rf->package_count].names = nullptr;
 	rf->packages[rf->package_count].count = 0;
 	rf->package_count++;
 	return &rf->packages[rf->package_count - 1];
@@ -43,13 +43,13 @@ static feature_set_t *get_or_create_set(resolved_features_t *rf, const char *pac
 resolved_features_t *features_resolve(manifest_t *root, sds *requested, size_t requested_count, bool all_features,
 									  bool no_default_features)
 {
-	if (!root) {
-		return NULL;
+	if (root == nullptr) {
+		return nullptr;
 	}
 
 	resolved_features_t *rf = calloc(1, sizeof(resolved_features_t));
-	if (!rf) {
-		return NULL;
+	if (rf == nullptr) {
+		return nullptr;
 	}
 
 	feature_set_t *root_set = get_or_create_set(rf, root->package.name != nullptr ? root->package.name : "root");
@@ -82,12 +82,12 @@ resolved_features_t *features_resolve(manifest_t *root, sds *requested, size_t r
 	}
 
 	for (size_t i = 0; i < root->features_count; i++) {
-		if (!root->features[i].name || !feature_in_set(root_set, root->features[i].name)) {
+		if (root->features[i].name == nullptr || !feature_in_set(root_set, root->features[i].name)) {
 			continue;
 		}
 		for (size_t j = 0; j < root->features[i].deps_count; j++) {
 			char *dep = root->features[i].deps[j];
-			if (!dep) {
+			if (dep == nullptr) {
 				continue;
 			}
 			char *slash = strchr(dep, '/');
@@ -107,7 +107,7 @@ resolved_features_t *features_resolve(manifest_t *root, sds *requested, size_t r
 
 void features_free(resolved_features_t *rf)
 {
-	if (!rf) {
+	if (rf == nullptr) {
 		return;
 	}
 	for (size_t i = 0; i < rf->package_count; i++) {
@@ -124,11 +124,11 @@ void features_free(resolved_features_t *rf)
 
 bool features_is_enabled(resolved_features_t *rf, sds package, sds feature)
 {
-	if (!rf || !package || !feature) {
+	if (rf == nullptr || package == nullptr || feature == nullptr) {
 		return false;
 	}
 	for (size_t i = 0; i < rf->package_count; i++) {
-		if (rf->package_names[i] && strcmp(rf->package_names[i], package) == 0) {
+		if (rf->package_names[i] != nullptr && strcmp(rf->package_names[i], package) == 0) {
 			return feature_in_set(&rf->packages[i], feature);
 		}
 	}
@@ -137,32 +137,32 @@ bool features_is_enabled(resolved_features_t *rf, sds package, sds feature)
 
 sds *features_to_compiler_flags(resolved_features_t *rf, sds package, size_t *out_count)
 {
-	if (!rf || !package || !out_count) {
-		return NULL;
+	if (rf == nullptr || package == nullptr || out_count == nullptr) {
+		return nullptr;
 	}
 
 	*out_count		   = 0;
-	feature_set_t *set = NULL;
+	feature_set_t *set = nullptr;
 
 	for (size_t i = 0; i < rf->package_count; i++) {
-		if (rf->package_names[i] && strcmp(rf->package_names[i], package) == 0) {
+		if (rf->package_names[i] != nullptr && strcmp(rf->package_names[i], package) == 0) {
 			set = &rf->packages[i];
 			break;
 		}
 	}
 
-	if (!set || set->count == 0) {
-		return NULL;
+	if (set == nullptr || set->count == 0) {
+		return nullptr;
 	}
 
 	char **flags = calloc(set->count, sizeof(char *));
-	if (!flags) {
-		return NULL;
+	if (flags == nullptr) {
+		return nullptr;
 	}
 
 	size_t idx = 0;
 	for (size_t i = 0; i < set->count; i++) {
-		if (!set->names[i] || strcmp(set->names[i], "default") == 0) {
+		if (set->names[i] == nullptr || strcmp(set->names[i], "default") == 0) {
 			continue;
 		}
 		size_t flag_len = strlen(set->names[i]) + 12;
@@ -189,8 +189,8 @@ sds *features_to_compiler_flags(resolved_features_t *rf, sds package, size_t *ou
 
 void features_parse_cli(sds cli_string, sds ***out_features, size_t *out_count)
 {
-	if (!cli_string || !out_features || !out_count) {
-		*out_features = NULL;
+	if (!cli_string || !out_features || out_count == nullptr) {
+		*out_features = nullptr;
 		*out_count	  = 0;
 		return;
 	}
@@ -203,8 +203,8 @@ void features_parse_cli(sds cli_string, sds ***out_features, size_t *out_count)
 	}
 
 	char **features = calloc(count, sizeof(char *));
-	if (!features) {
-		*out_features = NULL;
+	if (features == nullptr) {
+		*out_features = nullptr;
 		*out_count	  = 0;
 		return;
 	}
@@ -213,9 +213,9 @@ void features_parse_cli(sds cli_string, sds ***out_features, size_t *out_count)
 	const char *p	= cli_string;
 	const char *end = p;
 
-	while (*p) {
+	while (*p != '\0') {
 		end = p;
-		while (*end && *end != ',') {
+		while (*end != '\0' && *end != ',') {
 			end++;
 		}
 		size_t len	  = (size_t)(end - p);
@@ -223,7 +223,7 @@ void features_parse_cli(sds cli_string, sds ***out_features, size_t *out_count)
 		memccpy(features[idx], p, '\0', len);
 		features[idx][len] = '\0';
 		idx++;
-		p = *end ? end + 1 : end;
+		p = *end != '\0' ? end + 1 : end;
 	}
 
 	*out_features = features;

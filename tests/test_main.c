@@ -19,7 +19,7 @@ void coffee_register_framework_tests(void);
 
 int main(int argc, char **argv)
 {
-	const char *filter = NULL;
+	const char *filter = nullptr;
 
 	/* Parse --test and --verbose from argv */
 	int verbose = 0;
@@ -28,7 +28,7 @@ int main(int argc, char **argv)
 			verbose = 1;
 		} else if (strcmp(argv[i], "--test") == 0 && i + 1 < argc) {
 			filter = argv[++i];
-		} else if (filter == NULL && argv[i][0] != '-') {
+		} else if (filter == nullptr && argv[i][0] != '-') {
 			/* First non-flag argument is the filter */
 			filter = argv[i];
 		}

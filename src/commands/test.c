@@ -11,14 +11,14 @@
 
 int64_t handle_test(options *opts)
 {
-	manifest_t *manifest	  = NULL;
-	char	   *manifest_path = project_find_manifest(NULL);
+	manifest_t *manifest	  = nullptr;
+	char	   *manifest_path = project_find_manifest(nullptr);
 
 	if (manifest_path) {
 		manifest = manifest_parse(manifest_path);
 	}
 
-	char *dir_end	 = manifest_path != nullptr ? strrchr(manifest_path, '/') : NULL;
+	char *dir_end	 = manifest_path != nullptr ? strrchr(manifest_path, '/') : nullptr;
 	bool  in_project = false;
 	char  project_dir[4096];
 
@@ -80,7 +80,7 @@ int64_t handle_test(options *opts)
 	if (!test_filter && opts->inputs_num > 1) {
 		test_filter = opts->inputs[1];
 	}
-	if (test_filter && test_filter[0] != '\0') {
+	if (test_filter != nullptr && test_filter[0] != '\0') {
 		off += snprintf_safe(cmd + off, sizeof(cmd) - (size_t)off, " '%s'", test_filter);
 	}
 

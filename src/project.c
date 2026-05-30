@@ -23,8 +23,8 @@ sds *project_find_manifest(sds start_dir)
 	if (start_dir) {
 		dir = strdup(start_dir);
 	} else {
-		if (getcwd(cwd, sizeof(cwd)) == NULL) {
-			return NULL;
+		if (getcwd(cwd, sizeof(cwd)) == nullptr) {
+			return nullptr;
 		}
 		dir = strdup(cwd);
 	}
@@ -48,7 +48,7 @@ sds *project_find_manifest(sds start_dir)
 		if (strcmp(parent, dir) == 0) {
 			free(parent);
 			free(dir);
-			return NULL;
+			return nullptr;
 		}
 
 		free(dir);
@@ -63,8 +63,8 @@ manifest_t *project_load_manifest(sds path)
 
 sds *project_get_name(manifest_t *m)
 {
-	if (!m || !m->package.name) {
-		return NULL;
+	if (m == nullptr || m->package.name == nullptr) {
+		return nullptr;
 	}
 	return strdup(m->package.name);
 }
