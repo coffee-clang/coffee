@@ -212,6 +212,10 @@ Not okay:
 something instance;
 ```
 
+## Copy strings
+
+Use `memccpy` to copy a string. Avoid using `memcpy`.
+
 ## Banned functions
 
 To avoid footguns and unintended consequences we forbid the use of a number of C functions.
