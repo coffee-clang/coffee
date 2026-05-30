@@ -19,7 +19,7 @@ static char *pkg_dir(const char *name)
 	if (!dir) {
 		return NULL;
 	}
-	snprintf(dir, strlen(home) + strlen("/.coffee/deps/") + strlen(name) + 1, "%s/.coffee/deps/%s", home, name);
+	snprintf_safe(dir, strlen(home) + strlen("/.coffee/deps/") + strlen(name) + 1, "%s/.coffee/deps/%s", home, name);
 	return dir;
 }
 
@@ -40,7 +40,7 @@ static void append_libs_for_pkg(const char *name, char *buf, size_t bufsz, size_
 	const char *libname = name;
 
 	char toml_path[4'096];
-	snprintf(toml_path, sizeof(toml_path), "%s/library.toml", dir);
+	snprintf_safe(toml_path, sizeof(toml_path), "%s/library.toml", dir);
 
 	FILE *fp = fopen(toml_path, "r");
 	if (fp) {
@@ -52,7 +52,7 @@ static void append_libs_for_pkg(const char *name, char *buf, size_t bufsz, size_
 			if (raw_libname) {
 				char *s;
 				if (toml_rtos(raw_libname, &s) == 0 && s) {
-					snprintf(libname_buf, sizeof(libname_buf), "%s", s);
+					snprintf_safe(libname_buf, sizeof(libname_buf), "%s", s);
 					libname = libname_buf;
 					free(s);
 				}
@@ -69,7 +69,7 @@ static void append_libs_for_pkg(const char *name, char *buf, size_t bufsz, size_
 						if (toml_rtos(raw, &s) == 0 && s) {
 							size_t avail = bufsz - *off;
 							if (avail > 2) {
-								*off += snprintf(buf + *off, avail, "-L%s/%s ", dir, s);
+								*off += snprintf_safe(buf + *off, avail, "-L%s/%s ", dir, s);
 							}
 							free(s);
 							has_libdir = 1;
@@ -85,11 +85,11 @@ static void append_libs_for_pkg(const char *name, char *buf, size_t bufsz, size_
 	/* Fallback: convention-based library path */
 	if (!has_libdir) {
 		char lib_path[4'096];
-		snprintf(lib_path, sizeof(lib_path), "%s/lib", dir);
+		snprintf_safe(lib_path, sizeof(lib_path), "%s/lib", dir);
 		if (access(lib_path, F_OK) == 0) {
 			size_t avail = bufsz - *off;
 			if (avail > 2) {
-				*off += snprintf(buf + *off, avail, "-L%s ", lib_path);
+				*off += snprintf_safe(buf + *off, avail, "-L%s ", lib_path);
 			}
 		}
 	}
@@ -97,7 +97,7 @@ static void append_libs_for_pkg(const char *name, char *buf, size_t bufsz, size_
 	/* Append -l flag */
 	size_t avail = bufsz - *off;
 	if (avail > 10) {
-		*off += snprintf(buf + *off, avail, "-l%s ", libname);
+		*off += snprintf_safe(buf + *off, avail, "-l%s ", libname);
 	}
 
 	free(dir);
@@ -145,7 +145,7 @@ int64_t handle_libs(options *opts)
 				memcpy(name, dep, len);
 				name[len] = '\0';
 			} else {
-				snprintf(name, sizeof(name), "%s", dep);
+				snprintf_safe(name, sizeof(name), "%s", dep);
 			}
 
 			append_libs_for_pkg(name, buf, sizeof(buf), &off);

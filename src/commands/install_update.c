@@ -17,7 +17,7 @@ int64_t handle_install_update(options *opts)
 	}
 
 	char deps_dir[4'096];
-	snprintf(deps_dir, sizeof(deps_dir), "%s/.coffee/deps", home);
+	snprintf_safe(deps_dir, sizeof(deps_dir), "%s/.coffee/deps", home);
 
 	struct stat st;
 	if (stat(deps_dir, &st) != 0) {
@@ -32,7 +32,7 @@ int64_t handle_install_update(options *opts)
 
 	if (target) {
 		char pkg_dir[4'096];
-		snprintf(pkg_dir, sizeof(pkg_dir), "%s/%s", deps_dir, target);
+		snprintf_safe(pkg_dir, sizeof(pkg_dir), "%s/%s", deps_dir, target);
 
 		if (stat(pkg_dir, &st) != 0) {
 			fprintf(stderr, "Error: Package '%s' is not installed\n", target);
@@ -42,7 +42,7 @@ int64_t handle_install_update(options *opts)
 		printf("Updating %s...\n", target);
 
 		char cmd[4'096];
-		snprintf(cmd, sizeof(cmd), "rm -rf %s", pkg_dir);
+		snprintf_safe(cmd, sizeof(cmd), "rm -rf %s", pkg_dir);
 		system(cmd);
 
 		int ret = registry_fetch(target, NULL, pkg_dir);
@@ -69,12 +69,12 @@ int64_t handle_install_update(options *opts)
 		}
 
 		char pkg_dir[4'096];
-		snprintf(pkg_dir, sizeof(pkg_dir), "%s/%s", deps_dir, entry->d_name);
+		snprintf_safe(pkg_dir, sizeof(pkg_dir), "%s/%s", deps_dir, entry->d_name);
 
 		printf("Updating %s...\n", entry->d_name);
 
 		char cmd[4'096];
-		snprintf(cmd, sizeof(cmd), "rm -rf %s", pkg_dir);
+		snprintf_safe(cmd, sizeof(cmd), "rm -rf %s", pkg_dir);
 		system(cmd);
 
 		int ret = registry_fetch(entry->d_name, NULL, pkg_dir);

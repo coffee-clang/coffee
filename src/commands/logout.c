@@ -15,7 +15,7 @@ int64_t handle_logout(options *)
 	}
 
 	char cred_path[4'096];
-	snprintf(cred_path, sizeof(cred_path), "%s/.coffee/credentials", home);
+	snprintf_safe(cred_path, sizeof(cred_path), "%s/.coffee/credentials", home);
 
 	if (access(cred_path, F_OK) != 0) {
 		printf("Not logged in (no credentials found).\n");

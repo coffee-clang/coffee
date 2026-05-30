@@ -16,7 +16,7 @@ static int create_symlink(const char *target, const char *link_path)
 	if (lstat(link_path, &st) == 0) {
 		if (S_ISLNK(st.st_mode) || S_ISDIR(st.st_mode)) {
 			char cmd[8'192];
-			snprintf(cmd, sizeof(cmd), "rm -rf %s", link_path);
+			snprintf_safe(cmd, sizeof(cmd), "rm -rf %s", link_path);
 			if (system(cmd) != 0) {
 				return -1;
 			}
@@ -28,7 +28,7 @@ static int create_symlink(const char *target, const char *link_path)
 	if (last_slash) {
 		*last_slash = '\0';
 		char cmd[8'192];
-		snprintf(cmd, sizeof(cmd), "mkdir -p %s", link_copy);
+		snprintf_safe(cmd, sizeof(cmd), "mkdir -p %s", link_copy);
 		free(link_copy);
 		if (system(cmd) != 0) {
 			return -1;
@@ -70,11 +70,11 @@ int64_t handle_install(options *opts)
 
 	const char *coffee_home = coffee_home_dir();
 	char		global_deps[4'096];
-	snprintf(global_deps, sizeof(global_deps), "%s/deps", coffee_home);
+	snprintf_safe(global_deps, sizeof(global_deps), "%s/deps", coffee_home);
 	mkdir(global_deps, 0755);
 
 	char cache_path[4'096];
-	snprintf(cache_path, sizeof(cache_path), "%s/%s/%s", global_deps, package, version);
+	snprintf_safe(cache_path, sizeof(cache_path), "%s/%s/%s", global_deps, package, version);
 
 	int ret = registry_fetch(package, version, cache_path);
 	if (ret != 0) {
@@ -87,11 +87,11 @@ int64_t handle_install(options *opts)
 	char *manifest_path = project_find_manifest(NULL);
 	if (manifest_path) {
 		char project_deps[4'096];
-		snprintf(project_deps, sizeof(project_deps), ".coffee/deps");
+		snprintf_safe(project_deps, sizeof(project_deps), ".coffee/deps");
 		mkdir(project_deps, 0755);
 
 		char project_link_path[4'096];
-		snprintf(project_link_path, sizeof(project_link_path), "%s/%s/%s", project_deps, package, version);
+		snprintf_safe(project_link_path, sizeof(project_link_path), "%s/%s/%s", project_deps, package, version);
 
 		ret = create_symlink(cache_path, project_link_path);
 		if (ret != 0) {

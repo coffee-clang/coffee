@@ -73,7 +73,7 @@ static int scan_dir_for_dep(const char *dirpath, const char *dep_name)
 		}
 
 		char path[4'096];
-		snprintf(path, sizeof(path), "%s/%s", dirpath, entry->d_name);
+		snprintf_safe(path, sizeof(path), "%s/%s", dirpath, entry->d_name);
 
 		struct stat st;
 		if (stat(path, &st) != 0) {

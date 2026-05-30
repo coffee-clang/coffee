@@ -64,15 +64,15 @@ int64_t handle_remove(options *opts)
 	char  makefile_path[4096];
 	if (dir_end) {
 		size_t dir_len = (size_t)(dir_end - manifest_path) + 1;
-		snprintf(makefile_path, sizeof(makefile_path), "%.*sMakefile", (int)dir_len, manifest_path);
+		snprintf_safe(makefile_path, sizeof(makefile_path), "%.*sMakefile", (int)dir_len, manifest_path);
 	} else {
-		snprintf(makefile_path, sizeof(makefile_path), "Makefile");
+		snprintf_safe(makefile_path, sizeof(makefile_path), "Makefile");
 	}
 
 	FILE *mf = fopen(makefile_path, "r");
 	if (mf) {
 		char dep_header[64];
-		snprintf(dep_header, sizeof(dep_header), "# Dep: %s", package_name);
+		snprintf_safe(dep_header, sizeof(dep_header), "# Dep: %s", package_name);
 
 		fseek(mf, 0, SEEK_END);
 		long mf_len = ftell(mf);

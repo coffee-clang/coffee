@@ -1,6 +1,8 @@
 #ifndef REGISTRY_H_
 #define REGISTRY_H_
 
+#include "../deps/sds/sds.h"
+
 #include <stdbool.h>
 #include <stddef.h>
 
@@ -8,13 +10,13 @@
 #define REGISTRY_RAW_URL   "https://raw.githubusercontent.com/coffee-clang/recipes/main"
 
 typedef struct {
-	char *name;
-	char *version;
-	char *license;
-	char *repo;
-	char *description;
-	char *download_url;
-	char *dependencies;
+	sds name;
+	sds version;
+	sds license;
+	sds repo;
+	sds description;
+	sds download_url;
+	sds dependencies;
 } recipe_t;
 
 typedef struct {
@@ -23,19 +25,19 @@ typedef struct {
 } recipe_list_t;
 
 typedef struct {
-	char **versions;
+	sds	  *versions;
 	size_t count;
 } version_list_t;
 
-const char *coffee_home_dir(void);
+sds coffee_home_dir(void);
 
-recipe_list_t *registry_search(const char *query);
-recipe_t	  *registry_get(const char *name);
-int			   registry_fetch(const char *name, const char *version, const char *dest_dir);
+recipe_list_t *registry_search(sds query);
+recipe_t	  *registry_get(sds name);
+int			   registry_fetch(sds name, sds version, sds dest_dir);
 void		   registry_free_recipes(recipe_list_t *list);
 void		   registry_free_recipe(recipe_t *r);
 
-version_list_t *registry_get_versions(const char *name);
+version_list_t *registry_get_versions(sds name);
 void			registry_free_versions(version_list_t *list);
 
 #endif

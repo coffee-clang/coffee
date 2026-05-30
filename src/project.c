@@ -32,13 +32,13 @@ char *project_find_manifest(const char *start_dir)
 	char path[MAX_PATH_LEN];
 
 	while (1) {
-		snprintf(path, sizeof(path), "%s/Coffee.toml", dir);
+		snprintf_safe(path, sizeof(path), "%s/Coffee.toml", dir);
 		if (file_exists(path)) {
 			free(dir);
 			return strdup(path);
 		}
 
-		snprintf(path, sizeof(path), "%s/Coffee.toml", dir);
+		snprintf_safe(path, sizeof(path), "%s/Coffee.toml", dir);
 		if (file_exists(path)) {
 			free(dir);
 			return strdup(path);

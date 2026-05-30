@@ -35,22 +35,22 @@ typedef size_t	  usize;
 
 typedef struct options_s {
 	// Pointer fields
-	char  *error_code;
-	char **inputs;
-	char  *pkg_version;
-	char  *path;
-	char  *git;
-	char  *branch;
-	char  *tag;
-	char  *rev;
-	char  *registry;
-	char  *bin;
-	char  *example;
-	char  *features;
-	char  *profile;
-	char  *target;
-	char  *target_dir;
-	char  *manifest_path;
+	sds	 error_code;
+	sds *inputs;
+	sds	 pkg_version;
+	sds	 path;
+	sds	 git;
+	sds	 branch;
+	sds	 tag;
+	sds	 rev;
+	sds	 registry;
+	sds	 bin;
+	sds	 example;
+	sds	 features;
+	sds	 profile;
+	sds	 target;
+	sds	 target_dir;
+	sds	 manifest_path;
 
 	// Integer fields
 	i64 color;
@@ -75,8 +75,8 @@ typedef struct options_s {
 } options_s, options;
 
 typedef struct {
-	char *name;
-	char *description;
+	sds name;
+	sds description;
 	i64 (*action)(struct options_s *);
 } command_s;
 

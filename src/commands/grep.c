@@ -15,7 +15,7 @@ int64_t handle_grep(options *opts)
 	printf("Searching for '%s'...\n", pattern);
 
 	char cmd[4'096];
-	snprintf(cmd, sizeof(cmd), "grep -rn --exclude-dir=target --exclude-dir=.git \"%s\" src tests", pattern);
+	snprintf_safe(cmd, sizeof(cmd), "grep -rn --exclude-dir=target --exclude-dir=.git \"%s\" src tests", pattern);
 
 	int ret = system(cmd);
 

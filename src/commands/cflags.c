@@ -19,7 +19,7 @@ static char *pkg_dir(const char *name)
 	if (!dir) {
 		return NULL;
 	}
-	snprintf(dir, strlen(home) + strlen("/.coffee/deps/") + strlen(name) + 1, "%s/.coffee/deps/%s", home, name);
+	snprintf_safe(dir, strlen(home) + strlen("/.coffee/deps/") + strlen(name) + 1, "%s/.coffee/deps/%s", home, name);
 	return dir;
 }
 
@@ -36,7 +36,7 @@ static void append_cflags_for_pkg(const char *name, char *buf, size_t bufsz, siz
 	}
 
 	char toml_path[4096];
-	snprintf(toml_path, sizeof(toml_path), "%s/library.toml", dir);
+	snprintf_safe(toml_path, sizeof(toml_path), "%s/library.toml", dir);
 
 	int	  found = 0;
 	FILE *fp	= fopen(toml_path, "r");
@@ -54,7 +54,7 @@ static void append_cflags_for_pkg(const char *name, char *buf, size_t bufsz, siz
 						if (toml_rtos(raw, &s) == 0 && s) {
 							size_t avail = bufsz - *off;
 							if (avail > 2) {
-								*off += snprintf(buf + *off, avail, "-I%s/%s ", dir, s);
+								*off += snprintf_safe(buf + *off, avail, "-I%s/%s ", dir, s);
 							}
 							free(s);
 							found = 1;
@@ -69,11 +69,11 @@ static void append_cflags_for_pkg(const char *name, char *buf, size_t bufsz, siz
 
 	if (!found) {
 		char inc_path[4096];
-		snprintf(inc_path, sizeof(inc_path), "%s/include", dir);
+		snprintf_safe(inc_path, sizeof(inc_path), "%s/include", dir);
 		if (access(inc_path, F_OK) == 0) {
 			size_t avail = bufsz - *off;
 			if (avail > 2) {
-				*off += snprintf(buf + *off, avail, "-I%s ", inc_path);
+				*off += snprintf_safe(buf + *off, avail, "-I%s ", inc_path);
 			}
 		}
 	}
@@ -123,7 +123,7 @@ int64_t handle_cflags(options *opts)
 				memcpy(name, dep, len);
 				name[len] = '\0';
 			} else {
-				snprintf(name, sizeof(name), "%s", dep);
+				snprintf_safe(name, sizeof(name), "%s", dep);
 			}
 
 			append_cflags_for_pkg(name, buf, sizeof(buf), &off);

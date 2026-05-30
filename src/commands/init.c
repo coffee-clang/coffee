@@ -116,7 +116,7 @@ int64_t handle_init(options *opts)
 
 	/* Create include directory for project headers */
 	char include_project_dir[4'096];
-	snprintf(include_project_dir, sizeof(include_project_dir), "include/%s", name);
+	snprintf_safe(include_project_dir, sizeof(include_project_dir), "include/%s", name);
 	if (create_dir(include_project_dir) != 0) {
 		fprintf(stderr, "Error: Could not create include/%s directory\n", name);
 		free(name);
@@ -166,11 +166,11 @@ int64_t handle_init(options *opts)
 
 	/* Create README.md */
 	char readme_content[4'096];
-	snprintf(readme_content, sizeof(readme_content),
-			 "# %s\n"
-			 "\n"
-			 "A modern C project.\n",
-			 name);
+	snprintf_safe(readme_content, sizeof(readme_content),
+				  "# %s\n"
+				  "\n"
+				  "A modern C project.\n",
+				  name);
 	if (create_file("README.md", readme_content) != 0) {
 		fprintf(stderr, "Error: Could not create README.md\n");
 		free(name);
@@ -179,20 +179,20 @@ int64_t handle_init(options *opts)
 
 	/* Create manifest */
 	char manifest_content[4'096];
-	snprintf(manifest_content, sizeof(manifest_content),
-			 "[package]\n"
-			 "name = \"%s\"\n"
-			 "version = \"0.1.0\"\n"
-			 "edition = \"c23\"\n"
-			 "description = \"A new C project\"\n"
-			 "license = \"MIT\"\n"
-			 "\n"
-			 "[dependencies]\n"
-			 "\n"
-			 "[lib]\n"
-			 "sources = [\"src/*.c\"]\n"
-			 "headers = [\"include/%s/*.h\"]\n",
-			 name, name);
+	snprintf_safe(manifest_content, sizeof(manifest_content),
+				  "[package]\n"
+				  "name = \"%s\"\n"
+				  "version = \"0.1.0\"\n"
+				  "edition = \"c23\"\n"
+				  "description = \"A new C project\"\n"
+				  "license = \"MIT\"\n"
+				  "\n"
+				  "[dependencies]\n"
+				  "\n"
+				  "[lib]\n"
+				  "sources = [\"src/*.c\"]\n"
+				  "headers = [\"include/%s/*.h\"]\n",
+				  name, name);
 
 	if (create_file(manifest_path, manifest_content) != 0) {
 		fprintf(stderr, "Error: Could not create Coffee.toml\n");
@@ -202,13 +202,13 @@ int64_t handle_init(options *opts)
 
 	/* Create main.c */
 	char main_content[4'096];
-	snprintf(main_content, sizeof(main_content),
-			 "#include <stdio.h>\n"
-			 "\n"
-			 "int main(int argc, char **argv) {\n"
-			 "    printf(\"Hello, world!\\n\");\n"
-			 "    return 0;\n"
-			 "}\n");
+	snprintf_safe(main_content, sizeof(main_content),
+				  "#include <stdio.h>\n"
+				  "\n"
+				  "int main(int argc, char **argv) {\n"
+				  "    printf(\"Hello, world!\\n\");\n"
+				  "    return 0;\n"
+				  "}\n");
 
 	if (create_file("src/main.c", main_content) != 0) {
 		fprintf(stderr, "Error: Could not create main.c\n");
@@ -218,16 +218,16 @@ int64_t handle_init(options *opts)
 
 	/* Create main header */
 	char main_header_path[4'096];
-	snprintf(main_header_path, sizeof(main_header_path), "include/%s/%s.h", name, name);
+	snprintf_safe(main_header_path, sizeof(main_header_path), "include/%s/%s.h", name, name);
 	char header_content[4'096];
-	snprintf(header_content, sizeof(header_content),
-			 "#ifndef %s_H\n"
-			 "#define %s_H\n"
-			 "\n"
-			 "// Your declarations here\n"
-			 "\n"
-			 "#endif // %s_H\n",
-			 name, name, name);
+	snprintf_safe(header_content, sizeof(header_content),
+				  "#ifndef %s_H\n"
+				  "#define %s_H\n"
+				  "\n"
+				  "// Your declarations here\n"
+				  "\n"
+				  "#endif // %s_H\n",
+				  name, name, name);
 	if (create_file(main_header_path, header_content) != 0) {
 		fprintf(stderr, "Error: Could not create include/%s/%s.h\n", name, name);
 		free(name);

@@ -100,7 +100,7 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 			for (size_t i = 0; i < dflags_count; i++) {
 				size_t new_len	 = strlen(flags) + strlen(dflags[i]) + 2;
 				char  *new_flags = malloc(new_len);
-				snprintf(new_flags, new_len, "%s %s", flags, dflags[i]);
+				snprintf_safe(new_flags, new_len, "%s %s", flags, dflags[i]);
 				free(flags);
 				free(dflags[i]);
 				flags = new_flags;
@@ -121,7 +121,7 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 	}
 
 	char outpath[4096];
-	ret = snprintf(outpath, sizeof(outpath), "%s/%s", output_dir, name);
+	ret = snprintf_safe(outpath, sizeof(outpath), "%s/%s", output_dir, name);
 	if (ret < 0 || (size_t)ret >= sizeof(outpath)) {
 		free(flags);
 		globfree(&globbuf);
@@ -194,7 +194,7 @@ int build_run(manifest_t *manifest, build_opts_t *opts, char **args, int argc)
 	const char *name	   = manifest->package.name;
 
 	char exe_path[4096];
-	ret = snprintf(exe_path, sizeof(exe_path), "%s/%s", output_dir, name);
+	ret = snprintf_safe(exe_path, sizeof(exe_path), "%s/%s", output_dir, name);
 	if (ret < 0 || (size_t)ret >= sizeof(exe_path)) {
 		return 1;
 	}

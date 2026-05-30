@@ -14,13 +14,13 @@ const char *coffee_home_dir(void)
 	static char home_dir[4096];
 	const char *coffee_home = getenv("COFFEE_HOME");
 	if (coffee_home) {
-		snprintf(home_dir, sizeof(home_dir), "%s", coffee_home);
+		snprintf_safe(home_dir, sizeof(home_dir), "%s", coffee_home);
 	} else {
 		const char *home = getenv("HOME");
 		if (!home) {
 			home = "/tmp";
 		}
-		snprintf(home_dir, sizeof(home_dir), "%s/.coffee", home);
+		snprintf_safe(home_dir, sizeof(home_dir), "%s/.coffee", home);
 	}
 	return home_dir;
 }
@@ -33,7 +33,7 @@ static char *get_cache_dir(void)
 static char *get_index_path(void)
 {
 	static char index_path[4096];
-	snprintf(index_path, sizeof(index_path), "%s/packages.json", get_cache_dir());
+	snprintf_safe(index_path, sizeof(index_path), "%s/packages.json", get_cache_dir());
 	return index_path;
 }
 
@@ -51,10 +51,10 @@ static int ensure_index_cached(void)
 
 	char *cache_dir = get_cache_dir();
 	char  cmd[4096];
-	snprintf(cmd, sizeof(cmd), "mkdir -p %s", cache_dir);
+	snprintf_safe(cmd, sizeof(cmd), "mkdir -p %s", cache_dir);
 	system(cmd);
 
-	snprintf(cmd, sizeof(cmd), "curl -sL \"" REGISTRY_INDEX_URL "\" | zstd -df -o %s 2>/dev/null", index_path);
+	snprintf_safe(cmd, sizeof(cmd), "curl -sL \"" REGISTRY_INDEX_URL "\" | zstd -df -o %s 2>/dev/null", index_path);
 
 	return system(cmd);
 }
@@ -62,7 +62,7 @@ static int ensure_index_cached(void)
 static char *fetch_url(const char *url)
 {
 	char cmd[4096];
-	snprintf(cmd, sizeof(cmd), "curl -sL \"%s\" 2>/dev/null", url);
+	snprintf_safe(cmd, sizeof(cmd), "curl -sL \"%s\" 2>/dev/null", url);
 
 	FILE *fp = popen(cmd, "r");
 	if (!fp) {
@@ -284,7 +284,7 @@ recipe_t *registry_get(const char *name)
 
 	char first = tolower(name[0]);
 	char url[4096];
-	snprintf(url, sizeof(url), REGISTRY_RAW_URL "/recipes/%c/%s/library.toml", first, name);
+	snprintf_safe(url, sizeof(url), REGISTRY_RAW_URL "/recipes/%c/%s/library.toml", first, name);
 
 	char *meta = fetch_url(url);
 	if (!meta) {
@@ -317,20 +317,20 @@ int registry_fetch(const char *name, const char *version, const char *dest_dir)
 	char first = tolower(name[0]);
 	char cmd[4096];
 
-	snprintf(cmd, sizeof(cmd), "mkdir -p %s", dest_dir);
+	snprintf_safe(cmd, sizeof(cmd), "mkdir -p %s", dest_dir);
 	if (system(cmd) != 0) {
 		return -1;
 	}
 
-	snprintf(cmd, sizeof(cmd), "curl -sL \"" REGISTRY_RAW_URL "/recipes/%c/%s/library.toml\" -o %s/library.toml", first,
-			 name, dest_dir);
+	snprintf_safe(cmd, sizeof(cmd), "curl -sL \"" REGISTRY_RAW_URL "/recipes/%c/%s/library.toml\" -o %s/library.toml",
+				  first, name, dest_dir);
 	if (system(cmd) != 0) {
 		return -1;
 	}
 
-	snprintf(cmd, sizeof(cmd),
-			 "curl -sL \"" REGISTRY_RAW_URL "/recipes/%c/%s/install.sh\" -o %s/install.sh 2>/dev/null", first, name,
-			 dest_dir);
+	snprintf_safe(cmd, sizeof(cmd),
+				  "curl -sL \"" REGISTRY_RAW_URL "/recipes/%c/%s/install.sh\" -o %s/install.sh 2>/dev/null", first,
+				  name, dest_dir);
 	system(cmd);
 
 	return 0;
@@ -344,7 +344,7 @@ version_list_t *registry_get_versions(const char *name)
 
 	char first = tolower(name[0]);
 	char url[4096];
-	snprintf(url, sizeof(url), REGISTRY_RAW_URL "/recipes/%c/%s/library.toml", first, name);
+	snprintf_safe(url, sizeof(url), REGISTRY_RAW_URL "/recipes/%c/%s/library.toml", first, name);
 
 	char *meta = fetch_url(url);
 	if (!meta) {

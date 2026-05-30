@@ -32,9 +32,9 @@ int64_t handle_build(options *opts)
 	char   makefile_path[4096];
 	if (dir_end) {
 		dir_len = (size_t)(dir_end - manifest_path) + 1;
-		snprintf(makefile_path, sizeof(makefile_path), "%.*sMakefile", (int)dir_len, manifest_path);
+		snprintf_safe(makefile_path, sizeof(makefile_path), "%.*sMakefile", (int)dir_len, manifest_path);
 	} else {
-		snprintf(makefile_path, sizeof(makefile_path), "Makefile");
+		snprintf_safe(makefile_path, sizeof(makefile_path), "Makefile");
 	}
 
 	/* Check for Makefile */
@@ -48,7 +48,7 @@ int64_t handle_build(options *opts)
 			project_dir = strdup(".");
 		}
 
-		int off = snprintf(cmd, sizeof(cmd), "make -C '%s'", project_dir);
+		int off = snprintf_safe(cmd, sizeof(cmd), "make -C '%s'", project_dir);
 		free(project_dir);
 
 		if (off < 0 || (size_t)off >= sizeof(cmd)) {
@@ -57,13 +57,13 @@ int64_t handle_build(options *opts)
 		}
 
 		if (opts->release && (size_t)off < sizeof(cmd)) {
-			off += snprintf(cmd + off, sizeof(cmd) - (size_t)off, " RELEASE=1");
+			off += snprintf_safe(cmd + off, sizeof(cmd) - (size_t)off, " RELEASE=1");
 		}
 		if (opts->debug && (size_t)off < sizeof(cmd)) {
-			off += snprintf(cmd + off, sizeof(cmd) - (size_t)off, " DEBUG=1");
+			off += snprintf_safe(cmd + off, sizeof(cmd) - (size_t)off, " DEBUG=1");
 		}
 		if (opts->jobs > 0 && (size_t)off < sizeof(cmd)) {
-			off += snprintf(cmd + off, sizeof(cmd) - (size_t)off, " -j%d", opts->jobs);
+			off += snprintf_safe(cmd + off, sizeof(cmd) - (size_t)off, " -j%d", opts->jobs);
 		}
 
 		/* Pass feature flags if specified */
@@ -87,10 +87,10 @@ int64_t handle_build(options *opts)
 					char **dflags		= features_to_compiler_flags(resolved, manifest->package.name, &dflags_count);
 					if (dflags_count > 0) {
 						if ((size_t)off < sizeof(cmd)) {
-							off += snprintf(cmd + off, sizeof(cmd) - (size_t)off, " CFLAGS_EXTRA=");
+							off += snprintf_safe(cmd + off, sizeof(cmd) - (size_t)off, " CFLAGS_EXTRA=");
 							for (size_t i = 0; i < dflags_count && (size_t)off < sizeof(cmd); i++) {
-								off += snprintf(cmd + off, sizeof(cmd) - (size_t)off, "%s%s", dflags[i],
-												(i + 1 < dflags_count) ? " " : "");
+								off += snprintf_safe(cmd + off, sizeof(cmd) - (size_t)off, "%s%s", dflags[i],
+													 (i + 1 < dflags_count) ? " " : "");
 							}
 						}
 						for (size_t i = 0; i < dflags_count; i++) {

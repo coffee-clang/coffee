@@ -67,7 +67,7 @@ int64_t handle_new(options *opts)
 	}
 
 	char manifest_path[4'096];
-	snprintf(manifest_path, sizeof(manifest_path), "%s/Coffee.toml", path);
+	snprintf_safe(manifest_path, sizeof(manifest_path), "%s/Coffee.toml", path);
 
 	if (access(manifest_path, F_OK) == 0) {
 		fprintf(stderr, "Error: Project already exists at %s\n", path);
@@ -85,13 +85,13 @@ int64_t handle_new(options *opts)
 	char scripts_dir[4'096];
 	char build_dir[4'096];
 
-	snprintf(include_dir, sizeof(include_dir), "%s/include", path);
-	snprintf(src_dir, sizeof(src_dir), "%s/src", path);
-	snprintf(deps_dir, sizeof(deps_dir), "%s/deps", path);
-	snprintf(tests_dir, sizeof(tests_dir), "%s/tests", path);
-	snprintf(docs_dir, sizeof(docs_dir), "%s/docs", path);
-	snprintf(scripts_dir, sizeof(scripts_dir), "%s/scripts", path);
-	snprintf(build_dir, sizeof(build_dir), "%s/build", path);
+	snprintf_safe(include_dir, sizeof(include_dir), "%s/include", path);
+	snprintf_safe(src_dir, sizeof(src_dir), "%s/src", path);
+	snprintf_safe(deps_dir, sizeof(deps_dir), "%s/deps", path);
+	snprintf_safe(tests_dir, sizeof(tests_dir), "%s/tests", path);
+	snprintf_safe(docs_dir, sizeof(docs_dir), "%s/docs", path);
+	snprintf_safe(scripts_dir, sizeof(scripts_dir), "%s/scripts", path);
+	snprintf_safe(build_dir, sizeof(build_dir), "%s/build", path);
 
 	if (create_dir(include_dir) != 0) {
 		fprintf(stderr, "Error: Could not create include directory\n");
@@ -137,7 +137,7 @@ int64_t handle_new(options *opts)
 
 	/* Create include directory for project headers */
 	char include_project_dir[4'096];
-	snprintf(include_project_dir, sizeof(include_project_dir), "%s/include/%s", path, name);
+	snprintf_safe(include_project_dir, sizeof(include_project_dir), "%s/include/%s", path, name);
 	if (create_dir(include_project_dir) != 0) {
 		fprintf(stderr, "Error: Could not create include/%s directory\n", name);
 		free(name);
@@ -146,7 +146,7 @@ int64_t handle_new(options *opts)
 
 	/* Create .gitignore */
 	char gitignore_path[4'096];
-	snprintf(gitignore_path, sizeof(gitignore_path), "%s/.gitignore", path);
+	snprintf_safe(gitignore_path, sizeof(gitignore_path), "%s/.gitignore", path);
 	char gitignore_content[] = "build/\n"
 							   "target/\n"
 							   "*.o\n"
@@ -161,7 +161,7 @@ int64_t handle_new(options *opts)
 
 	/* Create LICENSE */
 	char license_path[4'096];
-	snprintf(license_path, sizeof(license_path), "%s/LICENSE", path);
+	snprintf_safe(license_path, sizeof(license_path), "%s/LICENSE", path);
 	char license_content[] = "MIT License\n"
 							 "\n"
 							 "Copyright (c) 2024\n"
@@ -191,13 +191,13 @@ int64_t handle_new(options *opts)
 
 	/* Create README.md */
 	char readme_path[4'096];
-	snprintf(readme_path, sizeof(readme_path), "%s/README.md", path);
+	snprintf_safe(readme_path, sizeof(readme_path), "%s/README.md", path);
 	char readme_content[4'096];
-	snprintf(readme_content, sizeof(readme_content),
-			 "# %s\n"
-			 "\n"
-			 "A modern C project.\n",
-			 name);
+	snprintf_safe(readme_content, sizeof(readme_content),
+				  "# %s\n"
+				  "\n"
+				  "A modern C project.\n",
+				  name);
 	if (create_file(readme_path, readme_content) != 0) {
 		fprintf(stderr, "Error: Could not create README.md\n");
 		free(name);
@@ -206,32 +206,32 @@ int64_t handle_new(options *opts)
 
 	/* Create Makefile */
 	char makefile_path[4'096];
-	snprintf(makefile_path, sizeof(makefile_path), "%s/Makefile", path);
+	snprintf_safe(makefile_path, sizeof(makefile_path), "%s/Makefile", path);
 	char makefile_content[4'096];
-	snprintf(makefile_content, sizeof(makefile_content),
-			 "CC ?= clang\n"
-			 "CFLAGS += -std=c23 -O3 -g\n"
-			 "CFLAGS += -Wall -Wextra -Wshadow -Wpedantic\n"
-			 "CFLAGS += -Wconversion -Wsign-conversion -Wunused\n"
-			 "CFLAGS += -Iinclude/%s\n"
-			 "\n"
-			 "TARGET := build/%s\n"
-			 "SOURCES := $(wildcard src/*.c)\n"
-			 "\n"
-			 ".PHONY: build clean format tidy\n"
-			 "\n"
-			 "build: $(SOURCES)\n"
-			 "\t$(CC) $(CFLAGS) -o $(TARGET) $(SOURCES) $(LDFLAGS)\n"
-			 "\n"
-			 "clean:\n"
-			 "\trm -rf build/\n"
-			 "\n"
-			 "format:\n"
-			 "\tclang-format -i src/*.c include/%s/*.h\n"
-			 "\n"
-			 "tidy:\n"
-			 "\tclang-tidy src/*.c -- $(CFLAGS)\n",
-			 name, name, name);
+	snprintf_safe(makefile_content, sizeof(makefile_content),
+				  "CC ?= clang\n"
+				  "CFLAGS += -std=c23 -O3 -g\n"
+				  "CFLAGS += -Wall -Wextra -Wshadow -Wpedantic\n"
+				  "CFLAGS += -Wconversion -Wsign-conversion -Wunused\n"
+				  "CFLAGS += -Iinclude/%s\n"
+				  "\n"
+				  "TARGET := build/%s\n"
+				  "SOURCES := $(wildcard src/*.c)\n"
+				  "\n"
+				  ".PHONY: build clean format tidy\n"
+				  "\n"
+				  "build: $(SOURCES)\n"
+				  "\t$(CC) $(CFLAGS) -o $(TARGET) $(SOURCES) $(LDFLAGS)\n"
+				  "\n"
+				  "clean:\n"
+				  "\trm -rf build/\n"
+				  "\n"
+				  "format:\n"
+				  "\tclang-format -i src/*.c include/%s/*.h\n"
+				  "\n"
+				  "tidy:\n"
+				  "\tclang-tidy src/*.c -- $(CFLAGS)\n",
+				  name, name, name);
 	if (create_file(makefile_path, makefile_content) != 0) {
 		fprintf(stderr, "Error: Could not create Makefile\n");
 		free(name);
@@ -240,20 +240,20 @@ int64_t handle_new(options *opts)
 
 	/* Create manifest */
 	char manifest_content[4'096];
-	snprintf(manifest_content, sizeof(manifest_content),
-			 "[package]\n"
-			 "name = \"%s\"\n"
-			 "version = \"0.1.0\"\n"
-			 "edition = \"c23\"\n"
-			 "description = \"A new C project\"\n"
-			 "license = \"MIT\"\n"
-			 "\n"
-			 "[dependencies]\n"
-			 "\n"
-			 "[lib]\n"
-			 "sources = [\"src/*.c\"]\n"
-			 "headers = [\"include/%s/*.h\"]\n",
-			 name, name);
+	snprintf_safe(manifest_content, sizeof(manifest_content),
+				  "[package]\n"
+				  "name = \"%s\"\n"
+				  "version = \"0.1.0\"\n"
+				  "edition = \"c23\"\n"
+				  "description = \"A new C project\"\n"
+				  "license = \"MIT\"\n"
+				  "\n"
+				  "[dependencies]\n"
+				  "\n"
+				  "[lib]\n"
+				  "sources = [\"src/*.c\"]\n"
+				  "headers = [\"include/%s/*.h\"]\n",
+				  name, name);
 
 	if (create_file(manifest_path, manifest_content) != 0) {
 		fprintf(stderr, "Error: Could not create Coffee.toml\n");
@@ -263,16 +263,16 @@ int64_t handle_new(options *opts)
 
 	/* Create main.c */
 	char src_main[4'096];
-	snprintf(src_main, sizeof(src_main), "%s/main.c", src_dir);
+	snprintf_safe(src_main, sizeof(src_main), "%s/main.c", src_dir);
 
 	char main_content[4'096];
-	snprintf(main_content, sizeof(main_content),
-			 "#include <stdio.h>\n"
-			 "\n"
-			 "int main(int argc, char **argv) {\n"
-			 "    printf(\"Hello, world!\\n\");\n"
-			 "    return 0;\n"
-			 "}\n");
+	snprintf_safe(main_content, sizeof(main_content),
+				  "#include <stdio.h>\n"
+				  "\n"
+				  "int main(int argc, char **argv) {\n"
+				  "    printf(\"Hello, world!\\n\");\n"
+				  "    return 0;\n"
+				  "}\n");
 
 	if (create_file(src_main, main_content) != 0) {
 		fprintf(stderr, "Error: Could not create main.c\n");
@@ -282,16 +282,16 @@ int64_t handle_new(options *opts)
 
 	/* Create main header */
 	char main_header_path[4'096];
-	snprintf(main_header_path, sizeof(main_header_path), "%s/include/%s/%s.h", path, name, name);
+	snprintf_safe(main_header_path, sizeof(main_header_path), "%s/include/%s/%s.h", path, name, name);
 	char header_content[4'096];
-	snprintf(header_content, sizeof(header_content),
-			 "#ifndef %s_H\n"
-			 "#define %s_H\n"
-			 "\n"
-			 "// Your declarations here\n"
-			 "\n"
-			 "#endif // %s_H\n",
-			 name, name, name);
+	snprintf_safe(header_content, sizeof(header_content),
+				  "#ifndef %s_H\n"
+				  "#define %s_H\n"
+				  "\n"
+				  "// Your declarations here\n"
+				  "\n"
+				  "#endif // %s_H\n",
+				  name, name, name);
 	if (create_file(main_header_path, header_content) != 0) {
 		fprintf(stderr, "Error: Could not create include/%s/%s.h\n", name, name);
 		free(name);
@@ -301,17 +301,17 @@ int64_t handle_new(options *opts)
 	if (opts->lib) {
 		/* Library mode: lib.c, library Makefile, [lib] manifest */
 		char src_lib[4096];
-		snprintf(src_lib, sizeof(src_lib), "%s/lib.c", src_dir);
+		snprintf_safe(src_lib, sizeof(src_lib), "%s/lib.c", src_dir);
 
 		char lib_content[4096];
-		snprintf(lib_content, sizeof(lib_content),
-				 "#include \"%s/%s.h\"\n"
-				 "\n"
-				 "int add(int a, int b)\n"
-				 "{\n"
-				 "    return a + b;\n"
-				 "}\n",
-				 name, name);
+		snprintf_safe(lib_content, sizeof(lib_content),
+					  "#include \"%s/%s.h\"\n"
+					  "\n"
+					  "int add(int a, int b)\n"
+					  "{\n"
+					  "    return a + b;\n"
+					  "}\n",
+					  name, name);
 
 		if (create_file(src_lib, lib_content) != 0) {
 			fprintf(stderr, "Error: Could not create lib.c\n");
@@ -321,39 +321,39 @@ int64_t handle_new(options *opts)
 
 		/* Library Makefile — builds static library */
 		char makefile_content[4096];
-		snprintf(makefile_content, sizeof(makefile_content),
-				 "CC ?= clang\n"
-				 "CFLAGS += -std=c23 -O3 -g\n"
-				 "CFLAGS += -Wall -Wextra -Wshadow -Wpedantic\n"
-				 "CFLAGS += -Wconversion -Wsign-conversion -Wunused\n"
-				 "CFLAGS += -Iinclude/%s\n"
-				 "\n"
-				 "AR ?= ar\n"
-				 "ARFLAGS := rcs\n"
-				 "\n"
-				 "TARGET := build/lib%s.a\n"
-				 "SOURCES := $(wildcard src/*.c)\n"
-				 "OBJECTS := $(SOURCES:src/%.c=build/%.o)\n"
-				 "\n"
-				 ".PHONY: build clean format tidy\n"
-				 "\n"
-				 "build: $(TARGET)\n"
-				 "\n"
-				 "$(TARGET): $(OBJECTS)\n"
-				 "\t$(AR) $(ARFLAGS) $@ $^\n"
-				 "\n"
-				 "build/%.o: src/%.c\n"
-				 "\t$(CC) $(CFLAGS) -c $< -o $@\n"
-				 "\n"
-				 "clean:\n"
-				 "\trm -rf build/\n"
-				 "\n"
-				 "format:\n"
-				 "\tclang-format -i src/*.c include/%s/*.h\n"
-				 "\n"
-				 "tidy:\n"
-				 "\tclang-tidy src/*.c -- $(CFLAGS)\n",
-				 name, name, name);
+		snprintf_safe(makefile_content, sizeof(makefile_content),
+					  "CC ?= clang\n"
+					  "CFLAGS += -std=c23 -O3 -g\n"
+					  "CFLAGS += -Wall -Wextra -Wshadow -Wpedantic\n"
+					  "CFLAGS += -Wconversion -Wsign-conversion -Wunused\n"
+					  "CFLAGS += -Iinclude/%s\n"
+					  "\n"
+					  "AR ?= ar\n"
+					  "ARFLAGS := rcs\n"
+					  "\n"
+					  "TARGET := build/lib%s.a\n"
+					  "SOURCES := $(wildcard src/*.c)\n"
+					  "OBJECTS := $(SOURCES:src/%.c=build/%.o)\n"
+					  "\n"
+					  ".PHONY: build clean format tidy\n"
+					  "\n"
+					  "build: $(TARGET)\n"
+					  "\n"
+					  "$(TARGET): $(OBJECTS)\n"
+					  "\t$(AR) $(ARFLAGS) $@ $^\n"
+					  "\n"
+					  "build/%.o: src/%.c\n"
+					  "\t$(CC) $(CFLAGS) -c $< -o $@\n"
+					  "\n"
+					  "clean:\n"
+					  "\trm -rf build/\n"
+					  "\n"
+					  "format:\n"
+					  "\tclang-format -i src/*.c include/%s/*.h\n"
+					  "\n"
+					  "tidy:\n"
+					  "\tclang-tidy src/*.c -- $(CFLAGS)\n",
+					  name, name, name);
 
 		if (create_file(makefile_path, makefile_content) != 0) {
 			fprintf(stderr, "Error: Could not create Makefile\n");
@@ -363,20 +363,20 @@ int64_t handle_new(options *opts)
 
 		/* Library manifest with [lib] section */
 		char manifest_content[4096];
-		snprintf(manifest_content, sizeof(manifest_content),
-				 "[package]\n"
-				 "name = \"%s\"\n"
-				 "version = \"0.1.0\"\n"
-				 "edition = \"c23\"\n"
-				 "description = \"A new C project\"\n"
-				 "license = \"MIT\"\n"
-				 "\n"
-				 "[dependencies]\n"
-				 "\n"
-				 "[lib]\n"
-				 "sources = [\"src/*.c\"]\n"
-				 "headers = [\"include/%s/*.h\"]\n",
-				 name, name);
+		snprintf_safe(manifest_content, sizeof(manifest_content),
+					  "[package]\n"
+					  "name = \"%s\"\n"
+					  "version = \"0.1.0\"\n"
+					  "edition = \"c23\"\n"
+					  "description = \"A new C project\"\n"
+					  "license = \"MIT\"\n"
+					  "\n"
+					  "[dependencies]\n"
+					  "\n"
+					  "[lib]\n"
+					  "sources = [\"src/*.c\"]\n"
+					  "headers = [\"include/%s/*.h\"]\n",
+					  name, name);
 
 		if (create_file(manifest_path, manifest_content) != 0) {
 			fprintf(stderr, "Error: Could not create Coffee.toml\n");
@@ -404,7 +404,7 @@ int64_t handle_new(options *opts)
 
 	/* Create placeholder files */
 	char docs_placeholder_path[4'096];
-	snprintf(docs_placeholder_path, sizeof(docs_placeholder_path), "%s/docs/index.md", path);
+	snprintf_safe(docs_placeholder_path, sizeof(docs_placeholder_path), "%s/docs/index.md", path);
 	if (create_file(docs_placeholder_path, "# Documentation\n") != 0) {
 		fprintf(stderr, "Error: Could not create docs/index.md\n");
 		free(name);

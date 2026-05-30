@@ -54,7 +54,7 @@ int64_t handle_vendor(options *opts)
 		}
 
 		char dest_dir[4'096];
-		snprintf(dest_dir, sizeof(dest_dir), "vendor/%s", name);
+		snprintf_safe(dest_dir, sizeof(dest_dir), "vendor/%s", name);
 
 		printf("  Vendoring: %s\n", name);
 

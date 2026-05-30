@@ -42,9 +42,9 @@ int64_t handle_test(options *opts)
 
 	/* Step 1: Build the test runner */
 	if (in_project) {
-		off = snprintf(cmd, sizeof(cmd), "make -s -C '%s' bin/tests/runner", project_dir);
+		off = snprintf_safe(cmd, sizeof(cmd), "make -s -C '%s' bin/tests/runner", project_dir);
 	} else {
-		off = snprintf(cmd, sizeof(cmd), "make -s bin/tests/runner");
+		off = snprintf_safe(cmd, sizeof(cmd), "make -s bin/tests/runner");
 	}
 
 	if ((size_t)off >= sizeof(cmd)) {
@@ -70,9 +70,9 @@ int64_t handle_test(options *opts)
 
 	/* Step 2: Run the test runner */
 	if (in_project) {
-		off = snprintf(cmd, sizeof(cmd), "'%s'/bin/tests/runner", project_dir);
+		off = snprintf_safe(cmd, sizeof(cmd), "'%s'/bin/tests/runner", project_dir);
 	} else {
-		off = snprintf(cmd, sizeof(cmd), "bin/tests/runner");
+		off = snprintf_safe(cmd, sizeof(cmd), "bin/tests/runner");
 	}
 
 	/* Pass TEST_FILTER from environment or first input arg as the filter */
@@ -81,11 +81,11 @@ int64_t handle_test(options *opts)
 		test_filter = opts->inputs[1];
 	}
 	if (test_filter && test_filter[0] != '\0') {
-		off += snprintf(cmd + off, sizeof(cmd) - (size_t)off, " '%s'", test_filter);
+		off += snprintf_safe(cmd + off, sizeof(cmd) - (size_t)off, " '%s'", test_filter);
 	}
 
 	if (opts->verbose) {
-		off += snprintf(cmd + off, sizeof(cmd) - (size_t)off, " --verbose");
+		off += snprintf_safe(cmd + off, sizeof(cmd) - (size_t)off, " --verbose");
 	}
 
 	if ((size_t)off >= sizeof(cmd)) {

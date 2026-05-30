@@ -6,30 +6,30 @@
 #include <toml.h>
 
 typedef struct {
-	char  *name;
-	char  *version;
-	char  *edition;
-	char  *description;
-	char  *license;
-	char  *repository;
-	char  *authors;
-	char **dependencies;
+	sds	   name;
+	sds	   version;
+	sds	   edition;
+	sds	   description;
+	sds	   license;
+	sds	   repository;
+	sds	   authors;
+	sds	  *dependencies;
 	size_t dependencies_count;
-	char **sources;
+	sds	  *sources;
 	size_t sources_count;
-	char **headers;
+	sds	  *headers;
 	size_t headers_count;
 } package_t;
 
 typedef struct {
 	package_t package;
-	char	 *name;
-	char	 *version;
-	char	 *path;
-	char	 *git;
-	char	 *branch;
-	char	 *tag;
-	char	 *rev;
+	sds		  name;
+	sds		  version;
+	sds		  path;
+	sds		  git;
+	sds		  branch;
+	sds		  tag;
+	sds		  rev;
 	bool	  optional;
 } dependency_t;
 
@@ -39,8 +39,8 @@ typedef struct {
 } dependencies_t;
 
 typedef struct {
-	char  *name;
-	char **deps;
+	sds	   name;
+	sds	  *deps;
 	size_t deps_count;
 } feature_def_t;
 
@@ -51,9 +51,9 @@ typedef struct {
 	size_t		   features_count;
 } manifest_t;
 
-manifest_t *manifest_parse(const char *path);
+manifest_t *manifest_parse(sds path);
 void		manifest_free(manifest_t *m);
-int			manifest_write(const char *path, manifest_t *m);
+int			manifest_write(sds path, manifest_t *m);
 
 /**
  * Extract package name and version constraint from a dependency entry.
@@ -62,6 +62,6 @@ int			manifest_write(const char *path, manifest_t *m);
  * @param name_out Output pointer for package name (must be freed by caller)
  * @param version_out Output pointer for version constraint (must be freed by caller)
  */
-void manifest_extract_dep_info(const char *entry, char **name_out, char **version_out);
+void manifest_extract_dep_info(const char *entry, sds *name_out, sds *version_out);
 
 #endif

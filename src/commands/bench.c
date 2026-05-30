@@ -10,9 +10,9 @@
 
 static int build_include_flags(manifest_t *m, char *buf, size_t buf_size)
 {
-	int off = snprintf(buf, buf_size, "-Isrc -Iinclude -I. -Ideps");
+	int off = snprintf_safe(buf, buf_size, "-Isrc -Iinclude -I. -Ideps");
 	if (m->package.name) {
-		off += snprintf(buf + off, buf_size - (size_t)off, " -Iinclude/%s", m->package.name);
+		off += snprintf_safe(buf + off, buf_size - (size_t)off, " -Iinclude/%s", m->package.name);
 	}
 	return off;
 }
@@ -46,13 +46,13 @@ int64_t handle_bench(options *opts)
 	int	 off;
 
 	if (strcmp(project_dir, ".") == 0) {
-		off = snprintf(cmd, sizeof(cmd), "make bench INC_FLAGS='%s'", inc_flags);
+		off = snprintf_safe(cmd, sizeof(cmd), "make bench INC_FLAGS='%s'", inc_flags);
 	} else {
-		off = snprintf(cmd, sizeof(cmd), "make -C '%s' bench INC_FLAGS='%s'", project_dir, inc_flags);
+		off = snprintf_safe(cmd, sizeof(cmd), "make -C '%s' bench INC_FLAGS='%s'", project_dir, inc_flags);
 	}
 
 	if (opts->verbose) {
-		off += snprintf(cmd + off, sizeof(cmd) - (size_t)off, " VERBOSE=1");
+		off += snprintf_safe(cmd + off, sizeof(cmd) - (size_t)off, " VERBOSE=1");
 	}
 
 	free(project_dir);

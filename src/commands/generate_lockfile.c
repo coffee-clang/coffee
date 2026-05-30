@@ -27,7 +27,7 @@ int64_t handle_generate_lockfile(options *opts)
 	}
 
 	char lockfile_path[4'096];
-	snprintf(lockfile_path, sizeof(lockfile_path), "Coffee.lock");
+	snprintf_safe(lockfile_path, sizeof(lockfile_path), "Coffee.lock");
 
 	char **features		  = NULL;
 	size_t features_count = 0;

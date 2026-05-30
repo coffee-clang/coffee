@@ -86,7 +86,7 @@ static int scan_directory(const char *dirpath, int *file_count, int *issue_count
 		}
 
 		char path[4'096];
-		snprintf(path, sizeof(path), "%s/%s", dirpath, entry->d_name);
+		snprintf_safe(path, sizeof(path), "%s/%s", dirpath, entry->d_name);
 
 		struct stat st;
 		if (stat(path, &st) != 0) {

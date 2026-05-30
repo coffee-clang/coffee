@@ -167,7 +167,7 @@ char **features_to_compiler_flags(resolved_features_t *rf, const char *package, 
 		}
 		size_t flag_len = strlen(set->names[i]) + 12;
 		flags[idx]		= malloc(flag_len);
-		snprintf(flags[idx], flag_len, "-DFEATURE_");
+		snprintf_safe(flags[idx], flag_len, "-DFEATURE_");
 		size_t prefix_len = strlen(flags[idx]);
 		for (size_t j = 0; set->names[i][j] != '\0'; j++) {
 			char c = set->names[i][j];

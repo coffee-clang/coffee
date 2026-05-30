@@ -65,38 +65,38 @@ int64_t handle_check(options *opts)
 	size_t off			   = strlen(inc_flags);
 
 	if (m->package.name) {
-		off += snprintf(inc_flags + off, sizeof(inc_flags) - off, " -Iinclude/%s", m->package.name);
+		off += snprintf_safe(inc_flags + off, sizeof(inc_flags) - off, " -Iinclude/%s", m->package.name);
 	}
 
 	/* Collect all source files */
 	char cmd[8192];
-	off = snprintf(cmd, sizeof(cmd), "%s -fsyntax-only %s", cc, inc_flags);
+	off = snprintf_safe(cmd, sizeof(cmd), "%s -fsyntax-only %s", cc, inc_flags);
 
 	/* Add sources from manifest */
 	if (m->package.sources_count > 0) {
 		for (size_t i = 0; i < m->package.sources_count && off < sizeof(cmd); i++) {
-			off += snprintf(cmd + off, sizeof(cmd) - off, " %s", m->package.sources[i]);
+			off += snprintf_safe(cmd + off, sizeof(cmd) - off, " %s", m->package.sources[i]);
 		}
 	} else {
 		/* Fall back to all .c files in src/ */
-		off += snprintf(cmd + off, sizeof(cmd) - off, " src/*.c");
+		off += snprintf_safe(cmd + off, sizeof(cmd) - off, " src/*.c");
 	}
 
 	if (m->package.headers_count > 0) {
 		for (size_t i = 0; i < m->package.headers_count && off < sizeof(cmd); i++) {
-			off += snprintf(cmd + off, sizeof(cmd) - off, " %s", m->package.headers[i]);
+			off += snprintf_safe(cmd + off, sizeof(cmd) - off, " %s", m->package.headers[i]);
 		}
 	} else {
 		glob_t globbuf;
 		if (glob("include/**/*.h", 0, NULL, &globbuf) == 0) {
 			for (size_t i = 0; i < globbuf.gl_pathc && off < sizeof(cmd); i++) {
-				off += snprintf(cmd + off, sizeof(cmd) - off, " %s", globbuf.gl_pathv[i]);
+				off += snprintf_safe(cmd + off, sizeof(cmd) - off, " %s", globbuf.gl_pathv[i]);
 			}
 			globfree(&globbuf);
 		}
 	}
 
-	off += snprintf(cmd + off, sizeof(cmd) - off, " 2>&1");
+	off += snprintf_safe(cmd + off, sizeof(cmd) - off, " 2>&1");
 
 	if (opts->verbose) {
 		printf("Running: %s\n", cmd);

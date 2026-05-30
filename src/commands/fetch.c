@@ -35,7 +35,7 @@ int64_t handle_fetch(options *)
 	}
 
 	char deps_dir[4'096];
-	snprintf(deps_dir, sizeof(deps_dir), "%s/.coffee/deps", cache_dir);
+	snprintf_safe(deps_dir, sizeof(deps_dir), "%s/.coffee/deps", cache_dir);
 	mkdir(deps_dir, 0755);
 
 	for (size_t i = 0; i < m->package.dependencies_count; i++) {
@@ -58,7 +58,7 @@ int64_t handle_fetch(options *)
 		printf("  Fetching: %s\n", name);
 
 		char pkg_dir[4'096];
-		snprintf(pkg_dir, sizeof(pkg_dir), "%s/%s", deps_dir, name);
+		snprintf_safe(pkg_dir, sizeof(pkg_dir), "%s/%s", deps_dir, name);
 
 		int ret = registry_fetch(name, NULL, pkg_dir);
 		if (ret != 0) {

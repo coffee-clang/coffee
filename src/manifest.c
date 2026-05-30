@@ -192,7 +192,7 @@ manifest_t *manifest_parse(const char *path)
 					char *vstr = toml_datum_to_string(val);
 					len		   = strlen(key) + strlen(" = \"") + strlen(vstr) + 2;
 					str		   = malloc(len);
-					snprintf(str, len, "%s = \"%s\"", key, vstr);
+					snprintf_safe(str, len, "%s = \"%s\"", key, vstr);
 					free(vstr);
 				} else {
 					str = strdup(key);

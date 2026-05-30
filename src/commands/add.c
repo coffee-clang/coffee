@@ -60,37 +60,37 @@ int64_t handle_add(options *opts)
 	char dep_str[1024];
 	if (opts->path) {
 		if (opts->pkg_version) {
-			snprintf(dep_str, sizeof(dep_str), "%s = { path = \"%s\", version = \"%s\" }", package_name, opts->path,
-					 opts->pkg_version);
+			snprintf_safe(dep_str, sizeof(dep_str), "%s = { path = \"%s\", version = \"%s\" }", package_name,
+						  opts->path, opts->pkg_version);
 		} else {
-			snprintf(dep_str, sizeof(dep_str), "%s = { path = \"%s\" }", package_name, opts->path);
+			snprintf_safe(dep_str, sizeof(dep_str), "%s = { path = \"%s\" }", package_name, opts->path);
 		}
 	} else if (opts->git) {
-		snprintf(dep_str, sizeof(dep_str), "%s = { git = \"%s\" }", package_name, opts->git);
+		snprintf_safe(dep_str, sizeof(dep_str), "%s = { git = \"%s\" }", package_name, opts->git);
 	} else {
 		const char *version = opts->pkg_version != nullptr ? opts->pkg_version : "*";
 
 		if (opts->features || opts->optional) {
-			int off = snprintf(dep_str, sizeof(dep_str), "%s = { version = \"%s\"", package_name, version);
+			int off = snprintf_safe(dep_str, sizeof(dep_str), "%s = { version = \"%s\"", package_name, version);
 			if (opts->features) {
-				off += snprintf(dep_str + off, sizeof(dep_str) - off, ", features = [\"%s\"]", opts->features);
+				off += snprintf_safe(dep_str + off, sizeof(dep_str) - off, ", features = [\"%s\"]", opts->features);
 			}
 			if (opts->optional) {
-				off += snprintf(dep_str + off, sizeof(dep_str) - off, ", optional = true");
+				off += snprintf_safe(dep_str + off, sizeof(dep_str) - off, ", optional = true");
 			}
-			snprintf(dep_str + off, sizeof(dep_str) - off, " }");
+			snprintf_safe(dep_str + off, sizeof(dep_str) - off, " }");
 		} else {
-			snprintf(dep_str, sizeof(dep_str), "%s = \"%s\"", package_name, version);
+			snprintf_safe(dep_str, sizeof(dep_str), "%s = \"%s\"", package_name, version);
 		}
 	}
 
 	/* Prefix for dev/build deps */
 	if (opts->dev) {
 		size_t dep_len = strlen(dep_str);
-		snprintf(dep_str + dep_len, sizeof(dep_str) - dep_len, "  # dev");
+		snprintf_safe(dep_str + dep_len, sizeof(dep_str) - dep_len, "  # dev");
 	} else if (opts->build_dep) {
 		size_t dep_len = strlen(dep_str);
-		snprintf(dep_str + dep_len, sizeof(dep_str) - dep_len, "  # build");
+		snprintf_safe(dep_str + dep_len, sizeof(dep_str) - dep_len, "  # build");
 	}
 
 	m->package.dependencies_count++;
@@ -112,9 +112,9 @@ int64_t handle_add(options *opts)
 	char   makefile_path[4'096];
 	if (dir_end) {
 		dir_len = (size_t)(dir_end - manifest_path) + 1;
-		snprintf(makefile_path, sizeof(makefile_path), "%.*sMakefile", (int)dir_len, manifest_path);
+		snprintf_safe(makefile_path, sizeof(makefile_path), "%.*sMakefile", (int)dir_len, manifest_path);
 	} else {
-		snprintf(makefile_path, sizeof(makefile_path), "Makefile");
+		snprintf_safe(makefile_path, sizeof(makefile_path), "Makefile");
 	}
 
 	if (!is_safe_package_name(package_name)) {

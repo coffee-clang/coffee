@@ -22,7 +22,7 @@ int64_t handle_uninstall(options *opts)
 	}
 
 	char pkg_dir[4'096];
-	snprintf(pkg_dir, sizeof(pkg_dir), "%s/.coffee/deps/%s", home, package);
+	snprintf_safe(pkg_dir, sizeof(pkg_dir), "%s/.coffee/deps/%s", home, package);
 
 	struct stat st;
 	if (stat(pkg_dir, &st) != 0) {
@@ -31,7 +31,7 @@ int64_t handle_uninstall(options *opts)
 	}
 
 	char cmd[4'096];
-	int	 ret = snprintf(cmd, sizeof(cmd), "rm -rf %s", pkg_dir);
+	int	 ret = snprintf_safe(cmd, sizeof(cmd), "rm -rf %s", pkg_dir);
 	if (ret < 0 || (size_t)ret >= sizeof(cmd)) {
 		fprintf(stderr, "Error: Path too long\n");
 		return 1;

@@ -36,10 +36,10 @@ int64_t handle_package(options *)
 	mkdir(package_dir, 0755);
 
 	char tarball[4'096];
-	snprintf(tarball, sizeof(tarball), "%s/%s-%s.tar.gz", package_dir, name, version);
+	snprintf_safe(tarball, sizeof(tarball), "%s/%s-%s.tar.gz", package_dir, name, version);
 
 	char cmd[4'096];
-	snprintf(cmd, sizeof(cmd), "tar -czf %s Coffee.toml src/ tests/ 2>/dev/null", tarball);
+	snprintf_safe(cmd, sizeof(cmd), "tar -czf %s Coffee.toml src/ tests/ 2>/dev/null", tarball);
 
 	int ret = system(cmd);
 

@@ -21,16 +21,16 @@ int64_t handle_lint(options *opts)
 
 	char inc_flags[4096] = "-Isrc";
 	if (m) {
-		int off = snprintf(inc_flags, sizeof(inc_flags), "-Isrc -Iinclude -I. -Ideps");
+		int off = snprintf_safe(inc_flags, sizeof(inc_flags), "-Isrc -Iinclude -I. -Ideps");
 		if (m->package.name) {
-			off += snprintf(inc_flags + off, sizeof(inc_flags) - (size_t)off, " -Iinclude/%s", m->package.name);
+			off += snprintf_safe(inc_flags + off, sizeof(inc_flags) - (size_t)off, " -Iinclude/%s", m->package.name);
 		}
 	}
 
 	const char *tidy_opts = opts->fix ? "--fix" : "";
 	char		cmd[8192];
-	snprintf(cmd, sizeof(cmd), "find src tests -name \"*.c\" | xargs clang-tidy %s --quiet -- %s 2>/dev/null",
-			 tidy_opts, inc_flags);
+	snprintf_safe(cmd, sizeof(cmd), "find src tests -name \"*.c\" | xargs clang-tidy %s --quiet -- %s 2>/dev/null",
+				  tidy_opts, inc_flags);
 
 	if (opts->verbose) {
 		printf("Running: %s\n", cmd);

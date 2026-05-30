@@ -24,11 +24,11 @@ int64_t handle_login(options *)
 	}
 
 	char coffee_dir[4'096];
-	snprintf(coffee_dir, sizeof(coffee_dir), "%s/.coffee", home);
+	snprintf_safe(coffee_dir, sizeof(coffee_dir), "%s/.coffee", home);
 	mkdir(coffee_dir, 0755);
 
 	char cred_path[4'096];
-	snprintf(cred_path, sizeof(cred_path), "%s/credentials", coffee_dir);
+	snprintf_safe(cred_path, sizeof(cred_path), "%s/credentials", coffee_dir);
 
 	FILE *fp = fopen(cred_path, "w");
 	if (!fp) {
