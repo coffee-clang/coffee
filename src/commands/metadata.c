@@ -45,7 +45,7 @@ static void print_transitive_json(const char *name, const char *version, int dep
 						size_t		name_len = slash != nullptr ? (size_t)(slash - start) : len;
 						dep_names			 = realloc(dep_names, (dep_count + 1) * sizeof(char *));
 						dep_names[dep_count] = malloc(name_len + 1);
-						memcpy(dep_names[dep_count], start, name_len);
+						memccpy(dep_names[dep_count], start, '\0', name_len);
 						dep_names[dep_count][name_len] = '\0';
 						dep_count++;
 					}

@@ -37,7 +37,7 @@ static void parse_dep_list(const char *input, char ***out_names, size_t *out_cou
 
 			*out_names				 = realloc(*out_names, (*out_count + 1) * sizeof(char *));
 			(*out_names)[*out_count] = malloc(name_len + 1);
-			memcpy((*out_names)[*out_count], start, name_len);
+			memccpy((*out_names)[*out_count], start, '\0', name_len);
 			(*out_names)[*out_count][name_len] = '\0';
 			(*out_count)++;
 		}

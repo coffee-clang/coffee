@@ -220,7 +220,7 @@ void features_parse_cli(const char *cli_string, char ***out_features, size_t *ou
 		}
 		size_t len	  = (size_t)(end - p);
 		features[idx] = malloc(len + 1);
-		memcpy(features[idx], p, len);
+		memccpy(features[idx], p, '\0', len);
 		features[idx][len] = '\0';
 		idx++;
 		p = *end ? end + 1 : end;

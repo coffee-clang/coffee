@@ -142,7 +142,7 @@ int64_t handle_libs(options *opts)
 				if (len >= sizeof(name)) {
 					len = sizeof(name) - 1;
 				}
-				memcpy(name, dep, len);
+				memccpy(name, dep, '\0', len);
 				name[len] = '\0';
 			} else {
 				snprintf_safe(name, sizeof(name), "%s", dep);

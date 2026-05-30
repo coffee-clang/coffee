@@ -128,7 +128,7 @@ static inline int snprintf_copy_to_buf(char *buf, size_t size, sds str)
 	if (buf != nullptr && size > 0) {
 		size_t copy = (size_t)len < size - 1 ? (size_t)len : size - 1;
 		if (copy > 0) {
-			memcpy(buf, str, copy);
+			memccpy(buf, str, '\0', copy);
 		}
 		buf[copy] = '\0';
 	}

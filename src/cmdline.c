@@ -179,7 +179,7 @@ static char *safe_strdup(const char *s)
 	if (!p) {
 		return nullptr;
 	}
-	memcpy(p, s, len + 1);
+	memccpy(p, s, '\0', len + 1);
 	return p;
 }
 

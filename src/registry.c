@@ -83,7 +83,7 @@ static char *fetch_url(const char *url)
 			return NULL;
 		}
 		buffer = newbuf;
-		memcpy(buffer + total, buf, len);
+		memccpy(buffer + total, buf, '\0', len);
 		total += len;
 		buffer[total] = '\0';
 	}
@@ -129,7 +129,7 @@ static char *extract_string_val(const char *text, const char *key)
 					}
 					if (*after_key == '\"' && after_key > start) {
 						char *result = malloc(after_key - start + 1);
-						memcpy(result, start, after_key - start);
+						memccpy(result, start, '\0', after_key - start);
 						result[after_key - start] = '\0';
 						return result;
 					}
@@ -182,7 +182,7 @@ static recipe_list_t *parse_package_list(const char *json)
 			if (brace_count == 0 && obj_start) {
 				size_t obj_len = p - obj_start + 1;
 				char  *obj	   = malloc(obj_len + 1);
-				memcpy(obj, obj_start, obj_len);
+				memccpy(obj, obj_start, '\0', obj_len);
 				obj[obj_len] = '\0';
 
 				recipe_t new_r;

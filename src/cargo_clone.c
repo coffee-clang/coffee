@@ -62,7 +62,7 @@ int main(int argc, char *argv[])
 	for (int i = 0; i < args_info.inputs_num; i++) {
 		const char *input = args_info.inputs[i];
 		size_t		len	  = strlen(input);
-		memcpy(cmd_line_substring + pos, input, len);
+		memccpy(cmd_line_substring + pos, input, '\0', len);
 		pos += len;
 		if (i < args_info.inputs_num - 1) {
 			cmd_line_substring[pos++] = ' ';

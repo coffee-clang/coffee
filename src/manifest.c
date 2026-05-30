@@ -321,7 +321,7 @@ void manifest_extract_dep_info(const char *entry, char **name_out, char **versio
 		size_t len = (size_t)(end - entry);
 		*name_out  = malloc(len + 1);
 		if (*name_out) {
-			memcpy(*name_out, entry, len);
+			memccpy(*name_out, entry, '\0', len);
 			(*name_out)[len] = '\0';
 		}
 		*version_out = strdup("*");
@@ -335,7 +335,7 @@ void manifest_extract_dep_info(const char *entry, char **name_out, char **versio
 	size_t name_len = (size_t)(name_end - entry + 1);
 	*name_out		= malloc(name_len + 1);
 	if (*name_out) {
-		memcpy(*name_out, entry, name_len);
+		memccpy(*name_out, entry, '\0', name_len);
 		(*name_out)[name_len] = '\0';
 	}
 
@@ -355,7 +355,7 @@ void manifest_extract_dep_info(const char *entry, char **name_out, char **versio
 	size_t ver_len = (size_t)(ver_end - ver_start);
 	*version_out   = malloc(ver_len + 1);
 	if (*version_out) {
-		memcpy(*version_out, ver_start, ver_len);
+		memccpy(*version_out, ver_start, '\0', ver_len);
 		(*version_out)[ver_len] = '\0';
 	}
 }

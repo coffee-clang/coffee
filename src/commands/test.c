@@ -27,7 +27,7 @@ int64_t handle_test(options *opts)
 		if (len >= sizeof(project_dir)) {
 			len = sizeof(project_dir) - 1;
 		}
-		memcpy(project_dir, manifest_path, len);
+		memccpy(project_dir, manifest_path, '\0', len);
 		project_dir[len] = '\0';
 		in_project		 = 1;
 	} else {
