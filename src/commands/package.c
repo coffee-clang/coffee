@@ -14,7 +14,7 @@ int64_t handle_package(options *)
 	char *manifest_path = project_find_manifest(NULL);
 
 	if (!manifest_path) {
-		fprintf(stderr, "Error: Could not find Coffee.toml\n");
+		fprintf_safe(stderr, "Error: Could not find Coffee.toml\n");
 		return 1;
 	}
 
@@ -22,7 +22,7 @@ int64_t handle_package(options *)
 	free(manifest_path);
 
 	if (!m) {
-		fprintf(stderr, "Error: Could not parse manifest\n");
+		fprintf_safe(stderr, "Error: Could not parse manifest\n");
 		return 1;
 	}
 
@@ -46,7 +46,7 @@ int64_t handle_package(options *)
 	if (ret == 0) {
 		printf("Package created: %s\n", tarball);
 	} else {
-		fprintf(stderr, "Error: Packaging failed.\n");
+		fprintf_safe(stderr, "Error: Packaging failed.\n");
 	}
 
 	manifest_free(m);

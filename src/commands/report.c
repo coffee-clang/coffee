@@ -78,7 +78,7 @@ int64_t handle_report(options *opts)
 	char *manifest_path = project_find_manifest(NULL);
 
 	if (!manifest_path) {
-		fprintf(stderr, "Error: Could not find Coffee.toml\n");
+		fprintf_safe(stderr, "Error: Could not find Coffee.toml\n");
 		return 1;
 	}
 
@@ -86,7 +86,7 @@ int64_t handle_report(options *opts)
 	free(manifest_path);
 
 	if (!m) {
-		fprintf(stderr, "Error: Could not parse Coffee.toml\n");
+		fprintf_safe(stderr, "Error: Could not parse Coffee.toml\n");
 		return 1;
 	}
 
@@ -100,7 +100,7 @@ int64_t handle_report(options *opts)
 	} else if (strcmp(type, "audit") == 0) {
 		report_audit(m);
 	} else {
-		fprintf(stderr, "Error: Unknown report type '%s'. Supported: deps, audit\n", type);
+		fprintf_safe(stderr, "Error: Unknown report type '%s'. Supported: deps, audit\n", type);
 		manifest_free(m);
 		return 1;
 	}

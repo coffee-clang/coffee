@@ -13,7 +13,7 @@ int64_t handle_clean(options *opts)
 
 	printf("Cleaning %s\n", target_dir);
 	if (system(cmd) != 0) {
-		fprintf(stderr, "Error: Could not clean target directory\n");
+		fprintf_safe(stderr, "Error: Could not clean target directory\n");
 		return 1;
 	}
 

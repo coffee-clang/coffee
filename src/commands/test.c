@@ -48,7 +48,7 @@ int64_t handle_test(options *opts)
 	}
 
 	if ((size_t)off >= sizeof(cmd)) {
-		fprintf(stderr, "Error: command too long\n");
+		fprintf_safe(stderr, "Error: command too long\n");
 		if (manifest) {
 			manifest_free(manifest);
 		}
@@ -61,7 +61,7 @@ int64_t handle_test(options *opts)
 
 	int ret = system(cmd);
 	if (ret != 0) {
-		fprintf(stderr, "Error: failed to build test runner\n");
+		fprintf_safe(stderr, "Error: failed to build test runner\n");
 		if (manifest) {
 			manifest_free(manifest);
 		}
@@ -89,7 +89,7 @@ int64_t handle_test(options *opts)
 	}
 
 	if ((size_t)off >= sizeof(cmd)) {
-		fprintf(stderr, "Error: command too long\n");
+		fprintf_safe(stderr, "Error: command too long\n");
 		if (manifest) {
 			manifest_free(manifest);
 		}

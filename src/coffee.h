@@ -4,6 +4,7 @@
 #include "../deps/sds/sds.h"
 #include "../deps/sds/sdsalloc.h"
 #include "cmdline.h"
+#include "strings.h"
 
 #include <stdbool.h>
 #include <stddef.h>

@@ -34,7 +34,7 @@ static int run_command(char **argv, bool verbose)
 			return WEXITSTATUS(status);
 		}
 		if (verbose) {
-			(void)fprintf(stderr, "Command terminated abnormally (signal %d)\n", WTERMSIG(status));
+			fprintf_safe(stderr, "Command terminated abnormally (signal %d)\n", WTERMSIG(status));
 		}
 		return 1;
 	}
@@ -46,7 +46,7 @@ static int run_command(char **argv, bool verbose)
 int build_project(manifest_t *manifest, build_opts_t *opts)
 {
 	if (!manifest || !manifest->package.name) {
-		fprintf(stderr, "Error: No valid manifest found\n");
+		fprintf_safe(stderr, "Error: No valid manifest found\n");
 		return 1;
 	}
 
@@ -112,7 +112,7 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 	glob_t globbuf;
 	ret = glob("src/*.c", 0, NULL, &globbuf);
 	if (ret != 0) {
-		(void)fprintf(stderr, "Error: No source files found in src/*.c\n");
+		fprintf_safe(stderr, "Error: No source files found in src/*.c\n");
 		free(flags);
 		if (resolved) {
 			features_free(resolved);
@@ -200,7 +200,7 @@ int build_run(manifest_t *manifest, build_opts_t *opts, char **args, int argc)
 	}
 
 	if (access(exe_path, X_OK) != 0) {
-		fprintf(stderr, "Error: Executable not found: %s\n", exe_path);
+		fprintf_safe(stderr, "Error: Executable not found: %s\n", exe_path);
 		return 1;
 	}
 

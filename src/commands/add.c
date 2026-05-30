@@ -26,7 +26,7 @@ static bool is_safe_package_name(const char *name)
 int64_t handle_add(options *opts)
 {
 	if (opts->inputs_num < 2) {
-		fprintf(stderr, "Error: No package specified\n");
+		fprintf_safe(stderr, "Error: No package specified\n");
 		return 1;
 	}
 
@@ -34,13 +34,13 @@ int64_t handle_add(options *opts)
 	char *manifest_path = project_find_manifest(NULL);
 
 	if (!manifest_path) {
-		fprintf(stderr, "Error: Could not find Coffee.toml in current directory or any parent directory\n");
+		fprintf_safe(stderr, "Error: Could not find Coffee.toml in current directory or any parent directory\n");
 		return 1;
 	}
 
 	manifest_t *m = manifest_parse(manifest_path);
 	if (!m) {
-		fprintf(stderr, "Error: Could not parse manifest at %s\n", manifest_path);
+		fprintf_safe(stderr, "Error: Could not parse manifest at %s\n", manifest_path);
 		free(manifest_path);
 		return 1;
 	}
@@ -98,7 +98,7 @@ int64_t handle_add(options *opts)
 	m->package.dependencies[m->package.dependencies_count - 1] = strdup(dep_str);
 
 	if (manifest_write(manifest_path, m) != 0) {
-		fprintf(stderr, "Error: Could not write manifest at %s\n", manifest_path);
+		fprintf_safe(stderr, "Error: Could not write manifest at %s\n", manifest_path);
 		manifest_free(m);
 		free(manifest_path);
 		return 1;
@@ -118,18 +118,18 @@ int64_t handle_add(options *opts)
 	}
 
 	if (!is_safe_package_name(package_name)) {
-		fprintf(stderr, "Warning: package name contains unsafe characters, skipping Makefile update\n");
+		fprintf_safe(stderr, "Warning: package name contains unsafe characters, skipping Makefile update\n");
 	} else {
 		FILE *exist_check = fopen(makefile_path, "r");
 		if (exist_check) {
 			fclose(exist_check);
 			FILE *mf = fopen(makefile_path, "a");
 			if (mf) {
-				fprintf(mf, "\n# Dep: %s\n", package_name);
-				fprintf(mf, "CFLAGS += -Ideps/%s/include\n", package_name);
-				fprintf(mf, "LDFLAGS += -Ldeps/%s/lib -l%s\n", package_name, package_name);
+				fprintf_safe(mf, "\n# Dep: %s\n", package_name);
+				fprintf_safe(mf, "CFLAGS += -Ideps/%s/include\n", package_name);
+				fprintf_safe(mf, "LDFLAGS += -Ldeps/%s/lib -l%s\n", package_name, package_name);
 				if (fclose(mf) != 0) {
-					fprintf(stderr, "Warning: failed to write to Makefile\n");
+					fprintf_safe(stderr, "Warning: failed to write to Makefile\n");
 				}
 			}
 		}

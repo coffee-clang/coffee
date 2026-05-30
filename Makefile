@@ -36,7 +36,9 @@ FEATURES_OBJ := $(BIN_DIR)/coffee_features.o
 
 TOML_OBJ := $(BIN_DIR)/toml.o
 
-OBJS := $(CORE_OBJ) $(COMMANDS_OBJ) $(MANIFEST_OBJ) $(REGISTRY_OBJ) $(PROJECT_OBJ) $(BUILD_OBJ) $(FEATURES_OBJ) $(TOML_OBJ) $(BIN_DIR)/cmdline.o
+SDS_OBJ := $(BIN_DIR)/sds.o
+
+OBJS := $(CORE_OBJ) $(COMMANDS_OBJ) $(MANIFEST_OBJ) $(REGISTRY_OBJ) $(PROJECT_OBJ) $(BUILD_OBJ) $(FEATURES_OBJ) $(TOML_OBJ) $(SDS_OBJ) $(BIN_DIR)/cmdline.o
 
 CFLAGS_COMMON := -g -Wall -Wextra -O3 -std=$(CSTD)
 CFLAGS_COMMON += -Wshadow -Wpointer-arith -Wcast-qual -Wstrict-prototypes -Wmissing-prototypes
@@ -56,6 +58,7 @@ DEPS_TOML_URL := https://raw.githubusercontent.com/cktan/tomlc99/master/toml.c
 DEPS_TOML_H_URL := https://raw.githubusercontent.com/cktan/tomlc99/master/toml.h
 DEPS_SDS_URL := https://raw.githubusercontent.com/antirez/sds/master/sds.h
 DEPS_SDSALLOC_URL := https://raw.githubusercontent.com/antirez/sds/master/sdsalloc.h
+DEPS_SDS_C_URL := https://raw.githubusercontent.com/antirez/sds/master/sds.c
 
 MDBOOK := $(if $(wildcard ./mdbook),./mdbook,mdbook)
 
@@ -72,7 +75,7 @@ TEST_SRCS := $(wildcard tests/*.c)
 TEST_OBJS := $(TEST_SRCS:tests/%.c=$(BIN_DIR)/tests/%.o)
 
 # All support objects for the test runner (everything except coffee.o which has main())
-TEST_SUPPORT_OBJS := $(filter-out $(CORE_OBJ), $(COMMANDS_OBJ) $(MANIFEST_OBJ) $(REGISTRY_OBJ) $(PROJECT_OBJ) $(BUILD_OBJ) $(FEATURES_OBJ) $(TOML_OBJ) $(BIN_DIR)/cmdline.o)
+TEST_SUPPORT_OBJS := $(filter-out $(CORE_OBJ), $(COMMANDS_OBJ) $(MANIFEST_OBJ) $(REGISTRY_OBJ) $(PROJECT_OBJ) $(BUILD_OBJ) $(FEATURES_OBJ) $(TOML_OBJ) $(SDS_OBJ) $(BIN_DIR)/cmdline.o)
 
 $(BIN_DIR)/%.o: $(SRC_DIR)/%.c
 	@mkdir -p $(dir $@)
@@ -83,6 +86,10 @@ $(BIN_DIR)/cmdline.o: $(SRC_DIR)/cmdline.c
 	$(CC) $(CFLAGS_COMMON) -c $< -o $@
 
 $(BIN_DIR)/toml.o: $(DEPS_DIR)/toml/toml.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS_COMMON) -c $< -o $@
+
+$(BIN_DIR)/sds.o: $(DEPS_DIR)/sds/sds.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS_COMMON) -c $< -o $@
 
@@ -125,6 +132,10 @@ bootstrap:
 	@if [ ! -f $(DEPS_DIR)/sds/sdsalloc.h ]; then \
 		echo "Downloading sdsalloc.h..."; \
 		curl -fsSL $(DEPS_SDSALLOC_URL) -o $(DEPS_DIR)/sds/sdsalloc.h; \
+	fi
+	@if [ ! -f $(DEPS_DIR)/sds/sds.c ]; then \
+		echo "Downloading sds.c..."; \
+		curl -fsSL $(DEPS_SDS_C_URL) -o $(DEPS_DIR)/sds/sds.c; \
 	fi
 	@echo "Dependencies ready."
 
