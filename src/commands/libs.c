@@ -9,38 +9,31 @@
 #include <toml.h>
 #include <unistd.h>
 
-static char *pkg_dir(const char *name)
+static sds pkg_dir(const char *name)
 {
 	const char *home = getenv("HOME");
 	if (home == nullptr) {
 		home = "/tmp";
 	}
-	char *dir = malloc(strlen(home) + strlen("/.coffee/deps/") + strlen(name) + 1);
-	if (dir == nullptr) {
-		return nullptr;
-	}
-	snprintf_safe(dir, strlen(home) + strlen("/.coffee/deps/") + strlen(name) + 1, "%s/.coffee/deps/%s", home, name);
-	return dir;
+	return sdscatfmt(sdsnew(home), "/.coffee/deps/%s", name);
 }
 
-static void append_libs_for_pkg(const char *name, char *buf, size_t bufsz, size_t *off)
+static void append_libs_for_pkg(const char *name, sds *buf)
 {
-	char *dir = pkg_dir(name);
+	sds dir = pkg_dir(name);
 	if (dir == nullptr) {
 		return;
 	}
 
 	if (access(dir, F_OK) != 0) {
-		free(dir);
+		sdsfree(dir);
 		return;
 	}
 
-	int         has_libdir = 0;
-	char        libname_buf[256];
-	const char *libname = name;
+	int has_libdir = 0;
+	sds libname    = sdsnew(name);
 
-	char toml_path[4'096];
-	snprintf_safe(toml_path, sizeof(toml_path), "%s/library.toml", dir);
+	sds toml_path = sdscatprintf(sdsempty(), "%s/library.toml", dir);
 
 	FILE *fp = fopen(toml_path, "r");
 	if (fp) {
@@ -52,8 +45,8 @@ static void append_libs_for_pkg(const char *name, char *buf, size_t bufsz, size_
 			if (raw_libname) {
 				char *s;
 				if (toml_rtos(raw_libname, &s) == 0 && s) {
-					snprintf_safe(libname_buf, sizeof(libname_buf), "%s", s);
-					libname = libname_buf;
+					sdsfree(libname);
+					libname = sdsnew(s);
 					free(s);
 				}
 			}
@@ -67,10 +60,7 @@ static void append_libs_for_pkg(const char *name, char *buf, size_t bufsz, size_
 					if (raw) {
 						char *s;
 						if (toml_rtos(raw, &s) == 0 && s) {
-							size_t avail = bufsz - *off;
-							if (avail > 2) {
-								*off += snprintf_safe(buf + *off, avail, "-L%s/%s ", dir, s);
-							}
+							*buf = sdscatprintf(*buf, "-L%s/%s ", dir, s);
 							free(s);
 							has_libdir = 1;
 						}
@@ -84,81 +74,75 @@ static void append_libs_for_pkg(const char *name, char *buf, size_t bufsz, size_
 
 	/* Fallback: convention-based library path */
 	if (!has_libdir) {
-		char lib_path[4'096];
-		snprintf_safe(lib_path, sizeof(lib_path), "%s/lib", dir);
+		sds lib_path = sdscatprintf(sdsempty(), "%s/lib", dir);
 		if (access(lib_path, F_OK) == 0) {
-			size_t avail = bufsz - *off;
-			if (avail > 2) {
-				*off += snprintf_safe(buf + *off, avail, "-L%s ", lib_path);
-			}
+			*buf = sdscatprintf(*buf, "-L%s ", lib_path);
 		}
+		sdsfree(lib_path);
 	}
 
 	/* Append -l flag */
-	size_t avail = bufsz - *off;
-	if (avail > 10) {
-		*off += snprintf_safe(buf + *off, avail, "-l%s ", libname);
-	}
+	*buf = sdscatprintf(*buf, "-l%s ", libname);
 
-	free(dir);
+	sdsfree(libname);
+	sdsfree(toml_path);
+	sdsfree(dir);
 }
 
 int64_t handle_libs(options *opts)
 {
-	char   buf[8'192];
-	size_t off = 0;
-	buf[0]     = '\0';
+	sds buf = sdsempty();
 
 	if (opts->inputs_num > 1) {
-		append_libs_for_pkg(opts->inputs[1], buf, sizeof(buf), &off);
+		append_libs_for_pkg(opts->inputs[1], &buf);
 	} else {
 		char *manifest_path = project_find_manifest(nullptr);
 		if (manifest_path == nullptr) {
+			sdsfree(buf);
 			fprintf_safe(stderr, "Error: Could not find Coffee.toml\n");
 			return 1;
 		}
 
 		manifest_t *m = manifest_parse(manifest_path);
-		free(manifest_path);
+		sdsfree(manifest_path);
 
 		if (m == nullptr) {
+			sdsfree(buf);
 			fprintf_safe(stderr, "Error: Could not parse Coffee.toml\n");
 			return 1;
 		}
 
 		for (size_t i = 0; i < m->package.dependencies_count; i++) {
-			char *dep = m->package.dependencies[i];
+			sds dep = m->package.dependencies[i];
 			if (dep == nullptr) {
 				continue;
 			}
 
-			char  name[256];
+			sds   name;
 			char *eq = strchr(dep, '=');
 			if (eq) {
 				size_t len = (size_t)(eq - dep);
 				while (len > 0 && dep[len - 1] == ' ') {
 					len--;
 				}
-				if (len >= sizeof(name)) {
-					len = sizeof(name) - 1;
-				}
-				memccpy(name, dep, '\0', len);
-				name[len] = '\0';
+				name = sdsnewlen(dep, len);
 			} else {
-				snprintf_safe(name, sizeof(name), "%s", dep);
+				name = sdsnew(dep);
 			}
 
-			append_libs_for_pkg(name, buf, sizeof(buf), &off);
+			append_libs_for_pkg(name, &buf);
+			sdsfree(name);
 		}
 
 		manifest_free(m);
 	}
 
-	if (off > 0 && buf[off - 1] == ' ') {
-		buf[off - 1] = '\0';
-		off--;
+	if (sdslen(buf) > 0 && buf[sdslen(buf) - 1] == ' ') {
+		buf[sdslen(buf) - 1] = '\0';
+		sdsupdatelen(buf);
 	}
 
 	printf("%s\n", buf);
+	sdsfree(buf);
 	return 0;
 }

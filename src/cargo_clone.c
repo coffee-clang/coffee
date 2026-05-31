@@ -51,25 +51,19 @@ int main(int argc, char *argv[])
 	}
 	total_length += 1; // for null terminator
 
-	char *cmd_line_substring = (char *)malloc(total_length * sizeof(char));
+	sds cmd_line_substring = sdsempty();
 	if (cmd_line_substring == nullptr) {
 		fprintf_safe(stderr, "Memory allocation error\n");
 		cmdline_parser_free(&args_info);
 		exit(1);
 	}
-	cmd_line_substring[0] = '\0';
 
-	size_t pos = 0;
 	for (int i = 0; i < args_info.inputs_num; i++) {
-		const char *input = args_info.inputs[i];
-		size_t      len   = strlen(input);
-		memccpy(cmd_line_substring + pos, input, '\0', len);
-		pos += len;
+		cmd_line_substring = sdscat(cmd_line_substring, args_info.inputs[i]);
 		if (i < args_info.inputs_num - 1) {
-			cmd_line_substring[pos++] = ' ';
+			cmd_line_substring = sdscat(cmd_line_substring, " ");
 		}
 	}
-	cmd_line_substring[pos] = '\0';
 
 	// Print the substring of the command line with the command and its unnamed options
 	printf("Command line substring: %s\n", cmd_line_substring);
@@ -77,7 +71,7 @@ int main(int argc, char *argv[])
 	// Simulate execution of the cargo command
 	printf("Executing cargo %s command...\n", command);
 
-	free(cmd_line_substring);
+	sdsfree(cmd_line_substring);
 	cmdline_parser_free(&args_info);
 	return 0;
 }

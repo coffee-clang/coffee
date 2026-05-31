@@ -19,7 +19,7 @@ int64_t handle_package(options *opts)
 	}
 
 	manifest_t *m = manifest_parse(manifest_path);
-	free(manifest_path);
+	sdsfree(manifest_path);
 
 	if (m == nullptr) {
 		fprintf_safe(stderr, "Error: Could not parse manifest\n");
@@ -35,11 +35,9 @@ int64_t handle_package(options *opts)
 	mkdir("target", 0755);
 	mkdir(package_dir, 0755);
 
-	char tarball[4'096];
-	snprintf_safe(tarball, sizeof(tarball), "%s/%s-%s.tar.gz", package_dir, name, version);
+	sds tarball = sdscatprintf(sdsempty(), "%s/%s-%s.tar.gz", package_dir, name, version);
 
-	char cmd[4'096];
-	snprintf_safe(cmd, sizeof(cmd), "tar -czf %s Coffee.toml src/ tests/ 2>/dev/null", tarball);
+	sds cmd = sdscatprintf(sdsempty(), "tar -czf %s Coffee.toml src/ tests/ 2>/dev/null", tarball);
 
 	int ret = system(cmd);
 
@@ -49,6 +47,8 @@ int64_t handle_package(options *opts)
 		fprintf_safe(stderr, "Error: Packaging failed.\n");
 	}
 
+	sdsfree(tarball);
+	sdsfree(cmd);
 	manifest_free(m);
 	return ret;
 }

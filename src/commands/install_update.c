@@ -16,11 +16,11 @@ int64_t handle_install_update(options *opts)
 		home = "/tmp";
 	}
 
-	char deps_dir[4'096];
-	snprintf_safe(deps_dir, sizeof(deps_dir), "%s/.coffee/deps", home);
+	sds deps_dir = sdscatprintf(sdsempty(), "%s/.coffee/deps", home);
 
 	struct stat st;
 	if (stat(deps_dir, &st) != 0) {
+		sdsfree(deps_dir);
 		printf("No packages to update.\n");
 		return 0;
 	}
@@ -31,21 +31,24 @@ int64_t handle_install_update(options *opts)
 	}
 
 	if (target) {
-		char pkg_dir[4'096];
-		snprintf_safe(pkg_dir, sizeof(pkg_dir), "%s/%s", deps_dir, target);
+		sds pkg_dir = sdscatprintf(sdsempty(), "%s/%s", deps_dir, target);
 
 		if (stat(pkg_dir, &st) != 0) {
+			sdsfree(pkg_dir);
+			sdsfree(deps_dir);
 			fprintf_safe(stderr, "Error: Package '%s' is not installed\n", target);
 			return 1;
 		}
 
 		printf("Updating %s...\n", target);
 
-		char cmd[4'096];
-		snprintf_safe(cmd, sizeof(cmd), "rm -rf %s", pkg_dir);
+		sds cmd = sdscatprintf(sdsempty(), "rm -rf %s", pkg_dir);
 		system(cmd);
+		sdsfree(cmd);
 
 		int ret = registry_fetch(target, nullptr, pkg_dir);
+		sdsfree(pkg_dir);
+		sdsfree(deps_dir);
 		if (ret != 0) {
 			fprintf_safe(stderr, "Error: Failed to update %s\n", target);
 			return 1;
@@ -57,6 +60,7 @@ int64_t handle_install_update(options *opts)
 
 	DIR *dir = opendir(deps_dir);
 	if (dir == nullptr) {
+		sdsfree(deps_dir);
 		printf("No packages to update.\n");
 		return 0;
 	}
@@ -68,14 +72,13 @@ int64_t handle_install_update(options *opts)
 			continue;
 		}
 
-		char pkg_dir[4'096];
-		snprintf_safe(pkg_dir, sizeof(pkg_dir), "%s/%s", deps_dir, entry->d_name);
+		sds pkg_dir = sdscatprintf(sdsempty(), "%s/%s", deps_dir, entry->d_name);
 
 		printf("Updating %s...\n", entry->d_name);
 
-		char cmd[4'096];
-		snprintf_safe(cmd, sizeof(cmd), "rm -rf %s", pkg_dir);
+		sds cmd = sdscatprintf(sdsempty(), "rm -rf %s", pkg_dir);
 		system(cmd);
+		sdsfree(cmd);
 
 		int ret = registry_fetch(entry->d_name, nullptr, pkg_dir);
 		if (ret != 0) {
@@ -83,10 +86,12 @@ int64_t handle_install_update(options *opts)
 		} else {
 			printf("Updated: %s\n", entry->d_name);
 		}
+		sdsfree(pkg_dir);
 		count++;
 	}
 
 	closedir(dir);
+	sdsfree(deps_dir);
 
 	if (count == 0) {
 		printf("No packages to update.\n");

@@ -14,7 +14,7 @@ int64_t handle_run(options *opts)
 	}
 
 	manifest_t *manifest = manifest_parse(manifest_path);
-	free(manifest_path);
+	sdsfree(manifest_path);
 
 	if (manifest == nullptr) {
 		fprintf_safe(stderr, "Error: Could not parse Coffee.toml\n");
@@ -50,7 +50,7 @@ int64_t handle_run(options *opts)
 	int ret = build_run(manifest, &build_opts, args, argc);
 
 	for (size_t i = 0; i < features_count; i++) {
-		free(features[i]);
+		sdsfree(features[i]);
 	}
 	free(features);
 

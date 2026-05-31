@@ -20,7 +20,7 @@ int64_t handle_fetch(options *opts)
 	}
 
 	manifest_t *m = manifest_parse(manifest_path);
-	free(manifest_path);
+	sdsfree(manifest_path);
 
 	if (m == nullptr) {
 		fprintf_safe(stderr, "Error: Could not parse manifest\n");
@@ -34,8 +34,7 @@ int64_t handle_fetch(options *opts)
 		cache_dir = "/tmp";
 	}
 
-	char deps_dir[4'096];
-	snprintf_safe(deps_dir, sizeof(deps_dir), "%s/.coffee/deps", cache_dir);
+	sds deps_dir = sdscatprintf(sdsempty(), "%s/.coffee/deps", cache_dir);
 	mkdir(deps_dir, 0755);
 
 	for (size_t i = 0; i < m->package.dependencies_count; i++) {
@@ -43,7 +42,7 @@ int64_t handle_fetch(options *opts)
 
 		// Dependencies might be "name = \"*\"" or just "name"
 		// This is a simple parser to get the name
-		char *name   = strdup(package);
+		sds   name   = sdsnew(package);
 		char *equals = strchr(name, '=');
 		if (equals) {
 			*equals = '\0';
@@ -57,17 +56,18 @@ int64_t handle_fetch(options *opts)
 
 		printf("  Fetching: %s\n", name);
 
-		char pkg_dir[4'096];
-		snprintf_safe(pkg_dir, sizeof(pkg_dir), "%s/%s", deps_dir, name);
+		sds pkg_dir = sdscatprintf(sdsempty(), "%s/%s", deps_dir, name);
 
 		int ret = registry_fetch(name, nullptr, pkg_dir);
 		if (ret != 0) {
 			fprintf_safe(stderr, "Error: Failed to fetch %s\n", name);
 		}
 
-		free(name);
+		sdsfree(pkg_dir);
+		sdsfree(name);
 	}
 
+	sdsfree(deps_dir);
 	manifest_free(m);
 	printf("Fetching complete.\n");
 	return 0;

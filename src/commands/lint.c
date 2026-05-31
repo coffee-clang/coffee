@@ -17,26 +17,27 @@ int64_t handle_lint(options *opts)
 	}
 
 	manifest_t *m = manifest_parse(manifest_path);
-	free(manifest_path);
+	sdsfree(manifest_path);
 
-	char inc_flags[4096] = "-Isrc";
+	sds inc_flags = sdsnew("-Isrc");
 	if (m) {
-		int off = snprintf_safe(inc_flags, sizeof(inc_flags), "-Isrc -Iinclude -I. -Ideps");
+		inc_flags = sdsnew("-Isrc -Iinclude -I. -Ideps");
 		if (m->package.name) {
-			off += snprintf_safe(inc_flags + off, sizeof(inc_flags) - (size_t)off, " -Iinclude/%s", m->package.name);
+			inc_flags = sdscatprintf(inc_flags, " -Iinclude/%s", m->package.name);
 		}
 	}
 
 	const char *tidy_opts = (int)opts->fix ? "--fix" : "";
-	char        cmd[8192];
-	snprintf_safe(cmd, sizeof(cmd), "find src tests -name \"*.c\" | xargs clang-tidy %s --quiet -- %s 2>/dev/null",
-	              tidy_opts, inc_flags);
+	sds cmd = sdscatprintf(sdsempty(), "find src tests -name \"*.c\" | xargs clang-tidy %s --quiet -- %s 2>/dev/null",
+	                       tidy_opts, inc_flags);
+	sdsfree(inc_flags);
 
 	if (opts->verbose) {
 		printf("Running: %s\n", cmd);
 	}
 
 	int ret = system(cmd);
+	sdsfree(cmd);
 
 	if (m) {
 		manifest_free(m);

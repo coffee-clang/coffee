@@ -37,8 +37,15 @@
 
 #include <stdarg.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
+
+/* glibc's inline bsearch (stdlib-bsearch.h) casts away const, triggering
+ * -Wcast-qual on Clang because Clang's __GNUC_MINOR__ is too low for the
+ * glibc-side pragma to activate.  Suppress the false positive here. */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-qual"
+#include <stdlib.h>
+#pragma GCC diagnostic pop
 
 /**
  * @brief Format text and write it to an arbitrary stream.
@@ -83,46 +90,33 @@ static inline void fprintf_safe(FILE *stream, const char *fmt, ...)
 /**
  * @brief Safely format text into a fixed-size buffer using SDS.
  *
- * Builds the output string with sdscatfmt(3), then copies up to
+ * Builds the output string with sdscatvprintf(3), then copies up to
  * size-1 characters into buf and NUL-terminates.  Behaviour mirrors
  * C11 snprintf(3): if buf is nullptr or size is 0, no data is written
  * but the length that *would* have been written is still returned.
  *
- * This is a macro so that sdscatfmt(3) can receive the variadic
- * arguments directly (no va_list alternative exists for sdscatfmt).
- * The heavy lifting is delegated to the helper function
- * snprintf_copy_to_buf().
+ * Uses sdscatvprintf(3) so all standard printf format specifiers are
+ * supported (unlike sdscatfmt which only supports a subset).
  *
  * @param buf   Destination buffer (may be nullptr when size is 0).
  * @param size  Capacity of buf in bytes.
- * @param ...   sdscatfmt(3)-style format string and arguments.
+ * @param fmt   printf(3)-style format string.
+ * @param ...   Arguments for the format string.
  * @return      The number of characters that would have been written
  *              (excluding the NUL terminator) had size been large
  *              enough.
  *
  * @internal
- * This macro is for internal use only and exposes no public
- * interface.
- */
-#define snprintf_safe(buf, size, ...) snprintf_copy_to_buf(buf, size, sdscatfmt(sdsempty(), __VA_ARGS__))
-
-/**
- * @brief Copy an SDS string into a fixed-size buffer.
- *
- * Helper invoked by the snprintf_safe() macro.  Takes ownership of
- * the sds string and frees it.
- *
- * @param buf  Destination buffer.
- * @param size  Capacity of buf in bytes.
- * @param str   SDS string to copy from (will be freed).
- * @return      The length of str (before truncation).
- *
- * @internal
  * This function is for internal use only and exposes no public
  * interface.
  */
-static inline int snprintf_copy_to_buf(char *buf, size_t size, sds str)
+static inline int snprintf_safe(char *buf, size_t size, const char *fmt, ...)
 {
+	va_list ap;
+	va_start(ap, fmt);
+	sds str = sdscatvprintf(sdsempty(), fmt, ap);
+	va_end(ap);
+
 	int len = (int)sdslen(str);
 
 	if (buf != nullptr && size > 0) {

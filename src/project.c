@@ -1,5 +1,7 @@
 #include "project.h"
 
+#include "../deps/sds/sds.h"
+
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,51 +10,46 @@
 #include <libgen.h>
 #include <unistd.h>
 
-#define MAX_PATH_LEN 4096
-
 static int file_exists(const char *path)
 {
 	return access(path, F_OK) == 0;
 }
 
-sds *project_find_manifest(sds start_dir)
+sds project_find_manifest(sds start_dir)
 {
-	char  cwd[MAX_PATH_LEN];
-	char *dir;
+	sds dir;
 
 	if (start_dir) {
-		dir = strdup(start_dir);
+		dir = sdsnew(start_dir);
 	} else {
-		if (getcwd(cwd, sizeof(cwd)) == nullptr) {
+		sds cwd = sdsnewlen(nullptr, 4096);
+		if (getcwd(cwd, 4096) == nullptr) {
+			sdsfree(cwd);
 			return nullptr;
 		}
-		dir = strdup(cwd);
+		dir = sdsnew(cwd);
+		sdsfree(cwd);
 	}
 
-	char path[MAX_PATH_LEN];
-
 	while (1) {
-		snprintf_safe(path, sizeof(path), "%s/Coffee.toml", dir);
+		sds path = sdscatprintf(sdsempty(), "%s/Coffee.toml", dir);
 		if (file_exists(path)) {
-			free(dir);
-			return strdup(path);
+			sdsfree(dir);
+			return path;
 		}
+		sdsfree(path);
 
-		snprintf_safe(path, sizeof(path), "%s/Coffee.toml", dir);
-		if (file_exists(path)) {
-			free(dir);
-			return strdup(path);
-		}
-
-		char *parent = dirname(strdup(dir));
-		if (strcmp(parent, dir) == 0) {
-			free(parent);
-			free(dir);
+		sds   parent     = sdsdup(dir);
+		char *parent_dir = dirname(parent);
+		if (strcmp(parent_dir, dir) == 0) {
+			sdsfree(parent);
+			sdsfree(dir);
 			return nullptr;
 		}
 
-		free(dir);
-		dir = parent;
+		sdsfree(dir);
+		dir = sdsnew(parent_dir);
+		sdsfree(parent);
 	}
 }
 
@@ -61,10 +58,10 @@ manifest_t *project_load_manifest(sds path)
 	return manifest_parse(path);
 }
 
-sds *project_get_name(manifest_t *m)
+sds project_get_name(manifest_t *m)
 {
 	if (m == nullptr || m->package.name == nullptr) {
 		return nullptr;
 	}
-	return strdup(m->package.name);
+	return sdsnew(m->package.name);
 }

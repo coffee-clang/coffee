@@ -16,7 +16,7 @@ int64_t handle_build(options *opts)
 {
 	char *manifest_path = nullptr;
 	if (opts->manifest_path) {
-		manifest_path = strdup(opts->manifest_path);
+		manifest_path = sdsnew(opts->manifest_path);
 	} else {
 		manifest_path = project_find_manifest(nullptr);
 	}
@@ -29,41 +29,36 @@ int64_t handle_build(options *opts)
 	/* Extract project directory from manifest path */
 	char  *dir_end = strrchr(manifest_path, '/');
 	size_t dir_len;
-	char   makefile_path[4096];
+	sds    makefile_path;
 	if (dir_end) {
-		dir_len = (size_t)(dir_end - manifest_path) + 1;
-		snprintf_safe(makefile_path, sizeof(makefile_path), "%.*sMakefile", (int)dir_len, manifest_path);
+		dir_len       = (size_t)(dir_end - manifest_path) + 1;
+		makefile_path = sdscatprintf(sdsempty(), "%.*sMakefile", (int)dir_len, manifest_path);
 	} else {
-		snprintf_safe(makefile_path, sizeof(makefile_path), "Makefile");
+		makefile_path = sdsnew("Makefile");
 	}
 
 	/* Check for Makefile */
 	if (access(makefile_path, F_OK) == 0) {
 		/* Build with make */
-		char  cmd[4096];
-		char *project_dir = nullptr;
+		sds cmd         = sdsempty();
+		sds project_dir = nullptr;
 		if (dir_end) {
-			project_dir = strndup(manifest_path, (size_t)(dir_end - manifest_path));
+			project_dir = sdsnewlen(manifest_path, (size_t)(dir_end - manifest_path));
 		} else {
-			project_dir = strdup(".");
+			project_dir = sdsnew(".");
 		}
 
-		int off = snprintf_safe(cmd, sizeof(cmd), "make -C '%s'", project_dir);
-		free(project_dir);
+		cmd = sdscatprintf(cmd, "make -C '%s'", project_dir);
+		sdsfree(project_dir);
 
-		if (off < 0 || (size_t)off >= sizeof(cmd)) {
-			free(manifest_path);
-			return 1;
+		if ((int)opts->release) {
+			cmd = sdscatprintf(cmd, " RELEASE=1");
 		}
-
-		if ((int)opts->release && (size_t)off < sizeof(cmd)) {
-			off += snprintf_safe(cmd + off, sizeof(cmd) - (size_t)off, " RELEASE=1");
+		if ((int)opts->debug) {
+			cmd = sdscatprintf(cmd, " DEBUG=1");
 		}
-		if ((int)opts->debug && (size_t)off < sizeof(cmd)) {
-			off += snprintf_safe(cmd + off, sizeof(cmd) - (size_t)off, " DEBUG=1");
-		}
-		if (opts->jobs > 0 && (size_t)off < sizeof(cmd)) {
-			off += snprintf_safe(cmd + off, sizeof(cmd) - (size_t)off, " -j%d", opts->jobs);
+		if (opts->jobs > 0) {
+			cmd = sdscatprintf(cmd, " -j%d", opts->jobs);
 		}
 
 		/* Pass feature flags if specified */
@@ -84,17 +79,14 @@ int64_t handle_build(options *opts)
 				                                                 opts->all_features, opts->no_default_features);
 				if (resolved) {
 					size_t dflags_count = 0;
-					char **dflags       = features_to_compiler_flags(resolved, manifest->package.name, &dflags_count);
+					sds   *dflags       = features_to_compiler_flags(resolved, manifest->package.name, &dflags_count);
 					if (dflags_count > 0) {
-						if ((size_t)off < sizeof(cmd)) {
-							off += snprintf_safe(cmd + off, sizeof(cmd) - (size_t)off, " CFLAGS_EXTRA=");
-							for (size_t i = 0; i < dflags_count && (size_t)off < sizeof(cmd); i++) {
-								off += snprintf_safe(cmd + off, sizeof(cmd) - (size_t)off, "%s%s", dflags[i],
-								                     (i + 1 < dflags_count) ? " " : "");
-							}
+						cmd = sdscatprintf(cmd, " CFLAGS_EXTRA=");
+						for (size_t i = 0; i < dflags_count; i++) {
+							cmd = sdscatprintf(cmd, "%s%s", dflags[i], (i + 1 < dflags_count) ? " " : "");
 						}
 						for (size_t i = 0; i < dflags_count; i++) {
-							free(dflags[i]);
+							sdsfree(dflags[i]);
 						}
 					}
 					free(dflags);
@@ -103,16 +95,10 @@ int64_t handle_build(options *opts)
 			}
 
 			for (size_t i = 0; i < features_count; i++) {
-				free(features[i]);
+				sdsfree(features[i]);
 			}
 			free(features);
 			manifest_free(manifest);
-		}
-
-		if ((size_t)off >= sizeof(cmd)) {
-			fprintf_safe(stderr, "Error: build command too long\n");
-			free(manifest_path);
-			return 1;
 		}
 
 		if (opts->verbose) {
@@ -120,8 +106,9 @@ int64_t handle_build(options *opts)
 		}
 
 		int status = system(cmd);
-
-		free(manifest_path);
+		sdsfree(cmd);
+		sdsfree(makefile_path);
+		sdsfree(manifest_path);
 
 		if (status == -1) {
 			fprintf_safe(stderr, "Error: failed to run make\n");
@@ -139,9 +126,10 @@ int64_t handle_build(options *opts)
 	/* Fall back to build_project for projects without Makefile */
 
 	manifest_t *manifest = manifest_parse(manifest_path);
-	free(manifest_path);
+	sdsfree(manifest_path);
 
 	if (manifest == nullptr) {
+		sdsfree(makefile_path);
 		fprintf_safe(stderr, "Error: Could not parse Coffee.toml\n");
 		return 1;
 	}
@@ -168,11 +156,12 @@ int64_t handle_build(options *opts)
 	int ret = build_project(manifest, &build_opts);
 
 	for (size_t i = 0; i < features_count; i++) {
-		free(features[i]);
+		sdsfree(features[i]);
 	}
 	free(features);
 
 	manifest_free(manifest);
+	sdsfree(makefile_path);
 
 	if (ret == 0) {
 		printf("Build successful\n");

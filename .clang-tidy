@@ -69,3 +69,5 @@ CheckOptions:
     value: true
   - key: readability-sizeof-expression.WarnOnToIntegerCast
     value: true
+  - key: readability-function-cognitive-complexity.Threshold
+    value: '50'

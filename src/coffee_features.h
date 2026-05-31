@@ -26,6 +26,6 @@ bool features_is_enabled(resolved_features_t *rf, sds package, sds feature);
 
 sds *features_to_compiler_flags(resolved_features_t *rf, sds package, size_t *out_count);
 
-void features_parse_cli(sds cli_string, sds ***out_features, size_t *out_count);
+void features_parse_cli(const char *cli_string, sds ***out_features, size_t *out_count);
 
 #endif

@@ -72,11 +72,11 @@ static int scan_dir_for_dep(const char *dirpath, const char *dep_name)
 			continue;
 		}
 
-		char path[4'096];
-		snprintf_safe(path, sizeof(path), "%s/%s", dirpath, entry->d_name);
+		sds path = sdscatprintf(sdsempty(), "%s/%s", dirpath, entry->d_name);
 
 		struct stat st;
 		if (stat(path, &st) != 0) {
+			sdsfree(path);
 			continue;
 		}
 
@@ -86,6 +86,7 @@ static int scan_dir_for_dep(const char *dirpath, const char *dep_name)
 			found |= scan_file_for_include(path, dep_name);
 		}
 
+		sdsfree(path);
 		if (found) {
 			break;
 		}
@@ -107,7 +108,7 @@ int64_t handle_machete(options *opts)
 	}
 
 	manifest_t *m = manifest_parse(manifest_path);
-	free(manifest_path);
+	sdsfree(manifest_path);
 
 	if (m == nullptr) {
 		fprintf_safe(stderr, "Error: Could not parse Coffee.toml\n");
@@ -125,7 +126,7 @@ int64_t handle_machete(options *opts)
 	for (size_t i = 0; i < m->package.dependencies_count; i++) {
 		const char *entry = m->package.dependencies[i];
 
-		char *name   = strdup(entry);
+		sds   name   = sdsnew(entry);
 		char *equals = strchr(name, '=');
 		if (equals) {
 			*equals   = '\0';
@@ -145,7 +146,7 @@ int64_t handle_machete(options *opts)
 			unused_count++;
 		}
 
-		free(name);
+		sdsfree(name);
 	}
 
 	if (unused_count == 0) {

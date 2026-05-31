@@ -3,8 +3,8 @@
 
 #include "manifest.h"
 
-sds        *project_find_manifest(sds start_dir);
+sds         project_find_manifest(sds start_dir);
 manifest_t *project_load_manifest(sds path);
-sds        *project_get_name(manifest_t *m);
+sds         project_get_name(manifest_t *m);
 
 #endif

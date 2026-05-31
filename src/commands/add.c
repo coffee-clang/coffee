@@ -41,7 +41,7 @@ int64_t handle_add(options *opts)
 	manifest_t *m = manifest_parse(manifest_path);
 	if (m == nullptr) {
 		fprintf_safe(stderr, "Error: Could not parse manifest at %s\n", manifest_path);
-		free(manifest_path);
+		sdsfree(manifest_path);
 		return 1;
 	}
 
@@ -51,56 +51,55 @@ int64_t handle_add(options *opts)
 		    strncmp(m->package.dependencies[i], package_name, strlen(package_name)) == 0) {
 			printf("Dependency %s already exists\n", package_name);
 			manifest_free(m);
-			free(manifest_path);
+			sdsfree(manifest_path);
 			return 0;
 		}
 	}
 
 	// Add new dependency
-	char dep_str[1024];
+	sds dep_str;
 	if (opts->path) {
 		if (opts->pkg_version) {
-			snprintf_safe(dep_str, sizeof(dep_str), "%s = { path = \"%s\", version = \"%s\" }", package_name,
-			              opts->path, opts->pkg_version);
+			dep_str = sdscatprintf(sdsempty(), "%s = { path = \"%s\", version = \"%s\" }", package_name, opts->path,
+			                       opts->pkg_version);
 		} else {
-			snprintf_safe(dep_str, sizeof(dep_str), "%s = { path = \"%s\" }", package_name, opts->path);
+			dep_str = sdscatprintf(sdsempty(), "%s = { path = \"%s\" }", package_name, opts->path);
 		}
 	} else if (opts->git) {
-		snprintf_safe(dep_str, sizeof(dep_str), "%s = { git = \"%s\" }", package_name, opts->git);
+		dep_str = sdscatprintf(sdsempty(), "%s = { git = \"%s\" }", package_name, opts->git);
 	} else {
 		const char *version = opts->pkg_version != nullptr ? opts->pkg_version : "*";
 
 		if (opts->features != nullptr || (int)opts->optional) {
-			int off = snprintf_safe(dep_str, sizeof(dep_str), "%s = { version = \"%s\"", package_name, version);
+			dep_str = sdscatprintf(sdsempty(), "%s = { version = \"%s\"", package_name, version);
 			if (opts->features) {
-				off += snprintf_safe(dep_str + off, sizeof(dep_str) - off, ", features = [\"%s\"]", opts->features);
+				dep_str = sdscatprintf(dep_str, ", features = [\"%s\"]", opts->features);
 			}
 			if (opts->optional) {
-				off += snprintf_safe(dep_str + off, sizeof(dep_str) - off, ", optional = true");
+				dep_str = sdscatprintf(dep_str, ", optional = true");
 			}
-			snprintf_safe(dep_str + off, sizeof(dep_str) - off, " }");
+			dep_str = sdscatprintf(dep_str, " }");
 		} else {
-			snprintf_safe(dep_str, sizeof(dep_str), "%s = \"%s\"", package_name, version);
+			dep_str = sdscatprintf(sdsempty(), "%s = \"%s\"", package_name, version);
 		}
 	}
 
 	/* Prefix for dev/build deps */
 	if (opts->dev) {
-		size_t dep_len = strlen(dep_str);
-		snprintf_safe(dep_str + dep_len, sizeof(dep_str) - dep_len, "  # dev");
+		dep_str = sdscatprintf(dep_str, "  # dev");
 	} else if (opts->build_dep) {
-		size_t dep_len = strlen(dep_str);
-		snprintf_safe(dep_str + dep_len, sizeof(dep_str) - dep_len, "  # build");
+		dep_str = sdscatprintf(dep_str, "  # build");
 	}
 
 	m->package.dependencies_count++;
-	m->package.dependencies = realloc(m->package.dependencies, m->package.dependencies_count * sizeof(char *));
-	m->package.dependencies[m->package.dependencies_count - 1] = strdup(dep_str);
+	m->package.dependencies = realloc(m->package.dependencies, m->package.dependencies_count * sizeof(sds));
+	m->package.dependencies[m->package.dependencies_count - 1] = sdsnew(dep_str);
+	sdsfree(dep_str);
 
 	if (manifest_write(manifest_path, m) != 0) {
 		fprintf_safe(stderr, "Error: Could not write manifest at %s\n", manifest_path);
 		manifest_free(m);
-		free(manifest_path);
+		sdsfree(manifest_path);
 		return 1;
 	}
 
@@ -109,15 +108,16 @@ int64_t handle_add(options *opts)
 	/* Append dependency flags to Makefile if it exists */
 	char  *dir_end = strrchr(manifest_path, '/');
 	size_t dir_len;
-	char   makefile_path[4'096];
+	sds    makefile_path;
 	if (dir_end) {
-		dir_len = (size_t)(dir_end - manifest_path) + 1;
-		snprintf_safe(makefile_path, sizeof(makefile_path), "%.*sMakefile", (int)dir_len, manifest_path);
+		dir_len       = (size_t)(dir_end - manifest_path) + 1;
+		makefile_path = sdscatprintf(sdsempty(), "%.*sMakefile", (int)dir_len, manifest_path);
 	} else {
-		snprintf_safe(makefile_path, sizeof(makefile_path), "Makefile");
+		makefile_path = sdsnew("Makefile");
 	}
 
 	if (!is_safe_package_name(package_name)) {
+		sdsfree(makefile_path);
 		fprintf_safe(stderr, "Warning: package name contains unsafe characters, skipping Makefile update\n");
 	} else {
 		FILE *exist_check = fopen(makefile_path, "r");
@@ -135,7 +135,8 @@ int64_t handle_add(options *opts)
 		}
 	}
 
+	sdsfree(makefile_path);
 	manifest_free(m);
-	free(manifest_path);
+	sdsfree(manifest_path);
 	return 0;
 }

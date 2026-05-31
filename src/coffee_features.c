@@ -1,5 +1,7 @@
 #include "coffee_features.h"
 
+#include "../deps/sds/sds.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -19,8 +21,8 @@ static void feature_set_add(feature_set_t *fs, const char *name)
 	if (feature_in_set(fs, name)) {
 		return;
 	}
-	fs->names            = realloc(fs->names, (fs->count + 1) * sizeof(char *));
-	fs->names[fs->count] = strdup(name);
+	fs->names            = realloc(fs->names, (fs->count + 1) * sizeof(sds));
+	fs->names[fs->count] = sdsnew(name);
 	fs->count++;
 }
 
@@ -31,9 +33,9 @@ static feature_set_t *get_or_create_set(resolved_features_t *rf, const char *pac
 			return &rf->packages[i];
 		}
 	}
-	rf->package_names                     = realloc(rf->package_names, (rf->package_count + 1) * sizeof(char *));
+	rf->package_names                     = realloc(rf->package_names, (rf->package_count + 1) * sizeof(sds));
 	rf->packages                          = realloc(rf->packages, (rf->package_count + 1) * sizeof(feature_set_t));
-	rf->package_names[rf->package_count]  = strdup(package);
+	rf->package_names[rf->package_count]  = sdsnew(package);
 	rf->packages[rf->package_count].names = nullptr;
 	rf->packages[rf->package_count].count = 0;
 	rf->package_count++;
@@ -86,18 +88,18 @@ resolved_features_t *features_resolve(manifest_t *root, sds *requested, size_t r
 			continue;
 		}
 		for (size_t j = 0; j < root->features[i].deps_count; j++) {
-			char *dep = root->features[i].deps[j];
+			sds dep = root->features[i].deps[j];
 			if (dep == nullptr) {
 				continue;
 			}
 			char *slash = strchr(dep, '/');
 			if (slash) {
 				size_t         pkg_len   = (size_t)(slash - dep);
-				char          *pkg_name  = strndup(dep, pkg_len);
+				sds            pkg_name  = sdsnewlen(dep, pkg_len);
 				char          *feat_name = slash + 1;
 				feature_set_t *pkg_set   = get_or_create_set(rf, pkg_name);
 				feature_set_add(pkg_set, feat_name);
-				free(pkg_name);
+				sdsfree(pkg_name);
 			}
 		}
 	}
@@ -111,9 +113,9 @@ void features_free(resolved_features_t *rf)
 		return;
 	}
 	for (size_t i = 0; i < rf->package_count; i++) {
-		free(rf->package_names[i]);
+		sdsfree(rf->package_names[i]);
 		for (size_t j = 0; j < rf->packages[i].count; j++) {
-			free(rf->packages[i].names[j]);
+			sdsfree(rf->packages[i].names[j]);
 		}
 		free(rf->packages[i].names);
 	}
@@ -155,7 +157,7 @@ sds *features_to_compiler_flags(resolved_features_t *rf, sds package, size_t *ou
 		return nullptr;
 	}
 
-	char **flags = calloc(set->count, sizeof(char *));
+	sds *flags = calloc(set->count, sizeof(sds));
 	if (flags == nullptr) {
 		return nullptr;
 	}
@@ -165,21 +167,19 @@ sds *features_to_compiler_flags(resolved_features_t *rf, sds package, size_t *ou
 		if (set->names[i] == nullptr || strcmp(set->names[i], "default") == 0) {
 			continue;
 		}
-		size_t flag_len = strlen(set->names[i]) + 12;
-		flags[idx]      = malloc(flag_len);
-		snprintf_safe(flags[idx], flag_len, "-DFEATURE_");
-		size_t prefix_len = strlen(flags[idx]);
+		sds flag = sdsnew("-DFEATURE_");
 		for (size_t j = 0; set->names[i][j] != '\0'; j++) {
 			char c = set->names[i][j];
 			if (c == '-') {
-				flags[idx][prefix_len + j] = '_';
+				flag = sdscatlen(flag, "_", 1);
 			} else if (c >= 'a' && c <= 'z') {
-				flags[idx][prefix_len + j] = (char)(c - 32);
+				char upper = (char)(c - 32);
+				flag       = sdscatlen(flag, &upper, 1);
 			} else {
-				flags[idx][prefix_len + j] = c;
+				flag = sdscatlen(flag, &c, 1);
 			}
 		}
-		flags[idx][flag_len - 1] = '\0';
+		flags[idx] = flag;
 		idx++;
 	}
 
@@ -187,7 +187,7 @@ sds *features_to_compiler_flags(resolved_features_t *rf, sds package, size_t *ou
 	return flags;
 }
 
-void features_parse_cli(sds cli_string, sds ***out_features, size_t *out_count)
+void features_parse_cli(const char *cli_string, sds ***out_features, size_t *out_count)
 {
 	if (!cli_string || !out_features || out_count == nullptr) {
 		*out_features = nullptr;
@@ -202,7 +202,7 @@ void features_parse_cli(sds cli_string, sds ***out_features, size_t *out_count)
 		}
 	}
 
-	char **features = calloc(count, sizeof(char *));
+	sds *features = calloc(count, sizeof(sds));
 	if (features == nullptr) {
 		*out_features = nullptr;
 		*out_count    = 0;
@@ -219,9 +219,7 @@ void features_parse_cli(sds cli_string, sds ***out_features, size_t *out_count)
 			end++;
 		}
 		size_t len    = (size_t)(end - p);
-		features[idx] = malloc(len + 1);
-		memccpy(features[idx], p, '\0', len);
-		features[idx][len] = '\0';
+		features[idx] = sdsnewlen(p, len);
 		idx++;
 		p = *end != '\0' ? end + 1 : end;
 	}

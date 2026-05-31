@@ -19,15 +19,14 @@ int64_t handle_generate_lockfile(options *opts)
 	}
 
 	manifest_t *manifest = manifest_parse(manifest_path);
-	free(manifest_path);
+	sdsfree(manifest_path);
 
 	if (manifest == nullptr) {
 		fprintf_safe(stderr, "Error: Could not parse Coffee.toml\n");
 		return 1;
 	}
 
-	char lockfile_path[4'096];
-	snprintf_safe(lockfile_path, sizeof(lockfile_path), "Coffee.lock");
+	sds lockfile_path = sdsnew("Coffee.lock");
 
 	char **features       = nullptr;
 	size_t features_count = 0;
@@ -40,7 +39,7 @@ int64_t handle_generate_lockfile(options *opts)
 
 	if (features) {
 		for (size_t i = 0; i < features_count; i++) {
-			free(features[i]);
+			sdsfree(features[i]);
 		}
 		free(features);
 	}
@@ -49,6 +48,7 @@ int64_t handle_generate_lockfile(options *opts)
 
 	FILE *fp = fopen(lockfile_path, "w");
 	if (fp == nullptr) {
+		sdsfree(lockfile_path);
 		fprintf_safe(stderr, "Error: Could not create %s\n", lockfile_path);
 		if (resolved) {
 			features_free(resolved);
@@ -102,6 +102,7 @@ int64_t handle_generate_lockfile(options *opts)
 		features_free(resolved);
 	}
 
+	sdsfree(lockfile_path);
 	manifest_free(manifest);
 
 	printf("Lockfile generated successfully.\n");

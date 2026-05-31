@@ -16,7 +16,7 @@ int64_t handle_pkgid(options *opts)
 	}
 
 	manifest_t *m = manifest_parse(manifest_path);
-	free(manifest_path);
+	sdsfree(manifest_path);
 
 	if (m == nullptr) {
 		fprintf_safe(stderr, "Error: Could not parse manifest\n");

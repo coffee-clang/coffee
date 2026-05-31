@@ -24,7 +24,7 @@ int64_t handle_remove(options *opts)
 	manifest_t *m = manifest_parse(manifest_path);
 	if (m == nullptr) {
 		fprintf_safe(stderr, "Error: Could not parse manifest at %s\n", manifest_path);
-		free(manifest_path);
+		sdsfree(manifest_path);
 		return 1;
 	}
 
@@ -33,12 +33,12 @@ int64_t handle_remove(options *opts)
 		if (m->package.dependencies[i] &&
 		    strncmp(m->package.dependencies[i], package_name, strlen(package_name)) == 0) {
 			found = true;
-			free(m->package.dependencies[i]);
+			sdsfree(m->package.dependencies[i]);
 			for (size_t j = i; j < m->package.dependencies_count - 1; j++) {
 				m->package.dependencies[j] = m->package.dependencies[j + 1];
 			}
 			m->package.dependencies_count--;
-			m->package.dependencies = realloc(m->package.dependencies, m->package.dependencies_count * sizeof(char *));
+			m->package.dependencies = realloc(m->package.dependencies, m->package.dependencies_count * sizeof(sds));
 			break;
 		}
 	}
@@ -46,14 +46,14 @@ int64_t handle_remove(options *opts)
 	if (!found) {
 		fprintf_safe(stderr, "Error: Dependency %s not found in manifest\n", package_name);
 		manifest_free(m);
-		free(manifest_path);
+		sdsfree(manifest_path);
 		return 1;
 	}
 
 	if (manifest_write(manifest_path, m) != 0) {
 		fprintf_safe(stderr, "Error: Could not write manifest at %s\n", manifest_path);
 		manifest_free(m);
-		free(manifest_path);
+		sdsfree(manifest_path);
 		return 1;
 	}
 
@@ -61,27 +61,26 @@ int64_t handle_remove(options *opts)
 
 	/* Clean up Makefile section for this dependency */
 	char *dir_end = strrchr(manifest_path, '/');
-	char  makefile_path[4096];
+	sds   makefile_path;
 	if (dir_end) {
 		size_t dir_len = (size_t)(dir_end - manifest_path) + 1;
-		snprintf_safe(makefile_path, sizeof(makefile_path), "%.*sMakefile", (int)dir_len, manifest_path);
+		makefile_path  = sdscatprintf(sdsempty(), "%.*sMakefile", (int)dir_len, manifest_path);
 	} else {
-		snprintf_safe(makefile_path, sizeof(makefile_path), "Makefile");
+		makefile_path = sdsnew("Makefile");
 	}
 
 	FILE *mf = fopen(makefile_path, "r");
 	if (mf) {
-		char dep_header[64];
-		snprintf_safe(dep_header, sizeof(dep_header), "# Dep: %s", package_name);
+		sds dep_header = sdscatprintf(sdsempty(), "# Dep: %s", package_name);
 
-		fseek(mf, 0, SEEK_END);
-		long mf_len = ftell(mf);
-		fseek(mf, 0, SEEK_SET);
-
-		char *content = malloc((size_t)mf_len + 1);
+		sds content = sdsempty();
 		if (content) {
-			size_t read_len   = fread(content, 1, (size_t)mf_len, mf);
-			content[read_len] = '\0';
+			char   buf[4096];
+			size_t n;
+			fseek(mf, 0, SEEK_SET);
+			while ((n = fread(buf, 1, sizeof(buf), mf)) > 0) {
+				content = sdscatlen(content, buf, n);
+			}
 
 			char *dep_start = strstr(content, dep_header);
 			if (dep_start) {
@@ -98,7 +97,7 @@ int64_t handle_remove(options *opts)
 				}
 
 				size_t before_len = (size_t)(dep_start - content);
-				size_t after_len  = read_len - (size_t)(dep_end - content);
+				size_t after_len  = sdslen(content) - (size_t)(dep_end - content);
 
 				fclose(mf);
 				mf = fopen(makefile_path, "w");
@@ -110,14 +109,16 @@ int64_t handle_remove(options *opts)
 					mf = nullptr; /* Prevent double-close */
 				}
 			}
-			free(content);
+			sdsfree(content);
 		}
+		sdsfree(dep_header);
 		if (mf) {
 			fclose(mf);
 		}
 	}
 
+	sdsfree(makefile_path);
 	manifest_free(m);
-	free(manifest_path);
+	sdsfree(manifest_path);
 	return 0;
 }

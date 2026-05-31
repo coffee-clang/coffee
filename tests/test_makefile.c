@@ -13,8 +13,7 @@ TEST(makefile_is_created)
 	const char *test_dir = "/tmp/coffee-makefile-project";
 	mkdir(test_dir, 0755);
 
-	char make_path[4096];
-	snprintf(make_path, sizeof(make_path), "%s/Makefile", test_dir);
+	sds make_path = sdscatprintf(sdsempty(), "%s/Makefile", test_dir);
 
 	FILE *fp = fopen(make_path, "w");
 	ASSERT(fp, "could not create test Makefile");
@@ -46,9 +45,12 @@ TEST(makefile_is_created)
 	fp = fopen(make_path, "r");
 	ASSERT(fp, "Makefile should be readable");
 
-	char   buf[4096];
-	size_t len = fread(buf, 1, sizeof(buf) - 1, fp);
-	buf[len]   = '\0';
+	sds    buf = sdsempty();
+	char   chunk[4096];
+	size_t n;
+	while ((n = fread(chunk, 1, sizeof(chunk), fp)) > 0) {
+		buf = sdscatlen(buf, chunk, n);
+	}
 	fclose(fp);
 
 	ASSERT(strstr(buf, "CC ?= clang") != nullptr, "Makefile missing CC");
@@ -59,6 +61,8 @@ TEST(makefile_is_created)
 	ASSERT(strstr(buf, "format:") != nullptr, "Makefile missing format target");
 	ASSERT(strstr(buf, "tidy:") != nullptr, "Makefile missing tidy target");
 
+	sdsfree(buf);
+	sdsfree(make_path);
 	PASS();
 }
 
@@ -81,9 +85,12 @@ TEST(dep_appended_to_makefile)
 
 	fp = fopen(tmp_make, "r");
 	ASSERT(fp, "could not reopen Makefile");
-	char   buf[4096];
-	size_t len = fread(buf, 1, sizeof(buf) - 1, fp);
-	buf[len]   = '\0';
+	sds    buf = sdsempty();
+	char   chunk[4096];
+	size_t n;
+	while ((n = fread(chunk, 1, sizeof(chunk), fp)) > 0) {
+		buf = sdscatlen(buf, chunk, n);
+	}
 	fclose(fp);
 
 	ASSERT(strstr(buf, "# Dep: mylib") != nullptr, "Makefile missing dep comment");
@@ -91,6 +98,7 @@ TEST(dep_appended_to_makefile)
 	ASSERT(strstr(buf, "-Ldeps/mylib/lib") != nullptr, "Makefile missing library path");
 	ASSERT(strstr(buf, "-lmylib") != nullptr, "Makefile missing link flag");
 
+	sdsfree(buf);
 	remove(tmp_make);
 	PASS();
 }
@@ -100,9 +108,8 @@ TEST(build_finds_makefile)
 	const char *tmp_dir = "/tmp/coffee-build-test";
 	mkdir(tmp_dir, 0755);
 
-	char make_path[4096];
-	snprintf(make_path, sizeof(make_path), "%s/Makefile", tmp_dir);
-	FILE *fp = fopen(make_path, "w");
+	sds   make_path = sdscatprintf(sdsempty(), "%s/Makefile", tmp_dir);
+	FILE *fp        = fopen(make_path, "w");
 	ASSERT(fp, "could not create Makefile");
 	fprintf_safe(fp, "CC ?= clang\n");
 	fprintf_safe(fp, "build:\n");
@@ -113,6 +120,7 @@ TEST(build_finds_makefile)
 	ASSERT(fp, "Makefile should be readable");
 	fclose(fp);
 
+	sdsfree(make_path);
 	PASS();
 }
 

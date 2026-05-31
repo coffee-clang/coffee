@@ -35,10 +35,8 @@ static void parse_dep_list(const char *input, char ***out_names, size_t *out_cou
 			const char *slash    = (const char *)memchr(start, '/', len);
 			size_t      name_len = slash != nullptr ? (size_t)(slash - start) : len;
 
-			*out_names               = realloc(*out_names, (*out_count + 1) * sizeof(char *));
-			(*out_names)[*out_count] = malloc(name_len + 1);
-			memccpy((*out_names)[*out_count], start, '\0', name_len);
-			(*out_names)[*out_count][name_len] = '\0';
+			*out_names               = realloc(*out_names, (*out_count + 1) * sizeof(sds));
+			(*out_names)[*out_count] = sdsnewlen(start, name_len);
 			(*out_count)++;
 		}
 	}
@@ -52,9 +50,9 @@ static void print_transitive(const char *name, const char *version, const char *
 	}
 
 	const char *connector = (int)is_last ? "└── " : "├── ";
-	char       *ver       = version != nullptr ? strdup(version) : nullptr;
+	sds         ver       = version != nullptr ? sdsnew(version) : nullptr;
 	printf("%s%s%s v%s\n", prefix, connector, name != nullptr ? name : "?", ver != nullptr ? ver : "?");
-	free(ver);
+	sdsfree(ver);
 
 	if (depth >= max_depth) {
 		return;
@@ -65,8 +63,7 @@ static void print_transitive(const char *name, const char *version, const char *
 		return;
 	}
 
-	char *child_prefix = malloc(strlen(prefix) + strlen((int)is_last ? "    " : "│   ") + 1);
-	sprintf(child_prefix, "%s%s", prefix, (int)is_last ? "    " : "│   ");
+	sds child_prefix = sdscatfmt(sdsnew(prefix), "%s", (int)is_last ? "    " : "│   ");
 
 	char **dep_names = nullptr;
 	size_t dep_count = 0;
@@ -77,10 +74,10 @@ static void print_transitive(const char *name, const char *version, const char *
 	}
 
 	for (size_t i = 0; i < dep_count; i++) {
-		free(dep_names[i]);
+		sdsfree(dep_names[i]);
 	}
 	free(dep_names);
-	free(child_prefix);
+	sdsfree(child_prefix);
 
 	registry_free_recipe(recipe);
 }
@@ -94,7 +91,7 @@ int64_t handle_tree(options *opts)
 	}
 
 	manifest_t *m = manifest_parse(manifest_path);
-	free(manifest_path);
+	sdsfree(manifest_path);
 
 	if (m == nullptr) {
 		fprintf_safe(stderr, "Error: Could not parse manifest\n");
@@ -108,8 +105,8 @@ int64_t handle_tree(options *opts)
 
 	for (size_t i = 0; i < m->package.dependencies_count; i++) {
 		const char *entry       = m->package.dependencies[i];
-		char       *dep_name    = nullptr;
-		char       *dep_version = nullptr;
+		sds         dep_name    = nullptr;
+		sds         dep_version = nullptr;
 		manifest_extract_dep_info(entry, &dep_name, &dep_version);
 
 		if (dep_name == nullptr) {
@@ -119,8 +116,8 @@ int64_t handle_tree(options *opts)
 		bool is_last = (i == m->package.dependencies_count - 1);
 		print_transitive(dep_name, dep_version, "", is_last, 0, 3);
 
-		free(dep_name);
-		free(dep_version);
+		sdsfree(dep_name);
+		sdsfree(dep_version);
 	}
 
 	manifest_free(m);

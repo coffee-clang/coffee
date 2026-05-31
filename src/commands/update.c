@@ -122,26 +122,28 @@ static int create_symlink(const char *target, const char *link_path)
 	struct stat st;
 	if (lstat(link_path, &st) == 0) {
 		if (S_ISLNK(st.st_mode) || S_ISDIR(st.st_mode)) {
-			char cmd[8'192];
-			snprintf_safe(cmd, sizeof(cmd), "rm -rf %s", link_path);
+			sds cmd = sdscatprintf(sdsempty(), "rm -rf %s", link_path);
 			if (system(cmd) != 0) {
+				sdsfree(cmd);
 				return -1;
 			}
+			sdsfree(cmd);
 		}
 	}
 
-	char *link_copy  = strdup(link_path);
+	sds   link_copy  = sdsnew(link_path);
 	char *last_slash = strrchr(link_copy, '/');
 	if (last_slash) {
 		*last_slash = '\0';
-		char cmd[8'192];
-		snprintf_safe(cmd, sizeof(cmd), "mkdir -p %s", link_copy);
-		free(link_copy);
+		sds cmd     = sdscatprintf(sdsempty(), "mkdir -p %s", link_copy);
+		sdsfree(link_copy);
 		if (system(cmd) != 0) {
+			sdsfree(cmd);
 			return -1;
 		}
+		sdsfree(cmd);
 	} else {
-		free(link_copy);
+		sdsfree(link_copy);
 	}
 
 	if (symlink(target, link_path) != 0) {
@@ -161,7 +163,7 @@ int64_t handle_update(options *opts)
 	}
 
 	manifest_t *m = manifest_parse(manifest_path);
-	free(manifest_path);
+	sdsfree(manifest_path);
 
 	if (m == nullptr) {
 		fprintf_safe(stderr, "Error: Could not parse Coffee.toml\n");
@@ -169,12 +171,10 @@ int64_t handle_update(options *opts)
 	}
 
 	const char *coffee_home = coffee_home_dir();
-	char        global_deps[4'096];
-	snprintf_safe(global_deps, sizeof(global_deps), "%s/deps", coffee_home);
+	sds         global_deps = sdscatprintf(sdsempty(), "%s/deps", coffee_home);
 	mkdir(global_deps, 0755);
 
-	char project_deps[4'096];
-	snprintf_safe(project_deps, sizeof(project_deps), ".coffee/deps");
+	sds project_deps = sdsnew(".coffee/deps");
 	mkdir(project_deps, 0755);
 
 	printf("Updating dependencies...\n");
@@ -187,8 +187,8 @@ int64_t handle_update(options *opts)
 	for (size_t i = 0; i < m->package.dependencies_count; i++) {
 		const char *entry = m->package.dependencies[i];
 
-		char *name               = nullptr;
-		char *version_constraint = nullptr;
+		sds name               = nullptr;
+		sds version_constraint = nullptr;
 		manifest_extract_dep_info(entry, &name, &version_constraint);
 
 		if (name == nullptr) {
@@ -196,8 +196,8 @@ int64_t handle_update(options *opts)
 		}
 
 		if (target != nullptr && strcmp(name, target) != 0) {
-			free(name);
-			free(version_constraint);
+			sdsfree(name);
+			sdsfree(version_constraint);
 			continue;
 		}
 
@@ -206,8 +206,8 @@ int64_t handle_update(options *opts)
 		version_list_t *versions = registry_get_versions(name);
 		if (versions == nullptr || versions->count == 0) {
 			fprintf_safe(stderr, "  Error: Package '%s' not found in registry\n", name);
-			free(name);
-			free(version_constraint);
+			sdsfree(name);
+			sdsfree(version_constraint);
 			continue;
 		}
 
@@ -217,8 +217,8 @@ int64_t handle_update(options *opts)
 			if (!semver_match(version_constraint, resolved_version)) {
 				fprintf_safe(stderr, "  Warning: No version of '%s' matches constraint '%s' (latest is %s)\n", name,
 				             version_constraint, resolved_version);
-				free(name);
-				free(version_constraint);
+				sdsfree(name);
+				sdsfree(version_constraint);
 				registry_free_versions(versions);
 				continue;
 			}
@@ -227,39 +227,41 @@ int64_t handle_update(options *opts)
 			printf("  Selected version: %s\n", resolved_version);
 		}
 
-		char cache_path[4'096];
-		snprintf_safe(cache_path, sizeof(cache_path), "%s/%s/%s", global_deps, name, resolved_version);
-
-		char project_link_path[4'096];
-		snprintf_safe(project_link_path, sizeof(project_link_path), "%s/%s/%s", project_deps, name, resolved_version);
+		sds cache_path        = sdscatprintf(sdsempty(), "%s/%s/%s", global_deps, name, resolved_version);
+		sds project_link_path = sdscatprintf(sdsempty(), "%s/%s/%s", project_deps, name, resolved_version);
 
 		int ret = registry_fetch(name, resolved_version, cache_path);
 		if (ret != 0) {
+			sdsfree(cache_path);
+			sdsfree(project_link_path);
 			fprintf_safe(stderr, "  Error: Failed to fetch %s %s\n", name, resolved_version);
-			free(name);
-			free(version_constraint);
+			sdsfree(name);
+			sdsfree(version_constraint);
 			registry_free_versions(versions);
 			continue;
 		}
 
 		ret = create_symlink(cache_path, project_link_path);
 		if (ret != 0) {
+			sdsfree(cache_path);
+			sdsfree(project_link_path);
 			fprintf_safe(stderr, "  Error: Failed to create symlink for %s\n", name);
-			free(name);
-			free(version_constraint);
+			sdsfree(name);
+			sdsfree(version_constraint);
 			registry_free_versions(versions);
 			continue;
 		}
 
 		printf("  Updated: %s@%s\n", name, resolved_version);
 
-		free(name);
-		free(version_constraint);
+		sdsfree(cache_path);
+		sdsfree(project_link_path);
+		sdsfree(name);
+		sdsfree(version_constraint);
 		registry_free_versions(versions);
 	}
 
-	char lockfile_path[4'096];
-	snprintf_safe(lockfile_path, sizeof(lockfile_path), "Coffee.lock");
+	sds lockfile_path = sdsnew("Coffee.lock");
 
 	FILE *fp = fopen(lockfile_path, "w");
 	if (fp) {
@@ -288,6 +290,9 @@ int64_t handle_update(options *opts)
 		printf("Lockfile updated.\n");
 	}
 
+	sdsfree(lockfile_path);
+	sdsfree(global_deps);
+	sdsfree(project_deps);
 	manifest_free(m);
 	return 0;
 }

@@ -22,7 +22,7 @@ int64_t handle_vendor(options *opts)
 	}
 
 	manifest_t *m = manifest_parse(manifest_path);
-	free(manifest_path);
+	sdsfree(manifest_path);
 
 	if (m == nullptr) {
 		fprintf_safe(stderr, "Error: Could not parse Coffee.toml\n");
@@ -42,7 +42,7 @@ int64_t handle_vendor(options *opts)
 	for (size_t i = 0; i < m->package.dependencies_count; i++) {
 		const char *entry = m->package.dependencies[i];
 
-		char *name   = strdup(entry);
+		sds   name   = sdsnew(entry);
 		char *equals = strchr(name, '=');
 		if (equals) {
 			*equals   = '\0';
@@ -53,8 +53,7 @@ int64_t handle_vendor(options *opts)
 			}
 		}
 
-		char dest_dir[4'096];
-		snprintf_safe(dest_dir, sizeof(dest_dir), "vendor/%s", name);
+		sds dest_dir = sdscatprintf(sdsempty(), "vendor/%s", name);
 
 		printf("  Vendoring: %s\n", name);
 
@@ -65,7 +64,8 @@ int64_t handle_vendor(options *opts)
 			fprintf_safe(stderr, "Error: Failed to vendor %s\n", name);
 		}
 
-		free(name);
+		sdsfree(dest_dir);
+		sdsfree(name);
 	}
 
 	manifest_free(m);

@@ -8,6 +8,8 @@
 #ifndef CMDLINE_H
 #define CMDLINE_H
 
+#include "../deps/sds/sds.h"
+
 #include <stdbool.h>
 
 #include <stdio.h>
@@ -64,31 +66,31 @@ struct gengetopt_args_info {
 	int jobs_arg;
 
 	/* String options */
-	char *color_arg;
-	char *message_format_arg;
-	char *manifest_path_arg;
-	char *target_arg;
-	char *bin_arg;
-	char *example_arg;
-	char *features_arg;
-	char *profile_arg;
-	char *target_dir_arg;
-	char *timings_arg;
-	char *exclude_arg;
-	char *include_arg;
-	char *package_arg;
-	char *config_arg;
-	char *unstable_flags_arg;
-	char *rename_arg;
-	char *pkg_version_arg;
-	char *path_arg;
-	char *git_arg;
-	char *branch_arg;
-	char *tag_arg;
-	char *rev_arg;
-	char *registry_arg;
-	char *out_dir_arg;
-	char *command_arg;
+	sds color_arg;
+	sds message_format_arg;
+	sds manifest_path_arg;
+	sds target_arg;
+	sds bin_arg;
+	sds example_arg;
+	sds features_arg;
+	sds profile_arg;
+	sds target_dir_arg;
+	sds timings_arg;
+	sds exclude_arg;
+	sds include_arg;
+	sds package_arg;
+	sds config_arg;
+	sds unstable_flags_arg;
+	sds rename_arg;
+	sds pkg_version_arg;
+	sds path_arg;
+	sds git_arg;
+	sds branch_arg;
+	sds tag_arg;
+	sds rev_arg;
+	sds registry_arg;
+	sds out_dir_arg;
+	sds command_arg;
 
 	/* Enum options */
 	enum enum_toolchain toolchain_arg;
@@ -154,7 +156,7 @@ struct gengetopt_args_info {
 	bool command_given;
 
 	/* Unnamed (positional) arguments */
-	char   **inputs;
+	sds     *inputs;
 	unsigned inputs_num;
 };
 

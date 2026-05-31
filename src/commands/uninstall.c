@@ -21,23 +21,20 @@ int64_t handle_uninstall(options *opts)
 		home = "/tmp";
 	}
 
-	char pkg_dir[4'096];
-	snprintf_safe(pkg_dir, sizeof(pkg_dir), "%s/.coffee/deps/%s", home, package);
+	sds pkg_dir = sdscatprintf(sdsempty(), "%s/.coffee/deps/%s", home, package);
 
 	struct stat st;
 	if (stat(pkg_dir, &st) != 0) {
+		sdsfree(pkg_dir);
 		fprintf_safe(stderr, "Error: Package '%s' is not installed\n", package);
 		return 1;
 	}
 
-	char cmd[4'096];
-	int  ret = snprintf_safe(cmd, sizeof(cmd), "rm -rf %s", pkg_dir);
-	if (ret < 0 || (size_t)ret >= sizeof(cmd)) {
-		fprintf_safe(stderr, "Error: Path too long\n");
-		return 1;
-	}
+	sds cmd = sdscatprintf(sdsempty(), "rm -rf %s", pkg_dir);
+	sdsfree(pkg_dir);
 
-	ret = system(cmd);
+	int ret = system(cmd);
+	sdsfree(cmd);
 	if (ret != 0) {
 		fprintf_safe(stderr, "Error: Failed to remove %s\n", package);
 		return 1;

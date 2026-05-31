@@ -20,7 +20,7 @@ static void report_deps(manifest_t *m)
 	for (size_t i = 0; i < m->package.dependencies_count; i++) {
 		const char *entry = m->package.dependencies[i];
 
-		char *name   = strdup(entry);
+		sds   name   = sdsnew(entry);
 		char *equals = strchr(name, '=');
 		if (equals) {
 			*equals   = '\0';
@@ -32,7 +32,7 @@ static void report_deps(manifest_t *m)
 		}
 
 		printf("%-20s registry\n", name);
-		free(name);
+		sdsfree(name);
 	}
 
 	printf("\nTotal: %zu dependencies\n", m->package.dependencies_count);
@@ -50,7 +50,7 @@ static void report_audit(manifest_t *m)
 	for (size_t i = 0; i < m->package.dependencies_count; i++) {
 		const char *entry = m->package.dependencies[i];
 
-		char *name   = strdup(entry);
+		sds   name   = sdsnew(entry);
 		char *equals = strchr(name, '=');
 		if (equals) {
 			*equals   = '\0';
@@ -69,7 +69,7 @@ static void report_audit(manifest_t *m)
 			printf("  %-20s WARNING: not found in registry\n", name);
 		}
 
-		free(name);
+		sdsfree(name);
 	}
 }
 
@@ -83,7 +83,7 @@ int64_t handle_report(options *opts)
 	}
 
 	manifest_t *m = manifest_parse(manifest_path);
-	free(manifest_path);
+	sdsfree(manifest_path);
 
 	if (m == nullptr) {
 		fprintf_safe(stderr, "Error: Could not parse Coffee.toml\n");

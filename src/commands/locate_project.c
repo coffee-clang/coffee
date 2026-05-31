@@ -17,15 +17,17 @@ int64_t handle_locate_project(options *opts)
 		return 1;
 	}
 
-	char abs_path[PATH_MAX];
+	sds abs_path = sdsnewlen(nullptr, PATH_MAX);
 	if (realpath(manifest_path, abs_path) == nullptr) {
+		sdsfree(abs_path);
 		fprintf_safe(stderr, "Error: Could not resolve absolute path for manifest\n");
-		free(manifest_path);
+		sdsfree(manifest_path);
 		return 1;
 	}
 
 	printf("{ \"root\": \"%s\" }\n", abs_path);
+	sdsfree(abs_path);
 
-	free(manifest_path);
+	sdsfree(manifest_path);
 	return 0;
 }

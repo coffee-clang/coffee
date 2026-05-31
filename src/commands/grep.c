@@ -14,10 +14,10 @@ int64_t handle_grep(options *opts)
 	char *pattern = opts->inputs[1];
 	printf("Searching for '%s'...\n", pattern);
 
-	char cmd[4'096];
-	snprintf_safe(cmd, sizeof(cmd), "grep -rn --exclude-dir=target --exclude-dir=.git \"%s\" src tests", pattern);
+	sds cmd = sdscatprintf(sdsempty(), "grep -rn --exclude-dir=target --exclude-dir=.git \"%s\" src tests", pattern);
 
 	int ret = system(cmd);
+	sdsfree(cmd);
 
 	if (ret != 0) {
 		printf("Pattern not found.\n");

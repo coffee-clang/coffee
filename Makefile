@@ -194,7 +194,7 @@ $(STAMP_DIR):
 $(STAMP_DIR)/%.c.tidy: $(SRC_DIR)/%.c | $(STAMP_DIR)
 	@mkdir -p $(dir $@)
 	@echo "Linting $<..."
-	@$(TIDY) $< $(TIDY_FLAGS)
+	@$(TIDY) --quiet $< $(TIDY_FLAGS)
 	@touch $@
 
 

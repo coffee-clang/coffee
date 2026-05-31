@@ -1,30 +1,42 @@
-# Amalgamated style: coffee (host) + Git (reference)
-# TabWidth: 4 per user preference
+# coffee coding style - canonical formatting configuration
 #
-# Where coffee and Git disagree, coffee's setting is kept as canonical
-# (aligned with AGENTS.md rules).  Git's explicit defaults are adopted
-# for settings coffee left implicit, to prevent version-dependent drift.
-
+# This file is the ground truth for code formatting. All settings are
+# documented with the AGENTS.md rule they implement.
+#
+# We deviate from curl conventions in:
+#   - tabs over spaces (AGENTS.md: "We use tabs for indentation")
+#   - tab width 4 (curl uses 2-space indent)
+#   - continuation indent 4
+#   - column limit 120 (curl uses 79)
+#
 #Language: Cpp
 #Standard: c23
 
 # --- Indentation ---
-UseTab: ForIndentation
-IndentWidth: 4
-TabWidth: 4
-ContinuationIndentWidth: 4
-ColumnLimit: 120
+# AGENTS.md: "We use tabs for indentation, tab width is 4,
+# continuing indentation is 4, column limit is 120."
+UseTab: ForIndentation          # tabs, never spaces
+IndentWidth: 4                  # one tab level
+TabWidth: 4                     # tab display width
+ContinuationIndentWidth: 4      # continuation lines: one tab
+ColumnLimit: 120                # hard limit, no exceptions
 
 # --- Bracing & Control ---
+# AGENTS.md: braces on same line for control, new line for functions
+# AGENTS.md: "Never omit the braces"
+# AGENTS.md: "We never write multiple statements on the same source line"
 BreakBeforeBraces: Linux
 AllowShortBlocksOnASingleLine: false
 AllowShortCaseLabelsOnASingleLine: false
 AllowShortFunctionsOnASingleLine: None
 AllowShortIfStatementsOnASingleLine: false
 AllowShortLoopsOnASingleLine: false
-InsertBraces: true            # coffee: "Never omit the braces"
+InsertBraces: true
 
 # --- Spacing ---
+# AGENTS.md: "space between the keyword and the open parenthesis" (if/while/do/for)
+# AGENTS.md: "spaces on both sides of operators"
+# AGENTS.md: Postfix (), [], ->, ., ++, -- and Unary +, -, !, ~, & have no space
 PointerAlignment: Right
 SpaceBeforeParens: ControlStatements
 SpaceAfterCStyleCast: false
@@ -41,6 +53,8 @@ SpacesInParentheses: false
 SpacesInSquareBrackets: false
 
 # --- Alignment ---
+# AGENTS.md: align continuation lines on appropriate column
+# AGENTS.md: "operators should not start continuation lines"
 AlignAfterOpenBracket: Align
 AlignConsecutiveAssignments:
   Enabled: true
@@ -54,15 +68,17 @@ AlignOperands: true
 AlignTrailingComments: true
 
 # --- Wrapping & Bin-packing ---
+# AGENTS.md: "operators should not start continuation lines"
+BreakBeforeBinaryOperators: None
 AllowAllParametersOfDeclarationOnNextLine: false
 BinPackArguments: true
 BinPackParameters: true
-BreakBeforeBinaryOperators: None
 BreakBeforeTernaryOperators: false
 BreakStringLiterals: false
 AlwaysBreakAfterReturnType: None
 
 # --- Modern C (C23) ---
+# AGENTS.md: "use the most recent C standard (C23)"
 IntegerLiteralSeparator:
   Binary: 4
   Decimal: 3

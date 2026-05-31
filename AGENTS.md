@@ -74,6 +74,10 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 We follow the example of [curl](https://curl.se) and [Sqlite](https://sqlite.org/). Most of the rules are taken or
 inspired by them.
 
+We deviate from curl on indentation: we use tabs (tab width 4) with
+continuation indent 4 and column limit 120.  Curl uses 2-space indent
+and 79-column limit.
+
 After each change, follow the instructions in the README.md. When those instructions conflict with AGENTS.md or the
 command specific documentation, ask for additional instructions.
 
@@ -95,7 +99,11 @@ You can use the most recent C standard (C23). This means:
 Follow the options in .clang-tidy. You cannot modify that file.
 You cannot have `NOLINT` in the `.c` and `.h` files.
 
-We follow the [curl conventions](https://curl.se/dev/code-style.html), except for the fact that we are a C23 project.
+We follow the [curl conventions](https://curl.se/dev/code-style.html), except:
+
+- We use tabs for indentation (tab width 4, continuation indent 4), not spaces
+- We use a 120-column limit, not 79
+- We use the most recent C standard (C23)
 
 ## Compilation
 
@@ -190,7 +198,7 @@ int size = sizeof(int);
 
 Some statements cannot be completed on a single line because the line would be too long, the statement too hard to read, or due to other style guidelines above. In such a case the statement spans multiple lines.
 
-If a continuation line is part of an expression or sub-expression then you should align on the appropriate column so that it is easy to tell what part of the statement it is. Operators should not start continuation lines. In other cases follow the 2-space indent guideline
+If a continuation line is part of an expression or sub-expression then you should align on the appropriate column so that it is easy to tell what part of the statement it is. Operators should not start continuation lines. In other cases follow the 4-space continuation indent (one tab level).
 
 ## No typedefed structs
 

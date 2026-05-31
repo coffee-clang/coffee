@@ -42,7 +42,7 @@ int64_t handle_check(options *opts)
 	}
 
 	manifest_t *m = manifest_parse(manifest_path);
-	free(manifest_path);
+	sdsfree(manifest_path);
 
 	if (m == nullptr) {
 		fprintf_safe(stderr, "Error: Could not parse Coffee.toml\n");
@@ -61,48 +61,48 @@ int64_t handle_check(options *opts)
 	const char *cc = getenv("CC") != nullptr ? getenv("CC") : "clang";
 
 	/* Build include flags */
-	char   inc_flags[4096] = "-Ideps -Isrc -Iinclude -I.";
-	size_t off             = strlen(inc_flags);
+	sds inc_flags = sdsnew("-Ideps -Isrc -Iinclude -I.");
 
 	if (m->package.name) {
-		off += snprintf_safe(inc_flags + off, sizeof(inc_flags) - off, " -Iinclude/%s", m->package.name);
+		inc_flags = sdscatprintf(inc_flags, " -Iinclude/%s", m->package.name);
 	}
 
 	/* Collect all source files */
-	char cmd[8192];
-	off = snprintf_safe(cmd, sizeof(cmd), "%s -fsyntax-only %s", cc, inc_flags);
+	sds cmd = sdscatprintf(sdsempty(), "%s -fsyntax-only %s", cc, inc_flags);
+	sdsfree(inc_flags);
 
 	/* Add sources from manifest */
 	if (m->package.sources_count > 0) {
-		for (size_t i = 0; i < m->package.sources_count && off < sizeof(cmd); i++) {
-			off += snprintf_safe(cmd + off, sizeof(cmd) - off, " %s", m->package.sources[i]);
+		for (size_t i = 0; i < m->package.sources_count; i++) {
+			cmd = sdscatprintf(cmd, " %s", m->package.sources[i]);
 		}
 	} else {
 		/* Fall back to all .c files in src/ */
-		off += snprintf_safe(cmd + off, sizeof(cmd) - off, " src/*.c");
+		cmd = sdscatprintf(cmd, " src/*.c");
 	}
 
 	if (m->package.headers_count > 0) {
-		for (size_t i = 0; i < m->package.headers_count && off < sizeof(cmd); i++) {
-			off += snprintf_safe(cmd + off, sizeof(cmd) - off, " %s", m->package.headers[i]);
+		for (size_t i = 0; i < m->package.headers_count; i++) {
+			cmd = sdscatprintf(cmd, " %s", m->package.headers[i]);
 		}
 	} else {
 		glob_t globbuf;
 		if (glob("include/**/*.h", 0, nullptr, &globbuf) == 0) {
-			for (size_t i = 0; i < globbuf.gl_pathc && off < sizeof(cmd); i++) {
-				off += snprintf_safe(cmd + off, sizeof(cmd) - off, " %s", globbuf.gl_pathv[i]);
+			for (size_t i = 0; i < globbuf.gl_pathc; i++) {
+				cmd = sdscatprintf(cmd, " %s", globbuf.gl_pathv[i]);
 			}
 			globfree(&globbuf);
 		}
 	}
 
-	off += snprintf_safe(cmd + off, sizeof(cmd) - off, " 2>&1");
+	cmd = sdscatprintf(cmd, " 2>&1");
 
 	if (opts->verbose) {
 		printf("Running: %s\n", cmd);
 	}
 
 	int ret = system(cmd);
+	sdsfree(cmd);
 
 	manifest_free(m);
 

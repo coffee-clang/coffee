@@ -14,11 +14,11 @@ static void print_transitive_json(const char *name, const char *version, int dep
 		return;
 	}
 
-	char *ver = version != nullptr ? strdup(version) : nullptr;
+	sds ver = version != nullptr ? sdsnew(version) : nullptr;
 	printf("{\n");
 	printf("  \"name\": \"%s\",\n", name);
 	printf("  \"version\": \"%s\"", ver != nullptr ? ver : "?");
-	free(ver);
+	sdsfree(ver);
 
 	if (depth < max_depth) {
 		recipe_t *recipe = registry_get(name);
@@ -43,10 +43,8 @@ static void print_transitive_json(const char *name, const char *version, int dep
 					if (len > 0) {
 						const char *slash    = (const char *)memchr(start, '/', len);
 						size_t      name_len = slash != nullptr ? (size_t)(slash - start) : len;
-						dep_names            = realloc(dep_names, (dep_count + 1) * sizeof(char *));
-						dep_names[dep_count] = malloc(name_len + 1);
-						memccpy(dep_names[dep_count], start, '\0', name_len);
-						dep_names[dep_count][name_len] = '\0';
+						dep_names            = realloc(dep_names, (dep_count + 1) * sizeof(sds));
+						dep_names[dep_count] = sdsnewlen(start, name_len);
 						dep_count++;
 					}
 				}
@@ -66,7 +64,7 @@ static void print_transitive_json(const char *name, const char *version, int dep
 			}
 
 			for (size_t i = 0; i < dep_count; i++) {
-				free(dep_names[i]);
+				sdsfree(dep_names[i]);
 			}
 			free(dep_names);
 			registry_free_recipe(recipe);
@@ -86,7 +84,7 @@ int64_t handle_metadata(options *opts)
 	}
 
 	manifest_t *m = manifest_parse(manifest_path);
-	free(manifest_path);
+	sdsfree(manifest_path);
 
 	if (m == nullptr) {
 		fprintf_safe(stderr, "Error: Could not parse manifest\n");
@@ -137,8 +135,8 @@ int64_t handle_metadata(options *opts)
 		printf(",\n  \"transitive_deps\": [\n");
 		for (size_t i = 0; i < m->package.dependencies_count; i++) {
 			const char *entry    = m->package.dependencies[i];
-			char       *dep_name = nullptr;
-			char       *dep_ver  = nullptr;
+			sds         dep_name = nullptr;
+			sds         dep_ver  = nullptr;
 			manifest_extract_dep_info(entry, &dep_name, &dep_ver);
 
 			if (dep_name) {
@@ -148,8 +146,8 @@ int64_t handle_metadata(options *opts)
 					printf(",");
 				}
 				printf("\n");
-				free(dep_name);
-				free(dep_ver);
+				sdsfree(dep_name);
+				sdsfree(dep_ver);
 			}
 		}
 		printf("  ]\n");

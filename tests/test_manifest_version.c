@@ -1,3 +1,4 @@
+#include "../deps/sds/sds.h"
 #include "../src/manifest.h"
 #include "test_framework.h"
 
@@ -7,68 +8,68 @@
 
 TEST(extract_exact_version)
 {
-	char *name    = nullptr;
-	char *version = nullptr;
+	sds name    = nullptr;
+	sds version = nullptr;
 
 	manifest_extract_dep_info("toml = \"1.0.0\"", &name, &version);
 	ASSERT(name != nullptr, "name is nullptr");
 	ASSERT(strcmp(name, "toml") == 0, "name mismatch");
 	ASSERT(version != nullptr, "version is nullptr");
 	ASSERT(strcmp(version, "1.0.0") == 0, "version mismatch");
-	free(name);
-	free(version);
+	sdsfree(name);
+	sdsfree(version);
 	PASS();
 }
 
 TEST(extract_wildcard)
 {
-	char *name    = nullptr;
-	char *version = nullptr;
+	sds name    = nullptr;
+	sds version = nullptr;
 
 	manifest_extract_dep_info("sds = \"*\"", &name, &version);
 	ASSERT(name != nullptr, "name is nullptr");
 	ASSERT(strcmp(name, "sds") == 0, "name mismatch");
 	ASSERT(version != nullptr, "version is nullptr");
 	ASSERT(strcmp(version, "*") == 0, "version mismatch");
-	free(name);
-	free(version);
+	sdsfree(name);
+	sdsfree(version);
 	PASS();
 }
 
 TEST(extract_range)
 {
-	char *name    = nullptr;
-	char *version = nullptr;
+	sds name    = nullptr;
+	sds version = nullptr;
 
 	manifest_extract_dep_info("json = \">=2.0\"", &name, &version);
 	ASSERT(name != nullptr, "name is nullptr");
 	ASSERT(strcmp(name, "json") == 0, "name mismatch");
 	ASSERT(version != nullptr, "version is nullptr");
 	ASSERT(strcmp(version, ">=2.0") == 0, "version mismatch");
-	free(name);
-	free(version);
+	sdsfree(name);
+	sdsfree(version);
 	PASS();
 }
 
 TEST(extract_no_version)
 {
-	char *name    = nullptr;
-	char *version = nullptr;
+	sds name    = nullptr;
+	sds version = nullptr;
 
 	manifest_extract_dep_info("mylib", &name, &version);
 	ASSERT(name != nullptr, "name is nullptr");
 	ASSERT(strcmp(name, "mylib") == 0, "name mismatch");
 	ASSERT(version != nullptr, "version is nullptr");
 	ASSERT(strcmp(version, "*") == 0, "version should default to *");
-	free(name);
-	free(version);
+	sdsfree(name);
+	sdsfree(version);
 	PASS();
 }
 
 TEST(extract_null_input)
 {
-	char *name    = (char *)0xdeadbeef;
-	char *version = (char *)0xdeadbeef;
+	sds name    = (sds)0xdeadbeef;
+	sds version = (sds)0xdeadbeef;
 
 	manifest_extract_dep_info(nullptr, &name, &version);
 	ASSERT(name == nullptr, "name should be nullptr for nullptr entry");

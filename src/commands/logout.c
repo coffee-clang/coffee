@@ -14,10 +14,10 @@ int64_t handle_logout(options *opts)
 		return 1;
 	}
 
-	char cred_path[4'096];
-	snprintf_safe(cred_path, sizeof(cred_path), "%s/.coffee/credentials", home);
+	sds cred_path = sdscatprintf(sdsempty(), "%s/.coffee/credentials", home);
 
 	if (access(cred_path, F_OK) != 0) {
+		sdsfree(cred_path);
 		printf("Not logged in (no credentials found).\n");
 		return 0;
 	}
@@ -26,8 +26,10 @@ int64_t handle_logout(options *opts)
 		printf("Successfully logged out. Removed credentials from %s\n", cred_path);
 	} else {
 		fprintf_safe(stderr, "Error: Could not remove credentials from %s\n", cred_path);
+		sdsfree(cred_path);
 		return 1;
 	}
 
+	sdsfree(cred_path);
 	return 0;
 }

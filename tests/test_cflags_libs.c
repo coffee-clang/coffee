@@ -22,12 +22,12 @@ TEST(pkg_dir_exists)
 	const char *home = getenv("HOME");
 	ASSERT(home, "HOME not set");
 
-	char pkgdir[4096];
-	snprintf(pkgdir, sizeof(pkgdir), "%s/.coffee/deps/test-pkg", home);
+	sds pkgdir = sdscatprintf(sdsempty(), "%s/.coffee/deps/test-pkg", home);
 
 	mkdir(pkgdir, 0755);
 
 	ASSERT(access(pkgdir, F_OK) == 0, "pkg directory should exist");
+	sdsfree(pkgdir);
 
 	PASS();
 }
@@ -37,12 +37,10 @@ TEST(library_toml_with_include)
 	const char *home = getenv("HOME");
 	ASSERT(home, "HOME not set");
 
-	char pkgdir[4096];
-	snprintf(pkgdir, sizeof(pkgdir), "%s/.coffee/deps/test-pkg", home);
+	sds pkgdir = sdscatprintf(sdsempty(), "%s/.coffee/deps/test-pkg", home);
 	mkdir(pkgdir, 0755);
 
-	char toml_path[4096];
-	snprintf(toml_path, sizeof(toml_path), "%s/library.toml", pkgdir);
+	sds toml_path = sdscatprintf(sdsempty(), "%s/library.toml", pkgdir);
 
 	create_file(toml_path, "title = \"test-pkg\"\n"
 	                       "version = \"1.0\"\n"
@@ -50,14 +48,21 @@ TEST(library_toml_with_include)
 
 	FILE *fp = fopen(toml_path, "r");
 	ASSERT(fp, "library.toml should exist");
-	char   buf[1024];
-	size_t len = fread(buf, 1, sizeof(buf) - 1, fp);
-	buf[len]   = '\0';
+	sds    buf = sdsempty();
+	char   chunk[1024];
+	size_t n;
+	while ((n = fread(chunk, 1, sizeof(chunk), fp)) > 0) {
+		buf = sdscatlen(buf, chunk, n);
+	}
 	fclose(fp);
+
+	sdsfree(toml_path);
+	sdsfree(pkgdir);
 
 	ASSERT(strstr(buf, "include = ["), "library.toml missing include key");
 	ASSERT(strstr(buf, "src/include"), "library.toml missing second include path");
 
+	sdsfree(buf);
 	PASS();
 }
 
@@ -66,12 +71,10 @@ TEST(library_toml_with_libname)
 	const char *home = getenv("HOME");
 	ASSERT(home, "HOME not set");
 
-	char pkgdir[4096];
-	snprintf(pkgdir, sizeof(pkgdir), "%s/.coffee/deps/test-pkg", home);
+	sds pkgdir = sdscatprintf(sdsempty(), "%s/.coffee/deps/test-pkg", home);
 	mkdir(pkgdir, 0755);
 
-	char toml_path[4096];
-	snprintf(toml_path, sizeof(toml_path), "%s/library.toml", pkgdir);
+	sds toml_path = sdscatprintf(sdsempty(), "%s/library.toml", pkgdir);
 
 	create_file(toml_path, "title = \"test-pkg\"\n"
 	                       "version = \"1.0\"\n"
@@ -80,14 +83,21 @@ TEST(library_toml_with_libname)
 
 	FILE *fp = fopen(toml_path, "r");
 	ASSERT(fp, "library.toml should exist");
-	char   buf[1024];
-	size_t len = fread(buf, 1, sizeof(buf) - 1, fp);
-	buf[len]   = '\0';
+	sds    buf = sdsempty();
+	char   chunk[1024];
+	size_t n;
+	while ((n = fread(chunk, 1, sizeof(chunk), fp)) > 0) {
+		buf = sdscatlen(buf, chunk, n);
+	}
 	fclose(fp);
+
+	sdsfree(toml_path);
+	sdsfree(pkgdir);
 
 	ASSERT(strstr(buf, "libname = \"testpkg\""), "library.toml missing libname key");
 	ASSERT(strstr(buf, "lib = ["), "library.toml missing lib key");
 
+	sdsfree(buf);
 	PASS();
 }
 
@@ -96,25 +106,26 @@ TEST(fallback_no_keys)
 	const char *home = getenv("HOME");
 	ASSERT(home, "HOME not set");
 
-	char pkgdir[4096];
-	snprintf(pkgdir, sizeof(pkgdir), "%s/.coffee/deps/test-nokeys", home);
+	sds pkgdir = sdscatprintf(sdsempty(), "%s/.coffee/deps/test-nokeys", home);
 	mkdir(pkgdir, 0755);
 
-	char incdir[4096];
-	snprintf(incdir, sizeof(incdir), "%s/include", pkgdir);
+	sds incdir = sdscatprintf(sdsempty(), "%s/include", pkgdir);
 	mkdir(incdir, 0755);
 
-	char libdir[4096];
-	snprintf(libdir, sizeof(libdir), "%s/lib", pkgdir);
+	sds libdir = sdscatprintf(sdsempty(), "%s/lib", pkgdir);
 	mkdir(libdir, 0755);
 
-	char toml_path[4096];
-	snprintf(toml_path, sizeof(toml_path), "%s/library.toml", pkgdir);
+	sds toml_path = sdscatprintf(sdsempty(), "%s/library.toml", pkgdir);
 	create_file(toml_path, "title = \"test-nokeys\"\n"
 	                       "version = \"1.0\"\n");
 
 	ASSERT(access(incdir, F_OK) == 0, "fallback include dir should exist");
 	ASSERT(access(libdir, F_OK) == 0, "fallback lib dir should exist");
+
+	sdsfree(toml_path);
+	sdsfree(incdir);
+	sdsfree(libdir);
+	sdsfree(pkgdir);
 
 	PASS();
 }
@@ -124,10 +135,10 @@ TEST(pkg_not_installed)
 	const char *home = getenv("HOME");
 	ASSERT(home, "HOME not set");
 
-	char pkgdir[4096];
-	snprintf(pkgdir, sizeof(pkgdir), "%s/.coffee/deps/nonexistent-pkg", home);
+	sds pkgdir = sdscatprintf(sdsempty(), "%s/.coffee/deps/nonexistent-pkg", home);
 
 	ASSERT(access(pkgdir, F_OK) != 0, "nonexistent package dir should not exist");
+	sdsfree(pkgdir);
 
 	PASS();
 }

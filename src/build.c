@@ -1,5 +1,6 @@
 #include "build.h"
 
+#include "../deps/sds/sds.h"
 #include "strings.h"
 
 #include <stdbool.h>
@@ -76,7 +77,7 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 			flags_str = "-g";
 		}
 	}
-	char *flags = strdup(flags_str);
+	sds flags = sdsnew(flags_str);
 
 	resolved_features_t *resolved     = nullptr;
 	bool                 has_features = false;
@@ -98,14 +99,10 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 
 		if (resolved) {
 			size_t dflags_count = 0;
-			char **dflags       = features_to_compiler_flags(resolved, name, &dflags_count);
+			sds   *dflags       = features_to_compiler_flags(resolved, name, &dflags_count);
 			for (size_t i = 0; i < dflags_count; i++) {
-				size_t new_len   = strlen(flags) + strlen(dflags[i]) + 2;
-				char  *new_flags = malloc(new_len);
-				snprintf_safe(new_flags, new_len, "%s %s", flags, dflags[i]);
-				free(flags);
-				free(dflags[i]);
-				flags = new_flags;
+				flags = sdscatfmt(flags, " %s", dflags[i]);
+				sdsfree(dflags[i]);
 			}
 			free((void *)dflags);
 		}
@@ -115,17 +112,16 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 	ret = glob("src/*.c", 0, nullptr, &globbuf);
 	if (ret != 0) {
 		fprintf_safe(stderr, "Error: No source files found in src/*.c\n");
-		free(flags);
+		sdsfree(flags);
 		if (resolved) {
 			features_free(resolved);
 		}
 		return 1;
 	}
 
-	char outpath[4096];
-	ret = snprintf_safe(outpath, sizeof(outpath), "%s/%s", output_dir, name);
-	if (ret < 0 || (size_t)ret >= sizeof(outpath)) {
-		free(flags);
+	sds outpath = sdscatprintf(sdsempty(), "%s/%s", output_dir, name);
+	if (outpath == nullptr) {
+		sdsfree(flags);
 		globfree(&globbuf);
 		if (resolved) {
 			features_free(resolved);
@@ -143,7 +139,7 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 	int    argc_total    = 1 + max_tokens + 2 + (int)globbuf.gl_pathc + 1;
 	char **compiler_argv = (char **)malloc(sizeof(char *) * ((size_t)argc_total + 1));
 	if (compiler_argv == nullptr) {
-		free(flags);
+		sdsfree(flags);
 		globfree(&globbuf);
 		if (resolved) {
 			features_free(resolved);
@@ -154,7 +150,7 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 	int idx              = 0;
 	compiler_argv[idx++] = (char *)cc;
 
-	char *flags_copy = strdup(flags);
+	sds   flags_copy = sdsdup(flags);
 	char *saveptr;
 	char *token = strtok_r(flags_copy, " ", &saveptr);
 	while (token) {
@@ -170,11 +166,12 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 	}
 	compiler_argv[idx] = nullptr;
 
-	free(flags);
+	sdsfree(flags);
 
 	ret = run_command(compiler_argv, verbose);
 
-	free(flags_copy);
+	sdsfree(outpath);
+	sdsfree(flags_copy);
 	free((void *)compiler_argv);
 	globfree(&globbuf);
 
@@ -185,7 +182,7 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 	return ret;
 }
 
-int build_run(manifest_t *manifest, build_opts_t *opts, char **args, int argc)
+int build_run(manifest_t *manifest, build_opts_t *opts, sds *args, int argc)
 {
 	int ret = build_project(manifest, opts);
 	if (ret != 0) {
@@ -195,20 +192,21 @@ int build_run(manifest_t *manifest, build_opts_t *opts, char **args, int argc)
 	const char *output_dir = opts != nullptr && opts->target_dir != nullptr ? opts->target_dir : "target/debug";
 	const char *name       = manifest->package.name;
 
-	char exe_path[4096];
-	ret = snprintf_safe(exe_path, sizeof(exe_path), "%s/%s", output_dir, name);
-	if (ret < 0 || (size_t)ret >= sizeof(exe_path)) {
+	sds exe_path = sdscatprintf(sdsempty(), "%s/%s", output_dir, name);
+	if (exe_path == nullptr) {
 		return 1;
 	}
 
 	if (access(exe_path, X_OK) != 0) {
 		fprintf_safe(stderr, "Error: Executable not found: %s\n", exe_path);
+		sdsfree(exe_path);
 		return 1;
 	}
 
 	int    total    = 1 + (args != nullptr ? argc : 0) + 1;
 	char **run_argv = (char **)malloc(sizeof(char *) * (size_t)total);
 	if (run_argv == nullptr) {
+		sdsfree(exe_path);
 		return 1;
 	}
 
@@ -224,6 +222,7 @@ int build_run(manifest_t *manifest, build_opts_t *opts, char **args, int argc)
 		verbose = opts->verbose;
 	}
 	ret = run_command(run_argv, verbose);
+	sdsfree(exe_path);
 	free((void *)run_argv);
 	return ret;
 }

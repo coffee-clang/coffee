@@ -136,7 +136,7 @@ TEST(feature_no_default)
 
 TEST(cli_parsing)
 {
-	char **features = nullptr;
+	sds   *features = nullptr;
 	size_t count    = 0;
 	features_parse_cli("json,xml,logging", &features, &count);
 	ASSERT(count == 3, "expected 3 features");
@@ -145,7 +145,7 @@ TEST(cli_parsing)
 	ASSERT(strcmp(features[2], "logging") == 0, "third feature should be logging");
 
 	for (size_t i = 0; i < count; i++) {
-		free(features[i]);
+		sdsfree(features[i]);
 	}
 	free(features);
 
@@ -172,7 +172,7 @@ TEST(compiler_flags)
 	ASSERT(resolved != nullptr, "features_resolve returned nullptr");
 
 	size_t flags_count = 0;
-	char **flags       = features_to_compiler_flags(resolved, "test", &flags_count);
+	sds   *flags       = features_to_compiler_flags(resolved, "test", &flags_count);
 	ASSERT(flags != nullptr, "features_to_compiler_flags returned nullptr");
 	ASSERT(flags_count == 2, "expected 2 flags");
 
@@ -185,7 +185,7 @@ TEST(compiler_flags)
 		if (strcmp(flags[i], "-DFEATURE_ADVANCED_LOGGING") == 0) {
 			found_logging = 1;
 		}
-		free(flags[i]);
+		sdsfree(flags[i]);
 	}
 	free(flags);
 

@@ -41,13 +41,11 @@ command_s commands[] = {
 	{ .name        = "locate-project",
 	  .description = "Print the location of a project's manifest file",
 	  .action      = &handle_locate_project },
-	{ .name = "login", .description = "Save an API token for registry authentication", .action = &handle_login },
 	{ .name = "logout", .description = "Remove an API token for the registry locally", .action = &handle_logout },
 	{ .name = "machete", .description = "Detect unused dependencies", .action = &handle_machete },
 	{ .name        = "metadata",
 	  .description = "Output the resolved dependencies of a package in machine-readable format",
 	  .action      = &handle_metadata },
-	{ .name = "miri", .description = "Run Miri", .action = &handle_miri },
 	{ .name = "new", .description = "Create a new coffee package", .action = &handle_new },
 	{ .name = "owner", .description = "Manage the owners of a crate on the registry", .action = &handle_owner },
 	{ .name        = "package",
@@ -91,6 +89,9 @@ int main(int argc, char **argv)
 	}
 
 	/* Process all options */
+	/* Ownership: args_info owns the sds strings. options borrows them.
+	 * Since cmdline_parser_free is only called on error paths (exit on success),
+	 * this is safe. */
 	options opt = {
 		.offline    = args_info.offline_given,
 		.locked     = args_info.locked_given,
