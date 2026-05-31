@@ -29,14 +29,14 @@ int64_t handle_generate_lockfile(options *opts)
 	char lockfile_path[4'096];
 	snprintf_safe(lockfile_path, sizeof(lockfile_path), "Coffee.lock");
 
-	char **features		  = nullptr;
+	char **features       = nullptr;
 	size_t features_count = 0;
 	if (opts->features) {
 		features_parse_cli(opts->features, &features, &features_count);
 	}
 
 	resolved_features_t *resolved = features_resolve(manifest, (const char **)features, features_count,
-													 opts->all_features, opts->no_default_features);
+	                                                 opts->all_features, opts->no_default_features);
 
 	if (features) {
 		for (size_t i = 0; i < features_count; i++) {

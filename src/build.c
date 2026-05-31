@@ -52,7 +52,7 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 		return 1;
 	}
 
-	const char *cc		   = getenv("CC") != nullptr ? getenv("CC") : "clang";
+	const char *cc         = getenv("CC") != nullptr ? getenv("CC") : "clang";
 	const char *output_dir = opts != nullptr && opts->target_dir != nullptr ? opts->target_dir : "target/debug";
 
 	bool verbose = false;
@@ -61,7 +61,7 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 	}
 
 	char *mkdir_argv[] = { (char *)"mkdir", (char *)"-p", (char *)output_dir, nullptr };
-	int	  ret		   = run_command(mkdir_argv, verbose);
+	int   ret          = run_command(mkdir_argv, verbose);
 	if (ret != 0) {
 		return 1;
 	}
@@ -78,8 +78,8 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 	}
 	char *flags = strdup(flags_str);
 
-	resolved_features_t *resolved	  = nullptr;
-	bool				 has_features = false;
+	resolved_features_t *resolved     = nullptr;
+	bool                 has_features = false;
 	if (opts != nullptr) {
 		if (opts->features_count > 0) {
 			has_features = true;
@@ -94,13 +94,13 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 			requested = (const char **)opts->features;
 		}
 		resolved =
-			features_resolve(manifest, requested, opts->features_count, opts->all_features, opts->no_default_features);
+		    features_resolve(manifest, requested, opts->features_count, opts->all_features, opts->no_default_features);
 
 		if (resolved) {
 			size_t dflags_count = 0;
-			char **dflags		= features_to_compiler_flags(resolved, name, &dflags_count);
+			char **dflags       = features_to_compiler_flags(resolved, name, &dflags_count);
 			for (size_t i = 0; i < dflags_count; i++) {
-				size_t new_len	 = strlen(flags) + strlen(dflags[i]) + 2;
+				size_t new_len   = strlen(flags) + strlen(dflags[i]) + 2;
 				char  *new_flags = malloc(new_len);
 				snprintf_safe(new_flags, new_len, "%s %s", flags, dflags[i]);
 				free(flags);
@@ -140,7 +140,7 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 		}
 	}
 
-	int	   argc_total	 = 1 + max_tokens + 2 + (int)globbuf.gl_pathc + 1;
+	int    argc_total    = 1 + max_tokens + 2 + (int)globbuf.gl_pathc + 1;
 	char **compiler_argv = (char **)malloc(sizeof(char *) * ((size_t)argc_total + 1));
 	if (compiler_argv == nullptr) {
 		free(flags);
@@ -151,7 +151,7 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 		return 1;
 	}
 
-	int idx				 = 0;
+	int idx              = 0;
 	compiler_argv[idx++] = (char *)cc;
 
 	char *flags_copy = strdup(flags);
@@ -159,7 +159,7 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 	char *token = strtok_r(flags_copy, " ", &saveptr);
 	while (token) {
 		compiler_argv[idx++] = token;
-		token				 = strtok_r(nullptr, " ", &saveptr);
+		token                = strtok_r(nullptr, " ", &saveptr);
 	}
 
 	compiler_argv[idx++] = (char *)"-o";
@@ -193,7 +193,7 @@ int build_run(manifest_t *manifest, build_opts_t *opts, char **args, int argc)
 	}
 
 	const char *output_dir = opts != nullptr && opts->target_dir != nullptr ? opts->target_dir : "target/debug";
-	const char *name	   = manifest->package.name;
+	const char *name       = manifest->package.name;
 
 	char exe_path[4096];
 	ret = snprintf_safe(exe_path, sizeof(exe_path), "%s/%s", output_dir, name);
@@ -206,13 +206,13 @@ int build_run(manifest_t *manifest, build_opts_t *opts, char **args, int argc)
 		return 1;
 	}
 
-	int	   total	= 1 + (args != nullptr ? argc : 0) + 1;
+	int    total    = 1 + (args != nullptr ? argc : 0) + 1;
 	char **run_argv = (char **)malloc(sizeof(char *) * (size_t)total);
 	if (run_argv == nullptr) {
 		return 1;
 	}
 
-	int idx			= 0;
+	int idx         = 0;
 	run_argv[idx++] = exe_path;
 	for (int i = 0; i < argc && args; i++) {
 		run_argv[idx++] = args[i];

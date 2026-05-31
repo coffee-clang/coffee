@@ -41,7 +41,7 @@ static int analyze_file(const char *filepath, int *file_count, int *issue_count)
 	(*file_count)++;
 
 	char line[4'096];
-	int	 line_num = 0;
+	int  line_num = 0;
 	while (fgets(line, sizeof(line), fp)) {
 		line_num++;
 		char *p = line;
@@ -55,7 +55,7 @@ static int analyze_file(const char *filepath, int *file_count, int *issue_count)
 				start++;
 				char *end = strchr(start, '"');
 				if (end) {
-					*end	  = '\0';
+					*end      = '\0';
 					FILE *inc = fopen(start, "r");
 					if (inc == nullptr) {
 						printf("  %s:%d: warning: included file '%s' not found\n", filepath, line_num, start);
@@ -125,7 +125,7 @@ int64_t handle_miri(options *opts)
 
 	manifest_free(m);
 
-	int file_count	= 0;
+	int file_count  = 0;
 	int issue_count = 0;
 
 	printf("Running static analysis...\n\n");

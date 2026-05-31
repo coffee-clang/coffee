@@ -65,7 +65,7 @@ TEST(makefile_is_created)
 TEST(dep_appended_to_makefile)
 {
 	const char *tmp_make = "/tmp/coffee-makefile-add-test.mk";
-	FILE	   *fp		 = fopen(tmp_make, "w");
+	FILE       *fp       = fopen(tmp_make, "w");
 	ASSERT(fp, "could not create test Makefile");
 	fprintf_safe(fp, "CC ?= clang\n");
 	fprintf_safe(fp, "build:\n");
@@ -149,8 +149,8 @@ TEST(safe_package_name)
 
 	const char *invalid[] = { "bad name", "bad$name", "bad;name", "bad\nname", "$(shell)", nullptr };
 	for (int i = 0; invalid[i]; i++) {
-		const char *p	  = invalid[i];
-		int			found = 0;
+		const char *p     = invalid[i];
+		int         found = 0;
 		while (*p && !found) {
 			int c = (unsigned char)*p;
 			if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-')) {

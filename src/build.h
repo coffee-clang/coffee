@@ -10,10 +10,10 @@ typedef struct {
 	bool   verbose;
 	bool   release;
 	bool   debug;
-	sds	   target;
-	sds	   target_dir;
-	int	   jobs;
-	sds	  *features;
+	sds    target;
+	sds    target_dir;
+	int    jobs;
+	sds   *features;
 	size_t features_count;
 	bool   all_features;
 	bool   no_default_features;

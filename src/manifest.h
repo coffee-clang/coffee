@@ -6,54 +6,54 @@
 #include <toml.h>
 
 typedef struct {
-	sds	   name;
-	sds	   version;
-	sds	   edition;
-	sds	   description;
-	sds	   license;
-	sds	   repository;
-	sds	   authors;
-	sds	  *dependencies;
+	sds    name;
+	sds    version;
+	sds    edition;
+	sds    description;
+	sds    license;
+	sds    repository;
+	sds    authors;
+	sds   *dependencies;
 	size_t dependencies_count;
-	sds	  *sources;
+	sds   *sources;
 	size_t sources_count;
-	sds	  *headers;
+	sds   *headers;
 	size_t headers_count;
 } package_t;
 
 typedef struct {
 	package_t package;
-	sds		  name;
-	sds		  version;
-	sds		  path;
-	sds		  git;
-	sds		  branch;
-	sds		  tag;
-	sds		  rev;
-	bool	  optional;
+	sds       name;
+	sds       version;
+	sds       path;
+	sds       git;
+	sds       branch;
+	sds       tag;
+	sds       rev;
+	bool      optional;
 } dependency_t;
 
 typedef struct {
 	dependency_t *deps;
-	size_t		  deps_count;
+	size_t        deps_count;
 } dependencies_t;
 
 typedef struct {
-	sds	   name;
-	sds	  *deps;
+	sds    name;
+	sds   *deps;
 	size_t deps_count;
 } feature_def_t;
 
 typedef struct {
-	package_t	   package;
+	package_t      package;
 	dependencies_t dependencies;
 	feature_def_t *features;
-	size_t		   features_count;
+	size_t         features_count;
 } manifest_t;
 
 manifest_t *manifest_parse(sds path);
-void		manifest_free(manifest_t *m);
-int			manifest_write(sds path, manifest_t *m);
+void        manifest_free(manifest_t *m);
+int         manifest_write(sds path, manifest_t *m);
 
 /**
  * Extract package name and version constraint from a dependency entry.

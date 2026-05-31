@@ -35,8 +35,8 @@ static void append_libs_for_pkg(const char *name, char *buf, size_t bufsz, size_
 		return;
 	}
 
-	int			has_libdir = 0;
-	char		libname_buf[256];
+	int         has_libdir = 0;
+	char        libname_buf[256];
 	const char *libname = name;
 
 	char toml_path[4'096];
@@ -44,7 +44,7 @@ static void append_libs_for_pkg(const char *name, char *buf, size_t bufsz, size_
 
 	FILE *fp = fopen(toml_path, "r");
 	if (fp) {
-		char		  errbuf[256];
+		char          errbuf[256];
 		toml_table_t *conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
 		if (conf) {
 			/* Read libname override */
@@ -107,7 +107,7 @@ int64_t handle_libs(options *opts)
 {
 	char   buf[8'192];
 	size_t off = 0;
-	buf[0]	   = '\0';
+	buf[0]     = '\0';
 
 	if (opts->inputs_num > 1) {
 		append_libs_for_pkg(opts->inputs[1], buf, sizeof(buf), &off);

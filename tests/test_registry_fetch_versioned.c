@@ -17,7 +17,7 @@ TEST(fetch_to_versioned_path)
 	}
 
 	const char *test_dir = "/tmp/coffee_test_registry_fetch";
-	char		clean_cmd[4096];
+	char        clean_cmd[4096];
 	snprintf(clean_cmd, sizeof(clean_cmd), "rm -rf %s", test_dir);
 	system(clean_cmd);
 
@@ -49,7 +49,7 @@ TEST(fetch_creates_directories)
 	}
 
 	const char *test_dir = "/tmp/coffee_test_registry_mkdirs";
-	char		clean_cmd[4096];
+	char        clean_cmd[4096];
 	snprintf(clean_cmd, sizeof(clean_cmd), "rm -rf %s", test_dir);
 	system(clean_cmd);
 

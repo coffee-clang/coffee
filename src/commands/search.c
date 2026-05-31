@@ -30,10 +30,10 @@ int64_t handle_search(options *opts)
 	printf("%-20s %-10s %s\n", "----", "-------", "-----------");
 
 	for (size_t i = 0; i < list->count; i++) {
-		recipe_t   *r		= &list->recipes[i];
-		const char *name	= r->name != nullptr ? r->name : "-";
+		recipe_t   *r       = &list->recipes[i];
+		const char *name    = r->name != nullptr ? r->name : "-";
 		const char *version = r->version != nullptr ? r->version : "-";
-		const char *desc	= r->description != nullptr ? r->description : "";
+		const char *desc    = r->description != nullptr ? r->description : "";
 
 		if (strlen(desc) > 50) {
 			printf("%-20s %-10s %.50s...\n", name, version, desc);

@@ -41,9 +41,9 @@ static void print_transitive_json(const char *name, const char *version, int dep
 					}
 					size_t len = (size_t)(p - start);
 					if (len > 0) {
-						const char *slash	 = (const char *)memchr(start, '/', len);
-						size_t		name_len = slash != nullptr ? (size_t)(slash - start) : len;
-						dep_names			 = realloc(dep_names, (dep_count + 1) * sizeof(char *));
+						const char *slash    = (const char *)memchr(start, '/', len);
+						size_t      name_len = slash != nullptr ? (size_t)(slash - start) : len;
+						dep_names            = realloc(dep_names, (dep_count + 1) * sizeof(char *));
 						dep_names[dep_count] = malloc(name_len + 1);
 						memccpy(dep_names[dep_count], start, '\0', name_len);
 						dep_names[dep_count][name_len] = '\0';
@@ -136,9 +136,9 @@ int64_t handle_metadata(options *opts)
 	if (m->package.dependencies_count > 0) {
 		printf(",\n  \"transitive_deps\": [\n");
 		for (size_t i = 0; i < m->package.dependencies_count; i++) {
-			const char *entry	 = m->package.dependencies[i];
-			char	   *dep_name = nullptr;
-			char	   *dep_ver	 = nullptr;
+			const char *entry    = m->package.dependencies[i];
+			char       *dep_name = nullptr;
+			char       *dep_ver  = nullptr;
 			manifest_extract_dep_info(entry, &dep_name, &dep_ver);
 
 			if (dep_name) {

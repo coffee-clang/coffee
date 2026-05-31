@@ -11,14 +11,14 @@
 
 int64_t handle_test(options *opts)
 {
-	manifest_t *manifest	  = nullptr;
-	char	   *manifest_path = project_find_manifest(nullptr);
+	manifest_t *manifest      = nullptr;
+	char       *manifest_path = project_find_manifest(nullptr);
 
 	if (manifest_path) {
 		manifest = manifest_parse(manifest_path);
 	}
 
-	char *dir_end	 = manifest_path != nullptr ? strrchr(manifest_path, '/') : nullptr;
+	char *dir_end    = manifest_path != nullptr ? strrchr(manifest_path, '/') : nullptr;
 	bool  in_project = false;
 	char  project_dir[4096];
 
@@ -29,7 +29,7 @@ int64_t handle_test(options *opts)
 		}
 		memccpy(project_dir, manifest_path, '\0', len);
 		project_dir[len] = '\0';
-		in_project		 = true;
+		in_project       = true;
 	} else {
 		project_dir[0] = '.';
 		project_dir[1] = '\0';
@@ -38,7 +38,7 @@ int64_t handle_test(options *opts)
 	free(manifest_path);
 
 	char cmd[4096];
-	int	 off = 0;
+	int  off = 0;
 
 	/* Step 1: Build the test runner */
 	if (in_project) {

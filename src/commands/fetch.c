@@ -43,7 +43,7 @@ int64_t handle_fetch(options *opts)
 
 		// Dependencies might be "name = \"*\"" or just "name"
 		// This is a simple parser to get the name
-		char *name	 = strdup(package);
+		char *name   = strdup(package);
 		char *equals = strchr(name, '=');
 		if (equals) {
 			*equals = '\0';

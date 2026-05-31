@@ -71,7 +71,7 @@ static bool semver_match(const char *constraint, const char *candidate)
 		return false;
 	}
 
-	semver_t	con;
+	semver_t    con;
 	const char *p = constraint;
 
 	if (*p == '=') {
@@ -130,7 +130,7 @@ static int create_symlink(const char *target, const char *link_path)
 		}
 	}
 
-	char *link_copy	 = strdup(link_path);
+	char *link_copy  = strdup(link_path);
 	char *last_slash = strrchr(link_copy, '/');
 	if (last_slash) {
 		*last_slash = '\0';
@@ -169,7 +169,7 @@ int64_t handle_update(options *opts)
 	}
 
 	const char *coffee_home = coffee_home_dir();
-	char		global_deps[4'096];
+	char        global_deps[4'096];
 	snprintf_safe(global_deps, sizeof(global_deps), "%s/deps", coffee_home);
 	mkdir(global_deps, 0755);
 
@@ -187,7 +187,7 @@ int64_t handle_update(options *opts)
 	for (size_t i = 0; i < m->package.dependencies_count; i++) {
 		const char *entry = m->package.dependencies[i];
 
-		char *name				 = nullptr;
+		char *name               = nullptr;
 		char *version_constraint = nullptr;
 		manifest_extract_dep_info(entry, &name, &version_constraint);
 
@@ -216,7 +216,7 @@ int64_t handle_update(options *opts)
 		if (version_constraint != nullptr && strcmp(version_constraint, "*") != 0) {
 			if (!semver_match(version_constraint, resolved_version)) {
 				fprintf_safe(stderr, "  Warning: No version of '%s' matches constraint '%s' (latest is %s)\n", name,
-							 version_constraint, resolved_version);
+				             version_constraint, resolved_version);
 				free(name);
 				free(version_constraint);
 				registry_free_versions(versions);

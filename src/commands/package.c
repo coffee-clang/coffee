@@ -28,7 +28,7 @@ int64_t handle_package(options *opts)
 
 	printf("Packaging project...\n");
 
-	const char *name	= m->package.name != nullptr ? m->package.name : "project";
+	const char *name    = m->package.name != nullptr ? m->package.name : "project";
 	const char *version = m->package.version != nullptr ? m->package.version : "0.1.0";
 
 	char package_dir[] = "target/package";

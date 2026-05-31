@@ -9,7 +9,7 @@
 #Standard: c23
 
 # --- Indentation ---
-UseTab: Always
+UseTab: ForIndentation
 IndentWidth: 4
 TabWidth: 4
 ContinuationIndentWidth: 4

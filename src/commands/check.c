@@ -62,7 +62,7 @@ int64_t handle_check(options *opts)
 
 	/* Build include flags */
 	char   inc_flags[4096] = "-Ideps -Isrc -Iinclude -I.";
-	size_t off			   = strlen(inc_flags);
+	size_t off             = strlen(inc_flags);
 
 	if (m->package.name) {
 		off += snprintf_safe(inc_flags + off, sizeof(inc_flags) - off, " -Iinclude/%s", m->package.name);

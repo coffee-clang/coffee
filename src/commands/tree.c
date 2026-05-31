@@ -32,10 +32,10 @@ static void parse_dep_list(const char *input, char ***out_names, size_t *out_cou
 
 		size_t len = (size_t)(p - start);
 		if (len > 0) {
-			const char *slash	 = (const char *)memchr(start, '/', len);
-			size_t		name_len = slash != nullptr ? (size_t)(slash - start) : len;
+			const char *slash    = (const char *)memchr(start, '/', len);
+			size_t      name_len = slash != nullptr ? (size_t)(slash - start) : len;
 
-			*out_names				 = realloc(*out_names, (*out_count + 1) * sizeof(char *));
+			*out_names               = realloc(*out_names, (*out_count + 1) * sizeof(char *));
 			(*out_names)[*out_count] = malloc(name_len + 1);
 			memccpy((*out_names)[*out_count], start, '\0', name_len);
 			(*out_names)[*out_count][name_len] = '\0';
@@ -45,14 +45,14 @@ static void parse_dep_list(const char *input, char ***out_names, size_t *out_cou
 }
 
 static void print_transitive(const char *name, const char *version, const char *prefix, bool is_last, int depth,
-							 int max_depth)
+                             int max_depth)
 {
 	if (depth > max_depth) {
 		return;
 	}
 
 	const char *connector = (int)is_last ? "└── " : "├── ";
-	char	   *ver		  = version != nullptr ? strdup(version) : nullptr;
+	char       *ver       = version != nullptr ? strdup(version) : nullptr;
 	printf("%s%s%s v%s\n", prefix, connector, name != nullptr ? name : "?", ver != nullptr ? ver : "?");
 	free(ver);
 
@@ -101,15 +101,15 @@ int64_t handle_tree(options *opts)
 		return 1;
 	}
 
-	const char *name	= m->package.name != nullptr ? m->package.name : "project";
+	const char *name    = m->package.name != nullptr ? m->package.name : "project";
 	const char *version = m->package.version != nullptr ? m->package.version : "0.1.0";
 
 	printf("%s v%s\n", name, version);
 
 	for (size_t i = 0; i < m->package.dependencies_count; i++) {
-		const char *entry		= m->package.dependencies[i];
-		char	   *dep_name	= nullptr;
-		char	   *dep_version = nullptr;
+		const char *entry       = m->package.dependencies[i];
+		char       *dep_name    = nullptr;
+		char       *dep_version = nullptr;
 		manifest_extract_dep_info(entry, &dep_name, &dep_version);
 
 		if (dep_name == nullptr) {

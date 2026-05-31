@@ -119,7 +119,7 @@ manifest_t *manifest_parse(sds path)
 		return nullptr;
 	}
 
-	char		  errbuf[256];
+	char          errbuf[256];
 	toml_table_t *conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
 	fclose(fp);
 
@@ -136,33 +136,33 @@ manifest_t *manifest_parse(sds path)
 	toml_table_t *pkg = toml_table_in(conf, "package");
 	if (pkg) {
 		toml_datum_t name = toml_string_in(pkg, "name");
-		m->package.name	  = toml_datum_to_string(name);
+		m->package.name   = toml_datum_to_string(name);
 
 		toml_datum_t version = toml_string_in(pkg, "version");
-		m->package.version	 = toml_datum_to_string(version);
+		m->package.version   = toml_datum_to_string(version);
 
 		toml_datum_t edition = toml_string_in(pkg, "edition");
-		m->package.edition	 = toml_datum_to_string(edition);
+		m->package.edition   = toml_datum_to_string(edition);
 
 		toml_datum_t description = toml_string_in(pkg, "description");
-		m->package.description	 = toml_datum_to_string(description);
+		m->package.description   = toml_datum_to_string(description);
 
 		toml_datum_t license = toml_string_in(pkg, "license");
-		m->package.license	 = toml_datum_to_string(license);
+		m->package.license   = toml_datum_to_string(license);
 
 		toml_datum_t repository = toml_string_in(pkg, "repository");
-		m->package.repository	= toml_datum_to_string(repository);
+		m->package.repository   = toml_datum_to_string(repository);
 
 		toml_datum_t authors = toml_string_in(pkg, "authors");
-		m->package.authors	 = toml_datum_to_string(authors);
+		m->package.authors   = toml_datum_to_string(authors);
 	}
 
 	toml_array_t *deps_arr = toml_array_in(conf, "dependencies");
 	if (deps_arr) {
 		m->package.dependencies_count = toml_array_nelem(deps_arr);
-		m->package.dependencies		  = calloc(m->package.dependencies_count, sizeof(char *));
+		m->package.dependencies       = calloc(m->package.dependencies_count, sizeof(char *));
 		for (size_t i = 0; i < m->package.dependencies_count; i++) {
-			toml_datum_t dep		   = toml_string_at(deps_arr, i);
+			toml_datum_t dep           = toml_string_at(deps_arr, i);
 			m->package.dependencies[i] = toml_datum_to_string(dep);
 		}
 	} else {
@@ -179,8 +179,8 @@ manifest_t *manifest_parse(sds path)
 				count++;
 			}
 			m->package.dependencies_count = count;
-			m->package.dependencies		  = calloc(count, sizeof(char *));
-			size_t idx					  = 0;
+			m->package.dependencies       = calloc(count, sizeof(char *));
+			size_t idx                    = 0;
 			/* Build "name = value" strings matching array format */
 			for (int i = 0; idx < count; i++) {
 				const char *key = toml_key_in(deps_table, i);
@@ -188,12 +188,12 @@ manifest_t *manifest_parse(sds path)
 					break;
 				}
 				toml_datum_t val = toml_string_in(deps_table, key);
-				size_t		 len;
-				char		*str;
+				size_t       len;
+				char        *str;
 				if (val.ok) {
 					char *vstr = toml_datum_to_string(val);
-					len		   = strlen(key) + strlen(" = \"") + strlen(vstr) + 2;
-					str		   = malloc(len);
+					len        = strlen(key) + strlen(" = \"") + strlen(vstr) + 2;
+					str        = malloc(len);
 					snprintf_safe(str, len, "%s = \"%s\"", key, vstr);
 					free(vstr);
 				} else {
@@ -210,9 +210,9 @@ manifest_t *manifest_parse(sds path)
 	toml_array_t *sources_arr = toml_array_in(conf, "sources");
 	if (sources_arr) {
 		m->package.sources_count = toml_array_nelem(sources_arr);
-		m->package.sources		 = calloc(m->package.sources_count, sizeof(char *));
+		m->package.sources       = calloc(m->package.sources_count, sizeof(char *));
 		for (size_t i = 0; i < m->package.sources_count; i++) {
-			toml_datum_t src	  = toml_string_at(sources_arr, i);
+			toml_datum_t src      = toml_string_at(sources_arr, i);
 			m->package.sources[i] = toml_datum_to_string(src);
 		}
 	}
@@ -220,9 +220,9 @@ manifest_t *manifest_parse(sds path)
 	toml_array_t *headers_arr = toml_array_in(conf, "headers");
 	if (headers_arr) {
 		m->package.headers_count = toml_array_nelem(headers_arr);
-		m->package.headers		 = calloc(m->package.headers_count, sizeof(char *));
+		m->package.headers       = calloc(m->package.headers_count, sizeof(char *));
 		for (size_t i = 0; i < m->package.headers_count; i++) {
-			toml_datum_t hdr	  = toml_string_at(headers_arr, i);
+			toml_datum_t hdr      = toml_string_at(headers_arr, i);
 			m->package.headers[i] = toml_datum_to_string(hdr);
 		}
 	}
@@ -244,7 +244,7 @@ manifest_t *manifest_parse(sds path)
 
 		if (m->features_count > 0) {
 			m->features = calloc(m->features_count, sizeof(feature_def_t));
-			size_t idx	= 0;
+			size_t idx  = 0;
 			for (int i = 0;; i++) {
 				const char *key = toml_key_in(features_table, i);
 				if (key == nullptr) {
@@ -262,7 +262,7 @@ manifest_t *manifest_parse(sds path)
 				if (m->features[idx].deps_count > 0) {
 					m->features[idx].deps = calloc(m->features[idx].deps_count, sizeof(char *));
 					for (size_t j = 0; j < m->features[idx].deps_count; j++) {
-						toml_datum_t dep		 = toml_string_at(arr, j);
+						toml_datum_t dep         = toml_string_at(arr, j);
 						m->features[idx].deps[j] = toml_datum_to_string(dep);
 					}
 				}
@@ -284,11 +284,11 @@ manifest_t *manifest_parse(sds path)
 				if (m->features[k].name != nullptr && strcmp(dep, m->features[k].name) == 0) {
 					for (size_t l = 0; l < m->features[k].deps_count; l++) {
 						if (m->features[k].deps[l] != nullptr &&
-							strcmp(m->features[k].deps[l], m->features[i].name) == 0) {
+						    strcmp(m->features[k].deps[l], m->features[i].name) == 0) {
 							fprintf_safe(stderr,
-										 "Warning: Circular feature dependency detected: %s <-> "
-										 "%s\n",
-										 m->features[i].name, m->features[k].name);
+							             "Warning: Circular feature dependency detected: %s <-> "
+							             "%s\n",
+							             m->features[i].name, m->features[k].name);
 						}
 					}
 				}
@@ -312,7 +312,7 @@ void manifest_extract_dep_info(const char *entry, char **name_out, char **versio
 		return;
 	}
 
-	*name_out	 = nullptr;
+	*name_out    = nullptr;
 	*version_out = nullptr;
 
 	const char *eq = strchr(entry, '=');
@@ -336,7 +336,7 @@ void manifest_extract_dep_info(const char *entry, char **name_out, char **versio
 		name_end--;
 	}
 	size_t name_len = (size_t)(name_end - entry + 1);
-	*name_out		= malloc(name_len + 1);
+	*name_out       = malloc(name_len + 1);
 	if (*name_out) {
 		memccpy(*name_out, entry, '\0', name_len);
 		(*name_out)[name_len] = '\0';

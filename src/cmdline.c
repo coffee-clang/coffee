@@ -26,72 +26,72 @@ const char *cmdline_parser_toolchain_values[] = { "+stable", "+clang-stable", "+
 /* ------------------------------------------------------------------ */
 
 static const char *usage_str = "Usage: coffee [OPTION]... [FILE]...\n"
-							   "\n"
-							   "A modern package manager for C\n"
-							   "\n"
-							   "  -h, --help                    Print help and exit\n"
-							   "      --version                 Print version and exit\n"
-							   "  -v, --verbose                 Use verbose output (-vv very verbose) (default=off)\n"
-							   "  -q, --quiet                   Do not print cargo log messages (default=off)\n"
-							   "      --color=color             Coloring [possible values: auto, always, never]\n"
-							   "      --message-format=fmt      Error format [possible values: human, json, short]\n"
-							   "      --manifest-path=path      Path to Cargo.toml\n"
-							   "      --target=target           Build for the target triple\n"
-							   "      --debug                   Build with debug symbols (default=off)\n"
-							   "      --release                 Build in release mode (default=off)\n"
-							   "  -j, --jobs=N                  Number of parallel jobs, defaults to # of CPUs\n"
-							   "      --bin=name                Build only the specified binary\n"
-							   "      --example=name            Build only the specified example\n"
-							   "      --features=features       Space-separated list of features to activate\n"
-							   "      --all-features            Activate all available features (default=off)\n"
-							   "      --no-default-features     Do not activate the `default` feature (default=off)\n"
-							   "      --profile=profile         Build with given profile\n"
-							   "      --target-dir=dir          Directory for all generated artifacts\n"
-							   "      --unit-graph              Output build graph in JSON (default=off)\n"
-							   "      --ignore-rust-version     Ignore `rust-version` specification (default=off)\n"
-							   "      --timings=timings         Output build timing information\n"
-							   "      --future-incompat-report  Output future incompatibility report (default=off)\n"
-							   "      --workspace               Build all packages in the workspace (default=off)\n"
-							   "      --exclude=exclude         Exclude packages from the build\n"
-							   "      --include=include         Include packages in the build\n"
-							   "      --lib                     Build only this package's library (default=off)\n"
-							   "  -p, --package=pkgid           Package to build\n"
-							   "      --locked                  Require Cargo.lock is up to date (default=off)\n"
-							   "      --offline                 Run without accessing the network (default=off)\n"
-							   "      --frozen                  Equivalent to --locked and --offline (default=off)\n"
-							   "      --config=config           Override a configuration value\n"
-							   "  -Z, --unstable-flags=flags    Unstable (nightly-only) flags\n"
-							   "      --dev                     Add as a development dependency (default=off)\n"
-							   "      --build                   Add as a build dependency (default=off)\n"
-							   "      --optional                Mark dependency as optional (default=off)\n"
-							   "      --no-optional             Mark dependency as required (default=off)\n"
-							   "      --rename=name             Rename the dependency\n"
-							   "  -V, --pkg-version=version     Version constraint\n"
-							   "      --path=path               Filesystem path to local dependency\n"
-							   "      --git=url                 Git repository location\n"
-							   "      --branch=branch           Git branch to download\n"
-							   "      --tag=tag                 Git tag to download\n"
-							   "      --rev=rev                 Git commit reference to download\n"
-							   "      --registry=registry       Package registry for this dependency\n"
-							   "      --dry-run                 Don't actually write the manifest (default=off)\n"
-							   "      --out-dir=dir             Output directory for artifacts\n"
-							   "      --build-plan              Output the build plan in JSON (default=off)\n"
-							   "      --keep-going              Continue building as much as possible (default=off)\n"
-							   "      --bins                    Build all binary targets (default=off)\n"
-							   "      --examples                Build all example targets (default=off)\n"
-							   "      --tests                   Build all test targets (default=off)\n"
-							   "      --benches                 Build all bench targets (default=off)\n"
-							   "      --all-targets             Build all targets (default=off)\n"
-							   "      --no-run                  Don't run the generated binaries (default=off)\n"
-							   "      --no-fail-fast            Run all tests regardless of failure (default=off)\n"
-							   "      --fix                     Fix warnings automatically (default=off)\n";
+                               "\n"
+                               "A modern package manager for C\n"
+                               "\n"
+                               "  -h, --help                    Print help and exit\n"
+                               "      --version                 Print version and exit\n"
+                               "  -v, --verbose                 Use verbose output (-vv very verbose) (default=off)\n"
+                               "  -q, --quiet                   Do not print cargo log messages (default=off)\n"
+                               "      --color=color             Coloring [possible values: auto, always, never]\n"
+                               "      --message-format=fmt      Error format [possible values: human, json, short]\n"
+                               "      --manifest-path=path      Path to Cargo.toml\n"
+                               "      --target=target           Build for the target triple\n"
+                               "      --debug                   Build with debug symbols (default=off)\n"
+                               "      --release                 Build in release mode (default=off)\n"
+                               "  -j, --jobs=N                  Number of parallel jobs, defaults to # of CPUs\n"
+                               "      --bin=name                Build only the specified binary\n"
+                               "      --example=name            Build only the specified example\n"
+                               "      --features=features       Space-separated list of features to activate\n"
+                               "      --all-features            Activate all available features (default=off)\n"
+                               "      --no-default-features     Do not activate the `default` feature (default=off)\n"
+                               "      --profile=profile         Build with given profile\n"
+                               "      --target-dir=dir          Directory for all generated artifacts\n"
+                               "      --unit-graph              Output build graph in JSON (default=off)\n"
+                               "      --ignore-rust-version     Ignore `rust-version` specification (default=off)\n"
+                               "      --timings=timings         Output build timing information\n"
+                               "      --future-incompat-report  Output future incompatibility report (default=off)\n"
+                               "      --workspace               Build all packages in the workspace (default=off)\n"
+                               "      --exclude=exclude         Exclude packages from the build\n"
+                               "      --include=include         Include packages in the build\n"
+                               "      --lib                     Build only this package's library (default=off)\n"
+                               "  -p, --package=pkgid           Package to build\n"
+                               "      --locked                  Require Cargo.lock is up to date (default=off)\n"
+                               "      --offline                 Run without accessing the network (default=off)\n"
+                               "      --frozen                  Equivalent to --locked and --offline (default=off)\n"
+                               "      --config=config           Override a configuration value\n"
+                               "  -Z, --unstable-flags=flags    Unstable (nightly-only) flags\n"
+                               "      --dev                     Add as a development dependency (default=off)\n"
+                               "      --build                   Add as a build dependency (default=off)\n"
+                               "      --optional                Mark dependency as optional (default=off)\n"
+                               "      --no-optional             Mark dependency as required (default=off)\n"
+                               "      --rename=name             Rename the dependency\n"
+                               "  -V, --pkg-version=version     Version constraint\n"
+                               "      --path=path               Filesystem path to local dependency\n"
+                               "      --git=url                 Git repository location\n"
+                               "      --branch=branch           Git branch to download\n"
+                               "      --tag=tag                 Git tag to download\n"
+                               "      --rev=rev                 Git commit reference to download\n"
+                               "      --registry=registry       Package registry for this dependency\n"
+                               "      --dry-run                 Don't actually write the manifest (default=off)\n"
+                               "      --out-dir=dir             Output directory for artifacts\n"
+                               "      --build-plan              Output the build plan in JSON (default=off)\n"
+                               "      --keep-going              Continue building as much as possible (default=off)\n"
+                               "      --bins                    Build all binary targets (default=off)\n"
+                               "      --examples                Build all example targets (default=off)\n"
+                               "      --tests                   Build all test targets (default=off)\n"
+                               "      --benches                 Build all bench targets (default=off)\n"
+                               "      --all-targets             Build all targets (default=off)\n"
+                               "      --no-run                  Don't run the generated binaries (default=off)\n"
+                               "      --no-fail-fast            Run all tests regardless of failure (default=off)\n"
+                               "      --fix                     Fix warnings automatically (default=off)\n";
 
 /* ------------------------------------------------------------------ */
 /*  Forward declarations                                              */
 /* ------------------------------------------------------------------ */
 
 static char *safe_strdup(const char *s);
-static int	 check_enum_value(const char *val, const char *values[], int *out_index);
+static int   check_enum_value(const char *val, const char *values[], int *out_index);
 
 /* ------------------------------------------------------------------ */
 /*  cmdline_parser_init                                               */
@@ -159,7 +159,7 @@ void cmdline_parser_free(struct gengetopt_args_info *args_info)
 		free(args_info->inputs[i]);
 	}
 	free(args_info->inputs);
-	args_info->inputs	  = nullptr;
+	args_info->inputs     = nullptr;
 	args_info->inputs_num = 0;
 
 	/* Reset to defaults */
@@ -196,7 +196,7 @@ static int check_enum_value(const char *val, const char *values[], int *out_inde
 		return -1;
 	}
 
-	int	   found  = -1;
+	int    found  = -1;
 	size_t vallen = strlen(val);
 
 	for (int i = 0; values[i]; i++) {
@@ -294,64 +294,64 @@ enum long_opt_id {
 };
 
 static const struct option long_options[] = { { "help", no_argument, 0, 'h' },
-											  { "version", no_argument, 0, LOPT_VERSION },
-											  { "verbose", no_argument, 0, 'v' },
-											  { "quiet", no_argument, 0, 'q' },
-											  { "color", required_argument, 0, LOPT_COLOR },
-											  { "message-format", required_argument, 0, LOPT_MESSAGE_FORMAT },
-											  { "manifest-path", required_argument, 0, LOPT_MANIFEST_PATH },
-											  { "target", required_argument, 0, LOPT_TARGET },
-											  { "debug", no_argument, 0, LOPT_DEBUG },
-											  { "release", no_argument, 0, LOPT_RELEASE },
-											  { "jobs", required_argument, 0, 'j' },
-											  { "bin", required_argument, 0, LOPT_BIN },
-											  { "example", required_argument, 0, LOPT_EXAMPLE },
-											  { "features", required_argument, 0, LOPT_FEATURES },
-											  { "all-features", no_argument, 0, LOPT_ALL_FEATURES },
-											  { "no-default-features", no_argument, 0, LOPT_NO_DEFAULT_FEATURES },
-											  { "profile", required_argument, 0, LOPT_PROFILE },
-											  { "target-dir", required_argument, 0, LOPT_TARGET_DIR },
-											  { "unit-graph", no_argument, 0, LOPT_UNIT_GRAPH },
-											  { "ignore-rust-version", no_argument, 0, LOPT_IGNORE_RUST_VERSION },
-											  { "timings", required_argument, 0, LOPT_TIMINGS },
-											  { "future-incompat-report", no_argument, 0, LOPT_FUTURE_INCOMPAT_REPORT },
-											  { "workspace", no_argument, 0, LOPT_WORKSPACE },
-											  { "exclude", required_argument, 0, LOPT_EXCLUDE },
-											  { "include", required_argument, 0, LOPT_INCLUDE },
-											  { "lib", no_argument, 0, LOPT_LIB },
-											  { "package", required_argument, 0, 'p' },
-											  { "locked", no_argument, 0, LOPT_LOCKED },
-											  { "offline", no_argument, 0, LOPT_OFFLINE },
-											  { "frozen", no_argument, 0, LOPT_FROZEN },
-											  { "config", required_argument, 0, LOPT_CONFIG },
-											  { "unstable-flags", required_argument, 0, 'Z' },
-											  { "dev", no_argument, 0, LOPT_DEV },
-											  { "build", no_argument, 0, LOPT_BUILD },
-											  { "optional", no_argument, 0, LOPT_OPTIONAL },
-											  { "no-optional", no_argument, 0, LOPT_NO_OPTIONAL },
-											  { "rename", required_argument, 0, LOPT_RENAME },
-											  { "pkg-version", required_argument, 0, 'V' },
-											  { "path", required_argument, 0, LOPT_PATH },
-											  { "git", required_argument, 0, LOPT_GIT },
-											  { "branch", required_argument, 0, LOPT_BRANCH },
-											  { "tag", required_argument, 0, LOPT_TAG },
-											  { "rev", required_argument, 0, LOPT_REV },
-											  { "registry", required_argument, 0, LOPT_REGISTRY },
-											  { "dry-run", no_argument, 0, LOPT_DRY_RUN },
-											  { "out-dir", required_argument, 0, LOPT_OUT_DIR },
-											  { "build-plan", no_argument, 0, LOPT_BUILD_PLAN },
-											  { "keep-going", no_argument, 0, LOPT_KEEP_GOING },
-											  { "bins", no_argument, 0, LOPT_BINS },
-											  { "examples", no_argument, 0, LOPT_EXAMPLES },
-											  { "tests", no_argument, 0, LOPT_TESTS },
-											  { "benches", no_argument, 0, LOPT_BENCHES },
-											  { "all-targets", no_argument, 0, LOPT_ALL_TARGETS },
-											  { "no-run", no_argument, 0, LOPT_NO_RUN },
-											  { "no-fail-fast", no_argument, 0, LOPT_NO_FAIL_FAST },
-											  { "fix", no_argument, 0, LOPT_FIX },
-											  { "toolchain", required_argument, 0, LOPT_TOOLCHAIN },
-											  { "command", required_argument, 0, LOPT_COMMAND },
-											  { 0, 0, 0, 0 } };
+	                                          { "version", no_argument, 0, LOPT_VERSION },
+	                                          { "verbose", no_argument, 0, 'v' },
+	                                          { "quiet", no_argument, 0, 'q' },
+	                                          { "color", required_argument, 0, LOPT_COLOR },
+	                                          { "message-format", required_argument, 0, LOPT_MESSAGE_FORMAT },
+	                                          { "manifest-path", required_argument, 0, LOPT_MANIFEST_PATH },
+	                                          { "target", required_argument, 0, LOPT_TARGET },
+	                                          { "debug", no_argument, 0, LOPT_DEBUG },
+	                                          { "release", no_argument, 0, LOPT_RELEASE },
+	                                          { "jobs", required_argument, 0, 'j' },
+	                                          { "bin", required_argument, 0, LOPT_BIN },
+	                                          { "example", required_argument, 0, LOPT_EXAMPLE },
+	                                          { "features", required_argument, 0, LOPT_FEATURES },
+	                                          { "all-features", no_argument, 0, LOPT_ALL_FEATURES },
+	                                          { "no-default-features", no_argument, 0, LOPT_NO_DEFAULT_FEATURES },
+	                                          { "profile", required_argument, 0, LOPT_PROFILE },
+	                                          { "target-dir", required_argument, 0, LOPT_TARGET_DIR },
+	                                          { "unit-graph", no_argument, 0, LOPT_UNIT_GRAPH },
+	                                          { "ignore-rust-version", no_argument, 0, LOPT_IGNORE_RUST_VERSION },
+	                                          { "timings", required_argument, 0, LOPT_TIMINGS },
+	                                          { "future-incompat-report", no_argument, 0, LOPT_FUTURE_INCOMPAT_REPORT },
+	                                          { "workspace", no_argument, 0, LOPT_WORKSPACE },
+	                                          { "exclude", required_argument, 0, LOPT_EXCLUDE },
+	                                          { "include", required_argument, 0, LOPT_INCLUDE },
+	                                          { "lib", no_argument, 0, LOPT_LIB },
+	                                          { "package", required_argument, 0, 'p' },
+	                                          { "locked", no_argument, 0, LOPT_LOCKED },
+	                                          { "offline", no_argument, 0, LOPT_OFFLINE },
+	                                          { "frozen", no_argument, 0, LOPT_FROZEN },
+	                                          { "config", required_argument, 0, LOPT_CONFIG },
+	                                          { "unstable-flags", required_argument, 0, 'Z' },
+	                                          { "dev", no_argument, 0, LOPT_DEV },
+	                                          { "build", no_argument, 0, LOPT_BUILD },
+	                                          { "optional", no_argument, 0, LOPT_OPTIONAL },
+	                                          { "no-optional", no_argument, 0, LOPT_NO_OPTIONAL },
+	                                          { "rename", required_argument, 0, LOPT_RENAME },
+	                                          { "pkg-version", required_argument, 0, 'V' },
+	                                          { "path", required_argument, 0, LOPT_PATH },
+	                                          { "git", required_argument, 0, LOPT_GIT },
+	                                          { "branch", required_argument, 0, LOPT_BRANCH },
+	                                          { "tag", required_argument, 0, LOPT_TAG },
+	                                          { "rev", required_argument, 0, LOPT_REV },
+	                                          { "registry", required_argument, 0, LOPT_REGISTRY },
+	                                          { "dry-run", no_argument, 0, LOPT_DRY_RUN },
+	                                          { "out-dir", required_argument, 0, LOPT_OUT_DIR },
+	                                          { "build-plan", no_argument, 0, LOPT_BUILD_PLAN },
+	                                          { "keep-going", no_argument, 0, LOPT_KEEP_GOING },
+	                                          { "bins", no_argument, 0, LOPT_BINS },
+	                                          { "examples", no_argument, 0, LOPT_EXAMPLES },
+	                                          { "tests", no_argument, 0, LOPT_TESTS },
+	                                          { "benches", no_argument, 0, LOPT_BENCHES },
+	                                          { "all-targets", no_argument, 0, LOPT_ALL_TARGETS },
+	                                          { "no-run", no_argument, 0, LOPT_NO_RUN },
+	                                          { "no-fail-fast", no_argument, 0, LOPT_NO_FAIL_FAST },
+	                                          { "fix", no_argument, 0, LOPT_FIX },
+	                                          { "toolchain", required_argument, 0, LOPT_TOOLCHAIN },
+	                                          { "command", required_argument, 0, LOPT_COMMAND },
+	                                          { 0, 0, 0, 0 } };
 
 /* ------------------------------------------------------------------ */
 /*  cmdline_parser — main entry point                                 */
@@ -382,7 +382,7 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 
 		case 'v':
 			args_info->verbose_given = true;
-			args_info->verbose_flag	 = !args_info->verbose_flag;
+			args_info->verbose_flag  = !args_info->verbose_flag;
 			break;
 
 		case 'q':
@@ -489,7 +489,7 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 
 		case LOPT_RELEASE:
 			args_info->release_given = true;
-			args_info->release_flag	 = true;
+			args_info->release_flag  = true;
 			break;
 
 		case LOPT_BIN:
@@ -532,7 +532,7 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 
 		case LOPT_NO_DEFAULT_FEATURES:
 			args_info->no_default_features_given = true;
-			args_info->no_default_features_flag	 = true;
+			args_info->no_default_features_flag  = true;
 			break;
 
 		case LOPT_PROFILE:
@@ -559,12 +559,12 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 
 		case LOPT_UNIT_GRAPH:
 			args_info->unit_graph_given = true;
-			args_info->unit_graph_flag	= true;
+			args_info->unit_graph_flag  = true;
 			break;
 
 		case LOPT_IGNORE_RUST_VERSION:
 			args_info->ignore_rust_version_given = true;
-			args_info->ignore_rust_version_flag	 = true;
+			args_info->ignore_rust_version_flag  = true;
 			break;
 
 		case LOPT_TIMINGS:
@@ -580,7 +580,7 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 
 		case LOPT_FUTURE_INCOMPAT_REPORT:
 			args_info->future_incompat_report_given = true;
-			args_info->future_incompat_report_flag	= true;
+			args_info->future_incompat_report_flag  = true;
 			break;
 
 		case LOPT_WORKSPACE:
@@ -612,22 +612,22 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 
 		case LOPT_LIB:
 			args_info->lib_given = true;
-			args_info->lib_flag	 = true;
+			args_info->lib_flag  = true;
 			break;
 
 		case LOPT_LOCKED:
 			args_info->locked_given = true;
-			args_info->locked_flag	= true;
+			args_info->locked_flag  = true;
 			break;
 
 		case LOPT_OFFLINE:
 			args_info->offline_given = true;
-			args_info->offline_flag	 = true;
+			args_info->offline_flag  = true;
 			break;
 
 		case LOPT_FROZEN:
 			args_info->frozen_given = true;
-			args_info->frozen_flag	= true;
+			args_info->frozen_flag  = true;
 			break;
 
 		case LOPT_CONFIG:
@@ -643,7 +643,7 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 
 		case LOPT_DEV:
 			args_info->dev_given = true;
-			args_info->dev_flag	 = true;
+			args_info->dev_flag  = true;
 			break;
 
 		case LOPT_BUILD:
@@ -658,7 +658,7 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 
 		case LOPT_NO_OPTIONAL:
 			args_info->no_optional_given = true;
-			args_info->no_optional_flag	 = true;
+			args_info->no_optional_flag  = true;
 			break;
 
 		case LOPT_RENAME:
@@ -740,7 +740,7 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 
 		case LOPT_DRY_RUN:
 			args_info->dry_run_given = true;
-			args_info->dry_run_flag	 = true;
+			args_info->dry_run_flag  = true;
 			break;
 
 		case LOPT_OUT_DIR:
@@ -756,12 +756,12 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 
 		case LOPT_BUILD_PLAN:
 			args_info->build_plan_given = true;
-			args_info->build_plan_flag	= true;
+			args_info->build_plan_flag  = true;
 			break;
 
 		case LOPT_KEEP_GOING:
 			args_info->keep_going_given = true;
-			args_info->keep_going_flag	= true;
+			args_info->keep_going_flag  = true;
 			break;
 
 		case LOPT_BINS:
@@ -781,17 +781,17 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 
 		case LOPT_BENCHES:
 			args_info->benches_given = true;
-			args_info->benches_flag	 = true;
+			args_info->benches_flag  = true;
 			break;
 
 		case LOPT_ALL_TARGETS:
 			args_info->all_targets_given = true;
-			args_info->all_targets_flag	 = true;
+			args_info->all_targets_flag  = true;
 			break;
 
 		case LOPT_NO_RUN:
 			args_info->no_run_given = true;
-			args_info->no_run_flag	= true;
+			args_info->no_run_flag  = true;
 			break;
 
 		case LOPT_NO_FAIL_FAST:
@@ -801,7 +801,7 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 
 		case LOPT_FIX:
 			args_info->fix_given = true;
-			args_info->fix_flag	 = true;
+			args_info->fix_flag  = true;
 			break;
 
 		case LOPT_TOOLCHAIN:

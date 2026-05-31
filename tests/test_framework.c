@@ -7,7 +7,7 @@ test_entry_t test_framework_tests[TEST_FRAMEWORK_MAX_TESTS];
 unsigned int test_framework_count = 0;
 
 /* Per-run results */
-static int tests_run	= 0;
+static int tests_run    = 0;
 static int tests_passed = 0;
 static int tests_failed = 0;
 
@@ -70,7 +70,7 @@ void test_framework_summary(void)
 void test_framework_reset(void)
 {
 	test_framework_count = 0;
-	tests_run			 = 0;
-	tests_passed		 = 0;
-	tests_failed		 = 0;
+	tests_run            = 0;
+	tests_passed         = 0;
+	tests_failed         = 0;
 }

@@ -7,7 +7,7 @@
 
 TEST(extract_exact_version)
 {
-	char *name	  = nullptr;
+	char *name    = nullptr;
 	char *version = nullptr;
 
 	manifest_extract_dep_info("toml = \"1.0.0\"", &name, &version);
@@ -22,7 +22,7 @@ TEST(extract_exact_version)
 
 TEST(extract_wildcard)
 {
-	char *name	  = nullptr;
+	char *name    = nullptr;
 	char *version = nullptr;
 
 	manifest_extract_dep_info("sds = \"*\"", &name, &version);
@@ -37,7 +37,7 @@ TEST(extract_wildcard)
 
 TEST(extract_range)
 {
-	char *name	  = nullptr;
+	char *name    = nullptr;
 	char *version = nullptr;
 
 	manifest_extract_dep_info("json = \">=2.0\"", &name, &version);
@@ -52,7 +52,7 @@ TEST(extract_range)
 
 TEST(extract_no_version)
 {
-	char *name	  = nullptr;
+	char *name    = nullptr;
 	char *version = nullptr;
 
 	manifest_extract_dep_info("mylib", &name, &version);
@@ -67,7 +67,7 @@ TEST(extract_no_version)
 
 TEST(extract_null_input)
 {
-	char *name	  = (char *)0xdeadbeef;
+	char *name    = (char *)0xdeadbeef;
 	char *version = (char *)0xdeadbeef;
 
 	manifest_extract_dep_info(nullptr, &name, &version);

@@ -13,7 +13,7 @@ int64_t handle_remove(options *opts)
 		return 1;
 	}
 
-	char *package_name	= opts->inputs[1];
+	char *package_name  = opts->inputs[1];
 	char *manifest_path = project_find_manifest(nullptr);
 
 	if (manifest_path == nullptr) {
@@ -31,7 +31,7 @@ int64_t handle_remove(options *opts)
 	bool found = false;
 	for (size_t i = 0; i < m->package.dependencies_count; i++) {
 		if (m->package.dependencies[i] &&
-			strncmp(m->package.dependencies[i], package_name, strlen(package_name)) == 0) {
+		    strncmp(m->package.dependencies[i], package_name, strlen(package_name)) == 0) {
 			found = true;
 			free(m->package.dependencies[i]);
 			for (size_t j = i; j < m->package.dependencies_count - 1; j++) {
@@ -80,13 +80,13 @@ int64_t handle_remove(options *opts)
 
 		char *content = malloc((size_t)mf_len + 1);
 		if (content) {
-			size_t read_len	  = fread(content, 1, (size_t)mf_len, mf);
+			size_t read_len   = fread(content, 1, (size_t)mf_len, mf);
 			content[read_len] = '\0';
 
 			char *dep_start = strstr(content, dep_header);
 			if (dep_start) {
 				char *dep_end = dep_start;
-				int	  lines	  = 0;
+				int   lines   = 0;
 				while (*dep_end != '\0' && lines < 4) {
 					if (*dep_end == '\n') {
 						lines++;

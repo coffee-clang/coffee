@@ -45,8 +45,8 @@ TEST(library_toml_with_include)
 	snprintf(toml_path, sizeof(toml_path), "%s/library.toml", pkgdir);
 
 	create_file(toml_path, "title = \"test-pkg\"\n"
-						   "version = \"1.0\"\n"
-						   "include = [\"include\", \"src/include\"]\n");
+	                       "version = \"1.0\"\n"
+	                       "include = [\"include\", \"src/include\"]\n");
 
 	FILE *fp = fopen(toml_path, "r");
 	ASSERT(fp, "library.toml should exist");
@@ -74,9 +74,9 @@ TEST(library_toml_with_libname)
 	snprintf(toml_path, sizeof(toml_path), "%s/library.toml", pkgdir);
 
 	create_file(toml_path, "title = \"test-pkg\"\n"
-						   "version = \"1.0\"\n"
-						   "libname = \"testpkg\"\n"
-						   "lib = [\"lib\"]\n");
+	                       "version = \"1.0\"\n"
+	                       "libname = \"testpkg\"\n"
+	                       "lib = [\"lib\"]\n");
 
 	FILE *fp = fopen(toml_path, "r");
 	ASSERT(fp, "library.toml should exist");
@@ -111,7 +111,7 @@ TEST(fallback_no_keys)
 	char toml_path[4096];
 	snprintf(toml_path, sizeof(toml_path), "%s/library.toml", pkgdir);
 	create_file(toml_path, "title = \"test-nokeys\"\n"
-						   "version = \"1.0\"\n");
+	                       "version = \"1.0\"\n");
 
 	ASSERT(access(incdir, F_OK) == 0, "fallback include dir should exist");
 	ASSERT(access(libdir, F_OK) == 0, "fallback lib dir should exist");

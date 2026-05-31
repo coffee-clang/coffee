@@ -27,7 +27,7 @@ int64_t handle_bench(options *opts)
 
 	manifest_t *m = manifest_parse(manifest_path);
 
-	char *dir_end	  = strrchr(manifest_path, '/');
+	char *dir_end     = strrchr(manifest_path, '/');
 	char *project_dir = nullptr;
 	if (dir_end) {
 		project_dir = strndup(manifest_path, (size_t)(dir_end - manifest_path));
@@ -43,7 +43,7 @@ int64_t handle_bench(options *opts)
 	}
 
 	char cmd[4096];
-	int	 off;
+	int  off;
 
 	if (strcmp(project_dir, ".") == 0) {
 		off = snprintf_safe(cmd, sizeof(cmd), "make bench INC_FLAGS='%s'", inc_flags);

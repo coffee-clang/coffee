@@ -24,8 +24,8 @@ TEST(feature_parse)
 	ASSERT(m != nullptr, "manifest_parse returned nullptr");
 	ASSERT(m->features_count == 3, "expected 3 features");
 	ASSERT(strcmp(m->features[0].name, "default") == 0 || strcmp(m->features[0].name, "json") == 0 ||
-			   strcmp(m->features[0].name, "logging") == 0,
-		   "unexpected feature name");
+	           strcmp(m->features[0].name, "logging") == 0,
+	       "unexpected feature name");
 
 	manifest_free(m);
 	PASS();
@@ -47,8 +47,8 @@ TEST(feature_resolve)
 	manifest_t *m = manifest_parse("/tmp/coffee-features-test.toml");
 	ASSERT(m != nullptr, "manifest_parse returned nullptr");
 
-	const char			*requested[] = { "json" };
-	resolved_features_t *resolved	 = features_resolve(m, requested, 1, false, false);
+	const char          *requested[] = { "json" };
+	resolved_features_t *resolved    = features_resolve(m, requested, 1, false, false);
 	ASSERT(resolved != nullptr, "features_resolve returned nullptr");
 	ASSERT(features_is_enabled(resolved, "test", "json"), "json should be enabled");
 
@@ -137,7 +137,7 @@ TEST(feature_no_default)
 TEST(cli_parsing)
 {
 	char **features = nullptr;
-	size_t count	= 0;
+	size_t count    = 0;
 	features_parse_cli("json,xml,logging", &features, &count);
 	ASSERT(count == 3, "expected 3 features");
 	ASSERT(strcmp(features[0], "json") == 0, "first feature should be json");
@@ -167,16 +167,16 @@ TEST(compiler_flags)
 	manifest_t *m = manifest_parse("/tmp/coffee-features-test.toml");
 	ASSERT(m != nullptr, "manifest_parse returned nullptr");
 
-	const char			*requested[] = { "json", "advanced-logging" };
-	resolved_features_t *resolved	 = features_resolve(m, requested, 2, false, false);
+	const char          *requested[] = { "json", "advanced-logging" };
+	resolved_features_t *resolved    = features_resolve(m, requested, 2, false, false);
 	ASSERT(resolved != nullptr, "features_resolve returned nullptr");
 
 	size_t flags_count = 0;
-	char **flags	   = features_to_compiler_flags(resolved, "test", &flags_count);
+	char **flags       = features_to_compiler_flags(resolved, "test", &flags_count);
 	ASSERT(flags != nullptr, "features_to_compiler_flags returned nullptr");
 	ASSERT(flags_count == 2, "expected 2 flags");
 
-	int found_json	  = 0;
+	int found_json    = 0;
 	int found_logging = 0;
 	for (size_t i = 0; i < flags_count; i++) {
 		if (strcmp(flags[i], "-DFEATURE_JSON") == 0) {
@@ -211,8 +211,8 @@ TEST(transitive_features)
 	manifest_t *m = manifest_parse("/tmp/coffee-features-test.toml");
 	ASSERT(m != nullptr, "manifest_parse returned nullptr");
 
-	const char			*requested[] = { "json" };
-	resolved_features_t *resolved	 = features_resolve(m, requested, 1, false, false);
+	const char          *requested[] = { "json" };
+	resolved_features_t *resolved    = features_resolve(m, requested, 1, false, false);
 	ASSERT(resolved != nullptr, "features_resolve returned nullptr");
 	ASSERT(features_is_enabled(resolved, "test", "json"), "json should be enabled");
 	ASSERT(features_is_enabled(resolved, "log", "info"), "log/info should be enabled transitively");

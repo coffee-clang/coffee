@@ -21,23 +21,23 @@ typedef struct {
 
 typedef struct {
 	recipe_t *recipes;
-	size_t	  count;
+	size_t    count;
 } recipe_list_t;
 
 typedef struct {
-	sds	  *versions;
+	sds   *versions;
 	size_t count;
 } version_list_t;
 
 sds coffee_home_dir(void);
 
 recipe_list_t *registry_search(sds query);
-recipe_t	  *registry_get(sds name);
-int			   registry_fetch(sds name, sds version, sds dest_dir);
-void		   registry_free_recipes(recipe_list_t *list);
-void		   registry_free_recipe(recipe_t *r);
+recipe_t      *registry_get(sds name);
+int            registry_fetch(sds name, sds version, sds dest_dir);
+void           registry_free_recipes(recipe_list_t *list);
+void           registry_free_recipe(recipe_t *r);
 
 version_list_t *registry_get_versions(sds name);
-void			registry_free_versions(version_list_t *list);
+void            registry_free_versions(version_list_t *list);
 
 #endif

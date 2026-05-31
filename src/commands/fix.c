@@ -29,7 +29,7 @@ int64_t handle_fix(options *opts)
 
 	char cmd[8192];
 	snprintf_safe(cmd, sizeof(cmd), "find src tests -name \"*.c\" | xargs clang-tidy --fix --quiet -- %s 2>/dev/null",
-				  inc_flags);
+	              inc_flags);
 
 	if (opts->verbose) {
 		printf("Running: %s\n", cmd);
@@ -43,7 +43,7 @@ int64_t handle_fix(options *opts)
 
 	if (ret != 0) {
 		fprintf_safe(stderr, "Error: Automatic fix failed. Please ensure 'clang-tidy' is installed and your code is "
-							 "mostly valid.\n");
+		                     "mostly valid.\n");
 		return 1;
 	}
 
