@@ -49,7 +49,6 @@ static const char *usage_str = "Usage: coffee [OPTION]... [FILE]...\n"
                                "      --profile=profile         Build with given profile\n"
                                "      --target-dir=dir          Directory for all generated artifacts\n"
                                "      --unit-graph              Output build graph in JSON (default=off)\n"
-                               "      --ignore-rust-version     Ignore `rust-version` specification (default=off)\n"
                                "      --timings=timings         Output build timing information\n"
                                "      --future-incompat-report  Output future incompatibility report (default=off)\n"
                                "      --workspace               Build all packages in the workspace (default=off)\n"
@@ -228,7 +227,6 @@ enum long_opt_id {
 	LOPT_PROFILE,
 	LOPT_TARGET_DIR,
 	LOPT_UNIT_GRAPH,
-	LOPT_IGNORE_RUST_VERSION,
 	LOPT_TIMINGS,
 	LOPT_FUTURE_INCOMPAT_REPORT,
 	LOPT_WORKSPACE,
@@ -285,7 +283,6 @@ static const struct option long_options[] = { { "help", no_argument, 0, 'h' },
 	                                          { "profile", required_argument, 0, LOPT_PROFILE },
 	                                          { "target-dir", required_argument, 0, LOPT_TARGET_DIR },
 	                                          { "unit-graph", no_argument, 0, LOPT_UNIT_GRAPH },
-	                                          { "ignore-rust-version", no_argument, 0, LOPT_IGNORE_RUST_VERSION },
 	                                          { "timings", required_argument, 0, LOPT_TIMINGS },
 	                                          { "future-incompat-report", no_argument, 0, LOPT_FUTURE_INCOMPAT_REPORT },
 	                                          { "workspace", no_argument, 0, LOPT_WORKSPACE },
@@ -533,11 +530,6 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 		case LOPT_UNIT_GRAPH:
 			args_info->unit_graph_given = true;
 			args_info->unit_graph_flag  = true;
-			break;
-
-		case LOPT_IGNORE_RUST_VERSION:
-			args_info->ignore_rust_version_given = true;
-			args_info->ignore_rust_version_flag  = true;
 			break;
 
 		case LOPT_TIMINGS:

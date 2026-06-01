@@ -20,7 +20,6 @@ option  "no-default-features" - "Do not activate the `default` feature" flag off
 option  "profile" - "Build with given profile" string typestr="profile" optional
 option  "target-dir" - "Directory for all generated artifacts" string typestr="target_dir" optional
 option  "unit-graph" - "Output build graph in JSON" flag off
-option  "ignore-rust-version" - "Ignore `rust-version` specification in packages" flag off
 option  "timings" - "Output build timing information" string typestr="timings" optional
 option  "future-incompat-report" - "Outputs a future incompatibility report" flag off
 option  "workspace" - "Build all packages in the workspace" flag off

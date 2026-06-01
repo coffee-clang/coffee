@@ -39,7 +39,6 @@ struct gengetopt_args_info {
 	bool all_features_flag;
 	bool no_default_features_flag;
 	bool unit_graph_flag;
-	bool ignore_rust_version_flag;
 	bool future_incompat_report_flag;
 	bool workspace_flag;
 	bool lib_flag;
@@ -115,7 +114,6 @@ struct gengetopt_args_info {
 	bool profile_given;
 	bool target_dir_given;
 	bool unit_graph_given;
-	bool ignore_rust_version_given;
 	bool timings_given;
 	bool future_incompat_report_given;
 	bool workspace_given;

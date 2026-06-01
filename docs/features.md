@@ -23,7 +23,7 @@ You don't need all features for every customer. The feature system lets you "con
 
 ## Why This Matters for C
 
-In C, unlike Rust or other languages, conditional compilation is traditionally done with:
+In C, conditional compilation is traditionally done with:
 
 ```c
 #ifdef ENABLE_LOGGING
