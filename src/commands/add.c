@@ -70,7 +70,7 @@ int64_t handle_add(options *opts)
 	} else {
 		const char *version = opts->pkg_version != nullptr ? opts->pkg_version : "*";
 
-		if (opts->features != nullptr || (int)opts->optional) {
+		if (opts->features != nullptr || (i64)opts->optional) {
 			dep_str = sdscatprintf(sdsempty(), "%s = { version = \"%s\"", package_name, version);
 			if (opts->features) {
 				dep_str = sdscatprintf(dep_str, ", features = [\"%s\"]", opts->features);
@@ -111,7 +111,7 @@ int64_t handle_add(options *opts)
 	sds    makefile_path;
 	if (dir_end) {
 		dir_len       = (size_t)(dir_end - manifest_path) + 1;
-		makefile_path = sdscatprintf(sdsempty(), "%.*sMakefile", (int)dir_len, manifest_path);
+		makefile_path = sdscatprintf(sdsempty(), "%.*sMakefile", (i64)dir_len, manifest_path);
 	} else {
 		makefile_path = sdsnew("Makefile");
 	}

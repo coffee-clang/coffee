@@ -176,8 +176,8 @@ TEST(compiler_flags)
 	ASSERT(flags != nullptr, "features_to_compiler_flags returned nullptr");
 	ASSERT(flags_count == 2, "expected 2 flags");
 
-	int found_json    = 0;
-	int found_logging = 0;
+	i64 found_json    = 0;
+	i64 found_logging = 0;
 	for (size_t i = 0; i < flags_count; i++) {
 		if (strcmp(flags[i], "-DFEATURE_JSON") == 0) {
 			found_json = 1;

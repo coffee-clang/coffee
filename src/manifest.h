@@ -53,7 +53,7 @@ typedef struct {
 
 manifest_t *manifest_parse(sds path);
 void        manifest_free(manifest_t *m);
-int         manifest_write(sds path, manifest_t *m);
+i64         manifest_write(sds path, manifest_t *m);
 
 /**
  * Extract package name and version constraint from a dependency entry.

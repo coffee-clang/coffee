@@ -4,7 +4,7 @@
 TEST(framework_registers_test)
 {
 	const char *found = nullptr;
-	for (unsigned int i = 0; i < test_framework_count; i++) {
+	for (u64 i = 0; i < test_framework_count; i++) {
 		if (strcmp(test_framework_tests[i].name, "framework_registers_test") == 0) {
 			found = test_framework_tests[i].name;
 			break;
@@ -27,7 +27,7 @@ TEST(framework_test_function_returns_expected)
 	if (test_framework_count == 0) {
 		FAIL("no tests registered");
 	}
-	int result = test_framework_tests[0].func();
+	i64 result = test_framework_tests[0].func();
 	/* We're testing that calling works, result depends on which test is first */
 	(void)result;
 	PASS();
@@ -35,8 +35,8 @@ TEST(framework_test_function_returns_expected)
 
 TEST(framework_no_duplicate_names)
 {
-	for (unsigned int i = 0; i < test_framework_count; i++) {
-		for (unsigned int j = i + 1; j < test_framework_count; j++) {
+	for (u64 i = 0; i < test_framework_count; i++) {
+		for (u64 j = i + 1; j < test_framework_count; j++) {
 			if (strcmp(test_framework_tests[i].name, test_framework_tests[j].name) == 0) {
 				FAIL("duplicate test name found");
 				return 0;

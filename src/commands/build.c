@@ -32,7 +32,7 @@ int64_t handle_build(options *opts)
 	sds    makefile_path;
 	if (dir_end) {
 		dir_len       = (size_t)(dir_end - manifest_path) + 1;
-		makefile_path = sdscatprintf(sdsempty(), "%.*sMakefile", (int)dir_len, manifest_path);
+		makefile_path = sdscatprintf(sdsempty(), "%.*sMakefile", (i64)dir_len, manifest_path);
 	} else {
 		makefile_path = sdsnew("Makefile");
 	}
@@ -51,10 +51,10 @@ int64_t handle_build(options *opts)
 		cmd = sdscatprintf(cmd, "make -C '%s'", project_dir);
 		sdsfree(project_dir);
 
-		if ((int)opts->release) {
+		if ((i64)opts->release) {
 			cmd = sdscatprintf(cmd, " RELEASE=1");
 		}
-		if ((int)opts->debug) {
+		if ((i64)opts->debug) {
 			cmd = sdscatprintf(cmd, " DEBUG=1");
 		}
 		if (opts->jobs > 0) {
@@ -70,7 +70,7 @@ int64_t handle_build(options *opts)
 				features_parse_cli(opts->features, &features, &features_count);
 			}
 
-			if (features_count > 0 || (int)opts->all_features) {
+			if (features_count > 0 || (i64)opts->all_features) {
 				const char **requested = nullptr;
 				if (features_count > 0) {
 					requested = (const char **)features;
@@ -105,7 +105,7 @@ int64_t handle_build(options *opts)
 			printf("Running: %s\n", cmd);
 		}
 
-		int status = system(cmd);
+		i64 status = system(cmd);
 		sdsfree(cmd);
 		sdsfree(makefile_path);
 		sdsfree(manifest_path);
@@ -114,7 +114,7 @@ int64_t handle_build(options *opts)
 			fprintf_safe(stderr, "Error: failed to run make\n");
 			return 1;
 		}
-		int ret = WEXITSTATUS(status);
+		i64 ret = WEXITSTATUS(status);
 		if (ret == 0) {
 			printf("Build successful\n");
 		} else {
@@ -153,7 +153,7 @@ int64_t handle_build(options *opts)
 		.no_default_features = opts->no_default_features,
 	};
 
-	int ret = build_project(manifest, &build_opts);
+	i64 ret = build_project(manifest, &build_opts);
 
 	for (size_t i = 0; i < features_count; i++) {
 		sdsfree(features[i]);

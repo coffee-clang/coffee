@@ -16,7 +16,7 @@ int64_t handle_grep(options *opts)
 
 	sds cmd = sdscatprintf(sdsempty(), "grep -rn --exclude-dir=target --exclude-dir=.git \"%s\" src tests", pattern);
 
-	int ret = system(cmd);
+	i64 ret = system(cmd);
 	sdsfree(cmd);
 
 	if (ret != 0) {

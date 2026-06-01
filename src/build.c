@@ -14,7 +14,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-static int run_command(char **argv, bool verbose)
+static i64 run_command(char **argv, bool verbose)
 {
 	if (verbose) {
 		printf("Running:");
@@ -31,13 +31,13 @@ static int run_command(char **argv, bool verbose)
 		perror("execvp");
 		exit(1);
 	} else if (pid > 0) {
-		int status;
-		waitpid(pid, &status, 0);
-		if (WIFEXITED(status)) {
-			return WEXITSTATUS(status);
+		i64 wstatus;
+		waitpid(pid, (int *)&wstatus, 0);
+		if (WIFEXITED(wstatus)) {
+			return WEXITSTATUS(wstatus);
 		}
 		if (verbose) {
-			fprintf_safe(stderr, "Command terminated abnormally (signal %d)\n", WTERMSIG(status));
+			fprintf_safe(stderr, "Command terminated abnormally (signal %d)\n", WTERMSIG(wstatus));
 		}
 		return 1;
 	}
@@ -46,7 +46,7 @@ static int run_command(char **argv, bool verbose)
 	return 1;
 }
 
-int build_project(manifest_t *manifest, build_opts_t *opts)
+i64 build_project(manifest_t *manifest, build_opts_t *opts)
 {
 	if (manifest == nullptr || manifest->package.name == nullptr) {
 		fprintf_safe(stderr, "Error: No valid manifest found\n");
@@ -62,7 +62,7 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 	}
 
 	char *mkdir_argv[] = { (char *)"mkdir", (char *)"-p", (char *)output_dir, nullptr };
-	int   ret          = run_command(mkdir_argv, verbose);
+	i64   ret          = run_command(mkdir_argv, verbose);
 	if (ret != 0) {
 		return 1;
 	}
@@ -129,7 +129,7 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 		return 1;
 	}
 
-	int max_tokens = 1;
+	i64 max_tokens = 1;
 	for (const char *p = flags; *p != '\0'; p++) {
 		if (*p == ' ') {
 			max_tokens++;
@@ -147,7 +147,7 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 		return 1;
 	}
 
-	int idx              = 0;
+	i64 idx              = 0;
 	compiler_argv[idx++] = (char *)cc;
 
 	sds   flags_copy = sdsdup(flags);
@@ -182,9 +182,9 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 	return ret;
 }
 
-int build_run(manifest_t *manifest, build_opts_t *opts, sds *args, int argc)
+i64 build_run(manifest_t *manifest, build_opts_t *opts, sds *args, i64 argc)
 {
-	int ret = build_project(manifest, opts);
+	i64 ret = build_project(manifest, opts);
 	if (ret != 0) {
 		return ret;
 	}
@@ -203,16 +203,16 @@ int build_run(manifest_t *manifest, build_opts_t *opts, sds *args, int argc)
 		return 1;
 	}
 
-	int    total    = 1 + (args != nullptr ? argc : 0) + 1;
+	i64    total    = 1 + (args != nullptr ? argc : 0) + 1;
 	char **run_argv = (char **)malloc(sizeof(char *) * (size_t)total);
 	if (run_argv == nullptr) {
 		sdsfree(exe_path);
 		return 1;
 	}
 
-	int idx         = 0;
+	i64 idx         = 0;
 	run_argv[idx++] = exe_path;
-	for (int i = 0; i < argc && args; i++) {
+	for (i64 i = 0; i < argc && args; i++) {
 		run_argv[idx++] = args[i];
 	}
 	run_argv[idx] = nullptr;

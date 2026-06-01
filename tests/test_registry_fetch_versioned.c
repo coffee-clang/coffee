@@ -24,7 +24,7 @@ TEST(fetch_to_versioned_path)
 	char dest_dir[4096];
 	snprintf(dest_dir, sizeof(dest_dir), "%s/test_pkg/1.0.0", test_dir);
 
-	int ret = registry_fetch("test_pkg", "1.0.0", dest_dir);
+	i64 ret = registry_fetch("test_pkg", "1.0.0", dest_dir);
 
 	if (ret != 0) {
 		printf("(expected error for non-existent package) ");

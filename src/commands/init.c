@@ -9,7 +9,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-static int create_dir(const char *path)
+static i64 create_dir(const char *path)
 {
 	struct stat st;
 	if (stat(path, &st) == 0) {
@@ -18,7 +18,7 @@ static int create_dir(const char *path)
 	return mkdir(path, 0755);
 }
 
-static int create_file(const char *path, const char *content)
+static i64 create_file(const char *path, const char *content)
 {
 	FILE *fp = fopen(path, "w");
 	if (fp == nullptr) {
@@ -208,7 +208,7 @@ int64_t handle_init(options *opts)
 	/* Create main.c */
 	sds main_content = sdsnew("#include <stdio.h>\n"
 	                          "\n"
-	                          "int main(int argc, char **argv) {\n"
+	                          "int main(i64 argc, char **argv) {\n"
 	                          "    printf(\"Hello, world!\\n\");\n"
 	                          "    return 0;\n"
 	                          "}\n");

@@ -11,7 +11,7 @@ int64_t handle_doc(options *opts)
 	printf("Generating documentation...\n");
 
 	if (access("Doxyfile", F_OK) == 0) {
-		int ret = system("doxygen");
+		i64 ret = system("doxygen");
 		if (ret != 0) {
 			fprintf_safe(stderr, "Error: Documentation generation failed. Please ensure 'doxygen' is installed.\n");
 			return 1;

@@ -9,7 +9,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 
-static int file_is_source(const char *name)
+static i64 file_is_source(const char *name)
 {
 	size_t len = strlen(name);
 	if (len < 2) {
@@ -31,7 +31,7 @@ static int file_is_source(const char *name)
 	return 0;
 }
 
-static int scan_file_for_include(const char *filepath, const char *dep_name)
+static i64 scan_file_for_include(const char *filepath, const char *dep_name)
 {
 	FILE *fp = fopen(filepath, "r");
 	if (fp == nullptr) {
@@ -58,14 +58,14 @@ static int scan_file_for_include(const char *filepath, const char *dep_name)
 	return 0;
 }
 
-static int scan_dir_for_dep(const char *dirpath, const char *dep_name)
+static i64 scan_dir_for_dep(const char *dirpath, const char *dep_name)
 {
 	DIR *dir = opendir(dirpath);
 	if (dir == nullptr) {
 		return 0;
 	}
 
-	int            found = 0;
+	i64            found = 0;
 	struct dirent *entry;
 	while ((entry = readdir(dir)) != nullptr) {
 		if (entry->d_name[0] == '.') {
@@ -121,7 +121,7 @@ int64_t handle_machete(options *opts)
 		return 0;
 	}
 
-	int unused_count = 0;
+	i64 unused_count = 0;
 
 	for (size_t i = 0; i < m->package.dependencies_count; i++) {
 		const char *entry = m->package.dependencies[i];
@@ -137,7 +137,7 @@ int64_t handle_machete(options *opts)
 			}
 		}
 
-		int used = scan_dir_for_dep(".", name);
+		i64 used = scan_dir_for_dep(".", name);
 		if (!used) {
 			if (unused_count == 0) {
 				printf("Unused dependencies:\n");

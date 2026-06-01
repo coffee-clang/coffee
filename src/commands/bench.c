@@ -59,7 +59,7 @@ int64_t handle_bench(options *opts)
 		printf("Running: %s\n", cmd);
 	}
 
-	int ret = system(cmd);
+	i64 ret = system(cmd);
 	sdsfree(cmd);
 	sdsfree(inc_flags);
 

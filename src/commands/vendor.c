@@ -59,7 +59,7 @@ int64_t handle_vendor(options *opts)
 
 		mkdir(dest_dir, 0755);
 
-		int ret = registry_fetch(name, nullptr, dest_dir);
+		i64 ret = registry_fetch(name, nullptr, dest_dir);
 		if (ret != 0) {
 			fprintf_safe(stderr, "Error: Failed to vendor %s\n", name);
 		}

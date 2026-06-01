@@ -5,6 +5,11 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
+
+/* Type aliases used throughout the project */
+typedef uint64_t u64;
+typedef int64_t  i64;
 
 #define REGISTRY_INDEX_URL "https://coffee-clang.github.io/recipes/.well-known/packages.json.zstd"
 #define REGISTRY_RAW_URL   "https://raw.githubusercontent.com/coffee-clang/recipes/main"
@@ -33,7 +38,7 @@ sds coffee_home_dir(void);
 
 recipe_list_t *registry_search(sds query);
 recipe_t      *registry_get(sds name);
-int            registry_fetch(sds name, sds version, sds dest_dir);
+i64            registry_fetch(sds name, sds version, sds dest_dir);
 void           registry_free_recipes(recipe_list_t *list);
 void           registry_free_recipe(recipe_t *r);
 

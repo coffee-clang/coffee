@@ -64,7 +64,7 @@ int64_t handle_remove(options *opts)
 	sds   makefile_path;
 	if (dir_end) {
 		size_t dir_len = (size_t)(dir_end - manifest_path) + 1;
-		makefile_path  = sdscatprintf(sdsempty(), "%.*sMakefile", (int)dir_len, manifest_path);
+		makefile_path  = sdscatprintf(sdsempty(), "%.*sMakefile", (i64)dir_len, manifest_path);
 	} else {
 		makefile_path = sdsnew("Makefile");
 	}
@@ -85,7 +85,7 @@ int64_t handle_remove(options *opts)
 			char *dep_start = strstr(content, dep_header);
 			if (dep_start) {
 				char *dep_end = dep_start;
-				int   lines   = 0;
+				i64   lines   = 0;
 				while (*dep_end != '\0' && lines < 4) {
 					if (*dep_end == '\n') {
 						lines++;

@@ -1,9 +1,15 @@
 #ifndef TEST_FRAMEWORK_H_
 #define TEST_FRAMEWORK_H_
 
+#include <stdint.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+/* Type aliases used throughout the project */
+typedef uint64_t u64;
+typedef int64_t  i64;
 
 /*
  * Coffee test framework — shared macros and runner API.
@@ -18,7 +24,7 @@
 
 /* --- Test registration --- */
 
-typedef int (*test_func_t)(void);
+typedef i64 (*test_func_t)(void);
 
 typedef struct {
 	const char *name;
@@ -28,7 +34,7 @@ typedef struct {
 #define TEST_FRAMEWORK_MAX_TESTS 256
 
 extern test_entry_t test_framework_tests[TEST_FRAMEWORK_MAX_TESTS];
-extern unsigned int test_framework_count;
+extern u64          test_framework_count;
 
 void test_framework_register(const char *name, test_func_t func);
 
@@ -38,7 +44,7 @@ void test_framework_register(const char *name, test_func_t func);
 /* --- Test definition --- */
 
 /* TEST(name) defines a test function named test_fn_<name> */
-#define TEST(name) static int test_fn_##name(void)
+#define TEST(name) static i64 test_fn_##name(void)
 
 /* --- Test result macros --- */
 
@@ -66,7 +72,7 @@ void test_framework_register(const char *name, test_func_t func);
 /* --- Runner API --- */
 
 /* Run all registered tests matching filter (nullptr or "" = all) */
-int test_framework_run(const char *filter);
+i64 test_framework_run(const char *filter);
 
 /* Print summary of all results */
 void test_framework_summary(void);

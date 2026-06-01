@@ -46,7 +46,7 @@ int64_t handle_install_update(options *opts)
 		system(cmd);
 		sdsfree(cmd);
 
-		int ret = registry_fetch(target, nullptr, pkg_dir);
+		i64 ret = registry_fetch(target, nullptr, pkg_dir);
 		sdsfree(pkg_dir);
 		sdsfree(deps_dir);
 		if (ret != 0) {
@@ -65,7 +65,7 @@ int64_t handle_install_update(options *opts)
 		return 0;
 	}
 
-	int            count = 0;
+	i64            count = 0;
 	struct dirent *entry;
 	while ((entry = readdir(dir)) != nullptr) {
 		if (entry->d_name[0] == '.') {
@@ -80,7 +80,7 @@ int64_t handle_install_update(options *opts)
 		system(cmd);
 		sdsfree(cmd);
 
-		int ret = registry_fetch(entry->d_name, nullptr, pkg_dir);
+		i64 ret = registry_fetch(entry->d_name, nullptr, pkg_dir);
 		if (ret != 0) {
 			fprintf_safe(stderr, "Error: Failed to update %s\n", entry->d_name);
 		} else {

@@ -10,7 +10,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-static int create_symlink(const char *target, const char *link_path)
+static i64 create_symlink(const char *target, const char *link_path)
 {
 	struct stat st;
 	if (lstat(link_path, &st) == 0) {
@@ -77,7 +77,7 @@ int64_t handle_install(options *opts)
 	sds cache_path = sdscatprintf(sdsempty(), "%s/%s/%s", global_deps, package, version);
 	sdsfree(global_deps);
 
-	int ret = registry_fetch(package, version, cache_path);
+	i64 ret = registry_fetch(package, version, cache_path);
 	if (ret != 0) {
 		sdsfree(cache_path);
 		fprintf_safe(stderr, "Error: Failed to install %s\n", package);
@@ -94,7 +94,7 @@ int64_t handle_install(options *opts)
 		sds project_link_path = sdscatprintf(sdsempty(), "%s/%s/%s", project_deps, package, version);
 		sdsfree(project_deps);
 
-		int symret = create_symlink(cache_path, project_link_path);
+		i64 symret = create_symlink(cache_path, project_link_path);
 		if (symret != 0) {
 			fprintf_safe(stderr, "Warning: Failed to create project symlink\n");
 		} else {

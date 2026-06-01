@@ -35,7 +35,7 @@ int64_t handle_fix(options *opts)
 		printf("Running: %s\n", cmd);
 	}
 
-	int ret = system(cmd);
+	i64 ret = system(cmd);
 	sdsfree(cmd);
 
 	if (m) {

@@ -27,7 +27,7 @@ int64_t handle_lint(options *opts)
 		}
 	}
 
-	const char *tidy_opts = (int)opts->fix ? "--fix" : "";
+	const char *tidy_opts = (i64)opts->fix ? "--fix" : "";
 	sds cmd = sdscatprintf(sdsempty(), "find src tests -name \"*.c\" | xargs clang-tidy %s --quiet -- %s 2>/dev/null",
 	                       tidy_opts, inc_flags);
 	sdsfree(inc_flags);
@@ -36,7 +36,7 @@ int64_t handle_lint(options *opts)
 		printf("Running: %s\n", cmd);
 	}
 
-	int ret = system(cmd);
+	i64 ret = system(cmd);
 	sdsfree(cmd);
 
 	if (m) {

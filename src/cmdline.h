@@ -11,6 +11,7 @@
 #include "../deps/sds/sds.h"
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #include <stdio.h>
 
@@ -21,6 +22,10 @@ extern "C" {
 #ifndef CMDLINE_PARSER_VERSION
 # define CMDLINE_PARSER_VERSION "0.1.0"
 #endif
+
+/* Type aliases used throughout the project */
+typedef uint64_t u64;
+typedef int64_t  i64;
 
 enum enum_toolchain {
 	toolchain__NULL = -1,
@@ -62,7 +67,7 @@ struct cli_args {
 	bool fix_flag;
 
 	/* Integer options */
-	int jobs_arg;
+	i64 jobs_arg;
 
 	/* String options */
 	sds color_arg;
@@ -169,7 +174,7 @@ extern const char *cmdline_parser_toolchain_values[];
  * @return 0 on success, non-zero on error
  */
 [[nodiscard]]
-int cmdline_parser(int argc, char **argv, struct cli_args *args_info);
+i64 cmdline_parser(i64 argc, char **argv, struct cli_args *args_info);
 
 /**
  * Initialize the args_info structure to defaults.

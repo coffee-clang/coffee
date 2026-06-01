@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-static void print_transitive_json(const char *name, const char *version, int depth, int max_depth)
+static void print_transitive_json(const char *name, const char *version, i64 depth, i64 max_depth)
 {
 	if (depth > max_depth || name == nullptr) {
 		return;

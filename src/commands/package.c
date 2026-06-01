@@ -39,7 +39,7 @@ int64_t handle_package(options *opts)
 
 	sds cmd = sdscatprintf(sdsempty(), "tar -czf %s Coffee.toml src/ tests/ 2>/dev/null", tarball);
 
-	int ret = system(cmd);
+	i64 ret = system(cmd);
 
 	if (ret == 0) {
 		printf("Package created: %s\n", tarball);

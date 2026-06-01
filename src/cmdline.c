@@ -90,7 +90,7 @@ static const char *usage_str = "Usage: coffee [OPTIONS]... [COMMAND]...\n"
 /*  Forward declarations                                              */
 /* ------------------------------------------------------------------ */
 
-static int check_enum_value(const char *val, const char *values[], int *out_index);
+static i64 check_enum_value(const char *val, const char *values[], i64 *out_index);
 
 /* ------------------------------------------------------------------ */
 /*  cmdline_parser_init                                               */
@@ -162,16 +162,16 @@ void cmdline_parser_free(struct cli_args *args_info)
 /*  Returns 0 on success, -1 on invalid, -2 on ambiguous.             */
 /* ------------------------------------------------------------------ */
 
-static int check_enum_value(const char *val, const char *values[], int *out_index)
+static i64 check_enum_value(const char *val, const char *values[], i64 *out_index)
 {
 	if (val == nullptr || !values) {
 		return -1;
 	}
 
-	int    found  = -1;
+	i64    found  = -1;
 	size_t vallen = strlen(val);
 
-	for (int i = 0; values[i]; i++) {
+	for (i64 i = 0; values[i]; i++) {
 		if (strncmp(val, values[i], vallen) == 0) {
 			if (strlen(values[i]) == vallen) {
 				/* Exact match */
@@ -327,7 +327,7 @@ static const struct option long_options[] = { { "help", no_argument, 0, 'h' },
 /*  cmdline_parser — main entry point                                 */
 /* ------------------------------------------------------------------ */
 
-int cmdline_parser(int argc, char **argv, struct cli_args *args_info)
+i64 cmdline_parser(i64 argc, char **argv, struct cli_args *args_info)
 {
 	if (args_info == nullptr) {
 		return 1;
@@ -335,7 +335,7 @@ int cmdline_parser(int argc, char **argv, struct cli_args *args_info)
 
 	cmdline_parser_init(args_info);
 
-	int ch;
+	i64 ch;
 	while ((ch = getopt_long(argc, argv, "hvqj:p:Z:V:", long_options, nullptr)) != -1) {
 		switch (ch) {
 		case 'h':
@@ -370,7 +370,7 @@ int cmdline_parser(int argc, char **argv, struct cli_args *args_info)
 					cmdline_parser_free(args_info);
 					return 1;
 				}
-				args_info->jobs_arg = (int)val;
+				args_info->jobs_arg = (i64)val;
 			}
 			break;
 
@@ -772,8 +772,8 @@ int cmdline_parser(int argc, char **argv, struct cli_args *args_info)
 		case LOPT_TOOLCHAIN:
 			args_info->toolchain_given = true;
 			{
-				int idx;
-				int rc = check_enum_value(optarg, cmdline_parser_toolchain_values, &idx);
+				i64 idx;
+				i64 rc = check_enum_value(optarg, cmdline_parser_toolchain_values, &idx);
 				if (rc == -2) {
 					fprintf_safe(stderr, "coffee: ambiguous argument \"%s\" for --toolchain\n", optarg);
 					cmdline_parser_free(args_info);
@@ -821,7 +821,7 @@ int cmdline_parser(int argc, char **argv, struct cli_args *args_info)
 			return 1;
 		}
 		for (unsigned i = 0; i < remaining; i++) {
-			args_info->inputs[i] = sdsnew(argv[optind + (int)i]);
+			args_info->inputs[i] = sdsnew(argv[optind + (i64)i]);
 			if (!args_info->inputs[i]) {
 				fprintf_safe(stderr, "coffee: out of memory\n");
 				cmdline_parser_free(args_info);

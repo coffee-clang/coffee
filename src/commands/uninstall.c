@@ -33,7 +33,7 @@ int64_t handle_uninstall(options *opts)
 	sds cmd = sdscatprintf(sdsempty(), "rm -rf %s", pkg_dir);
 	sdsfree(pkg_dir);
 
-	int ret = system(cmd);
+	i64 ret = system(cmd);
 	sdsfree(cmd);
 	if (ret != 0) {
 		fprintf_safe(stderr, "Error: Failed to remove %s\n", package);

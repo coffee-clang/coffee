@@ -54,8 +54,8 @@ typedef struct options_s {
 
 	// Integer fields
 	i64 color;
-	int inputs_num;
-	int jobs;
+	i64 inputs_num;
+	i64 jobs;
 
 	// Boolean fields
 	bool verbose;

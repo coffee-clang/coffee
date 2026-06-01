@@ -13,7 +13,7 @@ void print_usage(void)
 int main(int argc, char *argv[])
 {
 	struct cli_args args_info;
-	int             parse_result = cmdline_parser(argc, argv, &args_info);
+	i64             parse_result = cmdline_parser(argc, argv, &args_info);
 	if (parse_result != 0) {
 		// Error messages are printed by the generated parser.
 		exit(1);
@@ -27,9 +27,9 @@ int main(int argc, char *argv[])
 	char       *command            = args_info.inputs[0];
 	const char *allowed_commands[] = { "build", "run",  "test",    "check",   "doc",    "bench",
 		                               "new",   "init", "publish", "install", "update", "search" };
-	int         allowed            = 0;
-	int         allowed_count      = sizeof(allowed_commands) / sizeof(allowed_commands[0]);
-	for (int i = 0; i < allowed_count; i++) {
+	i64         allowed            = 0;
+	i64         allowed_count      = sizeof(allowed_commands) / sizeof(allowed_commands[0]);
+	for (i64 i = 0; i < allowed_count; i++) {
 		if (strcmp(command, allowed_commands[i]) == 0) {
 			allowed = 1;
 			break;
@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	for (int i = 0; i < args_info.inputs_num; i++) {
+	for (i64 i = 0; i < args_info.inputs_num; i++) {
 		cmd_line_substring = sdscat(cmd_line_substring, args_info.inputs[i]);
 		if (i < args_info.inputs_num - 1) {
 			cmd_line_substring = sdscat(cmd_line_substring, " ");

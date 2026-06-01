@@ -4,12 +4,12 @@
 
 /* Global test registry */
 test_entry_t test_framework_tests[TEST_FRAMEWORK_MAX_TESTS];
-unsigned int test_framework_count = 0;
+u64          test_framework_count = 0;
 
 /* Per-run results */
-static int tests_run    = 0;
-static int tests_passed = 0;
-static int tests_failed = 0;
+static i64 tests_run    = 0;
+static i64 tests_passed = 0;
+static i64 tests_failed = 0;
 
 void test_framework_register(const char *name, test_func_t func)
 {
@@ -22,7 +22,7 @@ void test_framework_register(const char *name, test_func_t func)
 	test_framework_count++;
 }
 
-static int test_matches_filter(const char *test_name, const char *filter)
+static i64 test_matches_filter(const char *test_name, const char *filter)
 {
 	if (!filter || filter[0] == '\0') {
 		return 1; /* No filter = match all */
@@ -30,12 +30,12 @@ static int test_matches_filter(const char *test_name, const char *filter)
 	return strstr(test_name, filter) != nullptr;
 }
 
-int test_framework_run(const char *filter)
+i64 test_framework_run(const char *filter)
 {
-	int local_passed = 0;
-	int local_failed = 0;
+	i64 local_passed = 0;
+	i64 local_failed = 0;
 
-	for (unsigned int i = 0; i < test_framework_count; i++) {
+	for (u64 i = 0; i < test_framework_count; i++) {
 		const char *name = test_framework_tests[i].name;
 
 		if (!test_matches_filter(name, filter)) {
@@ -45,7 +45,7 @@ int test_framework_run(const char *filter)
 		printf("  %-55s ... ", name);
 		fflush(stdout);
 
-		int result = test_framework_tests[i].func();
+		i64 result = test_framework_tests[i].func();
 
 		if (result) {
 			local_passed++;

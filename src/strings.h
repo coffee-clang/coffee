@@ -35,9 +35,15 @@
 
 #include "../deps/sds/sds.h"
 
+#include <stdint.h>
+
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
+
+/* Type aliases used throughout the project */
+typedef uint64_t u64;
+typedef int64_t  i64;
 
 /* glibc's inline bsearch (stdlib-bsearch.h) casts away const, triggering
  * -Wcast-qual on Clang because Clang's __GNUC_MINOR__ is too low for the
@@ -110,14 +116,14 @@ static inline void fprintf_safe(FILE *stream, const char *fmt, ...)
  * This function is for internal use only and exposes no public
  * interface.
  */
-static inline int snprintf_safe(char *buf, size_t size, const char *fmt, ...)
+static inline i64 snprintf_safe(char *buf, size_t size, const char *fmt, ...)
 {
 	va_list ap;
 	va_start(ap, fmt);
 	sds str = sdscatvprintf(sdsempty(), fmt, ap);
 	va_end(ap);
 
-	int len = (int)sdslen(str);
+	i64 len = (i64)sdslen(str);
 
 	if (buf != nullptr && size > 0) {
 		size_t copy = (size_t)len < size - 1 ? (size_t)len : size - 1;

@@ -20,8 +20,8 @@ int main(int argc, char **argv)
 	const char *filter = nullptr;
 
 	/* Parse --test and --verbose from argv */
-	int verbose = 0;
-	for (int i = 1; i < argc; i++) {
+	i64 verbose = 0;
+	for (i64 i = 1; i < argc; i++) {
 		if (strcmp(argv[i], "--verbose") == 0 || strcmp(argv[i], "-v") == 0) {
 			verbose = 1;
 		} else if (strcmp(argv[i], "--test") == 0 && i + 1 < argc) {
@@ -46,7 +46,7 @@ int main(int argc, char **argv)
 
 	printf("=== Coffee Test Suite ===\n\n");
 
-	int result = test_framework_run(filter);
+	i64 result = test_framework_run(filter);
 
 	test_framework_summary();
 

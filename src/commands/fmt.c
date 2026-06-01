@@ -10,7 +10,7 @@ int64_t handle_fmt(options *opts)
 
 	// Use find to get all .c and .h files in src and tests
 	// and run clang-format -i on them.
-	int ret = system("find src tests -name \"*.c\" -o -name \"*.h\" | xargs clang-format -i 2>/dev/null");
+	i64 ret = system("find src tests -name \"*.c\" -o -name \"*.h\" | xargs clang-format -i 2>/dev/null");
 
 	if (ret != 0) {
 		fprintf_safe(stderr, "Error: Formatting failed. Please ensure 'clang-format' is installed.\n");

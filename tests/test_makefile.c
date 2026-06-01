@@ -143,10 +143,10 @@ TEST(add_skips_when_no_makefile)
 TEST(safe_package_name)
 {
 	const char *valid[] = { "mylib", "my_lib", "my-lib", "mylib123", "MyLib", nullptr };
-	for (int i = 0; valid[i]; i++) {
+	for (i64 i = 0; valid[i]; i++) {
 		const char *p = valid[i];
 		while (*p) {
-			int c = (unsigned char)*p;
+			i64 c = (unsigned char)*p;
 			if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-')) {
 				FAIL("valid name should pass validation");
 				return 0;
@@ -156,11 +156,11 @@ TEST(safe_package_name)
 	}
 
 	const char *invalid[] = { "bad name", "bad$name", "bad;name", "bad\nname", "$(shell)", nullptr };
-	for (int i = 0; invalid[i]; i++) {
+	for (i64 i = 0; invalid[i]; i++) {
 		const char *p     = invalid[i];
-		int         found = 0;
+		i64         found = 0;
 		while (*p && !found) {
-			int c = (unsigned char)*p;
+			i64 c = (unsigned char)*p;
 			if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-')) {
 				found = 1;
 			}

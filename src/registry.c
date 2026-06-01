@@ -39,7 +39,7 @@ static const char *get_index_path(void)
 	return index_path;
 }
 
-static int ensure_index_cached(void)
+static i64 ensure_index_cached(void)
 {
 	const char *index_path = get_index_path();
 	struct stat st;
@@ -158,7 +158,7 @@ static recipe_list_t *parse_package_list(const char *json)
 	}
 
 	const char *p           = json;
-	int         brace_count = 0;
+	i64         brace_count = 0;
 	const char *obj_start   = nullptr;
 
 	while (*p != '\0') {
@@ -245,7 +245,7 @@ recipe_list_t *registry_search(sds query)
 
 	for (size_t i = 0; i < all->count; i++) {
 		recipe_t *r     = &all->recipes[i];
-		int       match = 0;
+		i64       match = 0;
 
 		if (r->name != nullptr && strcasestr(r->name, query)) {
 			match = 1;
@@ -330,7 +330,7 @@ recipe_t *registry_get(sds name)
 	return r;
 }
 
-int registry_fetch(sds name, sds version, sds dest_dir)
+i64 registry_fetch(sds name, sds version, sds dest_dir)
 {
 	if (name == nullptr || !dest_dir) {
 		return -1;

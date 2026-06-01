@@ -80,8 +80,8 @@ int main(int argc, char **argv)
 	cmdline_parser(argc, argv, &args_info);
 
 	// Find first non-toolchain argument (commands start with letter)
-	int command_idx = -1;
-	for (int i = 0; i < args_info.inputs_num; i++) {
+	i64 command_idx = -1;
+	for (i64 i = 0; i < args_info.inputs_num; i++) {
 		if (args_info.inputs[i][0] != '+') {
 			command_idx = i;
 			break;
@@ -99,31 +99,31 @@ int main(int argc, char **argv)
 		.verbose2   = args_info.verbose_given,
 		.quiet      = args_info.quiet_given,
 		.inputs     = args_info.inputs,
-		.inputs_num = (int)args_info.inputs_num,
+		.inputs_num = (i64)args_info.inputs_num,
 
-		.pkg_version = (int)args_info.pkg_version_given ? args_info.pkg_version_arg : nullptr,
-		.path        = (int)args_info.path_given ? args_info.path_arg : nullptr,
-		.git         = (int)args_info.git_given ? args_info.git_arg : nullptr,
-		.branch      = (int)args_info.branch_given ? args_info.branch_arg : nullptr,
-		.tag         = (int)args_info.tag_given ? args_info.tag_arg : nullptr,
-		.rev         = (int)args_info.rev_given ? args_info.rev_arg : nullptr,
-		.registry    = (int)args_info.registry_given ? args_info.registry_arg : nullptr,
+		.pkg_version = (i64)args_info.pkg_version_given ? args_info.pkg_version_arg : nullptr,
+		.path        = (i64)args_info.path_given ? args_info.path_arg : nullptr,
+		.git         = (i64)args_info.git_given ? args_info.git_arg : nullptr,
+		.branch      = (i64)args_info.branch_given ? args_info.branch_arg : nullptr,
+		.tag         = (i64)args_info.tag_given ? args_info.tag_arg : nullptr,
+		.rev         = (i64)args_info.rev_given ? args_info.rev_arg : nullptr,
+		.registry    = (i64)args_info.registry_given ? args_info.registry_arg : nullptr,
 		.dev         = args_info.dev_given,
 		.build_dep   = args_info.build_given,
 		.optional    = args_info.optional_given,
 
 		.release             = args_info.release_given,
 		.debug               = args_info.debug_given,
-		.jobs                = (int)args_info.jobs_given ? args_info.jobs_arg : 0,
-		.bin                 = (int)args_info.bin_given ? args_info.bin_arg : nullptr,
-		.example             = (int)args_info.example_given ? args_info.example_arg : nullptr,
-		.features            = (int)args_info.features_given ? args_info.features_arg : nullptr,
+		.jobs                = (i64)args_info.jobs_given ? args_info.jobs_arg : 0,
+		.bin                 = (i64)args_info.bin_given ? args_info.bin_arg : nullptr,
+		.example             = (i64)args_info.example_given ? args_info.example_arg : nullptr,
+		.features            = (i64)args_info.features_given ? args_info.features_arg : nullptr,
 		.all_features        = args_info.all_features_given,
 		.no_default_features = args_info.no_default_features_given,
-		.profile             = (int)args_info.profile_given ? args_info.profile_arg : nullptr,
-		.target              = (int)args_info.target_given ? args_info.target_arg : nullptr,
-		.target_dir          = (int)args_info.target_dir_given ? args_info.target_dir_arg : nullptr,
-		.manifest_path       = (int)args_info.manifest_path_given ? args_info.manifest_path_arg : nullptr,
+		.profile             = (i64)args_info.profile_given ? args_info.profile_arg : nullptr,
+		.target              = (i64)args_info.target_given ? args_info.target_arg : nullptr,
+		.target_dir          = (i64)args_info.target_dir_given ? args_info.target_dir_arg : nullptr,
+		.manifest_path       = (i64)args_info.manifest_path_given ? args_info.manifest_path_arg : nullptr,
 		.lib                 = args_info.lib_given,
 		.fix                 = args_info.fix_given,
 	};

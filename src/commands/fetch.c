@@ -58,7 +58,7 @@ int64_t handle_fetch(options *opts)
 
 		sds pkg_dir = sdscatprintf(sdsempty(), "%s/%s", deps_dir, name);
 
-		int ret = registry_fetch(name, nullptr, pkg_dir);
+		i64 ret = registry_fetch(name, nullptr, pkg_dir);
 		if (ret != 0) {
 			fprintf_safe(stderr, "Error: Failed to fetch %s\n", name);
 		}

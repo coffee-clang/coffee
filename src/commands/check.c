@@ -8,9 +8,9 @@
 
 #include <glob.h>
 
-static int validate_manifest(manifest_t *m)
+static i64 validate_manifest(manifest_t *m)
 {
-	int errors = 0;
+	i64 errors = 0;
 
 	if (m->package.name == nullptr) {
 		fprintf_safe(stderr, "Error: [package] name is required\n");
@@ -101,7 +101,7 @@ int64_t handle_check(options *opts)
 		printf("Running: %s\n", cmd);
 	}
 
-	int ret = system(cmd);
+	i64 ret = system(cmd);
 	sdsfree(cmd);
 
 	manifest_free(m);

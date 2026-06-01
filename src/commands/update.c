@@ -11,9 +11,9 @@
 #include <unistd.h>
 
 typedef struct {
-	int major;
-	int minor;
-	int patch;
+	i64 major;
+	i64 minor;
+	i64 patch;
 } semver_t;
 
 static bool semver_parse(const char *s, semver_t *v)
@@ -49,7 +49,7 @@ static bool semver_parse(const char *s, semver_t *v)
 	return true;
 }
 
-static int semver_cmp(semver_t a, semver_t b)
+static i64 semver_cmp(semver_t a, semver_t b)
 {
 	if (a.major != b.major) {
 		return a.major - b.major;
@@ -117,7 +117,7 @@ static bool semver_match(const char *constraint, const char *candidate)
 	return semver_cmp(ver, con) == 0;
 }
 
-static int create_symlink(const char *target, const char *link_path)
+static i64 create_symlink(const char *target, const char *link_path)
 {
 	struct stat st;
 	if (lstat(link_path, &st) == 0) {
@@ -230,7 +230,7 @@ int64_t handle_update(options *opts)
 		sds cache_path        = sdscatprintf(sdsempty(), "%s/%s/%s", global_deps, name, resolved_version);
 		sds project_link_path = sdscatprintf(sdsempty(), "%s/%s/%s", project_deps, name, resolved_version);
 
-		int ret = registry_fetch(name, resolved_version, cache_path);
+		i64 ret = registry_fetch(name, resolved_version, cache_path);
 		if (ret != 0) {
 			sdsfree(cache_path);
 			sdsfree(project_link_path);

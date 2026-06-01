@@ -10,7 +10,7 @@
 #include <libgen.h>
 #include <unistd.h>
 
-static int file_exists(const char *path)
+static i64 file_exists(const char *path)
 {
 	return access(path, F_OK) == 0;
 }

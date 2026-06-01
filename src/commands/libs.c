@@ -30,7 +30,7 @@ static void append_libs_for_pkg(const char *name, sds *buf)
 		return;
 	}
 
-	int has_libdir = 0;
+	i64 has_libdir = 0;
 	sds libname    = sdsnew(name);
 
 	sds toml_path = sdscatprintf(sdsempty(), "%s/library.toml", dir);
@@ -54,8 +54,8 @@ static void append_libs_for_pkg(const char *name, sds *buf)
 			/* Read lib array */
 			toml_array_t *lib = toml_array_in(conf, "lib");
 			if (lib) {
-				int n = toml_array_nelem(lib);
-				for (int i = 0; i < n; i++) {
+				i64 n = toml_array_nelem(lib);
+				for (i64 i = 0; i < n; i++) {
 					toml_raw_t raw = toml_raw_at(lib, i);
 					if (raw) {
 						char *s;

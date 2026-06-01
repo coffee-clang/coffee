@@ -42,14 +42,14 @@ static void parse_dep_list(const char *input, char ***out_names, size_t *out_cou
 	}
 }
 
-static void print_transitive(const char *name, const char *version, const char *prefix, bool is_last, int depth,
-                             int max_depth)
+static void print_transitive(const char *name, const char *version, const char *prefix, bool is_last, i64 depth,
+                             i64 max_depth)
 {
 	if (depth > max_depth) {
 		return;
 	}
 
-	const char *connector = (int)is_last ? "└── " : "├── ";
+	const char *connector = (i64)is_last ? "└── " : "├── ";
 	sds         ver       = version != nullptr ? sdsnew(version) : nullptr;
 	printf("%s%s%s v%s\n", prefix, connector, name != nullptr ? name : "?", ver != nullptr ? ver : "?");
 	sdsfree(ver);
@@ -63,7 +63,7 @@ static void print_transitive(const char *name, const char *version, const char *
 		return;
 	}
 
-	sds child_prefix = sdscatfmt(sdsnew(prefix), "%s", (int)is_last ? "    " : "│   ");
+	sds child_prefix = sdscatfmt(sdsnew(prefix), "%s", (i64)is_last ? "    " : "│   ");
 
 	char **dep_names = nullptr;
 	size_t dep_count = 0;

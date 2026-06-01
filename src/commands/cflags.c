@@ -32,7 +32,7 @@ static void append_cflags_for_pkg(const char *name, sds *buf)
 
 	sds toml_path = sdscatprintf(sdsempty(), "%s/library.toml", dir);
 
-	int   found = 0;
+	i64   found = 0;
 	FILE *fp    = fopen(toml_path, "r");
 	if (fp) {
 		char          errbuf[256];
@@ -40,8 +40,8 @@ static void append_cflags_for_pkg(const char *name, sds *buf)
 		if (conf) {
 			toml_array_t *inc = toml_array_in(conf, "include");
 			if (inc) {
-				int n = toml_array_nelem(inc);
-				for (int i = 0; i < n; i++) {
+				i64 n = toml_array_nelem(inc);
+				for (i64 i = 0; i < n; i++) {
 					toml_raw_t raw = toml_raw_at(inc, i);
 					if (raw) {
 						char *s;

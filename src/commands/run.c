@@ -41,13 +41,13 @@ int64_t handle_run(options *opts)
 	};
 
 	char **args = nullptr;
-	int    argc = 0;
+	i64    argc = 0;
 	if (opts->inputs_num > 1) {
 		args = &opts->inputs[1];
 		argc = opts->inputs_num - 1;
 	}
 
-	int ret = build_run(manifest, &build_opts, args, argc);
+	i64 ret = build_run(manifest, &build_opts, args, argc);
 
 	for (size_t i = 0; i < features_count; i++) {
 		sdsfree(features[i]);

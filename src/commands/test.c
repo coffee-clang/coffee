@@ -44,7 +44,7 @@ int64_t handle_test(options *opts)
 		printf("Building test runner: %s\n", cmd);
 	}
 
-	int ret = system(cmd);
+	i64 ret = system(cmd);
 	if (ret != 0) {
 		sdsfree(cmd);
 		sdsfree(project_dir);

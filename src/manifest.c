@@ -140,7 +140,7 @@ manifest_t *manifest_parse(sds path)
 		if (deps_table) {
 			/* Count entries */
 			size_t count = 0;
-			for (int i = 0;; i++) {
+			for (i64 i = 0;; i++) {
 				const char *key = toml_key_in(deps_table, i);
 				if (key == nullptr) {
 					break;
@@ -156,7 +156,7 @@ manifest_t *manifest_parse(sds path)
 			}
 			size_t idx = 0;
 			/* Build "name = value" strings matching array format */
-			for (int i = 0; idx < count; i++) {
+			for (i64 i = 0; idx < count; i++) {
 				const char *key = toml_key_in(deps_table, i);
 				if (key == nullptr) {
 					break;
@@ -211,7 +211,7 @@ manifest_t *manifest_parse(sds path)
 	toml_table_t *features_table = toml_table_in(conf, "features");
 	if (features_table) {
 		m->features_count = 0;
-		for (int i = 0;; i++) {
+		for (i64 i = 0;; i++) {
 			const char *key = toml_key_in(features_table, i);
 			if (key == nullptr) {
 				break;
@@ -231,7 +231,7 @@ manifest_t *manifest_parse(sds path)
 				return nullptr;
 			}
 			size_t idx = 0;
-			for (int i = 0;; i++) {
+			for (i64 i = 0;; i++) {
 				const char *key = toml_key_in(features_table, i);
 				if (key == nullptr) {
 					break;
@@ -362,7 +362,7 @@ void manifest_free(manifest_t *m)
 	free(m);
 }
 
-int manifest_write(sds path, manifest_t *m)
+i64 manifest_write(sds path, manifest_t *m)
 {
 	FILE *fp = fopen(path, "w");
 	if (fp == nullptr) {
