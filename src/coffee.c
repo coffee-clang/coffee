@@ -76,7 +76,7 @@ command_s commands[] = {
 
 int main(int argc, char **argv)
 {
-	static struct gengetopt_args_info args_info;
+	static struct cli_args args_info;
 	cmdline_parser(argc, argv, &args_info);
 
 	// Find first non-toolchain argument (commands start with letter)

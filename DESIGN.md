@@ -25,7 +25,7 @@ manifest_t
 
 ### `options_s` — CLI State (`src/coffee.h`)
 
-Global struct populated by gengetopt parser, threaded through all command handlers.
+Global struct populated by CLI parser, threaded through all command handlers.
 
 ```
 options_s
@@ -88,7 +88,7 @@ Passed to `build_project()` and `build_run()`.
 
 ```
 main() in coffee.c
-├── gengetopt parses argv → args_info
+├── cmdline_parser() parses argv → cli_args
 ├── options_s populated from args_info
 ├── command lookup by name → handler
 └── handler runs (each in src/commands/<name>.c)
@@ -143,7 +143,7 @@ Key enforced rules:
 
 ### P1: coffee add
 
-- Change `pkg-version` in `cli.ggo` from flag to string argument
+- Change `pkg-version` from flag to string argument
 - Format: with version → `name = "1.0"`, with features → `name = { version = "1.0", features = ["feat1"] }`
 - `--optional` → `optional = true`
 - `--dev` → `[dev-dependencies]` table, `--build` → `[build-dependencies]` table

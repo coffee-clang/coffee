@@ -12,8 +12,8 @@ void print_usage(void)
 
 int main(int argc, char *argv[])
 {
-	struct gengetopt_args_info args_info;
-	int                        parse_result = cmdline_parser(argc, argv, &args_info);
+	struct cli_args args_info;
+	int             parse_result = cmdline_parser(argc, argv, &args_info);
 	if (parse_result != 0) {
 		// Error messages are printed by the generated parser.
 		exit(1);

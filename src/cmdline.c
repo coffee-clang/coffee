@@ -26,7 +26,7 @@ const char *cmdline_parser_toolchain_values[] = { "+stable", "+clang-stable", "+
 /*  Help / usage text                                                 */
 /* ------------------------------------------------------------------ */
 
-static const char *usage_str = "Usage: coffee [OPTION]... [FILE]...\n"
+static const char *usage_str = "Usage: coffee [OPTIONS]... [COMMAND]...\n"
                                "\n"
                                "A modern package manager for C\n"
                                "\n"
@@ -96,7 +96,7 @@ static int check_enum_value(const char *val, const char *values[], int *out_inde
 /*  cmdline_parser_init                                               */
 /* ------------------------------------------------------------------ */
 
-void cmdline_parser_init(struct gengetopt_args_info *args_info)
+void cmdline_parser_init(struct cli_args *args_info)
 {
 	if (args_info == nullptr) {
 		return;
@@ -113,7 +113,7 @@ void cmdline_parser_init(struct gengetopt_args_info *args_info)
 /*  cmdline_parser_free                                               */
 /* ------------------------------------------------------------------ */
 
-void cmdline_parser_free(struct gengetopt_args_info *args_info)
+void cmdline_parser_free(struct cli_args *args_info)
 {
 	if (args_info == nullptr) {
 		return;
@@ -327,7 +327,7 @@ static const struct option long_options[] = { { "help", no_argument, 0, 'h' },
 /*  cmdline_parser — main entry point                                 */
 /* ------------------------------------------------------------------ */
 
-int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
+int cmdline_parser(int argc, char **argv, struct cli_args *args_info)
 {
 	if (args_info == nullptr) {
 		return 1;
@@ -352,7 +352,7 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 
 		case 'v':
 			args_info->verbose_given = true;
-			args_info->verbose_flag  = !args_info->verbose_flag;
+			args_info->verbose_flag  = (bool)(!args_info->verbose_flag);
 			break;
 
 		case 'q':
@@ -814,7 +814,7 @@ int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info)
 	/* Collect positional arguments */
 	if (optind < argc) {
 		unsigned remaining = (unsigned)(argc - optind);
-		args_info->inputs  = (sds *)malloc((size_t)(remaining) * sizeof(sds));
+		args_info->inputs  = (sds *)malloc((size_t)remaining * sizeof(sds));
 		if (!args_info->inputs) {
 			fprintf_safe(stderr, "coffee: out of memory\n");
 			cmdline_parser_free(args_info);

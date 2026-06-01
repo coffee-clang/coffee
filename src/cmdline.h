@@ -30,7 +30,7 @@ enum enum_toolchain {
 };
 
 /** @brief Parsed command line options */
-struct gengetopt_args_info {
+struct cli_args {
 	/* Flag options */
 	bool verbose_flag;
 	bool quiet_flag;
@@ -169,17 +169,17 @@ extern const char *cmdline_parser_toolchain_values[];
  * @return 0 on success, non-zero on error
  */
 [[nodiscard]]
-int cmdline_parser(int argc, char **argv, struct gengetopt_args_info *args_info);
+int cmdline_parser(int argc, char **argv, struct cli_args *args_info);
 
 /**
  * Initialize the args_info structure to defaults.
  */
-void cmdline_parser_init(struct gengetopt_args_info *args_info);
+void cmdline_parser_init(struct cli_args *args_info);
 
 /**
  * Free allocated memory inside args_info.
  */
-void cmdline_parser_free(struct gengetopt_args_info *args_info);
+void cmdline_parser_free(struct cli_args *args_info);
 
 /**
  * Print help text to stdout.
