@@ -156,6 +156,14 @@ test: $(TARGET) $(BIN_DIR)/tests/runner
 		$(BIN_DIR)/tests/runner; \
 	fi
 
+# Install
+INSTALL_DIR ?= $(HOME)/.coffee/bin
+
+install: $(TARGET)
+	@mkdir -p $(INSTALL_DIR)
+	cp $(TARGET) $(INSTALL_DIR)/$(P)
+	@echo "Installed $(P) to $(INSTALL_DIR)/$(P)"
+
 # Benchmark targets
 BENCH_SRCS := $(wildcard bench/*.c)
 BENCH_BINS := $(patsubst bench/%.c, $(BIN_DIR)/bench/%, $(BENCH_SRCS))
@@ -172,7 +180,7 @@ bench: $(BENCH_BINS)
 		echo; \
 	done
 
-.PHONY: clean format tidy check bootstrap test docs-assets docs serve
+.PHONY: clean format tidy check bootstrap test docs-assets docs serve install
 
 docs-assets:
 	@echo "Fetching remote docs theme assets..."
