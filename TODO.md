@@ -1,6 +1,6 @@
 # Coffee Project TODO
 
-> Generated from `cargo`-equivalent analysis. Overall completeness: **~78%**
+> Generated from `coffee`-equivalent analysis. Overall completeness: **~78%**
 
 ## Priority Legend
 
@@ -115,7 +115,7 @@
 | **v0.3** — "Testable"          | 65%      | P1: test/bench improvements, semver update, tree with transitive |
 | **v0.4** — "Publishable"       | 78%      | P2: metadata features+deps, fix/lint --fix, bench Makefile       |
 | **v0.5** — "Feature complete"  | 85%      | P2: publish, yank, owner, config subcommands, doc generation     |
-| **v1.0** — "Cargo-competitive" | 90%+     | P3 polish: install [[bin]], ecosystem, edge cases                |
+| **v1.0** — "Coffee-competitive" | 90%+     | P3 polish: install [[bin]], ecosystem, edge cases                |
 
 ---
 

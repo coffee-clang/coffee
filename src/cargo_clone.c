@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-void print_usage()
+void print_usage(void)
 {
 	cmdline_parser_print_help();
 }
@@ -42,15 +42,6 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 	// Build a substring from the command and all unnamed options (values)
-	size_t total_length = 0;
-	for (int i = 0; i < args_info.inputs_num; i++) {
-		total_length += strlen(args_info.inputs[i]);
-		if (i < args_info.inputs_num - 1) {
-			total_length += 1; // for space
-		}
-	}
-	total_length += 1; // for null terminator
-
 	sds cmd_line_substring = sdsempty();
 	if (cmd_line_substring == nullptr) {
 		fprintf_safe(stderr, "Memory allocation error\n");
@@ -68,8 +59,8 @@ int main(int argc, char *argv[])
 	// Print the substring of the command line with the command and its unnamed options
 	printf("Command line substring: %s\n", cmd_line_substring);
 
-	// Simulate execution of the cargo command
-	printf("Executing cargo %s command...\n", command);
+	// Simulate execution of the coffee command
+	printf("Executing coffee %s command...\n", command);
 
 	sdsfree(cmd_line_substring);
 	cmdline_parser_free(&args_info);

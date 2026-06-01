@@ -3,11 +3,11 @@ version "0.1.0"
 description "A moderm package manager for C"
 args "--unamed-opts --strict-hidden"
 
-option  "verbose" v "Use verbose output (-vv very verbose/build.rs output)" flag off
-option  "quiet" q "Do not print cargo log messages" flag off
+option  "verbose" v "Use verbose output (-vv very verbose)" flag off
+option  "quiet" q "Do not print coffee log messages" flag off
 option  "color" - "Coloring [possible values: auto, always, never]" string typestr="color" optional
 option  "message-format" - "Error format [possible values: human, json, short]" string typestr="message_format" optional
-option  "manifest-path" - "Path to Cargo.toml" string typestr="manifest_path" optional
+option  "manifest-path" - "Path to Coffee.toml" string typestr="manifest_path" optional
 option  "target" - "Build for the target triple" string typestr="target" optional
 option  "debug" - "Build with debug symbols" flag off
 option  "release" - "Build in release mode" flag off
@@ -27,7 +27,7 @@ option  "exclude" - "Exclude packages from the build" string typestr="exclude" o
 option  "include" - "Include packages in the build" string typestr="include" optional
 option  "lib" - "Build only this package's library" flag off
 option  "package" p "Package to build" string typestr="pkgid" optional
-option  "locked" - "Require Cargo.lock is up to date" flag off
+option  "locked" - "Require Coffee.lock is up to date" flag off
 option  "offline" - "Run without accessing the network" flag off
 option  "frozen" - "Equivalent to both --locked and --offline" flag off
 option  "config" - "Override a configuration value" string typestr="config" optional

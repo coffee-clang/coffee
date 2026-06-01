@@ -123,8 +123,13 @@ manifest_t *manifest_parse(sds path)
 
 	toml_array_t *deps_arr = toml_array_in(conf, "dependencies");
 	if (deps_arr) {
-		m->package.dependencies_count = toml_array_nelem(deps_arr);
+		m->package.dependencies_count = (size_t)toml_array_nelem(deps_arr);
 		m->package.dependencies       = calloc(m->package.dependencies_count, sizeof(sds));
+		if (m->package.dependencies == nullptr && m->package.dependencies_count > 0) {
+			manifest_free(m);
+			toml_free(conf);
+			return nullptr;
+		}
 		for (size_t i = 0; i < m->package.dependencies_count; i++) {
 			toml_datum_t dep           = toml_string_at(deps_arr, i);
 			m->package.dependencies[i] = toml_datum_to_string(dep);
@@ -144,7 +149,12 @@ manifest_t *manifest_parse(sds path)
 			}
 			m->package.dependencies_count = count;
 			m->package.dependencies       = calloc(count, sizeof(sds));
-			size_t idx                    = 0;
+			if (m->package.dependencies == nullptr && count > 0) {
+				manifest_free(m);
+				toml_free(conf);
+				return nullptr;
+			}
+			size_t idx = 0;
 			/* Build "name = value" strings matching array format */
 			for (int i = 0; idx < count; i++) {
 				const char *key = toml_key_in(deps_table, i);
@@ -170,8 +180,13 @@ manifest_t *manifest_parse(sds path)
 
 	toml_array_t *sources_arr = toml_array_in(conf, "sources");
 	if (sources_arr) {
-		m->package.sources_count = toml_array_nelem(sources_arr);
+		m->package.sources_count = (size_t)toml_array_nelem(sources_arr);
 		m->package.sources       = calloc(m->package.sources_count, sizeof(sds));
+		if (m->package.sources == nullptr && m->package.sources_count > 0) {
+			manifest_free(m);
+			toml_free(conf);
+			return nullptr;
+		}
 		for (size_t i = 0; i < m->package.sources_count; i++) {
 			toml_datum_t src      = toml_string_at(sources_arr, i);
 			m->package.sources[i] = toml_datum_to_string(src);
@@ -180,8 +195,13 @@ manifest_t *manifest_parse(sds path)
 
 	toml_array_t *headers_arr = toml_array_in(conf, "headers");
 	if (headers_arr) {
-		m->package.headers_count = toml_array_nelem(headers_arr);
+		m->package.headers_count = (size_t)toml_array_nelem(headers_arr);
 		m->package.headers       = calloc(m->package.headers_count, sizeof(sds));
+		if (m->package.headers == nullptr && m->package.headers_count > 0) {
+			manifest_free(m);
+			toml_free(conf);
+			return nullptr;
+		}
 		for (size_t i = 0; i < m->package.headers_count; i++) {
 			toml_datum_t hdr      = toml_string_at(headers_arr, i);
 			m->package.headers[i] = toml_datum_to_string(hdr);
@@ -205,7 +225,12 @@ manifest_t *manifest_parse(sds path)
 
 		if (m->features_count > 0) {
 			m->features = calloc(m->features_count, sizeof(feature_def_t));
-			size_t idx  = 0;
+			if (m->features == nullptr) {
+				manifest_free(m);
+				toml_free(conf);
+				return nullptr;
+			}
+			size_t idx = 0;
 			for (int i = 0;; i++) {
 				const char *key = toml_key_in(features_table, i);
 				if (key == nullptr) {
@@ -222,6 +247,11 @@ manifest_t *manifest_parse(sds path)
 				m->features[idx].deps_count = toml_array_nelem(arr);
 				if (m->features[idx].deps_count > 0) {
 					m->features[idx].deps = calloc(m->features[idx].deps_count, sizeof(sds));
+					if (m->features[idx].deps == nullptr) {
+						manifest_free(m);
+						toml_free(conf);
+						return nullptr;
+					}
 					for (size_t j = 0; j < m->features[idx].deps_count; j++) {
 						toml_datum_t dep         = toml_string_at(arr, j);
 						m->features[idx].deps[j] = toml_datum_to_string(dep);

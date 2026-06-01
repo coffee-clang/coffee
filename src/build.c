@@ -136,8 +136,8 @@ int build_project(manifest_t *manifest, build_opts_t *opts)
 		}
 	}
 
-	int    argc_total    = 1 + max_tokens + 2 + (int)globbuf.gl_pathc + 1;
-	char **compiler_argv = (char **)malloc(sizeof(char *) * ((size_t)argc_total + 1));
+	size_t argc_total    = (size_t)(1 + max_tokens + 2) + globbuf.gl_pathc + 1;
+	char **compiler_argv = (char **)malloc(sizeof(char *) * (argc_total + 1));
 	if (compiler_argv == nullptr) {
 		sdsfree(flags);
 		globfree(&globbuf);

@@ -16,14 +16,22 @@ static bool feature_in_set(feature_set_t *fs, const char *name)
 	return false;
 }
 
-static void feature_set_add(feature_set_t *fs, const char *name)
+static bool feature_set_add(feature_set_t *fs, const char *name)
 {
 	if (feature_in_set(fs, name)) {
-		return;
+		return true;
 	}
-	fs->names            = realloc(fs->names, (fs->count + 1) * sizeof(sds));
+	sds *new_names = realloc(fs->names, (fs->count + 1) * sizeof(sds));
+	if (new_names == nullptr) {
+		return false;
+	}
+	fs->names            = new_names;
 	fs->names[fs->count] = sdsnew(name);
+	if (fs->names[fs->count] == nullptr) {
+		return false;
+	}
 	fs->count++;
+	return true;
 }
 
 static feature_set_t *get_or_create_set(resolved_features_t *rf, const char *package)
@@ -33,8 +41,17 @@ static feature_set_t *get_or_create_set(resolved_features_t *rf, const char *pac
 			return &rf->packages[i];
 		}
 	}
-	rf->package_names                     = realloc(rf->package_names, (rf->package_count + 1) * sizeof(sds));
-	rf->packages                          = realloc(rf->packages, (rf->package_count + 1) * sizeof(feature_set_t));
+	sds *new_names = realloc(rf->package_names, (rf->package_count + 1) * sizeof(sds));
+	if (new_names == nullptr) {
+		return nullptr;
+	}
+	rf->package_names = new_names;
+
+	feature_set_t *new_pkgs = realloc(rf->packages, (rf->package_count + 1) * sizeof(feature_set_t));
+	if (new_pkgs == nullptr) {
+		return nullptr;
+	}
+	rf->packages                          = new_pkgs;
 	rf->package_names[rf->package_count]  = sdsnew(package);
 	rf->packages[rf->package_count].names = nullptr;
 	rf->packages[rf->package_count].count = 0;
@@ -55,6 +72,10 @@ resolved_features_t *features_resolve(manifest_t *root, sds *requested, size_t r
 	}
 
 	feature_set_t *root_set = get_or_create_set(rf, root->package.name != nullptr ? root->package.name : "root");
+	if (root_set == nullptr) {
+		features_free(rf);
+		return nullptr;
+	}
 
 	if (all_features) {
 		for (size_t i = 0; i < root->features_count; i++) {
@@ -98,7 +119,9 @@ resolved_features_t *features_resolve(manifest_t *root, sds *requested, size_t r
 				sds            pkg_name  = sdsnewlen(dep, pkg_len);
 				char          *feat_name = slash + 1;
 				feature_set_t *pkg_set   = get_or_create_set(rf, pkg_name);
-				feature_set_add(pkg_set, feat_name);
+				if (pkg_set != nullptr) {
+					feature_set_add(pkg_set, feat_name);
+				}
 				sdsfree(pkg_name);
 			}
 		}
@@ -187,7 +210,7 @@ sds *features_to_compiler_flags(resolved_features_t *rf, sds package, size_t *ou
 	return flags;
 }
 
-void features_parse_cli(const char *cli_string, sds ***out_features, size_t *out_count)
+void features_parse_cli(const char *cli_string, sds **out_features, size_t *out_count)
 {
 	if (!cli_string || !out_features || out_count == nullptr) {
 		*out_features = nullptr;

@@ -225,11 +225,11 @@ int64_t handle_init(options *opts)
 	sds main_header_path = sdscatprintf(sdsempty(), "include/%s/%s.h", name, name);
 	sds header_content   = sdscatprintf(sdsempty(),
 	                                    "#ifndef %s_H\n"
-	                                      "#define %s_H\n"
-	                                      "\n"
-	                                      "// Your declarations here\n"
-	                                      "\n"
-	                                      "#endif // %s_H\n",
+	                                    "#define %s_H\n"
+	                                    "\n"
+	                                    "// Your declarations here\n"
+	                                    "\n"
+	                                    "#endif // %s_H\n",
 	                                    name, name, name);
 	if (create_file(main_header_path, header_content) != 0) {
 		sdsfree(main_header_path);

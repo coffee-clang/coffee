@@ -22,13 +22,12 @@ sds project_find_manifest(sds start_dir)
 	if (start_dir) {
 		dir = sdsnew(start_dir);
 	} else {
-		sds cwd = sdsnewlen(nullptr, 4096);
-		if (getcwd(cwd, 4096) == nullptr) {
-			sdsfree(cwd);
+		char *cwd_buf = getcwd(nullptr, 0);
+		if (cwd_buf == nullptr) {
 			return nullptr;
 		}
-		dir = sdsnew(cwd);
-		sdsfree(cwd);
+		dir = sdsnew(cwd_buf);
+		free(cwd_buf);
 	}
 
 	while (1) {

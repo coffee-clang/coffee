@@ -31,7 +31,7 @@ command_s commands[] = {
 	{ .name = "info", .description = "Display information about a package", .action = &handle_info },
 	{ .name = "init", .description = "Create a new coffee package in an existing directory", .action = &handle_init },
 	{ .name        = "install",
-	  .description = "Install a binary. Default location is $HOME/.cargo/bin",
+	  .description = "Install a binary. Default location is $HOME/.coffee/bin",
 	  .action      = &handle_install },
 	{ .name        = "install-update-config",
 	  .description = "Install or update configuration as needed",

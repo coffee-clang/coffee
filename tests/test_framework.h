@@ -60,7 +60,6 @@ void test_framework_register(const char *name, test_func_t func);
 	do {                  \
 		if (!(cond)) {    \
 			FAIL(msg);    \
-			return 0;     \
 		}                 \
 	} while (0)
 
