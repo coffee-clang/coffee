@@ -30,4 +30,18 @@ i64 build_run(manifest_t *manifest, build_opts_t *opts, sds *args, i64 argc);
  */
 sds dep_resolve_dir(const char *name);
 
+/*
+ * Append compiler flags for a single dependency to the flags string.
+ * Returns the number of .c source files found (appended to src_argv).
+ * Pass nullptr for src_list/src_count if only flags are needed.
+ */
+size_t dep_add_flags(const char *dep_dir, const char *dep_name, sds *flags, sds *src_list, size_t *src_count);
+
+/*
+ * Extract dependency name from a raw TOML dependency entry string.
+ * Handles "name", "name = ...", and "name = { ... }" formats.
+ * Returns a new sds with the bare name (caller frees).
+ */
+sds dep_parse_name(const char *entry);
+
 #endif

@@ -66,6 +66,15 @@ static void free_dependency(dependency_t *dep)
 	sdsfree(dep->rev);
 }
 
+static void free_binary(binary_target_t *bin)
+{
+	sdsfree(bin->name);
+	for (size_t i = 0; i < bin->src_count; i++) {
+		sdsfree(bin->src[i]);
+	}
+	free(bin->src);
+}
+
 static sds toml_datum_to_string(toml_datum_t datum)
 {
 	if (!datum.ok) {
@@ -287,6 +296,44 @@ manifest_t *manifest_parse(sds path)
 		}
 	}
 
+	/* Parse [[bin]] array of tables */
+	toml_array_t *bin_arr = toml_array_in(conf, "bin");
+	if (bin_arr) {
+		m->bin_count = (size_t)toml_array_nelem(bin_arr);
+		if (m->bin_count > 0) {
+			m->bin = calloc(m->bin_count, sizeof(binary_target_t));
+			if (m->bin == nullptr) {
+				manifest_free(m);
+				toml_free(conf);
+				return nullptr;
+			}
+			for (size_t i = 0; i < m->bin_count; i++) {
+				toml_table_t *bt = toml_table_at(bin_arr, (int)i);
+				if (bt == nullptr) {
+					continue;
+				}
+				toml_datum_t bname    = toml_string_in(bt, "name");
+				m->bin[i].name        = toml_datum_to_string(bname);
+				toml_array_t *src_arr = toml_array_in(bt, "src");
+				if (src_arr) {
+					m->bin[i].src_count = (size_t)toml_array_nelem(src_arr);
+					if (m->bin[i].src_count > 0) {
+						m->bin[i].src = calloc(m->bin[i].src_count, sizeof(sds));
+						if (m->bin[i].src == nullptr) {
+							manifest_free(m);
+							toml_free(conf);
+							return nullptr;
+						}
+						for (size_t j = 0; j < m->bin[i].src_count; j++) {
+							toml_datum_t src = toml_string_at(src_arr, (int)j);
+							m->bin[i].src[j] = toml_datum_to_string(src);
+						}
+					}
+				}
+			}
+		}
+	}
+
 	toml_free(conf);
 	return m;
 }
@@ -358,6 +405,11 @@ void manifest_free(manifest_t *m)
 		free_feature(&m->features[i]);
 	}
 	free(m->features);
+
+	for (size_t i = 0; i < m->bin_count; i++) {
+		free_binary(&m->bin[i]);
+	}
+	free(m->bin);
 
 	free(m);
 }
@@ -435,6 +487,26 @@ i64 manifest_write(sds path, manifest_t *m)
 					}
 				}
 				fprintf_safe(fp, "]\n");
+			}
+		}
+	}
+
+	if (m->bin_count > 0) {
+		fprintf_safe(fp, "\n");
+		for (size_t i = 0; i < m->bin_count; i++) {
+			if (m->bin[i].name) {
+				fprintf_safe(fp, "[[bin]]\n");
+				fprintf_safe(fp, "name = \"%s\"\n", m->bin[i].name);
+				if (m->bin[i].src_count > 0) {
+					fprintf_safe(fp, "src = [\n");
+					for (size_t j = 0; j < m->bin[i].src_count; j++) {
+						if (m->bin[i].src[j]) {
+							fprintf_safe(fp, "  \"%s\",\n", m->bin[i].src[j]);
+						}
+					}
+					fprintf_safe(fp, "]\n");
+				}
+				fprintf_safe(fp, "\n");
 			}
 		}
 	}

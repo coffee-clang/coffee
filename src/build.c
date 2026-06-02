@@ -87,7 +87,7 @@ sds dep_resolve_dir(const char *name)
  * Append compiler flags for a single dependency to the flags string.
  * Returns the number of .c source files found (appended to src_argv).
  */
-static size_t dep_add_flags(const char *dep_dir, const char *dep_name, sds *flags, sds *src_list, size_t *src_count)
+size_t dep_add_flags(const char *dep_dir, const char *dep_name, sds *flags, sds *src_list, size_t *src_count)
 {
 	size_t found = 0;
 
@@ -161,17 +161,19 @@ static size_t dep_add_flags(const char *dep_dir, const char *dep_name, sds *flag
 	/* Always add -l<name> */
 	*flags = sdscatprintf(*flags, " -l%s", dep_name);
 
-	/* Also compile dep source files if they exist */
-	glob_t dep_glob;
-	sds    dep_src_glob = sdscatprintf(sdsempty(), "%s/src/*.c", dep_dir);
-	if (glob(dep_src_glob, 0, nullptr, &dep_glob) == 0) {
-		for (size_t i = 0; i < dep_glob.gl_pathc; i++) {
-			src_list[*src_count] = sdsnew(dep_glob.gl_pathv[i]);
-			(*src_count)++;
+	/* Also compile dep source files if they exist (only if src_list provided) */
+	if (src_list != nullptr && src_count != nullptr) {
+		glob_t dep_glob;
+		sds    dep_src_glob = sdscatprintf(sdsempty(), "%s/src/*.c", dep_dir);
+		if (glob(dep_src_glob, 0, nullptr, &dep_glob) == 0) {
+			for (size_t i = 0; i < dep_glob.gl_pathc; i++) {
+				src_list[*src_count] = sdsnew(dep_glob.gl_pathv[i]);
+				(*src_count)++;
+			}
+			globfree(&dep_glob);
 		}
-		globfree(&dep_glob);
+		sdsfree(dep_src_glob);
 	}
-	sdsfree(dep_src_glob);
 
 	return found;
 }
@@ -181,7 +183,7 @@ static size_t dep_add_flags(const char *dep_dir, const char *dep_name, sds *flag
  * Handles "name", "name = ...", and "name = { ... }" formats.
  * Returns a new sds with the bare name (caller frees).
  */
-static sds dep_parse_name(const char *entry)
+sds dep_parse_name(const char *entry)
 {
 	sds   name;
 	char *eq = strchr(entry, '=');
