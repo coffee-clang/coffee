@@ -14,5 +14,7 @@ coffee bench
 
 ## Implementation Notes
 
-- Stub command
-- Should compile benchmark code and run timing tests
+- Delegates to `make bench` with include flags
+- Builds include flags from project structure (-Isrc, -Iinclude, etc.)
+- Supports --verbose flag
+- Requires a Makefile with a `bench` target

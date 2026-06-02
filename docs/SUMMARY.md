@@ -59,7 +59,7 @@
 - [grep](commands/grep.md)
 - [locate-project](commands/locate_project.md)
 - [machete](commands/machete.md)
-- [miri](commands/miri.md)
+
 - [package](commands/package.md)
 - [pkgid](commands/pkgid.md)
 - [report](commands/report.md)

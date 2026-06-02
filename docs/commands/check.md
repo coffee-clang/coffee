@@ -16,5 +16,8 @@ coffee check
 
 ## Implementation Notes
 
-- Stub command
-- Should run static analysis tools (clang-tidy, etc.)
+- Validates Coffee.toml for required fields (name, version)
+- Runs `clang -fsyntax-only` on source files to check for syntax errors
+- Includes dependency include paths from deps/
+- Falls back to `src/*.c` glob if no sources listed in manifest
+- Also checks headers from include/ directories

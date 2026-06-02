@@ -9,22 +9,68 @@
 #include <toml.h>
 #include <unistd.h>
 
-/*
- * Read a TOML string value from a table, or return default.
- */
-static const char *toml_str_def(toml_table_t *tab, const char *key, const char *def)
+/* State for toml_str_def — use sds for thread safety and no static buffer */
+typedef struct {
+	sds project_name;
+	sds output_dir;
+	sds input_dirs;
+	sds exclude_patterns;
+} doc_settings_t;
+
+static void doc_settings_read(doc_settings_t *cfg, toml_table_t *doc_tab, const char *def_name, const char *def_out,
+                              const char *def_input)
 {
-	toml_raw_t raw = toml_raw_in(tab, key);
-	if (raw) {
-		char *s;
-		if (toml_rtos(raw, &s) == 0 && s) {
-			static char buf[1024];
-			snprintf_safe(buf, sizeof(buf), "%s", s);
-			free(s);
-			return buf;
-		}
+	memset(cfg, 0, sizeof(*cfg));
+	if (doc_tab == nullptr) {
+		cfg->project_name     = sdsnew(def_name);
+		cfg->output_dir       = sdsnew(def_out);
+		cfg->input_dirs       = sdsnew(def_input);
+		cfg->exclude_patterns = sdsnew("");
+		return;
 	}
-	return def;
+
+	toml_raw_t raw;
+	char      *s;
+
+	raw = toml_raw_in(doc_tab, "project-name");
+	if (raw && toml_rtos(raw, &s) == 0 && s) {
+		cfg->project_name = sdsnew(s);
+		free(s);
+	} else {
+		cfg->project_name = sdsnew(def_name);
+	}
+
+	raw = toml_raw_in(doc_tab, "output-dir");
+	if (raw && toml_rtos(raw, &s) == 0 && s) {
+		cfg->output_dir = sdsnew(s);
+		free(s);
+	} else {
+		cfg->output_dir = sdsnew(def_out);
+	}
+
+	raw = toml_raw_in(doc_tab, "input-dirs");
+	if (raw && toml_rtos(raw, &s) == 0 && s) {
+		cfg->input_dirs = sdsnew(s);
+		free(s);
+	} else {
+		cfg->input_dirs = sdsnew(def_input);
+	}
+
+	raw = toml_raw_in(doc_tab, "exclude-patterns");
+	if (raw && toml_rtos(raw, &s) == 0 && s) {
+		cfg->exclude_patterns = sdsnew(s);
+		free(s);
+	} else {
+		cfg->exclude_patterns = sdsnew("");
+	}
+}
+
+static void doc_settings_free(doc_settings_t *cfg)
+{
+	sdsfree(cfg->project_name);
+	sdsfree(cfg->output_dir);
+	sdsfree(cfg->input_dirs);
+	sdsfree(cfg->exclude_patterns);
 }
 
 /*
@@ -32,32 +78,32 @@ static const char *toml_str_def(toml_table_t *tab, const char *key, const char *
  */
 static i64 doc_generate_doxyfile(manifest_t *m, const sds project_dir)
 {
-	const char *name    = m->package.name ? m->package.name : "Project";
-	const char *version = m->package.version ? m->package.version : "";
-	const char *desc    = m->package.description ? m->package.description : "";
-	const char *out_dir = "docs/api";
-	const char *input   = "src include";
-	const char *exclude = "";
+	const char *def_name  = m->package.name ? m->package.name : "Project";
+	const char *version   = m->package.version ? m->package.version : "";
+	const char *desc      = m->package.description ? m->package.description : "";
+	const char *def_input = "src include";
 
 	/* Read [doc] section from Coffee.toml */
-	sds   manifest_path = sdscatprintf(sdsempty(), "%s/Coffee.toml", project_dir);
-	FILE *fp            = fopen(manifest_path, "r");
-	sdsfree(manifest_path);
+	doc_settings_t cfg;
+	{
+		sds   manifest_path = sdscatprintf(sdsempty(), "%s/Coffee.toml", project_dir);
+		FILE *fp            = fopen(manifest_path, "r");
+		sdsfree(manifest_path);
 
-	if (fp) {
-		char          errbuf[256];
-		toml_table_t *conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
-		fclose(fp);
+		if (fp) {
+			char          errbuf[256];
+			toml_table_t *conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
+			fclose(fp);
 
-		if (conf) {
-			toml_table_t *doc_tab = toml_table_in(conf, "doc");
-			if (doc_tab) {
-				name    = toml_str_def(doc_tab, "project-name", name);
-				out_dir = toml_str_def(doc_tab, "output-dir", "docs/api");
-				input   = toml_str_def(doc_tab, "input-dirs", "src include");
-				exclude = toml_str_def(doc_tab, "exclude-patterns", "");
+			if (conf) {
+				toml_table_t *doc_tab = toml_table_in(conf, "doc");
+				doc_settings_read(&cfg, doc_tab, def_name, "docs/api", def_input);
+				toml_free(conf);
+			} else {
+				doc_settings_read(&cfg, nullptr, def_name, "docs/api", def_input);
 			}
-			toml_free(conf);
+		} else {
+			doc_settings_read(&cfg, nullptr, def_name, "docs/api", def_input);
 		}
 	}
 
@@ -66,6 +112,7 @@ static i64 doc_generate_doxyfile(manifest_t *m, const sds project_dir)
 	if (df == nullptr) {
 		fprintf_safe(stderr, "Error: Could not create Doxyfile at %s\n", doxyfile_path);
 		sdsfree(doxyfile_path);
+		doc_settings_free(&cfg);
 		return 1;
 	}
 
@@ -96,13 +143,14 @@ static i64 doc_generate_doxyfile(manifest_t *m, const sds project_dir)
 	             "WARNINGS               = YES\n"
 	             "WARN_IF_UNDOCUMENTED   = NO\n"
 	             "WARN_FORMAT            = \"$file:$line: $text\"\n",
-	             name, version, desc, out_dir, input);
+	             cfg.project_name, version, desc, cfg.output_dir, cfg.input_dirs);
 
-	if (exclude && exclude[0]) {
-		fprintf_safe(df, "EXCLUDE_PATTERNS       = %s\n", exclude);
+	if (cfg.exclude_patterns && cfg.exclude_patterns[0]) {
+		fprintf_safe(df, "EXCLUDE_PATTERNS       = %s\n", cfg.exclude_patterns);
 	}
 
 	fclose(df);
+	doc_settings_free(&cfg);
 	printf("Generated Doxyfile\n");
 	sdsfree(doxyfile_path);
 	return 0;

@@ -14,5 +14,7 @@ coffee update [package]
 
 ## Implementation Notes
 
-- Stub command
-- Should update package versions in Coffee.lock
+- Updates Coffee.lock with resolved dependency versions
+- Can update a specific package or all dependencies
+- Preserves existing lockfile entries for non-targeted packages
+- Resolves dependency directories from local cache (deps/, vendor/, ~/.coffee/deps/)

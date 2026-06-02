@@ -15,6 +15,10 @@ void coffee_register_manifest_version_tests(void);
 void coffee_register_stubs_tests(void);
 void coffee_register_framework_tests(void);
 void coffee_register_lockfile_tests(void);
+void coffee_register_manifest_bin_tests(void);
+void coffee_register_config_tests(void);
+void coffee_register_doc_tests(void);
+void coffee_register_install_tests(void);
 
 int main(int argc, char **argv)
 {
@@ -41,6 +45,10 @@ int main(int argc, char **argv)
 	coffee_register_stubs_tests();
 	coffee_register_framework_tests();
 	coffee_register_lockfile_tests();
+	coffee_register_manifest_bin_tests();
+	coffee_register_config_tests();
+	coffee_register_doc_tests();
+	coffee_register_install_tests();
 
 	if (verbose) {
 		printf("Registered %u tests\n", test_framework_count);

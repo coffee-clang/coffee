@@ -10,5 +10,7 @@ coffee uninstall <package>
 
 ## Implementation Notes
 
-- Stub command
-- Should remove package from ~/.coffee/deps/
+- Removes package directory from `~/.coffee/deps/<package>`
+- Uses `rm -rf` via system() command
+- Reports usage if no package name is provided
+- Reports error if the package is not installed
