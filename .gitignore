@@ -6,7 +6,8 @@
 *.so
 .tidy_stamps/
 /deps/
-/bin/coffee
+/bin/*
+/fuzz/corpus/
 
 # Remote docs theme assets (fetched via make docs-assets)
 /docs/theme/index.hbs
