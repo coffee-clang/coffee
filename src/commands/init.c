@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <dirent.h>
 #include <libgen.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -27,6 +28,24 @@ static i64 create_file(const char *path, const char *content)
 	fprintf_safe(fp, "%s", content);
 	fclose(fp);
 	return 0;
+}
+
+static bool has_main_function(const char *path)
+{
+	FILE *fp = fopen(path, "r");
+	if (fp == nullptr) {
+		return false;
+	}
+	char buf[4096];
+	bool found = false;
+	while (fgets(buf, sizeof(buf), fp) != nullptr) {
+		if (strstr(buf, "int main(") != nullptr) {
+			found = true;
+			break;
+		}
+	}
+	fclose(fp);
+	return found;
 }
 
 static sds get_name_from_current_dir(void)
@@ -181,30 +200,6 @@ int64_t handle_init(options *opts)
 	}
 	sdsfree(readme_content);
 
-	/* Create manifest */
-	sds manifest_content = sdscatprintf(sdsempty(),
-	                                    "[package]\n"
-	                                    "name = \"%s\"\n"
-	                                    "version = \"0.1.0\"\n"
-	                                    "edition = \"c23\"\n"
-	                                    "description = \"A new C project\"\n"
-	                                    "license = \"MIT\"\n"
-	                                    "\n"
-	                                    "[dependencies]\n"
-	                                    "\n"
-	                                    "[lib]\n"
-	                                    "sources = [\"src/*.c\"]\n"
-	                                    "headers = [\"include/%s/*.h\"]\n",
-	                                    name, name);
-
-	if (create_file(manifest_path, manifest_content) != 0) {
-		sdsfree(manifest_content);
-		fprintf_safe(stderr, "Error: Could not create Coffee.toml\n");
-		sdsfree(name);
-		return 1;
-	}
-	sdsfree(manifest_content);
-
 	/* Create main.c */
 	sds main_content = sdsnew("#include <stdio.h>\n"
 	                          "\n"
@@ -247,6 +242,77 @@ int64_t handle_init(options *opts)
 		sdsfree(name);
 		return 1;
 	}
+
+	/* Detect if any src file has main() — implies a binary target */
+	bool has_bin = false;
+	DIR *d       = opendir("src");
+	if (d != nullptr) {
+		struct dirent *entry;
+		sds            src_path = sdsnew("src/");
+		size_t         base_len = sdslen(src_path);
+		while ((entry = readdir(d)) != nullptr) {
+			size_t len = strlen(entry->d_name);
+			if (len > 2 && entry->d_name[len - 2] == '.' && entry->d_name[len - 1] == 'c') {
+				sdssetlen(src_path, base_len);
+				src_path = sdscat(src_path, entry->d_name);
+				if (has_main_function(src_path)) {
+					has_bin = true;
+					sdsfree(src_path);
+					break;
+				}
+			}
+		}
+		if (!has_bin) {
+			sdsfree(src_path);
+		}
+		closedir(d);
+	}
+
+	/* Build manifest content — include [[bin]] if a main() was found */
+	sds manifest_content;
+	if (has_bin) {
+		manifest_content = sdscatprintf(sdsempty(),
+		                                "[package]\n"
+		                                "name = \"%s\"\n"
+		                                "version = \"0.1.0\"\n"
+		                                "edition = \"c23\"\n"
+		                                "description = \"A new C project\"\n"
+		                                "license = \"MIT\"\n"
+		                                "\n"
+		                                "[dependencies]\n"
+		                                "\n"
+		                                "[lib]\n"
+		                                "sources = [\"src/*.c\"]\n"
+		                                "headers = [\"include/%s/*.h\"]\n"
+		                                "\n"
+		                                "[[bin]]\n"
+		                                "name = \"%s\"\n"
+		                                "src = [\"src/*.c\"]\n",
+		                                name, name, name);
+	} else {
+		manifest_content = sdscatprintf(sdsempty(),
+		                                "[package]\n"
+		                                "name = \"%s\"\n"
+		                                "version = \"0.1.0\"\n"
+		                                "edition = \"c23\"\n"
+		                                "description = \"A new C project\"\n"
+		                                "license = \"MIT\"\n"
+		                                "\n"
+		                                "[dependencies]\n"
+		                                "\n"
+		                                "[lib]\n"
+		                                "sources = [\"src/*.c\"]\n"
+		                                "headers = [\"include/%s/*.h\"]\n",
+		                                name, name);
+	}
+
+	if (create_file(manifest_path, manifest_content) != 0) {
+		sdsfree(manifest_content);
+		fprintf_safe(stderr, "Error: Could not create Coffee.toml\n");
+		sdsfree(name);
+		return 1;
+	}
+	sdsfree(manifest_content);
 
 	printf("Initialized C project: %s\n", name);
 	printf("  - Coffee.toml\n");

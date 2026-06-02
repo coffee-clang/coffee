@@ -9,6 +9,7 @@
 
 #include <ctype.h>
 #include <sys/stat.h>
+#include <toml.h>
 #include <unistd.h>
 
 sds coffee_home_dir(void)
@@ -320,11 +321,35 @@ recipe_t *registry_get(sds name)
 		memccpy(r->name, name, '\0', nlen);
 		r->name[nlen] = '\0';
 	}
-	r->version      = extract_string_val(meta, "version");
-	r->license      = extract_string_val(meta, "license");
-	r->description  = extract_string_val(meta, "description");
-	r->download_url = extract_string_val(meta, "recipe_url");
-	r->dependencies = extract_string_val(meta, "dependencies");
+
+	/* Parse the fetched library.toml with vendored tomlc99 */
+	char          errbuf[256];
+	toml_table_t *tbl = toml_parse(meta, errbuf, sizeof(errbuf));
+	if (tbl) {
+		toml_datum_t v;
+		v = toml_string_in(tbl, "version");
+		if (v.ok) {
+			r->version = v.u.s; /* steal pointer — freed via registry_free_recipe */
+		}
+		v = toml_string_in(tbl, "license");
+		if (v.ok) {
+			r->license = v.u.s;
+		}
+		v = toml_string_in(tbl, "description");
+		if (v.ok) {
+			r->description = v.u.s;
+		}
+		v = toml_string_in(tbl, "recipe_url");
+		if (v.ok) {
+			r->download_url = v.u.s;
+		}
+		v = toml_string_in(tbl, "dependencies");
+		if (v.ok) {
+			r->dependencies = v.u.s;
+		}
+
+		toml_free(tbl);
+	}
 
 	free(meta);
 	return r;
@@ -379,15 +404,21 @@ version_list_t *registry_get_versions(sds name)
 		return nullptr;
 	}
 
-	char *version = extract_string_val(meta, "version");
-	if (version) {
-		list->versions = malloc(sizeof(char *));
-		if (list->versions) {
-			list->versions[0] = version;
-			list->count       = 1;
-		} else {
-			free(version);
+	/* Parse with vendored tomlc99 */
+	char          errbuf[256];
+	toml_table_t *tbl = toml_parse(meta, errbuf, sizeof(errbuf));
+	if (tbl) {
+		toml_datum_t v = toml_string_in(tbl, "version");
+		if (v.ok) {
+			list->versions = malloc(sizeof(char *));
+			if (list->versions) {
+				list->versions[0] = v.u.s; /* steal pointer */
+				list->count       = 1;
+			} else {
+				free(v.u.s);
+			}
 		}
+		toml_free(tbl);
 	}
 
 	free(meta);

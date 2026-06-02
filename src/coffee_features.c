@@ -1,6 +1,7 @@
 #include "coffee_features.h"
 
 #include "../deps/sds/sds.h"
+#include "build.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -59,6 +60,46 @@ static feature_set_t *get_or_create_set(resolved_features_t *rf, const char *pac
 	return &rf->packages[rf->package_count - 1];
 }
 
+static void resolve_cross_package_refs(manifest_t *manifest, resolved_features_t *rf)
+{
+	sds pkg = manifest->package.name;
+	if (pkg == nullptr) {
+		return;
+	}
+	feature_set_t *set = nullptr;
+	for (size_t k = 0; k < rf->package_count; k++) {
+		if (rf->package_names[k] != nullptr && strcmp(rf->package_names[k], pkg) == 0) {
+			set = &rf->packages[k];
+			break;
+		}
+	}
+	if (set == nullptr) {
+		return;
+	}
+	for (size_t i = 0; i < manifest->features_count; i++) {
+		if (manifest->features[i].name == nullptr || !feature_in_set(set, manifest->features[i].name)) {
+			continue;
+		}
+		for (size_t j = 0; j < manifest->features[i].deps_count; j++) {
+			sds dep = manifest->features[i].deps[j];
+			if (dep == nullptr) {
+				continue;
+			}
+			char *slash = strchr(dep, '/');
+			if (slash) {
+				size_t         pkg_len   = (size_t)(slash - dep);
+				sds            pkg_name  = sdsnewlen(dep, pkg_len);
+				char          *feat_name = slash + 1;
+				feature_set_t *pkg_set   = get_or_create_set(rf, pkg_name);
+				if (pkg_set != nullptr) {
+					feature_set_add(pkg_set, feat_name);
+				}
+				sdsfree(pkg_name);
+			}
+		}
+	}
+}
+
 resolved_features_t *features_resolve(manifest_t *root, sds *requested, size_t requested_count, bool all_features,
                                       bool no_default_features)
 {
@@ -104,26 +145,67 @@ resolved_features_t *features_resolve(manifest_t *root, sds *requested, size_t r
 		}
 	}
 
-	for (size_t i = 0; i < root->features_count; i++) {
-		if (root->features[i].name == nullptr || !feature_in_set(root_set, root->features[i].name)) {
-			continue;
-		}
-		for (size_t j = 0; j < root->features[i].deps_count; j++) {
-			sds dep = root->features[i].deps[j];
-			if (dep == nullptr) {
+	/* Single-level cross-package refs from root */
+	resolve_cross_package_refs(root, rf);
+
+	/* Transitive resolution: iterate discovered foreign packages until stable */
+	bool changed  = true;
+	i64  max_iter = 100; /* safety limit */
+	while (changed && max_iter-- > 0) {
+		changed = false;
+		for (size_t pi = 0; pi < rf->package_count; pi++) {
+			const char *pkg_name = rf->package_names[pi];
+			if (pkg_name == nullptr) {
 				continue;
 			}
-			char *slash = strchr(dep, '/');
-			if (slash) {
-				size_t         pkg_len   = (size_t)(slash - dep);
-				sds            pkg_name  = sdsnewlen(dep, pkg_len);
-				char          *feat_name = slash + 1;
-				feature_set_t *pkg_set   = get_or_create_set(rf, pkg_name);
-				if (pkg_set != nullptr) {
-					feature_set_add(pkg_set, feat_name);
-				}
-				sdsfree(pkg_name);
+			/* Skip root — already fully resolved */
+			if (root->package.name != nullptr && strcmp(pkg_name, root->package.name) == 0) {
+				continue;
 			}
+			/* Find the dep's directory on disk */
+			sds dep_dir = dep_resolve_dir(pkg_name);
+			if (dep_dir == nullptr) {
+				continue;
+			}
+			/* Load its manifest (Coffee.toml or library.toml) */
+			sds         manifest_path = sdscatprintf(sdsempty(), "%s/Coffee.toml", dep_dir);
+			manifest_t *dep_manifest  = manifest_parse(manifest_path);
+			if (dep_manifest == nullptr) {
+				sdsfree(manifest_path);
+				manifest_path = sdscatprintf(sdsempty(), "%s/library.toml", dep_dir);
+				dep_manifest  = manifest_parse(manifest_path);
+			}
+			sdsfree(manifest_path);
+			sdsfree(dep_dir);
+
+			if (dep_manifest == nullptr) {
+				continue;
+			}
+
+			/* Set the dep's package name in rf if not already set */
+			if (dep_manifest->package.name != nullptr) {
+				bool found = false;
+				for (size_t k = 0; k < rf->package_count; k++) {
+					if (rf->package_names[k] != nullptr &&
+					    strcmp(rf->package_names[k], dep_manifest->package.name) == 0) {
+						found = true;
+						break;
+					}
+				}
+				if (!found) {
+					/* Add the dep's canonical name to rf */
+					feature_set_t *new_set = get_or_create_set(rf, dep_manifest->package.name);
+					(void)new_set;
+					changed = true;
+				}
+			}
+
+			size_t before = rf->package_count;
+			resolve_cross_package_refs(dep_manifest, rf);
+			if (rf->package_count != before) {
+				changed = true;
+			}
+			manifest_free(dep_manifest);
 		}
 	}
 
