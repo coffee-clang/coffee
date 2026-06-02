@@ -1,0 +1,38 @@
+name: Sanitizers
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  sanitizers:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        sanitizer: [address, undefined]
+        include:
+          - sanitizer: address
+            cflags: "-fsanitize=address -fno-omit-frame-pointer"
+          - sanitizer: undefined
+            cflags: "-fsanitize=undefined -fno-sanitize-recover=all"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update && \
+          sudo apt-get install -y clang lz4 liblz4-dev zlib1g-dev
+
+      - name: Bootstrap dependencies
+        run: make bootstrap
+
+      - name: Build with ${{ matrix.sanitizer }}
+        run: |
+          make clean
+          make -j$(nproc) CC=clang CFLAGS_SAN="${{ matrix.cflags }}" LDFLAGS="-lz -L/usr/lib/x86_64-linux-gnu ${{ matrix.cflags }}"
+
+      - name: Run tests with ${{ matrix.sanitizer }}
+        run: |
+          make test CC=clang CFLAGS_SAN="${{ matrix.cflags }}" LDFLAGS="-lz -L/usr/lib/x86_64-linux-gnu ${{ matrix.cflags }}"

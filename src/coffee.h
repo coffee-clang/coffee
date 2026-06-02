@@ -114,6 +114,7 @@ extern i64 handle_logout(options *);
 extern i64 handle_machete(options *);
 extern i64 handle_metadata(options *);
 extern i64 handle_new(options *);
+extern i64 handle_outdated(options *);
 extern i64 handle_package(options *);
 extern i64 handle_pkgid(options *);
 extern i64 handle_remove(options *);

@@ -28,6 +28,7 @@
 - [add](commands/add.md)
 - [remove](commands/remove.md)
 - [update](commands/update.md)
+- [outdated](commands/outdated.md)
 - [fetch](commands/fetch.md)
 - [tree](commands/tree.md)
 

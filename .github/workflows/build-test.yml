@@ -1,0 +1,47 @@
+name: Build & Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update && \
+          sudo apt-get install -y clang clang-format clang-tidy lz4 liblz4-dev zlib1g-dev
+
+      - name: Bootstrap dependencies
+        run: make bootstrap
+
+      - name: Build coffee
+        run: make -j$(nproc)
+
+      - name: Run tests
+        run: make test
+
+      - name: Check tidy
+        run: make tidy
+
+      - name: Test init creates project with bin detection
+        run: |
+          TMPDIR=$(mktemp -d)
+          cd "$TMPDIR"
+          $GITHUB_WORKSPACE/bin/coffee init test-project
+          grep -q '\[\[bin\]\]' Coffee.toml && echo "bin detected OK" || echo "bin NOT detected"
+          grep 'name = "test-project"' Coffee.toml
+          rm -rf "$TMPDIR"
+
+      - name: Test outdated on empty project
+        run: |
+          TMPDIR=$(mktemp -d)
+          cd "$TMPDIR"
+          $GITHUB_WORKSPACE/bin/coffee init test-outdated
+          $GITHUB_WORKSPACE/bin/coffee generate-lockfile
+          $GITHUB_WORKSPACE/bin/coffee outdated || true
+          rm -rf "$TMPDIR"
