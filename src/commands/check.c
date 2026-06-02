@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include <glob.h>
+#include <unistd.h>
 
 static i64 validate_manifest(manifest_t *m)
 {
@@ -62,6 +63,33 @@ int64_t handle_check(options *opts)
 
 	/* Build include flags */
 	sds inc_flags = sdsnew("-Ideps -Isrc -Iinclude -I.");
+
+	/* Add dependency include directories */
+	for (size_t i = 0; i < m->package.dependencies_count; i++) {
+		sds   name;
+		char *eq = strchr(m->package.dependencies[i], '=');
+		if (eq) {
+			size_t len = (size_t)(eq - m->package.dependencies[i]);
+			while (len > 0 && m->package.dependencies[i][len - 1] == ' ') {
+				len--;
+			}
+			name = sdsnewlen(m->package.dependencies[i], len);
+		} else {
+			name = sdsnew(m->package.dependencies[i]);
+		}
+
+		sds dep_dir = sdscatprintf(sdsempty(), "deps/%s", name);
+		if (access(dep_dir, F_OK) == 0) {
+			sds inc = sdscatprintf(sdsempty(), "%s/include", dep_dir);
+			if (access(inc, F_OK) == 0) {
+				inc_flags = sdscatprintf(inc_flags, " -I%s", inc);
+			}
+			inc_flags = sdscatprintf(inc_flags, " -I%s", dep_dir);
+			sdsfree(inc);
+		}
+		sdsfree(dep_dir);
+		sdsfree(name);
+	}
 
 	if (m->package.name) {
 		inc_flags = sdscatprintf(inc_flags, " -Iinclude/%s", m->package.name);

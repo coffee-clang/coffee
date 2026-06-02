@@ -113,10 +113,8 @@ extern i64 handle_logout(options *);
 extern i64 handle_machete(options *);
 extern i64 handle_metadata(options *);
 extern i64 handle_new(options *);
-extern i64 handle_owner(options *);
 extern i64 handle_package(options *);
 extern i64 handle_pkgid(options *);
-extern i64 handle_publish(options *);
 extern i64 handle_remove(options *);
 extern i64 handle_report(options *);
 extern i64 handle_rm(options *);
@@ -128,6 +126,5 @@ extern i64 handle_uninstall(options *);
 extern i64 handle_update(options *);
 extern i64 handle_vendor(options *);
 extern i64 handle_version(options *);
-extern i64 handle_yank(options *);
 
 #endif // COFFEE_H_

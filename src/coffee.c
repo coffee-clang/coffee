@@ -47,14 +47,12 @@ command_s commands[] = {
 	  .description = "Output the resolved dependencies of a package in machine-readable format",
 	  .action      = &handle_metadata },
 	{ .name = "new", .description = "Create a new coffee package", .action = &handle_new },
-	{ .name = "owner", .description = "Manage the owners of a crate on the registry", .action = &handle_owner },
 	{ .name        = "package",
 	  .description = "Assemble the local package into a distributable archive",
 	  .action      = &handle_package },
 	{ .name        = "pkgid",
 	  .description = "Print a fully qualified package specification from a package ID spec",
 	  .action      = &handle_pkgid },
-	{ .name = "publish", .description = "Package and upload a package to the registry", .action = &handle_publish },
 	{ .name = "remove", .description = "Remove dependencies from a manifest file", .action = &handle_remove },
 	{ .name = "report", .description = "Generate and display various kinds of reports", .action = &handle_report },
 	{ .name = "rm", .description = "Remove a binary from the system", .action = &handle_rm },
@@ -68,7 +66,6 @@ command_s commands[] = {
 	{ .name = "update", .description = "Update dependencies as recorded in the local", .action = &handle_update },
 	{ .name = "vendor", .description = "Vendor all dependencies for a project locally", .action = &handle_vendor },
 	{ .name = "version", .description = "Show version information", .action = &handle_version },
-	{ .name = "yank", .description = "Remove a pushed crate from the index", .action = &handle_yank },
 	{ .name = nullptr, .description = nullptr, .action = nullptr },
 };
 

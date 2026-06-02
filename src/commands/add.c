@@ -1,10 +1,14 @@
 #include "../coffee.h"
 #include "../manifest.h"
 #include "../project.h"
+#include "../registry.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include <sys/stat.h>
+#include <unistd.h>
 
 static bool is_safe_package_name(const char *name)
 {
@@ -104,6 +108,44 @@ int64_t handle_add(options *opts)
 	}
 
 	printf("Added dependency: %s\n", package_name);
+
+	/* Auto-fetch the dependency */
+	{
+		sds ver = nullptr;
+		if (opts->pkg_version != nullptr && strcmp(opts->pkg_version, "*") != 0) {
+			ver = sdsnew(opts->pkg_version);
+		} else {
+			version_list_t *versions = registry_get_versions(package_name);
+			if (versions != nullptr && versions->count > 0) {
+				ver = sdsnew(versions->versions[0]);
+				registry_free_versions(versions);
+			}
+		}
+
+		if (ver != nullptr) {
+			const char *coffee_home = coffee_home_dir();
+			sds         global_deps = sdscatprintf(sdsempty(), "%s/deps", coffee_home);
+			mkdir(global_deps, 0755);
+			mkdir("deps", 0755);
+
+			sds cache_path = sdscatprintf(sdsempty(), "%s/%s/%s", global_deps, package_name, ver);
+			i64 fetch_ret  = registry_fetch(package_name, ver, cache_path);
+			if (fetch_ret == 0) {
+				sds         local_link = sdscatprintf(sdsempty(), "deps/%s", package_name);
+				struct stat st;
+				if (lstat(local_link, &st) == 0) {
+					sds rm_cmd = sdscatprintf(sdsempty(), "rm -rf %s", local_link);
+					system(rm_cmd);
+					sdsfree(rm_cmd);
+				}
+				symlink(cache_path, local_link);
+				sdsfree(local_link);
+			}
+			sdsfree(global_deps);
+			sdsfree(cache_path);
+			sdsfree(ver);
+		}
+	}
 
 	/* Append dependency flags to Makefile if it exists */
 	char  *dir_end = strrchr(manifest_path, '/');

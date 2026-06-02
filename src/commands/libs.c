@@ -11,6 +11,21 @@
 
 static sds pkg_dir(const char *name)
 {
+	/* Check local deps/ first */
+	sds local = sdscatprintf(sdsempty(), "deps/%s", name);
+	if (access(local, F_OK) == 0) {
+		return local;
+	}
+	sdsfree(local);
+
+	/* Check vendor/ next */
+	sds vendor_dir = sdscatprintf(sdsempty(), "vendor/%s", name);
+	if (access(vendor_dir, F_OK) == 0) {
+		return vendor_dir;
+	}
+	sdsfree(vendor_dir);
+
+	/* Fallback to global cache */
 	const char *home = getenv("HOME");
 	if (home == nullptr) {
 		home = "/tmp";

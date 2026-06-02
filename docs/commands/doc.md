@@ -4,15 +4,30 @@ Generate documentation.
 
 ## Description
 
-Generates API documentation from source code comments.
+Generates API documentation from source code comments using Doxygen.
 
 ## Usage
 
 ```
-coffee doc
+coffee doc [--no-deps]
 ```
 
-## Implementation Notes
+## Options
 
-- Stub command
-- Should generate HTML documentation (like Doxygen)
+| Option | Description |
+|--------|-------------|
+| `--no-deps` | Skip documentation for dependencies |
+
+## Configuration
+
+The `[doc]` section in `Coffee.toml` can customize documentation:
+
+```toml
+[doc]
+project-name = "My Project"
+output-dir = "docs/api"
+input-dirs = ["src", "include"]
+exclude-patterns = ["*/build/*"]
+```
+
+If no `[doc]` section exists, `coffee doc` falls back to running `doxygen -g`.

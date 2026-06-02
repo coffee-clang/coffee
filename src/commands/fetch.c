@@ -34,8 +34,11 @@ int64_t handle_fetch(options *opts)
 		cache_dir = "/tmp";
 	}
 
-	sds deps_dir = sdscatprintf(sdsempty(), "%s/.coffee/deps", cache_dir);
-	mkdir(deps_dir, 0755);
+	const char *coffee_home = coffee_home_dir();
+	sds         global_deps = sdscatprintf(sdsempty(), "%s/deps", coffee_home);
+	mkdir(global_deps, 0755);
+
+	mkdir("deps", 0755);
 
 	for (size_t i = 0; i < m->package.dependencies_count; i++) {
 		const char *package = m->package.dependencies[i];
@@ -56,18 +59,29 @@ int64_t handle_fetch(options *opts)
 
 		printf("  Fetching: %s\n", name);
 
-		sds pkg_dir = sdscatprintf(sdsempty(), "%s/%s", deps_dir, name);
+		sds cache_dir_pkg = sdscatprintf(sdsempty(), "%s/%s", global_deps, name);
 
-		i64 ret = registry_fetch(name, nullptr, pkg_dir);
+		i64 ret = registry_fetch(name, nullptr, cache_dir_pkg);
 		if (ret != 0) {
 			fprintf_safe(stderr, "Error: Failed to fetch %s\n", name);
+		} else {
+			/* Create project-local symlink: deps/<name> -> global cache */
+			sds         local_link = sdscatprintf(sdsempty(), "deps/%s", name);
+			struct stat st;
+			if (lstat(local_link, &st) == 0) {
+				sds rm_cmd = sdscatprintf(sdsempty(), "rm -rf %s", local_link);
+				system(rm_cmd);
+				sdsfree(rm_cmd);
+			}
+			symlink(cache_dir_pkg, local_link);
+			sdsfree(local_link);
 		}
 
-		sdsfree(pkg_dir);
+		sdsfree(cache_dir_pkg);
 		sdsfree(name);
 	}
 
-	sdsfree(deps_dir);
+	sdsfree(global_deps);
 	manifest_free(m);
 	printf("Fetching complete.\n");
 	return 0;

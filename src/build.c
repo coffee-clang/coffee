@@ -1,6 +1,8 @@
 #include "build.h"
 
 #include "../deps/sds/sds.h"
+#include "manifest.h"
+#include "registry.h"
 #include "strings.h"
 
 #include <stdbool.h>
@@ -12,6 +14,7 @@
 #include <glob.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <toml.h>
 #include <unistd.h>
 
 static i64 run_command(char **argv, bool verbose)
@@ -44,6 +47,152 @@ static i64 run_command(char **argv, bool verbose)
 
 	perror("fork");
 	return 1;
+}
+
+/*
+ * Resolve a dependency directory: check local deps/<name>/, vendor/<name>/,
+ * then global ~/.coffee/deps/<name>/.  Returns the path (caller frees) or
+ * nullptr if not found.
+ */
+static sds dep_resolve_dir(const char *name)
+{
+	sds local = sdscatprintf(sdsempty(), "deps/%s", name);
+	if (access(local, F_OK) == 0) {
+		return local;
+	}
+	sdsfree(local);
+
+	sds vendor_dir = sdscatprintf(sdsempty(), "vendor/%s", name);
+	if (access(vendor_dir, F_OK) == 0) {
+		return vendor_dir;
+	}
+	sdsfree(vendor_dir);
+
+	const char *home = getenv("HOME");
+	if (home == nullptr) {
+		home = "/tmp";
+	}
+	sds global = sdscatfmt(sdsnew(home), "/.coffee/deps/%s", name);
+	if (access(global, F_OK) == 0) {
+		return global;
+	}
+	sdsfree(global);
+
+	return nullptr;
+}
+
+/*
+ * Append compiler flags for a single dependency to the flags string.
+ * Returns the number of .c source files found (appended to src_argv).
+ */
+static size_t dep_add_flags(const char *dep_dir, const char *dep_name, sds *flags, sds *src_list, size_t *src_count)
+{
+	size_t found = 0;
+
+	if (dep_dir == nullptr) {
+		return 0;
+	}
+
+	/* Read library.toml if present */
+	sds   toml_path = sdscatprintf(sdsempty(), "%s/library.toml", dep_dir);
+	FILE *fp        = fopen(toml_path, "r");
+	if (fp) {
+		char          errbuf[256];
+		toml_table_t *conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
+		if (conf) {
+			/* Include directories */
+			toml_array_t *inc = toml_array_in(conf, "include");
+			if (inc) {
+				i64 n = toml_array_nelem(inc);
+				for (i64 i = 0; i < n; i++) {
+					toml_raw_t raw = toml_raw_at(inc, i);
+					if (raw) {
+						char *s;
+						if (toml_rtos(raw, &s) == 0 && s) {
+							*flags = sdscatprintf(*flags, " -I%s/%s", dep_dir, s);
+							free(s);
+							found = 1;
+						}
+					}
+				}
+			}
+
+			/* Library directories */
+			toml_array_t *lib = toml_array_in(conf, "lib");
+			if (lib) {
+				i64 n = toml_array_nelem(lib);
+				for (i64 i = 0; i < n; i++) {
+					toml_raw_t raw = toml_raw_at(lib, i);
+					if (raw) {
+						char *s;
+						if (toml_rtos(raw, &s) == 0 && s) {
+							*flags = sdscatprintf(*flags, " -L%s/%s", dep_dir, s);
+							free(s);
+							found = 1;
+						}
+					}
+				}
+			}
+
+			toml_free(conf);
+		}
+		fclose(fp);
+	}
+	sdsfree(toml_path);
+
+	/* Fallback: include/ directory */
+	if (!found) {
+		sds inc_path = sdscatprintf(sdsempty(), "%s/include", dep_dir);
+		if (access(inc_path, F_OK) == 0) {
+			*flags = sdscatprintf(*flags, " -I%s", inc_path);
+		}
+		sdsfree(inc_path);
+	}
+
+	/* Fallback: lib/ directory */
+	sds lib_path = sdscatprintf(sdsempty(), "%s/lib", dep_dir);
+	if (access(lib_path, F_OK) == 0) {
+		*flags = sdscatprintf(*flags, " -L%s", lib_path);
+	}
+	sdsfree(lib_path);
+
+	/* Always add -l<name> */
+	*flags = sdscatprintf(*flags, " -l%s", dep_name);
+
+	/* Also compile dep source files if they exist */
+	glob_t dep_glob;
+	sds    dep_src_glob = sdscatprintf(sdsempty(), "%s/src/*.c", dep_dir);
+	if (glob(dep_src_glob, 0, nullptr, &dep_glob) == 0) {
+		for (size_t i = 0; i < dep_glob.gl_pathc; i++) {
+			src_list[*src_count] = sdsnew(dep_glob.gl_pathv[i]);
+			(*src_count)++;
+		}
+		globfree(&dep_glob);
+	}
+	sdsfree(dep_src_glob);
+
+	return found;
+}
+
+/*
+ * Extract dependency name from a raw TOML dependency entry string.
+ * Handles "name", "name = ...", and "name = { ... }" formats.
+ * Returns a new sds with the bare name (caller frees).
+ */
+static sds dep_parse_name(const char *entry)
+{
+	sds   name;
+	char *eq = strchr(entry, '=');
+	if (eq) {
+		size_t len = (size_t)(eq - entry);
+		while (len > 0 && entry[len - 1] == ' ') {
+			len--;
+		}
+		name = sdsnewlen(entry, len);
+	} else {
+		name = sdsnew(entry);
+	}
+	return name;
 }
 
 i64 build_project(manifest_t *manifest, build_opts_t *opts)
@@ -108,11 +257,31 @@ i64 build_project(manifest_t *manifest, build_opts_t *opts)
 		}
 	}
 
+	/* Resolve dependencies: add -I/-L/-l flags and collect dep source files */
+	size_t dep_src_cap  = 64;
+	size_t dep_src_cnt  = 0;
+	sds   *dep_src_list = (sds *)malloc(sizeof(sds) * dep_src_cap);
+
+	for (size_t i = 0; i < manifest->package.dependencies_count; i++) {
+		sds dep_name = dep_parse_name(manifest->package.dependencies[i]);
+		sds dep_dir  = dep_resolve_dir(dep_name);
+		if (dep_dir != nullptr) {
+			dep_add_flags(dep_dir, dep_name, &flags, dep_src_list, &dep_src_cnt);
+			if (dep_src_cnt + 8 > dep_src_cap) {
+				dep_src_cap *= 2;
+				dep_src_list = (sds *)realloc(dep_src_list, sizeof(sds) * dep_src_cap);
+			}
+			sdsfree(dep_dir);
+		}
+		sdsfree(dep_name);
+	}
+
 	glob_t globbuf;
 	ret = glob("src/*.c", 0, nullptr, &globbuf);
-	if (ret != 0) {
+	if (ret != 0 && dep_src_cnt == 0) {
 		fprintf_safe(stderr, "Error: No source files found in src/*.c\n");
 		sdsfree(flags);
+		free(dep_src_list);
 		if (resolved) {
 			features_free(resolved);
 		}
@@ -123,6 +292,7 @@ i64 build_project(manifest_t *manifest, build_opts_t *opts)
 	if (outpath == nullptr) {
 		sdsfree(flags);
 		globfree(&globbuf);
+		free(dep_src_list);
 		if (resolved) {
 			features_free(resolved);
 		}
@@ -136,11 +306,12 @@ i64 build_project(manifest_t *manifest, build_opts_t *opts)
 		}
 	}
 
-	size_t argc_total    = (size_t)(1 + max_tokens + 2) + globbuf.gl_pathc + 1;
+	size_t argc_total    = (size_t)(1 + max_tokens + 2) + globbuf.gl_pathc + dep_src_cnt + 1;
 	char **compiler_argv = (char **)malloc(sizeof(char *) * (argc_total + 1));
 	if (compiler_argv == nullptr) {
 		sdsfree(flags);
 		globfree(&globbuf);
+		free(dep_src_list);
 		if (resolved) {
 			features_free(resolved);
 		}
@@ -164,6 +335,9 @@ i64 build_project(manifest_t *manifest, build_opts_t *opts)
 	for (size_t i = 0; i < globbuf.gl_pathc; i++) {
 		compiler_argv[idx++] = globbuf.gl_pathv[i];
 	}
+	for (size_t i = 0; i < dep_src_cnt; i++) {
+		compiler_argv[idx++] = dep_src_list[i];
+	}
 	compiler_argv[idx] = nullptr;
 
 	sdsfree(flags);
@@ -174,6 +348,10 @@ i64 build_project(manifest_t *manifest, build_opts_t *opts)
 	sdsfree(flags_copy);
 	free((void *)compiler_argv);
 	globfree(&globbuf);
+	for (size_t i = 0; i < dep_src_cnt; i++) {
+		sdsfree(dep_src_list[i]);
+	}
+	free(dep_src_list);
 
 	if (resolved) {
 		features_free(resolved);

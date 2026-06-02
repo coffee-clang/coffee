@@ -37,11 +37,7 @@
 - [info](commands/info.md)
 - [install](commands/install.md)
 - [uninstall](commands/uninstall.md)
-- [publish](commands/publish.md)
-- [owner](commands/owner.md)
-- [yank](commands/yank.md)
-- [login](commands/login.md)
-- [logout](commands/logout.md)
+ - [logout](commands/logout.md)
 
 ## Configuration & Metadata
 

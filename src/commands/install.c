@@ -88,10 +88,10 @@ int64_t handle_install(options *opts)
 
 	char *manifest_path = project_find_manifest(nullptr);
 	if (manifest_path) {
-		sds project_deps = sdsnew(".coffee/deps");
+		sds project_deps = sdsnew("deps");
 		mkdir(project_deps, 0755);
 
-		sds project_link_path = sdscatprintf(sdsempty(), "%s/%s/%s", project_deps, package, version);
+		sds project_link_path = sdscatprintf(sdsempty(), "%s/%s", project_deps, package);
 		sdsfree(project_deps);
 
 		i64 symret = create_symlink(cache_path, project_link_path);
