@@ -82,11 +82,20 @@ int main(int argc, char **argv)
 	cmdline_parser(argc, argv, &args_info);
 
 	// Find first non-toolchain argument (commands start with letter)
+	// Save the first +toolchain positional argument (without leading +)
+	// Reject multiple +-prefixed arguments
 	i64 command_idx = -1;
+	sds toolchain   = nullptr;
 	for (i64 i = 0; i < args_info.inputs_num; i++) {
 		if (args_info.inputs[i][0] != '+') {
 			command_idx = i;
 			break;
+		}
+		if (toolchain == nullptr) {
+			toolchain = sdsnew(args_info.inputs[i] + 1);
+		} else {
+			fprintf(stderr, "error: multiple +toolchain arguments\n");
+			exit(EXIT_FAILURE);
 		}
 	}
 
@@ -100,6 +109,7 @@ int main(int argc, char **argv)
 		.verbose    = args_info.verbose_given,
 		.verbose2   = args_info.verbose_given,
 		.quiet      = args_info.quiet_given,
+		.toolchain  = toolchain,
 		.inputs     = args_info.inputs,
 		.inputs_num = (i64)args_info.inputs_num,
 

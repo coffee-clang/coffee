@@ -38,6 +38,7 @@ typedef struct options_s {
 	sds  error_code;
 	sds *inputs;
 	sds  pkg_version;
+	sds  toolchain;
 	sds  path;
 	sds  git;
 	sds  branch;
