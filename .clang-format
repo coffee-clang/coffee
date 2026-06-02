@@ -9,8 +9,13 @@
 #   - continuation indent 4
 #   - column limit 120 (curl uses 79)
 #
-#Language: Cpp
-#Standard: c23
+---
+BasedOnStyle: LLVM
+Language: C
+
+# Force clang-format to use the latest language standard features
+Standard: Latest
+
 
 # --- Indentation ---
 # AGENTS.md: "We use tabs for indentation, tab width is 4,
@@ -25,74 +30,80 @@ ColumnLimit: 120                # hard limit, no exceptions
 # AGENTS.md: braces on same line for control, new line for functions
 # AGENTS.md: "Never omit the braces"
 # AGENTS.md: "We never write multiple statements on the same source line"
-BreakBeforeBraces: Linux
-AllowShortBlocksOnASingleLine: false
-AllowShortCaseLabelsOnASingleLine: false
-AllowShortFunctionsOnASingleLine: None
-AllowShortIfStatementsOnASingleLine: false
-AllowShortLoopsOnASingleLine: false
-InsertBraces: true
+BreakBeforeBraces: Linux        # break before function braces, not control braces
+AllowShortCaseLabelsOnASingleLine: false  # each case on its own line
+AllowShortFunctionsOnASingleLine: None    # never collapse function body on one line
+AllowShortIfStatementsOnASingleLine: false  # each if body on its own line
+AllowShortLoopsOnASingleLine: false       # each loop body on its own line
+AllowShortBlocksOnASingleLine: Empty      # only empty {} on same line, e.g. `while (1) {}`
+AllowShortLambdasOnASingleLine: All       # collapse short C23 lambdas: `[] {}`
+InsertBraces: true                        # auto-insert braces around single-statement bodies
 
 # --- Spacing ---
 # AGENTS.md: "space between the keyword and the open parenthesis" (if/while/do/for)
 # AGENTS.md: "spaces on both sides of operators"
 # AGENTS.md: Postfix (), [], ->, ., ++, -- and Unary +, -, !, ~, & have no space
+
+# Ensure pointers bind to the variable name, not the type (Classic C Style)
+# e.g., `char *buffer;` instead of `char* buffer;`
 PointerAlignment: Right
-SpaceBeforeParens: ControlStatements
-SpaceAfterCStyleCast: false
-SpaceAfterLogicalNot: false
-SpaceBeforeAssignmentOperators: true
-SpaceBeforeCaseColon: false
-SpaceBeforeSquareBrackets: false
-SpaceInEmptyParentheses: false
-SpaceInEmptyBlock: false
-SpacesBeforeTrailingComments: 1
-SpacesInContainerLiterals: false
-SpacesInCStyleCastParentheses: false
-SpacesInParentheses: false
-SpacesInSquareBrackets: false
+SpaceBeforeParens: ControlStatements  # space before ( only for if/while/for/switch, not calls
+SpaceAfterCStyleCast: false           # no space after cast: `(int)x` not `(int) x`
+SpaceAfterLogicalNot: false           # no space after !: `!x` not `! x`
+SpaceBeforeAssignmentOperators: true  # space before = in assignments
+SpaceBeforeCaseColon: false           # `case X:` not `case X :`
+SpaceBeforeSquareBrackets: false      # `arr[i]` not `arr [i]`
+SpaceInEmptyParentheses: false        # `()` not `( )`
+SpaceInEmptyBlock: false              # `{}` not `{ }`
+SpacesBeforeTrailingComments: 1       # one space before `//`
+SpacesInCStyleCastParentheses: false  # `(int)x` not `( int )x`
+SpacesInParentheses: false            # no spaces inside parens: `f(x)` not `f( x )`
+SpacesInSquareBrackets: false         # `a[i]` not `a[ i ]`
 
 # --- Alignment ---
 # AGENTS.md: align continuation lines on appropriate column
 # AGENTS.md: "operators should not start continuation lines"
-AlignAfterOpenBracket: Align
-AlignConsecutiveAssignments:
+AlignAfterOpenBracket: Align          # align args to opening bracket, not indent
+AlignConsecutiveAssignments:          # align `=` across consecutive lines
   Enabled: true
-AlignConsecutiveDeclarations:
+AlignConsecutiveDeclarations:         # align type or name across consecutive declarations
   Enabled: true
   AcrossEmptyLines: false
   AcrossComments: true
-AlignConsecutiveMacros: true
-AlignEscapedNewlines: Left
-AlignOperands: true
-AlignTrailingComments: true
+AlignConsecutiveMacros: true          # align `\` in consecutive macro continuation lines
+AlignEscapedNewlines: Left            # backslash aligned leftmost column
+AlignOperands: true                   # align operands of multi-line expressions
+AlignTrailingComments: true           # align trailing `//` comments to same column
 
 # --- Wrapping & Bin-packing ---
 # AGENTS.md: "operators should not start continuation lines"
-BreakBeforeBinaryOperators: None
-AllowAllParametersOfDeclarationOnNextLine: false
-BinPackArguments: true
-BinPackParameters: true
-BreakBeforeTernaryOperators: false
-BreakStringLiterals: false
-AlwaysBreakAfterReturnType: None
+BreakBeforeBinaryOperators: None        # break after binary ops, not before
+AllowAllParametersOfDeclarationOnNextLine: false  # allow to fit parameters on same line
+BinPackArguments: true                  # pack function args to fit column limit
+BinPackParameters: true                 # pack function params to fit column limit
+BreakBeforeTernaryOperators: false      # break after ? and :, not before them
+BreakStringLiterals: false              # never break string literals
+AlwaysBreakAfterReturnType: None        # return type on same line as function name
 
 # --- Modern C (C23) ---
 # AGENTS.md: "use the most recent C standard (C23)"
 IntegerLiteralSeparator:
-  Binary: 4
-  Decimal: 3
-  Hex: 2
-QualifierAlignment: Left
-BreakAfterAttributes: Always
+  Binary: 4        # 0b_0000_1010 -- every 4 digits
+  Decimal: 3       # 1_000_000      -- every 3 digits
+  Hex: 4           # 0xDEAD_BEEF   -- every 4 digits
+QualifierAlignment: Left                # `const int` not `int const`
+BreakAfterAttributes: Always            # line break after `[[nodiscard]]`
+BreakBeforeConceptDeclarations: Always  # line break before C23 concept declarations
+
 
 # --- Preprocessor ---
-IndentPPDirectives: AfterHash
-PPIndentWidth: 1
+IndentPPDirectives: AfterHash   # indent after #: `#  define X` for nested preprocessor
+PPIndentWidth: 1                # one level of indent per nesting
 
 # --- Includes ---
-SortIncludes: CaseSensitive
-IncludeBlocks: Regroup
+# Ordered: project headers (""), C standard headers (<>), system/third-party (<>)
+SortIncludes: CaseSensitive     # case-sensitive alphabetical sort of includes
+IncludeBlocks: Regroup          # regroup includes per IncludeCategories priorities
 IncludeCategories:
   - Regex:           '^"(llvm|llvm-c|clang|clang-c)/'
     Priority:        0
@@ -108,16 +119,16 @@ IncludeCategories:
     Priority:        4
 
 # --- Cleanup ---
-MaxEmptyLinesToKeep: 1
-KeepEmptyLinesAtTheStartOfBlocks: false
-IndentCaseLabels: false
-IndentWrappedFunctionNames: false
-Cpp11BracedListStyle: false
-BitFieldColonSpacing: None
+MaxEmptyLinesToKeep: 1                  # at most one blank line
+KeepEmptyLinesAtTheStartOfBlocks: false # no leading blank line inside blocks
+IndentCaseLabels: false                 # `case X:` at same indent level as `switch`
+IndentWrappedFunctionNames: false       # wrapped function name not extra-indented
+Cpp11BracedListStyle: false             # C-style list formatting: `int a[] = {1, 2}`
+BitFieldColonSpacing: None              # `int x:1` not `int x : 1`
 
 # --- Penalties ---
-PenaltyBreakString: 1000
-PenaltyBreakComment: 300
+PenaltyBreakString: 1000   # high penalty: avoid breaking strings at all costs
+PenaltyBreakComment: 300   # moderate penalty: prefer breaking here over strings
 
 # --- Macros ---
 ForEachMacros:

@@ -1,6 +1,7 @@
 #include "build.h"
 
 #include "../deps/sds/sds.h"
+#include "lockfile.h"
 #include "manifest.h"
 #include "registry.h"
 #include "strings.h"
@@ -12,6 +13,7 @@
 #include <string.h>
 
 #include <glob.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <toml.h>
@@ -54,7 +56,7 @@ static i64 run_command(char **argv, bool verbose)
  * then global ~/.coffee/deps/<name>/.  Returns the path (caller frees) or
  * nullptr if not found.
  */
-static sds dep_resolve_dir(const char *name)
+sds dep_resolve_dir(const char *name)
 {
 	sds local = sdscatprintf(sdsempty(), "deps/%s", name);
 	if (access(local, F_OK) == 0) {
@@ -218,10 +220,34 @@ i64 build_project(manifest_t *manifest, build_opts_t *opts)
 
 	const char *name = manifest->package.name;
 
+	/* Parse lockfile if it exists */
+	sds         lockfile_path = sdsnew("Coffee.lock");
+	lockfile_t *lockfile      = lockfile_parse(lockfile_path);
+
+	if (opts != nullptr && opts->locked) {
+		if (lockfile == nullptr) {
+			fprintf_safe(stderr, "Error: Coffee.lock not found (--locked requires it)\n");
+			sdsfree(lockfile_path);
+			return 1;
+		}
+		/* Check staleness: Coffee.toml should not be newer than Coffee.lock */
+		struct stat toml_st;
+		struct stat lock_st;
+		if (stat("Coffee.toml", &toml_st) == 0 && stat("Coffee.lock", &lock_st) == 0) {
+			if (toml_st.st_mtime > lock_st.st_mtime) {
+				fprintf_safe(stderr,
+				             "Error: Coffee.toml is newer than Coffee.lock (--locked requires up-to-date lockfile)\n");
+				lockfile_free(lockfile);
+				sdsfree(lockfile_path);
+				return 1;
+			}
+		}
+	}
+
 	const char *flags_str = "-O0 -g";
 	if (opts != nullptr) {
 		if (opts->release) {
-			flags_str = "-O2";
+			flags_str = "-O2 -s";
 		} else if (opts->debug) {
 			flags_str = "-g";
 		}
@@ -264,7 +290,19 @@ i64 build_project(manifest_t *manifest, build_opts_t *opts)
 
 	for (size_t i = 0; i < manifest->package.dependencies_count; i++) {
 		sds dep_name = dep_parse_name(manifest->package.dependencies[i]);
-		sds dep_dir  = dep_resolve_dir(dep_name);
+
+		/* Use lockfile path if available, otherwise resolve from filesystem */
+		sds dep_dir = nullptr;
+		if (lockfile != nullptr) {
+			lockfile_dep_t *locked = lockfile_find_dep(lockfile, dep_name);
+			if (locked != nullptr && locked->path != nullptr) {
+				dep_dir = sdsnew(locked->path);
+			}
+		}
+		if (dep_dir == nullptr) {
+			dep_dir = dep_resolve_dir(dep_name);
+		}
+
 		if (dep_dir != nullptr) {
 			dep_add_flags(dep_dir, dep_name, &flags, dep_src_list, &dep_src_cnt);
 			if (dep_src_cnt + 8 > dep_src_cap) {
@@ -282,6 +320,8 @@ i64 build_project(manifest_t *manifest, build_opts_t *opts)
 		fprintf_safe(stderr, "Error: No source files found in src/*.c\n");
 		sdsfree(flags);
 		free(dep_src_list);
+		lockfile_free(lockfile);
+		sdsfree(lockfile_path);
 		if (resolved) {
 			features_free(resolved);
 		}
@@ -293,6 +333,8 @@ i64 build_project(manifest_t *manifest, build_opts_t *opts)
 		sdsfree(flags);
 		globfree(&globbuf);
 		free(dep_src_list);
+		lockfile_free(lockfile);
+		sdsfree(lockfile_path);
 		if (resolved) {
 			features_free(resolved);
 		}
@@ -312,6 +354,8 @@ i64 build_project(manifest_t *manifest, build_opts_t *opts)
 		sdsfree(flags);
 		globfree(&globbuf);
 		free(dep_src_list);
+		lockfile_free(lockfile);
+		sdsfree(lockfile_path);
 		if (resolved) {
 			features_free(resolved);
 		}
@@ -352,6 +396,9 @@ i64 build_project(manifest_t *manifest, build_opts_t *opts)
 		sdsfree(dep_src_list[i]);
 	}
 	free(dep_src_list);
+
+	lockfile_free(lockfile);
+	sdsfree(lockfile_path);
 
 	if (resolved) {
 		features_free(resolved);

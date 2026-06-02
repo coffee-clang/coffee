@@ -144,6 +144,7 @@ int64_t handle_build(options *opts)
 		.verbose             = opts->verbose,
 		.release             = opts->release,
 		.debug               = opts->debug,
+		.locked              = opts->locked,
 		.target              = opts->target,
 		.target_dir          = opts->target_dir,
 		.jobs                = opts->jobs > 0 ? opts->jobs : 1,

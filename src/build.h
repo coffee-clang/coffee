@@ -10,6 +10,7 @@ typedef struct {
 	bool   verbose;
 	bool   release;
 	bool   debug;
+	bool   locked;
 	sds    target;
 	sds    target_dir;
 	i64    jobs;
@@ -21,5 +22,12 @@ typedef struct {
 
 i64 build_project(manifest_t *manifest, build_opts_t *opts);
 i64 build_run(manifest_t *manifest, build_opts_t *opts, sds *args, i64 argc);
+
+/*
+ * Resolve a dependency directory: check local deps/<name>/, vendor/<name>/,
+ * then global ~/.coffee/deps/<name>/.  Returns the path (caller frees) or
+ * nullptr if not found.
+ */
+sds dep_resolve_dir(const char *name);
 
 #endif

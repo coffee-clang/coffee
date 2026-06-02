@@ -1,156 +1,49 @@
+#include "../build.h"
 #include "../coffee.h"
+#include "../lockfile.h"
 #include "../manifest.h"
 #include "../project.h"
-#include "../registry.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include <sys/stat.h>
+#include <toml.h>
 #include <unistd.h>
 
-typedef struct {
-	i64 major;
-	i64 minor;
-	i64 patch;
-} semver_t;
-
-static bool semver_parse(const char *s, semver_t *v)
+/*
+ * Read version from a dep's library.toml, or return "*".
+ */
+static sds resolve_dep_version(const char *dep_dir)
 {
-	if (s == nullptr || *s == '\0') {
-		return false;
+	sds   toml_path = sdscatprintf(sdsempty(), "%s/library.toml", dep_dir);
+	FILE *fp        = fopen(toml_path, "r");
+	if (fp == nullptr) {
+		sdsfree(toml_path);
+		return sdsnew("*");
 	}
 
-	v->major = 0;
-	v->minor = 0;
-	v->patch = 0;
+	char          errbuf[256];
+	toml_table_t *conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
+	fclose(fp);
 
-	const char *p = s;
-	while (*p >= '0' && *p <= '9') {
-		v->major = (v->major * 10) + (*p - '0');
-		p++;
-	}
-	if (*p == '.') {
-		p++;
-		while (*p >= '0' && *p <= '9') {
-			v->minor = (v->minor * 10) + (*p - '0');
-			p++;
+	sds version = nullptr;
+	if (conf) {
+		toml_datum_t ver = toml_string_in(conf, "version");
+		if (ver.ok) {
+			version = sdsnew(ver.u.s);
+			free(ver.u.s);
 		}
-		if (*p == '.') {
-			p++;
-			while (*p >= '0' && *p <= '9') {
-				v->patch = (v->patch * 10) + (*p - '0');
-				p++;
-			}
-		}
+		toml_free(conf);
 	}
 
-	return true;
-}
+	sdsfree(toml_path);
 
-static i64 semver_cmp(semver_t a, semver_t b)
-{
-	if (a.major != b.major) {
-		return a.major - b.major;
+	if (version == nullptr) {
+		version = sdsnew("*");
 	}
-	if (a.minor != b.minor) {
-		return a.minor - b.minor;
-	}
-	return a.patch - b.patch;
-}
-
-static bool semver_match(const char *constraint, const char *candidate)
-{
-	if (constraint == nullptr || strcmp(constraint, "*") == 0) {
-		return true;
-	}
-
-	semver_t ver;
-	if (!semver_parse(candidate, &ver)) {
-		return false;
-	}
-
-	semver_t    con;
-	const char *p = constraint;
-
-	if (*p == '=') {
-		if (!semver_parse(p + 1, &con)) {
-			return false;
-		}
-		return semver_cmp(ver, con) == 0;
-	}
-	if (*p == '^') {
-		if (!semver_parse(p + 1, &con)) {
-			return false;
-		}
-		return (bool)(ver.major == con.major && ver.minor >= con.minor);
-	}
-	if (strncmp(p, ">=", 2) == 0) {
-		if (!semver_parse(p + 2, &con)) {
-			return false;
-		}
-		return semver_cmp(ver, con) >= 0;
-	}
-	if (*p == '>') {
-		if (!semver_parse(p + 1, &con)) {
-			return false;
-		}
-		return semver_cmp(ver, con) > 0;
-	}
-	if (strncmp(p, "<=", 2) == 0) {
-		if (!semver_parse(p + 2, &con)) {
-			return false;
-		}
-		return semver_cmp(ver, con) <= 0;
-	}
-	if (*p == '<') {
-		if (!semver_parse(p + 1, &con)) {
-			return false;
-		}
-		return semver_cmp(ver, con) < 0;
-	}
-
-	if (!semver_parse(constraint, &con)) {
-		return false;
-	}
-	return semver_cmp(ver, con) == 0;
-}
-
-static i64 create_symlink(const char *target, const char *link_path)
-{
-	struct stat st;
-	if (lstat(link_path, &st) == 0) {
-		if (S_ISLNK(st.st_mode) || S_ISDIR(st.st_mode)) {
-			sds cmd = sdscatprintf(sdsempty(), "rm -rf %s", link_path);
-			if (system(cmd) != 0) {
-				sdsfree(cmd);
-				return -1;
-			}
-			sdsfree(cmd);
-		}
-	}
-
-	sds   link_copy  = sdsnew(link_path);
-	char *last_slash = strrchr(link_copy, '/');
-	if (last_slash) {
-		*last_slash = '\0';
-		sds cmd     = sdscatprintf(sdsempty(), "mkdir -p %s", link_copy);
-		sdsfree(link_copy);
-		if (system(cmd) != 0) {
-			sdsfree(cmd);
-			return -1;
-		}
-		sdsfree(cmd);
-	} else {
-		sdsfree(link_copy);
-	}
-
-	if (symlink(target, link_path) != 0) {
-		return -1;
-	}
-
-	return 0;
+	return version;
 }
 
 int64_t handle_update(options *opts)
@@ -170,129 +63,103 @@ int64_t handle_update(options *opts)
 		return 1;
 	}
 
-	const char *coffee_home = coffee_home_dir();
-	sds         global_deps = sdscatprintf(sdsempty(), "%s/deps", coffee_home);
-	mkdir(global_deps, 0755);
-
-	sds project_deps = sdsnew(".coffee/deps");
-	mkdir(project_deps, 0755);
-
-	printf("Updating dependencies...\n");
-
+	/* Determine which dep to update (nullptr = all) */
 	char *target = nullptr;
 	if (opts->inputs_num > 1) {
 		target = opts->inputs[1];
 	}
 
-	for (size_t i = 0; i < m->package.dependencies_count; i++) {
-		const char *entry = m->package.dependencies[i];
+	printf("Updating dependencies...\n");
 
-		sds name               = nullptr;
-		sds version_constraint = nullptr;
-		manifest_extract_dep_info(entry, &name, &version_constraint);
+	lockfile_t lf;
+	memset(&lf, 0, sizeof(lf));
+	lf.version = 1;
 
-		if (name == nullptr) {
-			continue;
+	if (m->package.name) {
+		lf.package_name = sdsnew(m->package.name);
+	}
+	if (m->package.version) {
+		lf.package_version = sdsnew(m->package.version);
+	}
+
+	/* Resolve all (or targeted) dependencies */
+	if (m->package.dependencies_count > 0) {
+		lf.deps = calloc(m->package.dependencies_count, sizeof(lockfile_dep_t));
+		if (lf.deps == nullptr) {
+			manifest_free(m);
+			return 1;
 		}
 
-		if (target != nullptr && strcmp(name, target) != 0) {
-			sdsfree(name);
-			sdsfree(version_constraint);
-			continue;
-		}
+		for (size_t i = 0; i < m->package.dependencies_count; i++) {
+			sds dep_name = nullptr;
+			sds dep_vers = nullptr;
+			manifest_extract_dep_info(m->package.dependencies[i], &dep_name, &dep_vers);
 
-		printf("  Resolving: %s (%s)\n", name, version_constraint != nullptr ? version_constraint : "*");
-
-		version_list_t *versions = registry_get_versions(name);
-		if (versions == nullptr || versions->count == 0) {
-			fprintf_safe(stderr, "  Error: Package '%s' not found in registry\n", name);
-			sdsfree(name);
-			sdsfree(version_constraint);
-			continue;
-		}
-
-		char *resolved_version = versions->versions[0];
-
-		if (version_constraint != nullptr && strcmp(version_constraint, "*") != 0) {
-			if (!semver_match(version_constraint, resolved_version)) {
-				fprintf_safe(stderr, "  Warning: No version of '%s' matches constraint '%s' (latest is %s)\n", name,
-				             version_constraint, resolved_version);
-				sdsfree(name);
-				sdsfree(version_constraint);
-				registry_free_versions(versions);
+			if (dep_name == nullptr) {
 				continue;
 			}
-			printf("  Constraint '%s' matched by version %s\n", version_constraint, resolved_version);
-		} else {
-			printf("  Selected version: %s\n", resolved_version);
-		}
 
-		sds cache_path        = sdscatprintf(sdsempty(), "%s/%s/%s", global_deps, name, resolved_version);
-		sds project_link_path = sdscatprintf(sdsempty(), "%s/%s/%s", project_deps, name, resolved_version);
-
-		i64 ret = registry_fetch(name, resolved_version, cache_path);
-		if (ret != 0) {
-			sdsfree(cache_path);
-			sdsfree(project_link_path);
-			fprintf_safe(stderr, "  Error: Failed to fetch %s %s\n", name, resolved_version);
-			sdsfree(name);
-			sdsfree(version_constraint);
-			registry_free_versions(versions);
-			continue;
-		}
-
-		ret = create_symlink(cache_path, project_link_path);
-		if (ret != 0) {
-			sdsfree(cache_path);
-			sdsfree(project_link_path);
-			fprintf_safe(stderr, "  Error: Failed to create symlink for %s\n", name);
-			sdsfree(name);
-			sdsfree(version_constraint);
-			registry_free_versions(versions);
-			continue;
-		}
-
-		printf("  Updated: %s@%s\n", name, resolved_version);
-
-		sdsfree(cache_path);
-		sdsfree(project_link_path);
-		sdsfree(name);
-		sdsfree(version_constraint);
-		registry_free_versions(versions);
-	}
-
-	sds lockfile_path = sdsnew("Coffee.lock");
-
-	FILE *fp = fopen(lockfile_path, "w");
-	if (fp) {
-		fprintf_safe(fp, "# This file is automatically generated by coffee.\n");
-		fprintf_safe(fp, "# It contains the exact versions of all dependencies.\n");
-		fprintf_safe(fp, "version = 1\n");
-
-		fprintf_safe(fp, "\n[package]\n");
-		if (m->package.name) {
-			fprintf_safe(fp, "name = \"%s\"\n", m->package.name);
-		}
-		if (m->package.version) {
-			fprintf_safe(fp, "version = \"%s\"\n", m->package.version);
-		}
-
-		if (m->package.dependencies_count > 0) {
-			fprintf_safe(fp, "\n[[dependencies]]\n");
-			for (size_t i = 0; i < m->package.dependencies_count; i++) {
-				if (m->package.dependencies[i]) {
-					fprintf_safe(fp, "%s\n", m->package.dependencies[i]);
+			/* If a target is specified and this dep doesn't match, keep old lockfile entry */
+			if (target != nullptr && strcmp(dep_name, target) != 0) {
+				/* Try to preserve existing lockfile entry */
+				lockfile_t *old_lf = lockfile_parse("Coffee.lock");
+				if (old_lf != nullptr) {
+					lockfile_dep_t *old = lockfile_find_dep(old_lf, dep_name);
+					if (old != nullptr && old->path != nullptr) {
+						lf.deps[lf.deps_count].name    = sdsnew(dep_name);
+						lf.deps[lf.deps_count].version = old->version ? sdsnew(old->version) : sdsnew("*");
+						lf.deps[lf.deps_count].path    = sdsnew(old->path);
+						lf.deps_count++;
+						lockfile_free(old_lf);
+						sdsfree(dep_name);
+						sdsfree(dep_vers);
+						continue;
+					}
+					lockfile_free(old_lf);
 				}
+				/* No old entry; fall through to resolve */
 			}
-		}
 
-		fclose(fp);
-		printf("Lockfile updated.\n");
+			printf("  Resolving: %s\n", dep_name);
+
+			sds dep_dir = dep_resolve_dir(dep_name);
+			if (dep_dir != nullptr) {
+				lf.deps[lf.deps_count].name    = sdsnew(dep_name);
+				lf.deps[lf.deps_count].version = resolve_dep_version(dep_dir);
+				lf.deps[lf.deps_count].path    = sdsnew(dep_dir);
+				sdsfree(dep_dir);
+				printf("    Resolved to: %s\n", lf.deps[lf.deps_count].path);
+			} else {
+				lf.deps[lf.deps_count].name    = sdsnew(dep_name);
+				lf.deps[lf.deps_count].version = dep_vers != nullptr ? sdsnew(dep_vers) : sdsnew("*");
+				lf.deps[lf.deps_count].path    = sdsnew("");
+				fprintf_safe(stderr, "  Warning: %s not found in local deps\n", dep_name);
+			}
+
+			lf.deps_count++;
+			sdsfree(dep_name);
+			sdsfree(dep_vers);
+		}
 	}
 
-	sdsfree(lockfile_path);
-	sdsfree(global_deps);
-	sdsfree(project_deps);
+	i64 ret = lockfile_write("Coffee.lock", &lf);
+
+	/* Cleanup */
+	sdsfree(lf.package_name);
+	sdsfree(lf.package_version);
+	for (size_t i = 0; i < lf.deps_count; i++) {
+		sdsfree(lf.deps[i].name);
+		sdsfree(lf.deps[i].version);
+		sdsfree(lf.deps[i].path);
+	}
+	free(lf.deps);
 	manifest_free(m);
+
+	if (ret != 0) {
+		fprintf_safe(stderr, "Error: Could not write Coffee.lock\n");
+		return 1;
+	}
+
+	printf("Lockfile updated.\n");
 	return 0;
 }

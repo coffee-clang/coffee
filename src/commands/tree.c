@@ -1,85 +1,120 @@
+#include "../build.h"
 #include "../coffee.h"
+#include "../lockfile.h"
 #include "../manifest.h"
 #include "../project.h"
-#include "../registry.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-static void parse_dep_list(const char *input, char ***out_names, size_t *out_count)
+#include <toml.h>
+
+/*
+ * Read [dependencies] from a library.toml file.
+ * Returns a TOML table of dependencies, or nullptr.
+ */
+static toml_table_t *read_dep_table(const char *dep_dir)
 {
-	*out_names = nullptr;
-	*out_count = 0;
-
-	if (input == nullptr) {
-		return;
+	sds   toml_path = sdscatprintf(sdsempty(), "%s/library.toml", dep_dir);
+	FILE *fp        = fopen(toml_path, "r");
+	sdsfree(toml_path);
+	if (fp == nullptr) {
+		return nullptr;
 	}
 
-	const char *p = input;
-	while (*p != '\0') {
-		while (*p == ' ' || *p == ',') {
-			p++;
-		}
-		if (*p == '\0') {
-			break;
-		}
+	char          errbuf[256];
+	toml_table_t *conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
+	fclose(fp);
 
-		const char *start = p;
-		while (*p != '\0' && *p != ',' && *p != ' ') {
-			p++;
-		}
-
-		size_t len = (size_t)(p - start);
-		if (len > 0) {
-			const char *slash    = (const char *)memchr(start, '/', len);
-			size_t      name_len = slash != nullptr ? (size_t)(slash - start) : len;
-
-			*out_names               = realloc(*out_names, (*out_count + 1) * sizeof(sds));
-			(*out_names)[*out_count] = sdsnewlen(start, name_len);
-			(*out_count)++;
-		}
+	if (conf == nullptr) {
+		return nullptr;
 	}
+
+	toml_table_t *deps = toml_table_in(conf, "dependencies");
+	if (deps == nullptr) {
+		toml_free(conf);
+		return nullptr;
+	}
+
+	/* We need to keep conf alive while deps is in use, but we can't return both.
+	 * Instead, we return conf and let caller free it. deps is a borrowed reference. */
+	/* Actually toml_table_in returns a borrowed reference — the caller must free conf.
+	 * Let's just read all dep names out now. */
+	return conf;
 }
 
-static void print_transitive(const char *name, const char *version, const char *prefix, bool is_last, i64 depth,
-                             i64 max_depth)
+static void print_tree(const char *dep_dir, const char *dep_name, const char *version, const char *prefix, bool is_last,
+                       i64 depth, i64 max_depth)
 {
 	if (depth > max_depth) {
 		return;
 	}
 
-	const char *connector = (i64)is_last ? "└── " : "├── ";
-	sds         ver       = version != nullptr ? sdsnew(version) : nullptr;
-	printf("%s%s%s v%s\n", prefix, connector, name != nullptr ? name : "?", ver != nullptr ? ver : "?");
-	sdsfree(ver);
+	const char *connector = (int)is_last ? "└── " : "├── ";
+	printf("%s%s%s", prefix, connector, dep_name != nullptr ? dep_name : "?");
 
-	if (depth >= max_depth) {
+	if (version != nullptr && strcmp(version, "*") != 0) {
+		printf(" v%s", version);
+	}
+	printf("\n");
+
+	if (depth >= max_depth || dep_dir == nullptr || dep_dir[0] == '\0') {
 		return;
 	}
 
-	recipe_t *recipe = registry_get(name);
-	if (recipe == nullptr) {
+	/* Read library.toml from the dep directory for transitive deps */
+	toml_table_t *conf = read_dep_table(dep_dir);
+	if (conf == nullptr) {
 		return;
 	}
 
-	sds child_prefix = sdscatfmt(sdsnew(prefix), "%s", (i64)is_last ? "    " : "│   ");
+	toml_table_t *deps = toml_table_in(conf, "dependencies");
+	if (deps == nullptr) {
+		toml_free(conf);
+		return;
+	}
 
-	char **dep_names = nullptr;
+	/* Count entries */
 	size_t dep_count = 0;
-	parse_dep_list(recipe->dependencies, &dep_names, &dep_count);
-
-	for (size_t i = 0; i < dep_count; i++) {
-		print_transitive(dep_names[i], nullptr, child_prefix, i == dep_count - 1, depth + 1, max_depth);
+	for (i64 i = 0;; i++) {
+		const char *key = toml_key_in(deps, i);
+		if (key == nullptr) {
+			break;
+		}
+		dep_count++;
 	}
 
-	for (size_t i = 0; i < dep_count; i++) {
-		sdsfree(dep_names[i]);
+	sds child_prefix = sdscatfmt(sdsnew(prefix), "%s", (int)is_last ? "    " : "│   ");
+
+	size_t idx = 0;
+	for (i64 i = 0; idx < dep_count; i++) {
+		const char *key = toml_key_in(deps, i);
+		if (key == nullptr) {
+			break;
+		}
+		idx++;
+
+		/* Resolve transitive dep by name */
+		sds child_dir = dep_resolve_dir(key);
+		sds child_ver = nullptr;
+		if (child_dir != nullptr) {
+			/* Read version from library.toml */
+			toml_datum_t ver = toml_string_in(deps, key);
+			if (ver.ok) {
+				child_ver = sdsnew(ver.u.s);
+				free(ver.u.s);
+			}
+		}
+
+		print_tree(child_dir, key, child_ver, child_prefix, (bool)(idx == dep_count), depth + 1, max_depth);
+
+		sdsfree(child_dir);
+		sdsfree(child_ver);
 	}
-	free(dep_names);
+
 	sdsfree(child_prefix);
-
-	registry_free_recipe(recipe);
+	toml_free(conf);
 }
 
 int64_t handle_tree(options *opts)
@@ -103,23 +138,39 @@ int64_t handle_tree(options *opts)
 
 	printf("%s v%s\n", name, version);
 
+	/* Try to use lockfile first for resolved paths */
+	lockfile_t *lf = lockfile_parse("Coffee.lock");
+
 	for (size_t i = 0; i < m->package.dependencies_count; i++) {
-		const char *entry       = m->package.dependencies[i];
-		sds         dep_name    = nullptr;
-		sds         dep_version = nullptr;
-		manifest_extract_dep_info(entry, &dep_name, &dep_version);
+		sds dep_name    = nullptr;
+		sds dep_version = nullptr;
+		manifest_extract_dep_info(m->package.dependencies[i], &dep_name, &dep_version);
 
 		if (dep_name == nullptr) {
 			continue;
 		}
 
-		bool is_last = (i == m->package.dependencies_count - 1);
-		print_transitive(dep_name, dep_version, "", is_last, 0, 3);
+		/* Get path from lockfile, or resolve */
+		sds dep_path = nullptr;
+		if (lf != nullptr) {
+			lockfile_dep_t *locked = lockfile_find_dep(lf, dep_name);
+			if (locked != nullptr && locked->path != nullptr && locked->path[0] != '\0') {
+				dep_path = sdsnew(locked->path);
+			}
+		}
+		if (dep_path == nullptr) {
+			dep_path = dep_resolve_dir(dep_name);
+		}
 
+		bool is_last = (i == m->package.dependencies_count - 1);
+		print_tree(dep_path, dep_name, dep_version, "", is_last, 0, 3);
+
+		sdsfree(dep_path);
 		sdsfree(dep_name);
 		sdsfree(dep_version);
 	}
 
+	lockfile_free(lf);
 	manifest_free(m);
 	return 0;
 }
