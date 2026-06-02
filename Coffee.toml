@@ -1,10 +1,6 @@
 [package]
-name = "."
+name = "Coffee"
 version = "0.1.0"
 edition = "c23"
-description = "A new C project"
+description = "Coffee: C manager"
 license = "MIT"
-
-[dependencies]
-toml = "*"
-sds = "*"

@@ -1,0 +1,15 @@
+version = 1
+
+[package]
+name = "test-pkg"
+version = "0.1.0"
+
+[[dependencies]]
+name = "toml"
+version = "1.0.0"
+path = "deps/toml"
+
+[[dependencies]]
+name = "sds"
+version = "2.0.0"
+path = "deps/sds"

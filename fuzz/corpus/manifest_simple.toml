@@ -1,0 +1,16 @@
+[package]
+name = "test"
+version = "0.1.0"
+edition = "c23"
+description = "A test package"
+license = "MIT"
+
+[dependencies]
+
+[lib]
+sources = ["src/*.c"]
+headers = ["include/*.h"]
+
+[features]
+default = ["std"]
+std = []
