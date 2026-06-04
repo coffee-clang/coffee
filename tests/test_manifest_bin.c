@@ -8,6 +8,8 @@
 
 #include <unistd.h>
 
+void coffee_register_manifest_bin_tests(void);
+
 TEST(manifest_bin_parse_single)
 {
 	FILE *fp = fopen("/tmp/coffee-bin-test-single.toml", "w");

@@ -21,6 +21,14 @@ void coffee_register_install_tests(void);
 void coffee_register_commands_basic_tests(void);
 void coffee_register_commands_manifest_tests(void);
 void coffee_register_commands_deps_tests(void);
+void coffee_register_coverage_build_tests(void);
+void coffee_register_coverage_commands_tests(void);
+void coffee_register_coverage_manifest_tests(void);
+void coffee_register_cmdline_tests(void);
+void coffee_register_coverage_install_tests(void);
+void coffee_register_cmdline2_tests(void);
+void coffee_register_coverage_core_tests(void);
+void coffee_register_coverage_build_deps_tests(void);
 
 int main(int argc, char **argv)
 {
@@ -53,9 +61,17 @@ int main(int argc, char **argv)
 	coffee_register_commands_basic_tests();
 	coffee_register_commands_manifest_tests();
 	coffee_register_commands_deps_tests();
+	coffee_register_coverage_build_tests();
+	coffee_register_coverage_commands_tests();
+	coffee_register_coverage_manifest_tests();
+	coffee_register_cmdline_tests();
+	coffee_register_coverage_install_tests();
+	coffee_register_cmdline2_tests();
+	coffee_register_coverage_core_tests();
+	coffee_register_coverage_build_deps_tests();
 
 	if (verbose) {
-		printf("Registered %u tests\n", test_framework_count);
+		printf("Registered %lu tests\n", (unsigned long)test_framework_count);
 	}
 
 	printf("=== Coffee Test Suite ===\n\n");
@@ -64,5 +80,5 @@ int main(int argc, char **argv)
 
 	test_framework_summary();
 
-	return result;
+	return (int)result;
 }

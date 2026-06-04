@@ -1,6 +1,6 @@
 #include "registry.h"
 
-#include "../deps/sds/sds.h"
+#include "strings.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,6 +8,7 @@
 #include <time.h>
 
 #include <ctype.h>
+#include <sds/sds.h>
 #include <sys/stat.h>
 #include <toml.h>
 #include <unistd.h>
@@ -131,8 +132,8 @@ static char *extract_string_val(const char *text, const char *key)
 						after_key++;
 					}
 					if (*after_key == '\"' && after_key > start) {
-						char *result = malloc(after_key - start + 1);
-						memccpy(result, start, '\0', after_key - start);
+						char *result = malloc((size_t)(after_key - start + 1));
+						memccpy(result, start, '\0', (size_t)(after_key - start));
 						result[after_key - start] = '\0';
 						return result;
 					}
@@ -183,7 +184,7 @@ static recipe_list_t *parse_package_list(const char *json)
 			}
 
 			if (brace_count == 0 && obj_start) {
-				size_t obj_len = p - obj_start + 1;
+				size_t obj_len = (size_t)(p - obj_start + 1);
 				char  *obj     = malloc(obj_len + 1);
 				memccpy(obj, obj_start, '\0', obj_len);
 				obj[obj_len] = '\0';
@@ -227,8 +228,8 @@ recipe_list_t *registry_search(sds query)
 	long len = ftell(fp);
 	fseek(fp, 0, SEEK_SET);
 
-	char *json = malloc(len + 1);
-	fread(json, 1, len, fp);
+	char *json = malloc((size_t)(len + 1));
+	fread(json, 1, (size_t)len, fp);
 	json[len] = '\0';
 	fclose(fp);
 
@@ -300,7 +301,7 @@ recipe_t *registry_get(sds name)
 		return nullptr;
 	}
 
-	char first = tolower(name[0]);
+	char first = (char)tolower((unsigned char)name[0]);
 	char url[4096];
 	snprintf_safe(url, sizeof(url), REGISTRY_RAW_URL "/recipes/%c/%s/library.toml", first, name);
 
@@ -357,11 +358,12 @@ recipe_t *registry_get(sds name)
 
 i64 registry_fetch(sds name, sds version, sds dest_dir)
 {
+	(void)version;
 	if (name == nullptr || !dest_dir) {
 		return -1;
 	}
 
-	char first = tolower(name[0]);
+	char first = (char)tolower((unsigned char)name[0]);
 	char cmd[4096];
 
 	snprintf_safe(cmd, sizeof(cmd), "mkdir -p %s", dest_dir);
@@ -389,7 +391,7 @@ version_list_t *registry_get_versions(sds name)
 		return nullptr;
 	}
 
-	char first = tolower(name[0]);
+	char first = (char)tolower((unsigned char)name[0]);
 	char url[4096];
 	snprintf_safe(url, sizeof(url), REGISTRY_RAW_URL "/recipes/%c/%s/library.toml", first, name);
 

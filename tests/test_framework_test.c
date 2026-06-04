@@ -1,6 +1,8 @@
 /* Test for the test framework itself */
 #include "test_framework.h"
 
+void coffee_register_framework_tests(void);
+
 TEST(framework_registers_test)
 {
 	const char *found = nullptr;

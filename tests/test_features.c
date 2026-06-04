@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+void coffee_register_features_tests(void);
+
 TEST(feature_parse)
 {
 	FILE *fp = fopen("/tmp/coffee-features-test.toml", "w");
@@ -47,7 +49,7 @@ TEST(feature_resolve)
 	manifest_t *m = manifest_parse("/tmp/coffee-features-test.toml");
 	ASSERT(m != nullptr, "manifest_parse returned nullptr");
 
-	const char          *requested[] = { "json" };
+	sds                  requested[] = { sdsnew("json") };
 	resolved_features_t *resolved    = features_resolve(m, requested, 1, false, false);
 	ASSERT(resolved != nullptr, "features_resolve returned nullptr");
 	ASSERT(features_is_enabled(resolved, "test", "json"), "json should be enabled");
@@ -167,7 +169,7 @@ TEST(compiler_flags)
 	manifest_t *m = manifest_parse("/tmp/coffee-features-test.toml");
 	ASSERT(m != nullptr, "manifest_parse returned nullptr");
 
-	const char          *requested[] = { "json", "advanced-logging" };
+	sds                  requested[] = { sdsnew("json"), sdsnew("advanced-logging") };
 	resolved_features_t *resolved    = features_resolve(m, requested, 2, false, false);
 	ASSERT(resolved != nullptr, "features_resolve returned nullptr");
 
@@ -211,7 +213,7 @@ TEST(transitive_features)
 	manifest_t *m = manifest_parse("/tmp/coffee-features-test.toml");
 	ASSERT(m != nullptr, "manifest_parse returned nullptr");
 
-	const char          *requested[] = { "json" };
+	sds                  requested[] = { sdsnew("json") };
 	resolved_features_t *resolved    = features_resolve(m, requested, 1, false, false);
 	ASSERT(resolved != nullptr, "features_resolve returned nullptr");
 	ASSERT(features_is_enabled(resolved, "test", "json"), "json should be enabled");

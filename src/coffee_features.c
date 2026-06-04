@@ -1,11 +1,12 @@
 #include "coffee_features.h"
 
-#include "../deps/sds/sds.h"
 #include "build.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include <sds/sds.h>
 
 static bool feature_in_set(feature_set_t *fs, const char *name)
 {

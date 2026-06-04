@@ -1,13 +1,12 @@
 #include "project.h"
 
-#include "../deps/sds/sds.h"
-
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include <libgen.h>
+#include <sds/sds.h>
 #include <unistd.h>
 
 static i64 file_exists(const char *path)

@@ -11,6 +11,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+void coffee_register_doc_tests(void);
+
 TEST(doc_generate_doxyfile_with_doc_section)
 {
 	/* Use a unique temp dir */

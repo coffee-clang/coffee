@@ -35,7 +35,7 @@ root
 ├── Coffee.toml         # Project manifest
 ├── include/            # Public API headers
 ├── src/                # Source files
-├── deps/               # Dependencies
+├── include/            # Dependencies (vendored in-tree)
 ├── tests/              # Unit & integration tests
 ├── docs/               # Documentation
 ├── scripts/            # Utility scripts

@@ -1,13 +1,11 @@
-/build/
-/target/
-/book/
+build/
+target/
 *.o
 *.a
 *.so
+*.html
+*.log
+*.gcov
 .tidy_stamps/
-/deps/
-/bin/*
+/bin/
 /fuzz/corpus/
-
-# Remote docs theme assets (fetched via make docs-assets)
-/docs/theme/index.hbs

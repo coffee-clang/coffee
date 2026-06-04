@@ -1,10 +1,11 @@
-#include "../deps/sds/sds.h"
 #include "../src/manifest.h"
 #include "test_framework.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+void coffee_register_manifest_version_tests(void);
 
 TEST(extract_exact_version)
 {

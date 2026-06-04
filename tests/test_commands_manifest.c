@@ -59,6 +59,21 @@ static void setup_project(const char *test_name, const char *extra_toml)
 	/* Create a dummy .h file for include path testing */
 	mkdir("include", 0755);
 
+	/* Create a minimal Makefile so test/bench commands succeed */
+	FILE *mf = fopen("Makefile", "w");
+	if (mf) {
+		fprintf_safe(mf, "CC = clang\n");
+		fprintf_safe(mf, "CFLAGS = -std=c23 -g -O0\n");
+		fprintf_safe(mf, "\n");
+		fprintf_safe(mf, "bin/tests/runner: src/main.c\n");
+		fprintf_safe(mf, "\t@mkdir -p bin/tests\n");
+		fprintf_safe(mf, "\t$(CC) $(CFLAGS) -o $@ $^\n");
+		fprintf_safe(mf, "\n");
+		fprintf_safe(mf, "bench:\n");
+		fprintf_safe(mf, "\t@echo \"bench complete\"\n");
+		fclose(mf);
+	}
+
 	sdsfree(tmpdir);
 }
 
@@ -223,6 +238,7 @@ TEST(fix_with_manifest)
 		.inputs_num = 1,
 	};
 	i64 ret = handle_fix(&opt);
+	(void)ret;
 	teardown_project("fix");
 	/* fix runs clang-tidy, might fail if clang-tidy not installed */
 	/* accept any result (external tool) */
@@ -300,6 +316,7 @@ TEST(lint_with_manifest)
 		.inputs_num = 1,
 	};
 	i64 ret = handle_lint(&opt);
+	(void)ret;
 	teardown_project("lint");
 	/* lint runs clang-tidy, may fail if clang-tidy not installed */
 	/* accept any result (external tool) */

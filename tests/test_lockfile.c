@@ -2,6 +2,9 @@
 #include "../src/strings.h"
 #include "test_framework.h"
 
+/* Forward declaration */
+void coffee_register_lockfile_tests(void);
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

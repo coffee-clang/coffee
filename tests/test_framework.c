@@ -64,7 +64,8 @@ i64 test_framework_run(const char *filter)
 
 void test_framework_summary(void)
 {
-	printf("\n=== Results: %d passed, %d failed, %d total ===\n", tests_passed, tests_failed, tests_run);
+	printf("\n=== Results: %lld passed, %lld failed, %lld total ===\n", (long long)tests_passed,
+	       (long long)tests_failed, (long long)tests_run);
 }
 
 void test_framework_reset(void)

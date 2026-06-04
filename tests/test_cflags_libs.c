@@ -8,6 +8,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+void coffee_register_cflags_libs_tests(void);
+
 static void create_file(const char *path, const char *content)
 {
 	FILE *fp = fopen(path, "w");

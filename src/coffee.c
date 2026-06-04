@@ -79,7 +79,7 @@ command_s commands[] = {
 int main(int argc, char **argv)
 {
 	static struct cli_args args_info;
-	cmdline_parser(argc, argv, &args_info);
+	(void)cmdline_parser(argc, argv, &args_info);
 
 	// Find first non-toolchain argument (commands start with letter)
 	// Save the first +toolchain positional argument (without leading +)

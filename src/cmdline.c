@@ -7,7 +7,6 @@
 
 #include "cmdline.h"
 
-#include "../deps/sds/sds.h"
 #include "strings.h"
 
 #include <stdio.h>
@@ -15,6 +14,7 @@
 #include <string.h>
 
 #include <getopt.h>
+#include <sds/sds.h>
 
 /* ------------------------------------------------------------------ */
 /*  Toolchain values                                                  */
@@ -335,8 +335,9 @@ i64 cmdline_parser(i64 argc, char **argv, struct cli_args *args_info)
 
 	cmdline_parser_init(args_info);
 
+	optind = 1;
 	i64 ch;
-	while ((ch = getopt_long(argc, argv, "hvqj:p:Z:V:", long_options, nullptr)) != -1) {
+	while ((ch = getopt_long((int)argc, argv, "hvqj:p:Z:V:", long_options, nullptr)) != -1) {
 		switch (ch) {
 		case 'h':
 			args_info->help_given = true;

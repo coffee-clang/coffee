@@ -8,6 +8,8 @@
 
 #include <sys/stat.h>
 
+void coffee_register_makefile_tests(void);
+
 TEST(makefile_is_created)
 {
 	const char *test_dir = "/tmp/coffee-makefile-project";

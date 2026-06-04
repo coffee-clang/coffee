@@ -9,6 +9,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+void coffee_register_config_tests(void);
+
 /*
  * Config tests use a temporary COFFEE_HOME to avoid sharing state.
  * Each test sets COFFEE_HOME before running and restores it after.

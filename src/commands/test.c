@@ -31,6 +31,25 @@ int64_t handle_test(options *opts)
 
 	sdsfree(manifest_path);
 
+	/* Check that a Makefile exists before calling make */
+	sds makefile_check = sdsempty();
+	if (in_project) {
+		makefile_check = sdscatprintf(makefile_check, "%s/Makefile", project_dir);
+	} else {
+		makefile_check = sdsnew("Makefile");
+	}
+	bool has_makefile = (access(makefile_check, F_OK) == 0);
+	sdsfree(makefile_check);
+
+	if (!has_makefile) {
+		sdsfree(project_dir);
+		fprintf_safe(stderr, "Error: No Makefile found. Cannot build test runner.\n");
+		if (manifest) {
+			manifest_free(manifest);
+		}
+		return 1;
+	}
+
 	sds cmd = sdsempty();
 
 	/* Step 1: Build the test runner */

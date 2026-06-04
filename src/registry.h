@@ -1,7 +1,13 @@
 #ifndef REGISTRY_H_
 #define REGISTRY_H_
 
-#include "../deps/sds/sds.h"
+/* sds.h is vendored and not lint-clean; suppress its warnings */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wsign-conversion"
+#pragma GCC diagnostic ignored "-Wimplicit-int-conversion"
+#pragma GCC diagnostic ignored "-Wshorten-64-to-32"
+#include <sds/sds.h>
+#pragma GCC diagnostic pop
 
 #include <stdbool.h>
 #include <stddef.h>

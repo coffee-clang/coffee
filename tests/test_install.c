@@ -12,6 +12,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+void coffee_register_install_tests(void);
+
 /*
  * Install/list tests use a temporary COFFEE_HOME to avoid test pollution.
  */
