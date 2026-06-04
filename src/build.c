@@ -1,6 +1,5 @@
 #include "build.h"
 
-#include "../deps/sds/sds.h"
 #include "lockfile.h"
 #include "manifest.h"
 #include "registry.h"
@@ -13,6 +12,7 @@
 #include <string.h>
 
 #include <glob.h>
+#include <sds/sds.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -23,7 +23,7 @@ static i64 run_command(char **argv, bool verbose)
 {
 	if (verbose) {
 		printf("Running:");
-		for (char **a = argv; *a; a++) {
+		for (char *const *a = argv; *a; a++) {
 			printf(" %s", *a);
 		}
 		printf("\n");
@@ -185,8 +185,8 @@ size_t dep_add_flags(const char *dep_dir, const char *dep_name, sds *flags, sds 
  */
 sds dep_parse_name(const char *entry)
 {
-	sds   name;
-	char *eq = strchr(entry, '=');
+	sds         name;
+	const char *eq = strchr(entry, '=');
 	if (eq) {
 		size_t len = (size_t)(eq - entry);
 		while (len > 0 && entry[len - 1] == ' ') {
@@ -206,8 +206,8 @@ i64 build_project(manifest_t *manifest, build_opts_t *opts)
 		return 1;
 	}
 
-	const char *cc         = getenv("CC") != nullptr ? getenv("CC") : "clang";
-	const char *output_dir = opts != nullptr && opts->target_dir != nullptr ? opts->target_dir : "target/debug";
+	char *cc         = getenv("CC") != nullptr ? getenv("CC") : "clang";
+	char *output_dir = opts != nullptr && opts->target_dir != nullptr ? opts->target_dir : "target/debug";
 
 	bool verbose = false;
 	if (opts != nullptr) {
@@ -267,9 +267,9 @@ i64 build_project(manifest_t *manifest, build_opts_t *opts)
 		}
 	}
 	if (has_features) {
-		const char **requested = nullptr;
+		sds *requested = nullptr;
 		if (opts->features_count > 0) {
-			requested = (const char **)opts->features;
+			requested = opts->features;
 		}
 		resolved =
 		    features_resolve(manifest, requested, opts->features_count, opts->all_features, opts->no_default_features);

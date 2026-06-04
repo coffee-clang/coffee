@@ -58,7 +58,7 @@ int64_t handle_build(options *opts)
 			cmd = sdscatprintf(cmd, " DEBUG=1");
 		}
 		if (opts->jobs > 0) {
-			cmd = sdscatprintf(cmd, " -j%d", opts->jobs);
+			cmd = sdscatprintf(cmd, " -j%lld", (long long)opts->jobs);
 		}
 
 		/* Pass feature flags if specified */
@@ -81,10 +81,11 @@ int64_t handle_build(options *opts)
 					size_t dflags_count = 0;
 					sds   *dflags       = features_to_compiler_flags(resolved, manifest->package.name, &dflags_count);
 					if (dflags_count > 0) {
-						cmd = sdscatprintf(cmd, " CFLAGS_EXTRA=");
+						cmd = sdscatprintf(cmd, " CFLAGS_EXTRA='");
 						for (size_t i = 0; i < dflags_count; i++) {
 							cmd = sdscatprintf(cmd, "%s%s", dflags[i], (i + 1 < dflags_count) ? " " : "");
 						}
+						cmd = sdscatprintf(cmd, "'");
 						for (size_t i = 0; i < dflags_count; i++) {
 							sdsfree(dflags[i]);
 						}

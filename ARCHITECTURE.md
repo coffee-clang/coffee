@@ -33,10 +33,10 @@ them on every exploration.
 │       ├── run.c, test.c, bench.c, search.c, info.c, ...
 │       └── publish.c, yank.c, owner.c  # (stubs — not yet implemented)
 │
-├── deps/                # Vendored third-party dependencies (no package mgr)
+├── include/             # Vendored third-party dependencies (maintained in-tree)
 │   ├── sds/             # antirez/sds — Simple Dynamic Strings
-│   ├── toml/            # cktan/tomlc99 — TOML parser (C99)
-│   └── safe/            # Arena allocator / safe memory wrappers
+│   ├── toml.c, toml.h   # cktan/tomlc99 — TOML parser
+│   └── safe.h           # Arena allocator / safe memory wrappers
 │
 ├── tests/
 │   ├── test_framework.h/.c   # Custom lightweight test framework (macros + runner)
@@ -173,9 +173,9 @@ Binary output
 
 | Dependency | Source | Used in | Purpose |
 |------------|--------|---------|---------|
-| **sds** | `deps/sds/` (antirez/sds) | Everywhere | Dynamic string type (replaces `char *`) |
-| **toml** | `deps/toml/` (cktan/tomlc99) | `src/manifest.c` | Parse `Coffee.toml` into `manifest_t` |
-| **safe** | `deps/safe/` | Various | Arena allocator / safe memory wrappers |
+| **sds** | `include/sds/` (antirez/sds) | Everywhere | Dynamic string type (replaces `char *`) |
+| **toml** | `include/` (cktan/tomlc99) | `src/manifest.c` | Parse `Coffee.toml` into `manifest_t` |
+| **safe** | `include/` | Various | Arena allocator / safe memory wrappers |
 | **curl** | system (`pkg-config --libs`) | `src/registry.c` | HTTP downloads (called via `system()`) |
 | **zlib** | system (`-lz`) | `src/registry.c` | Decompress registry index |
 | **getopt_long** | libc (POSIX) | `src/cmdline.c` | CLI argument parsing via getopt_long |

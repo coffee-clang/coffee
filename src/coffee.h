@@ -1,8 +1,14 @@
 #ifndef COFFEE_H_
 #define COFFEE_H_
 
-#include "../deps/sds/sds.h"
-#include "../deps/sds/sdsalloc.h"
+/* sds.h is vendored and not lint-clean; suppress its warnings */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wsign-conversion"
+#pragma GCC diagnostic ignored "-Wimplicit-int-conversion"
+#pragma GCC diagnostic ignored "-Wshorten-64-to-32"
+#include <sds/sds.h>
+#include <sds/sdsalloc.h>
+#pragma GCC diagnostic pop
 #include "cmdline.h"
 #include "strings.h"
 
