@@ -44,7 +44,7 @@
 
 const char *SDS_NOINIT = "SDS_NOINIT";
 
-static inline int sdsHdrSize(char type)
+static inline i64 sdsHdrSize(char type)
 {
 	switch (type & SDS_TYPE_MASK) {
 	case SDS_TYPE_5:
@@ -105,7 +105,7 @@ sds sdsnewlen(const void *init, size_t initlen)
 	if (type == SDS_TYPE_5 && initlen == 0) {
 		type = SDS_TYPE_8;
 	}
-	int            hdrlen = sdsHdrSize(type);
+	i64            hdrlen = sdsHdrSize(type);
 	unsigned char *fp; /* flags pointer. */
 
 	sh = s_malloc(hdrlen + initlen + 1);
@@ -231,7 +231,7 @@ sds sdsMakeRoomFor(sds s, size_t addlen)
 	size_t avail = sdsavail(s);
 	size_t len, newlen, reqlen;
 	char   type, oldtype = s[-1] & SDS_TYPE_MASK;
-	int    hdrlen;
+	i64    hdrlen;
 
 	/* Return ASAP if there is enough space left. */
 	if (avail >= addlen) {
@@ -291,7 +291,7 @@ sds sdsRemoveFreeSpace(sds s)
 {
 	void  *sh, *newsh;
 	char   type, oldtype     = s[-1] & SDS_TYPE_MASK;
-	int    hdrlen, oldhdrlen = sdsHdrSize(oldtype);
+	i64    hdrlen, oldhdrlen = sdsHdrSize(oldtype);
 	size_t len   = sdslen(s);
 	size_t avail = sdsavail(s);
 	sh           = (char *)s - oldhdrlen;
@@ -382,27 +382,26 @@ void sdsIncrLen(sds s, ssize_t incr)
 	case SDS_TYPE_5: {
 		unsigned char *fp     = ((unsigned char *)s) - 1;
 		unsigned char  oldlen = SDS_TYPE_5_LEN(flags);
-		assert((incr > 0 && oldlen + incr < 32) || (incr < 0 && oldlen >= (unsigned int)(-incr)));
+		assert((incr > 0 && oldlen + incr < 32) || (incr < 0 && oldlen >= (uint64_t)(-incr)));
 		*fp = SDS_TYPE_5 | ((oldlen + incr) << SDS_TYPE_BITS);
 		len = oldlen + incr;
 		break;
 	}
 	case SDS_TYPE_8: {
 		SDS_HDR_VAR(8, s);
-		assert((incr >= 0 && sh->alloc - sh->len >= incr) || (incr < 0 && sh->len >= (unsigned int)(-incr)));
+		assert((incr >= 0 && sh->alloc - sh->len >= incr) || (incr < 0 && sh->len >= (uint64_t)(-incr)));
 		len = (sh->len += incr);
 		break;
 	}
 	case SDS_TYPE_16: {
 		SDS_HDR_VAR(16, s);
-		assert((incr >= 0 && sh->alloc - sh->len >= incr) || (incr < 0 && sh->len >= (unsigned int)(-incr)));
+		assert((incr >= 0 && sh->alloc - sh->len >= incr) || (incr < 0 && sh->len >= (uint64_t)(-incr)));
 		len = (sh->len += incr);
 		break;
 	}
 	case SDS_TYPE_32: {
 		SDS_HDR_VAR(32, s);
-		assert((incr >= 0 && sh->alloc - sh->len >= (unsigned int)incr) ||
-		       (incr < 0 && sh->len >= (unsigned int)(-incr)));
+		assert((incr >= 0 && sh->alloc - sh->len >= (uint64_t)incr) || (incr < 0 && sh->len >= (uint64_t)(-incr)));
 		len = (sh->len += incr);
 		break;
 	}
@@ -508,7 +507,7 @@ sds sdscpy(sds s, const char *t)
  * The function returns the length of the null-terminated string
  * representation stored at 's'. */
 #define SDS_LLSTR_SIZE 21
-int sdsll2str(char *s, long long value)
+i64 sdsll2str(char *s, long long value)
 {
 	char              *p, aux;
 	unsigned long long v;
@@ -554,7 +553,7 @@ int sdsll2str(char *s, long long value)
 }
 
 /* Identical sdsll2str(), but for unsigned long long type. */
-int sdsull2str(char *s, unsigned long long v)
+i64 sdsull2str(char *s, unsigned long long v)
 {
 	char  *p, aux;
 	size_t l;
@@ -590,7 +589,7 @@ int sdsull2str(char *s, unsigned long long v)
 sds sdsfromlonglong(long long value)
 {
 	char buf[SDS_LLSTR_SIZE];
-	int  len = sdsll2str(buf, value);
+	i64  len = sdsll2str(buf, value);
 
 	return sdsnewlen(buf, len);
 }
@@ -601,7 +600,7 @@ sds sdscatvprintf(sds s, const char *fmt, va_list ap)
 	va_list cpy;
 	char    staticbuf[1024], *buf = staticbuf, *t;
 	size_t  buflen = strlen(fmt) * 2;
-	int     bufstrlen;
+	i64     bufstrlen;
 
 	/* We try to start using a static buffer for speed.
 	 * If not possible we revert to heap allocation. */
@@ -684,9 +683,9 @@ sds sdscatprintf(sds s, const char *fmt, ...)
  *
  * %s - C String
  * %S - SDS string
- * %i - signed int
+ * %i - signed i64
  * %I - 64 bit signed integer (long long, int64_t)
- * %u - unsigned int
+ * %u - unsigned i64
  * %U - 64 bit unsigned integer (unsigned long long, uint64_t)
  * %% - Verbatim "%" character.
  */
@@ -737,7 +736,7 @@ sds sdscatfmt(sds s, const char *fmt, ...)
 			case 'i':
 			case 'I':
 				if (next == 'i') {
-					num = va_arg(ap, int);
+					num = va_arg(ap, i64);
 				} else {
 					num = va_arg(ap, long long);
 				}
@@ -755,7 +754,7 @@ sds sdscatfmt(sds s, const char *fmt, ...)
 			case 'u':
 			case 'U':
 				if (next == 'u') {
-					unum = va_arg(ap, unsigned int);
+					unum = va_arg(ap, unsigned long long);
 				} else {
 					unum = va_arg(ap, unsigned long long);
 				}
@@ -908,10 +907,10 @@ void sdstoupper(sds s)
  * If two strings share exactly the same prefix, but one of the two has
  * additional characters, the longer string is considered to be greater than
  * the smaller one. */
-int sdscmp(const sds s1, const sds s2)
+i64 sdscmp(const sds s1, const sds s2)
 {
 	size_t l1, l2, minlen;
-	int    cmp;
+	i64    cmp;
 
 	l1     = sdslen(s1);
 	l2     = sdslen(s2);
@@ -1055,14 +1054,14 @@ sds sdscatrepr(sds s, const char *p, size_t len)
 
 /* Helper function for sdssplitargs() that returns non zero if 'c'
  * is a valid hex digit. */
-int is_hex_digit(char c)
+i64 is_hex_digit(char c)
 {
 	return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
 }
 
 /* Helper function for sdssplitargs() that converts a hex digit into an
  * integer from 0 to 15 */
-int hex_digit_to_int(char c)
+i64 hex_digit_to_int(char c)
 {
 	switch (c) {
 	case '0':
@@ -1341,7 +1340,7 @@ void sds_free(void *ptr)
 # include <stdio.h>
 
 # define UNUSED(x) (void)(x)
-int sdsTest(void)
+i64 sdsTest(void)
 {
 	{
 		sds x = sdsnew("foo"), y;
@@ -1379,7 +1378,7 @@ int sdsTest(void)
 			for (size_t i = 0; i < sizeof(etalon); i++) {
 				etalon[i] = '0';
 			}
-			x = sdscatprintf(sdsempty(), "%0*d", (int)sizeof(etalon), 0);
+			x = sdscatprintf(sdsempty(), "%0*d", (i64)sizeof(etalon), 0);
 			test_cond("sdscatprintf() can print 1MB",
 			          sdslen(x) == sizeof(etalon) && memcmp(x, etalon, sizeof(etalon)) == 0)
 		}
@@ -1469,7 +1468,7 @@ int sdsTest(void)
 
 		{
 			char *p;
-			int   step = 10, j, i;
+			i64   step = 10, j, i;
 
 			sdsfree(x);
 			sdsfree(y);
@@ -1479,9 +1478,9 @@ int sdsTest(void)
 			/* Run the test a few times in order to hit the first two
 			 * SDS header types. */
 			for (i = 0; i < 10; i++) {
-				int oldlen = sdslen(x);
+				i64 oldlen = sdslen(x);
 				x          = sdsMakeRoomFor(x, step);
-				int type   = x[-1] & SDS_TYPE_MASK;
+				i64 type   = x[-1] & SDS_TYPE_MASK;
 
 				test_cond("sdsMakeRoomFor() len", sdslen(x) == oldlen);
 				if (type != SDS_TYPE_5) {
@@ -1508,7 +1507,7 @@ int sdsTest(void)
 #endif
 
 #ifdef SDS_TEST_MAIN
-int main(void)
+i64 main(void)
 {
 	return sdsTest();
 }
