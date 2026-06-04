@@ -14,7 +14,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-static i64 compile_binary(const char *cc, sds bin_name, sds *src_globs, size_t src_count, sds dep_flags, sds out_dir,
+static i64 compile_binary(char *cc, sds bin_name, sds *src_globs, size_t src_count, sds dep_flags, sds out_dir,
                           bool verbose)
 {
 	/* Collect source files from globs */
@@ -24,7 +24,7 @@ static i64 compile_binary(const char *cc, sds bin_name, sds *src_globs, size_t s
 
 	for (size_t i = 0; i < src_count; i++) {
 		glob_t gbuf;
-		int    ret = glob(src_globs[i], 0, nullptr, &gbuf);
+		i64    ret = (i64)glob(src_globs[i], 0, nullptr, &gbuf);
 		if (ret == 0) {
 			for (size_t j = 0; j < gbuf.gl_pathc; j++) {
 				if (src_cnt >= src_cap) {
@@ -53,7 +53,7 @@ static i64 compile_binary(const char *cc, sds bin_name, sds *src_globs, size_t s
 		}
 	}
 
-	size_t argc_total = (size_t)(1 + max_tokens + 2 + src_cnt + 1);
+	size_t argc_total = 1 + (size_t)max_tokens + 2 + src_cnt + 1;
 	char **argv       = malloc(sizeof(char *) * (argc_total + 1));
 	if (argv == nullptr) {
 		for (size_t i = 0; i < src_cnt; i++) {
@@ -204,7 +204,7 @@ int64_t handle_install(options *opts)
 	manifest_t *pkg_manifest = manifest_parse(lib_toml);
 	sdsfree(lib_toml);
 
-	const char *cc = getenv("CC") != nullptr ? getenv("CC") : "clang";
+	char *cc = getenv("CC") != nullptr ? getenv("CC") : "clang";
 
 	if (pkg_manifest != nullptr && pkg_manifest->bin_count > 0) {
 		/* Resolve dep flags for the package */

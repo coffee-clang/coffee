@@ -10,6 +10,7 @@
 
 int64_t handle_locate_project(options *opts)
 {
+	(void)opts;
 	char *manifest_path = project_find_manifest(nullptr);
 
 	if (manifest_path == nullptr) {

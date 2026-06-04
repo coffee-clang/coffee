@@ -10,8 +10,8 @@
 /* Wrappers for functions that clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
  * flags. These live in a system header (-isystem) so clang-tidy won't check them. */
 
-static inline int safe_snprintf(char *buf, size_t size, const char *fmt, ...) {
-    int ret;
+static inline i64 safe_snprintf(char *buf, size_t size, const char *fmt, ...) {
+    i64 ret;
     va_list ap;
     va_start(ap, fmt);
     ret = vsnprintf(buf, size, fmt, ap);
@@ -19,8 +19,8 @@ static inline int safe_snprintf(char *buf, size_t size, const char *fmt, ...) {
     return ret;
 }
 
-static inline int safe_fprintf(FILE *stream, const char *fmt, ...) {
-    int ret;
+static inline i64 safe_fprintf(FILE *stream, const char *fmt, ...) {
+    i64 ret;
     va_list ap;
     va_start(ap, fmt);
     ret = vfprintf(stream, fmt, ap);
@@ -28,8 +28,8 @@ static inline int safe_fprintf(FILE *stream, const char *fmt, ...) {
     return ret;
 }
 
-static inline int safe_printf(const char *fmt, ...) {
-    int ret;
+static inline i64 safe_printf(const char *fmt, ...) {
+    i64 ret;
     va_list ap;
     va_start(ap, fmt);
     ret = vprintf(fmt, ap);
@@ -45,8 +45,8 @@ static inline void *safe_memset(void *s, int c, size_t n) {
     return memset(s, c, n);
 }
 
-static inline int safe_sprintf(char *buf, const char *fmt, ...) {
-    int ret;
+static inline i64 safe_sprintf(char *buf, const char *fmt, ...) {
+    i64 ret;
     va_list ap;
     va_start(ap, fmt);
     ret = vsprintf(buf, fmt, ap);
@@ -58,8 +58,8 @@ static inline char *safe_strcpy(char *dest, const char *src) {
     return strcpy(dest, src);
 }
 
-static inline int safe_scanf(const char *fmt, ...) {
-    int ret;
+static inline i64 safe_scanf(const char *fmt, ...) {
+    i64 ret;
     va_list ap;
     va_start(ap, fmt);
     ret = vscanf(fmt, ap);
@@ -67,8 +67,8 @@ static inline int safe_scanf(const char *fmt, ...) {
     return ret;
 }
 
-static inline int safe_system(const char *command) {
-    return system(command);
+static inline i64 safe_system(const char *command) {
+    return (i64)system(command);
 }
 
 static inline FILE *safe_popen(const char *command, const char *type) {

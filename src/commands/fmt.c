@@ -6,6 +6,7 @@
 
 int64_t handle_fmt(options *opts)
 {
+	(void)opts;
 	printf("Formatting source code...\n");
 
 	// Use find to get all .c and .h files in src and tests

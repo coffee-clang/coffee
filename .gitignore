@@ -1,4 +1,5 @@
 build/
+book/
 target/
 *.o
 *.a
@@ -9,3 +10,4 @@ target/
 .tidy_stamps/
 /bin/
 /fuzz/corpus/
+/docs/theme/index.hbs

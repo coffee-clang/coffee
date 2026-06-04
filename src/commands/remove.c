@@ -64,7 +64,7 @@ int64_t handle_remove(options *opts)
 	sds   makefile_path;
 	if (dir_end) {
 		size_t dir_len = (size_t)(dir_end - manifest_path) + 1;
-		makefile_path  = sdscatprintf(sdsempty(), "%.*sMakefile", (i64)dir_len, manifest_path);
+		makefile_path  = sdscatprintf(sdsempty(), "%.*sMakefile", (int)dir_len, manifest_path);
 	} else {
 		makefile_path = sdsnew("Makefile");
 	}

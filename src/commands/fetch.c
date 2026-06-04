@@ -12,6 +12,7 @@
 
 int64_t handle_fetch(options *opts)
 {
+	(void)opts;
 	char *manifest_path = project_find_manifest(nullptr);
 
 	if (manifest_path == nullptr) {

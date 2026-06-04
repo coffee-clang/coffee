@@ -18,12 +18,12 @@ int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size)
 
 	/* Write fuzz data to a temp file */
 	char template[] = "/tmp/fuzz_manifest_XXXXXX";
-	int  fd         = mkstemp(template);
+	i64  fd         = (i64)mkstemp(template);
 	if (fd < 0) {
 		return 0;
 	}
-	write(fd, Data, Size);
-	close(fd);
+	write((int)fd, Data, Size);
+	close((int)fd);
 
 	/* Parse the manifest */
 	sds         path = sdsnew(template);

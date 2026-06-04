@@ -12,40 +12,6 @@
 #include <toml.h>
 #include <unistd.h>
 
-/*
- * Read version from a dep's library.toml, or return "*".
- */
-static sds resolve_dep_version(const char *dep_dir)
-{
-	sds   toml_path = sdscatprintf(sdsempty(), "%s/library.toml", dep_dir);
-	FILE *fp        = fopen(toml_path, "r");
-	if (fp == nullptr) {
-		sdsfree(toml_path);
-		return sdsnew("*");
-	}
-
-	char          errbuf[256];
-	toml_table_t *conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
-	fclose(fp);
-
-	sds version = nullptr;
-	if (conf) {
-		toml_datum_t ver = toml_string_in(conf, "version");
-		if (ver.ok) {
-			version = sdsnew(ver.u.s);
-			free(ver.u.s);
-		}
-		toml_free(conf);
-	}
-
-	sdsfree(toml_path);
-
-	if (version == nullptr) {
-		version = sdsnew("*");
-	}
-	return version;
-}
-
 int64_t handle_update(options *opts)
 {
 	char *manifest_path = project_find_manifest(nullptr);

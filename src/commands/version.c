@@ -5,6 +5,7 @@
 
 int64_t handle_version(options *opts)
 {
+	(void)opts;
 	printf("coffee %s\n", CMDLINE_PARSER_VERSION);
 	return 0;
 }

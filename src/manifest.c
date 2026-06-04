@@ -140,7 +140,7 @@ manifest_t *manifest_parse(sds path)
 			return nullptr;
 		}
 		for (size_t i = 0; i < m->package.dependencies_count; i++) {
-			toml_datum_t dep           = toml_string_at(deps_arr, i);
+			toml_datum_t dep           = toml_string_at(deps_arr, (i64)i);
 			m->package.dependencies[i] = toml_datum_to_string(dep);
 		}
 	} else {
@@ -197,7 +197,7 @@ manifest_t *manifest_parse(sds path)
 			return nullptr;
 		}
 		for (size_t i = 0; i < m->package.sources_count; i++) {
-			toml_datum_t src      = toml_string_at(sources_arr, i);
+			toml_datum_t src      = toml_string_at(sources_arr, (i64)i);
 			m->package.sources[i] = toml_datum_to_string(src);
 		}
 	}
@@ -212,7 +212,7 @@ manifest_t *manifest_parse(sds path)
 			return nullptr;
 		}
 		for (size_t i = 0; i < m->package.headers_count; i++) {
-			toml_datum_t hdr      = toml_string_at(headers_arr, i);
+			toml_datum_t hdr      = toml_string_at(headers_arr, (i64)i);
 			m->package.headers[i] = toml_datum_to_string(hdr);
 		}
 	}
@@ -253,7 +253,7 @@ manifest_t *manifest_parse(sds path)
 				if (!is_valid_feature_name(m->features[idx].name)) {
 					fprintf_safe(stderr, "Warning: Invalid feature name: %s\n", key);
 				}
-				m->features[idx].deps_count = toml_array_nelem(arr);
+				m->features[idx].deps_count = (size_t)toml_array_nelem(arr);
 				if (m->features[idx].deps_count > 0) {
 					m->features[idx].deps = calloc(m->features[idx].deps_count, sizeof(sds));
 					if (m->features[idx].deps == nullptr) {
@@ -262,7 +262,7 @@ manifest_t *manifest_parse(sds path)
 						return nullptr;
 					}
 					for (size_t j = 0; j < m->features[idx].deps_count; j++) {
-						toml_datum_t dep         = toml_string_at(arr, j);
+						toml_datum_t dep         = toml_string_at(arr, (i64)j);
 						m->features[idx].deps[j] = toml_datum_to_string(dep);
 					}
 				}
@@ -308,7 +308,7 @@ manifest_t *manifest_parse(sds path)
 				return nullptr;
 			}
 			for (size_t i = 0; i < m->bin_count; i++) {
-				toml_table_t *bt = toml_table_at(bin_arr, (int)i);
+				toml_table_t *bt = toml_table_at(bin_arr, (i64)i);
 				if (bt == nullptr) {
 					continue;
 				}
@@ -325,7 +325,7 @@ manifest_t *manifest_parse(sds path)
 							return nullptr;
 						}
 						for (size_t j = 0; j < m->bin[i].src_count; j++) {
-							toml_datum_t src = toml_string_at(src_arr, (int)j);
+							toml_datum_t src = toml_string_at(src_arr, (i64)j);
 							m->bin[i].src[j] = toml_datum_to_string(src);
 						}
 					}

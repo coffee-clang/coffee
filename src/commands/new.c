@@ -1,5 +1,6 @@
 #include "../coffee.h"
 #include "../manifest.h"
+#include "../project.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,30 +9,10 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-static i64 create_dir(const char *path)
-{
-	struct stat st;
-	if (stat(path, &st) == 0) {
-		return 0;
-	}
-	return mkdir(path, 0755);
-}
-
-static i64 create_file(const char *path, const char *content)
-{
-	FILE *fp = fopen(path, "w");
-	if (fp == nullptr) {
-		return -1;
-	}
-	fprintf_safe(fp, "%s", content);
-	fclose(fp);
-	return 0;
-}
-
 static sds get_name_from_path(const char *path)
 {
 	const char *name       = path;
-	char       *last_slash = strrchr(path, '/');
+	const char *last_slash = strrchr(path, '/');
 	if (last_slash) {
 		name = last_slash + 1;
 	}
@@ -331,43 +312,40 @@ int64_t handle_new(options *opts)
 		sdsfree(lib_content);
 
 		/* Library Makefile — builds static library */
-		sds makefile_content = sdscatprintf(sdsempty(),
-		                                    "CC ?= clang\n"
-		                                    "CFLAGS += -std=c23 -O3 -g\n"
-		                                    "CFLAGS += -Wall -Wextra -Wshadow -Wpedantic\n"
-		                                    "CFLAGS += -Wconversion -Wsign-conversion -Wunused\n"
-		                                    "CFLAGS += -Iinclude/%s\n"
-		                                    "\n"
-		                                    "# Dependency flags via coffee\n"
-		                                    "CFLAGS += $(shell coffee cflags 2>/dev/null)\n"
-		                                    "LDFLAGS += $(shell coffee libs 2>/dev/null)\n"
-		                                    "\n"
-		                                    "AR ?= ar\n"
-		                                    "ARFLAGS := rcs\n"
-		                                    "\n"
-		                                    "TARGET := build/lib%s.a\n"
-		                                    "SOURCES := $(wildcard src/*.c)\n"
-		                                    "OBJECTS := $(SOURCES:src/%.c=build/%.o)\n"
-		                                    "\n"
-		                                    ".PHONY: build clean format tidy\n"
-		                                    "\n"
-		                                    "build: $(TARGET)\n"
-		                                    "\n"
-		                                    "$(TARGET): $(OBJECTS)\n"
-		                                    "\t$(AR) $(ARFLAGS) $@ $^\n"
-		                                    "\n"
-		                                    "build/%.o: src/%.c\n"
-		                                    "\t$(CC) $(CFLAGS) -c $< -o $@\n"
-		                                    "\n"
-		                                    "clean:\n"
-		                                    "\trm -rf build/\n"
-		                                    "\n"
-		                                    "format:\n"
-		                                    "\tclang-format -i src/*.c include/%s/*.h\n"
-		                                    "\n"
-		                                    "tidy:\n"
-		                                    "\tclang-tidy src/*.c -- $(CFLAGS)\n",
-		                                    name, name, name);
+		makefile_content = sdscatprintf(sdsempty(),
+		                                "CC ?= clang\n"
+		                                "CFLAGS += -std=c23 -O3 -g\n"
+		                                "CFLAGS += -Wall -Wextra -Wshadow -Wpedantic\n"
+		                                "CFLAGS += -Wconversion -Wsign-conversion -Wunused\n"
+		                                "CFLAGS += -Iinclude/%s\n"
+		                                "\n"
+		                                "# Dependency flags via coffee\n"
+		                                "CFLAGS += $(shell coffee cflags 2>/dev/null)\n"
+		                                "LDFLAGS += $(shell coffee libs 2>/dev/null)\n"
+		                                "\n"
+		                                "TARGET := build/lib%s.a\n"
+		                                "SOURCES := $(wildcard src/*.c)\n"
+		                                "OBJECTS := $(SOURCES:src/%%.c=build/%%.o)\n"
+		                                "\n"
+		                                ".PHONY: build clean format tidy\n"
+		                                "\n"
+		                                "build: $(TARGET)\n"
+		                                "\n"
+		                                "$(TARGET): $(OBJECTS)\n"
+		                                "\t$(AR) $(ARFLAGS) $@ $^\n"
+		                                "\n"
+		                                "build/%%.o: src/%%.c\n"
+		                                "\t$(CC) $(CFLAGS) -c $< -o $@\n"
+		                                "\n"
+		                                "clean:\n"
+		                                "\trm -rf build/\n"
+		                                "\n"
+		                                "format:\n"
+		                                "\tclang-format -i src/*.c include/%s/*.h\n"
+		                                "\n"
+		                                "tidy:\n"
+		                                "\tclang-tidy src/*.c -- $(CFLAGS)\n",
+		                                name, name, name);
 
 		if (create_file(makefile_path, makefile_content) != 0) {
 			sdsfree(makefile_content);
@@ -378,20 +356,19 @@ int64_t handle_new(options *opts)
 		sdsfree(makefile_content);
 
 		/* Library manifest with [lib] section */
-		sds manifest_content = sdscatprintf(sdsempty(),
-		                                    "[package]\n"
-		                                    "name = \"%s\"\n"
-		                                    "version = \"0.1.0\"\n"
-		                                    "edition = \"c23\"\n"
-		                                    "description = \"A new C project\"\n"
-		                                    "license = \"MIT\"\n"
-		                                    "\n"
-		                                    "[dependencies]\n"
-		                                    "\n"
-		                                    "[lib]\n"
-		                                    "sources = [\"src/*.c\"]\n"
-		                                    "headers = [\"include/%s/*.h\"]\n",
-		                                    name, name);
+		manifest_content = sdscatprintf(sdsempty(),
+		                                "[package]\n"
+		                                "name = \"%s\"\n"
+		                                "version = \"0.1.0\"\n"
+		                                "edition = \"c23\"\n"
+		                                "description = \"A new C project\"\n"
+		                                "license = \"MIT\"\n"
+		                                "\n"
+		                                "[lib]\n"
+		                                "name = \"%s\"\n"
+		                                "src = [\"src/lib.c\"]\n"
+		                                "include = [\"include\"]\n",
+		                                name, name);
 
 		if (create_file(manifest_path, manifest_content) != 0) {
 			sdsfree(manifest_content);

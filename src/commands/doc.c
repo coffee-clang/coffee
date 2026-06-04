@@ -158,13 +158,7 @@ static i64 doc_generate_doxyfile(manifest_t *m, const sds project_dir)
 
 int64_t handle_doc(options *opts)
 {
-	bool no_deps = false;
-	for (i64 i = 1; i < opts->inputs_num; i++) {
-		if (strcmp(opts->inputs[i], "--no-deps") == 0) {
-			no_deps = true;
-		}
-	}
-
+	(void)opts;
 	/* Find and parse manifest */
 	char *manifest_path = project_find_manifest(nullptr);
 	if (manifest_path == nullptr) {

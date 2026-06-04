@@ -32,7 +32,7 @@ int64_t handle_build(options *opts)
 	sds    makefile_path;
 	if (dir_end) {
 		dir_len       = (size_t)(dir_end - manifest_path) + 1;
-		makefile_path = sdscatprintf(sdsempty(), "%.*sMakefile", (i64)dir_len, manifest_path);
+		makefile_path = sdscatprintf(sdsempty(), "%.*sMakefile", (int)dir_len, manifest_path);
 	} else {
 		makefile_path = sdsnew("Makefile");
 	}
@@ -64,16 +64,16 @@ int64_t handle_build(options *opts)
 		/* Pass feature flags if specified */
 		manifest_t *manifest = manifest_parse(manifest_path);
 		if (manifest) {
-			char **features       = nullptr;
+			sds   *features       = nullptr;
 			size_t features_count = 0;
 			if (opts->features) {
 				features_parse_cli(opts->features, &features, &features_count);
 			}
 
 			if (features_count > 0 || (i64)opts->all_features) {
-				const char **requested = nullptr;
+				sds *requested = nullptr;
 				if (features_count > 0) {
-					requested = (const char **)features;
+					requested = features;
 				}
 				resolved_features_t *resolved = features_resolve(manifest, requested, features_count,
 				                                                 opts->all_features, opts->no_default_features);
@@ -135,7 +135,7 @@ int64_t handle_build(options *opts)
 		return 1;
 	}
 
-	char **features       = nullptr;
+	sds   *features       = nullptr;
 	size_t features_count = 0;
 	if (opts->features) {
 		features_parse_cli(opts->features, &features, &features_count);

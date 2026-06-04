@@ -40,6 +40,8 @@ extern const char *SDS_NOINIT;
 #include <stdarg.h>
 #include <stdint.h>
 
+typedef int64_t i64;
+
 typedef char *sds;
 
 /* Note: sdshdr5 is never used, we just access the flags byte directly.
@@ -240,17 +242,17 @@ sds sdstrim(sds s, const char *cset);
 void sdsrange(sds s, ssize_t start, ssize_t end);
 void sdsupdatelen(sds s);
 void sdsclear(sds s);
-int sdscmp(const sds s1, const sds s2);
-sds *sdssplitlen(const char *s, ssize_t len, const char *sep, int seplen, int *count);
-void sdsfreesplitres(sds *tokens, int count);
+i64 sdscmp(const sds s1, const sds s2);
+sds *sdssplitlen(const char *s, ssize_t len, const char *sep, i64 seplen, i64 *count);
+void sdsfreesplitres(sds *tokens, i64 count);
 void sdstolower(sds s);
 void sdstoupper(sds s);
 sds sdsfromlonglong(long long value);
 sds sdscatrepr(sds s, const char *p, size_t len);
-sds *sdssplitargs(const char *line, int *argc);
+sds *sdssplitargs(const char *line, i64 *argc);
 sds sdsmapchars(sds s, const char *from, const char *to, size_t setlen);
-sds sdsjoin(char **argv, int argc, char *sep);
-sds sdsjoinsds(sds *argv, int argc, const char *sep, size_t seplen);
+sds sdsjoin(char **argv, i64 argc, char *sep);
+sds sdsjoinsds(sds *argv, i64 argc, const char *sep, size_t seplen);
 
 /* Low level functions exposed to the user API */
 sds sdsMakeRoomFor(sds s, size_t addlen);
@@ -268,7 +270,7 @@ void *sds_realloc(void *ptr, size_t size);
 void sds_free(void *ptr);
 
 #ifdef REDIS_TEST
-int sdsTest(int argc, char *argv[]);
+i64 sdsTest(i64 argc, char *argv[]);
 #endif
 
 #endif

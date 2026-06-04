@@ -939,10 +939,10 @@ int sdscmp(const sds s1, const sds s2)
  * requires length arguments. sdssplit() is just the
  * same function but for zero-terminated strings.
  */
-sds *sdssplitlen(const char *s, ssize_t len, const char *sep, int seplen, int *count)
+sds *sdssplitlen(const char *s, ssize_t len, const char *sep, i64 seplen, i64 *count)
 {
-	int  elements = 0, slots = 5;
-	long start = 0, j;
+	i64  elements = 0, slots = 5;
+	i64  start = 0, j;
 	sds *tokens;
 
 	if (seplen < 1 || len <= 0) {
@@ -988,7 +988,7 @@ sds *sdssplitlen(const char *s, ssize_t len, const char *sep, int seplen, int *c
 	return tokens;
 
 cleanup: {
-	int i;
+	i64 i;
 	for (i = 0; i < elements; i++) {
 		sdsfree(tokens[i]);
 	}
@@ -999,7 +999,7 @@ cleanup: {
 }
 
 /* Free the result returned by sdssplitlen(), or do nothing if 'tokens' is NULL. */
-void sdsfreesplitres(sds *tokens, int count)
+void sdsfreesplitres(sds *tokens, i64 count)
 {
 	if (!tokens) {
 		return;
@@ -1127,7 +1127,7 @@ int hex_digit_to_int(char c)
  * quotes or closed quotes followed by non space characters
  * as in: "foo"bar or "foo'
  */
-sds *sdssplitargs(const char *line, int *argc)
+sds *sdssplitargs(const char *line, i64 *argc)
 {
 	const char *p       = line;
 	char       *current = NULL;
@@ -1141,9 +1141,9 @@ sds *sdssplitargs(const char *line, int *argc)
 		}
 		if (*p) {
 			/* get a token */
-			int inq  = 0; /* set to 1 if we are in "quotes" */
-			int insq = 0; /* set to 1 if we are in 'single quotes' */
-			int done = 0;
+			i64 inq  = 0; /* set to 1 if we are in "quotes" */
+			i64 insq = 0; /* set to 1 if we are in 'single quotes' */
+			i64 done = 0;
 
 			if (current == NULL) {
 				current = sdsempty();
@@ -1287,10 +1287,10 @@ sds sdsmapchars(sds s, const char *from, const char *to, size_t setlen)
 
 /* Join an array of C strings using the specified separator (also a C string).
  * Returns the result as an sds string. */
-sds sdsjoin(char **argv, int argc, char *sep)
+sds sdsjoin(char **argv, i64 argc, char *sep)
 {
 	sds join = sdsempty();
-	int j;
+	i64 j;
 
 	for (j = 0; j < argc; j++) {
 		join = sdscat(join, argv[j]);
@@ -1302,10 +1302,10 @@ sds sdsjoin(char **argv, int argc, char *sep)
 }
 
 /* Like sdsjoin, but joins an array of SDS strings. */
-sds sdsjoinsds(sds *argv, int argc, const char *sep, size_t seplen)
+sds sdsjoinsds(sds *argv, i64 argc, const char *sep, size_t seplen)
 {
 	sds join = sdsempty();
-	int j;
+	i64 j;
 
 	for (j = 0; j < argc; j++) {
 		join = sdscatsds(join, argv[j]);

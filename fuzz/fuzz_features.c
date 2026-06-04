@@ -18,16 +18,16 @@ int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size)
 	}
 
 	char template[] = "/tmp/fuzz_features_XXXXXX";
-	int  fd         = mkstemp(template);
+	i64  fd         = (i64)mkstemp(template);
 	if (fd < 0) {
 		return 0;
 	}
-	if (write(fd, Data, Size) < 0) {
-		close(fd);
+	if (write((int)fd, Data, Size) < 0) {
+		close((int)fd);
 		unlink(template);
 		return 0;
 	}
-	close(fd);
+	close((int)fd);
 
 	sds         path = sdsnew(template);
 	manifest_t *m    = manifest_parse(path);

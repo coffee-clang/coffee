@@ -220,7 +220,7 @@ i64 build_project(manifest_t *manifest, build_opts_t *opts)
 		return 1;
 	}
 
-	const char *name = manifest->package.name;
+	sds name = manifest->package.name;
 
 	/* Parse lockfile if it exists */
 	sds         lockfile_path = sdsnew("Coffee.lock");

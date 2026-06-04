@@ -1,5 +1,6 @@
 #include "../coffee.h"
 #include "../manifest.h"
+#include "../project.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,26 +10,6 @@
 #include <libgen.h>
 #include <sys/stat.h>
 #include <unistd.h>
-
-static i64 create_dir(const char *path)
-{
-	struct stat st;
-	if (stat(path, &st) == 0) {
-		return 0;
-	}
-	return mkdir(path, 0755);
-}
-
-static i64 create_file(const char *path, const char *content)
-{
-	FILE *fp = fopen(path, "w");
-	if (fp == nullptr) {
-		return -1;
-	}
-	fprintf_safe(fp, "%s", content);
-	fclose(fp);
-	return 0;
-}
 
 static bool has_main_function(const char *path)
 {

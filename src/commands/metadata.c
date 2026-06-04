@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-static void print_transitive_json(const char *name, const char *version, i64 depth, i64 max_depth)
+static void print_transitive_json(sds name, const char *version, i64 depth, i64 max_depth)
 {
 	if (depth > max_depth || name == nullptr) {
 		return;
@@ -76,6 +76,7 @@ static void print_transitive_json(const char *name, const char *version, i64 dep
 
 int64_t handle_metadata(options *opts)
 {
+	(void)opts;
 	char *manifest_path = project_find_manifest(nullptr);
 
 	if (manifest_path == nullptr) {
