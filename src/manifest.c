@@ -188,6 +188,9 @@ manifest_t *manifest_parse(sds path)
 	}
 
 	toml_array_t *sources_arr = toml_array_in(conf, "sources");
+	if (sources_arr == nullptr && pkg != nullptr) {
+		sources_arr = toml_array_in(pkg, "sources");
+	}
 	if (sources_arr) {
 		m->package.sources_count = (size_t)toml_array_nelem(sources_arr);
 		m->package.sources       = calloc(m->package.sources_count, sizeof(sds));
@@ -203,6 +206,9 @@ manifest_t *manifest_parse(sds path)
 	}
 
 	toml_array_t *headers_arr = toml_array_in(conf, "headers");
+	if (headers_arr == nullptr && pkg != nullptr) {
+		headers_arr = toml_array_in(pkg, "headers");
+	}
 	if (headers_arr) {
 		m->package.headers_count = (size_t)toml_array_nelem(headers_arr);
 		m->package.headers       = calloc(m->package.headers_count, sizeof(sds));
@@ -444,15 +450,6 @@ i64 manifest_write(sds path, manifest_t *m)
 		fprintf_safe(fp, "authors = \"%s\"\n", m->package.authors);
 	}
 
-	if (m->package.dependencies_count > 0) {
-		fprintf_safe(fp, "\n[dependencies]\n");
-		for (size_t i = 0; i < m->package.dependencies_count; i++) {
-			if (m->package.dependencies[i]) {
-				fprintf_safe(fp, "%s\n", m->package.dependencies[i]);
-			}
-		}
-	}
-
 	if (m->package.sources_count > 0) {
 		fprintf_safe(fp, "\nsources = [\n");
 		for (size_t i = 0; i < m->package.sources_count; i++) {
@@ -464,13 +461,22 @@ i64 manifest_write(sds path, manifest_t *m)
 	}
 
 	if (m->package.headers_count > 0) {
-		fprintf_safe(fp, "\nheaders = [\n");
+		fprintf_safe(fp, "headers = [\n");
 		for (size_t i = 0; i < m->package.headers_count; i++) {
 			if (m->package.headers[i]) {
 				fprintf_safe(fp, "  \"%s\",\n", m->package.headers[i]);
 			}
 		}
 		fprintf_safe(fp, "]\n");
+	}
+
+	if (m->package.dependencies_count > 0) {
+		fprintf_safe(fp, "\n[dependencies]\n");
+		for (size_t i = 0; i < m->package.dependencies_count; i++) {
+			if (m->package.dependencies[i]) {
+				fprintf_safe(fp, "%s\n", m->package.dependencies[i]);
+			}
+		}
 	}
 
 	if (m->features_count > 0) {
