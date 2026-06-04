@@ -20,6 +20,18 @@ typedef struct {
 	bool   no_default_features;
 } build_opts_t;
 
+/*
+ * Compile a set of source files into a single binary.
+ * src_files: array of .c file paths
+ * n: number of source files
+ * output: path to output binary
+ * cc: compiler to use (e.g. "clang")
+ * flags: compiler flags string (space-separated, e.g. "-O0 -g -DFOO")
+ * verbose: if true, print the compiler command
+ * Returns 0 on success, non-zero on failure.
+ */
+i64 compile_sources(sds *src_files, size_t n, sds output, char *cc, const char *flags, bool verbose);
+
 i64 build_project(manifest_t *manifest, build_opts_t *opts);
 i64 build_run(manifest_t *manifest, build_opts_t *opts, sds *args, i64 argc);
 

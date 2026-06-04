@@ -340,6 +340,29 @@ manifest_t *manifest_parse(sds path)
 		}
 	}
 
+	/* Parse [test] section */
+	toml_table_t *test_tab = toml_table_in(conf, "test");
+	if (test_tab) {
+		toml_array_t *src_arr = toml_array_in(test_tab, "sources");
+		if (src_arr) {
+			m->test.sources_count = (size_t)toml_array_nelem(src_arr);
+			m->test.sources       = calloc(m->test.sources_count, sizeof(sds));
+			if (m->test.sources == nullptr && m->test.sources_count > 0) {
+				manifest_free(m);
+				toml_free(conf);
+				return nullptr;
+			}
+			for (size_t i = 0; i < m->test.sources_count; i++) {
+				toml_datum_t src   = toml_string_at(src_arr, (i64)i);
+				m->test.sources[i] = toml_datum_to_string(src);
+			}
+		}
+		toml_datum_t harness   = toml_string_in(test_tab, "harness");
+		m->test.harness        = toml_datum_to_string(harness);
+		toml_datum_t framework = toml_string_in(test_tab, "framework");
+		m->test.framework      = toml_datum_to_string(framework);
+	}
+
 	toml_free(conf);
 	return m;
 }
@@ -416,6 +439,13 @@ void manifest_free(manifest_t *m)
 		free_binary(&m->bin[i]);
 	}
 	free(m->bin);
+
+	for (size_t i = 0; i < m->test.sources_count; i++) {
+		sdsfree(m->test.sources[i]);
+	}
+	free(m->test.sources);
+	sdsfree(m->test.harness);
+	sdsfree(m->test.framework);
 
 	free(m);
 }
@@ -514,6 +544,25 @@ i64 manifest_write(sds path, manifest_t *m)
 				}
 				fprintf_safe(fp, "\n");
 			}
+		}
+	}
+
+	if (m->test.sources_count > 0 || m->test.harness || m->test.framework) {
+		fprintf_safe(fp, "\n[test]\n");
+		if (m->test.sources_count > 0) {
+			fprintf_safe(fp, "sources = [\n");
+			for (size_t i = 0; i < m->test.sources_count; i++) {
+				if (m->test.sources[i]) {
+					fprintf_safe(fp, "  \"%s\",\n", m->test.sources[i]);
+				}
+			}
+			fprintf_safe(fp, "]\n");
+		}
+		if (m->test.harness) {
+			fprintf_safe(fp, "harness = \"%s\"\n", m->test.harness);
+		}
+		if (m->test.framework) {
+			fprintf_safe(fp, "framework = \"%s\"\n", m->test.framework);
 		}
 	}
 

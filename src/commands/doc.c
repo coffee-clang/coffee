@@ -17,6 +17,17 @@ typedef struct {
 	sds exclude_patterns;
 } doc_settings_t;
 
+static i64 doc_check(void)
+{
+	i64 ret = system("command -v doxygen >/dev/null 2>&1");
+	if (ret != 0) {
+		printf("doxygen not found. Install it to generate documentation.\n");
+		return 1;
+	}
+	printf("doxygen found.\n");
+	return 0;
+}
+
 static void doc_settings_read(doc_settings_t *cfg, toml_table_t *doc_tab, const char *def_name, const char *def_out,
                               const char *def_input)
 {
@@ -156,35 +167,12 @@ static i64 doc_generate_doxyfile(manifest_t *m, const sds project_dir)
 	return 0;
 }
 
-int64_t handle_doc(options *opts)
+/*
+ * Generate documentation: create Doxyfile if needed, then run doxygen.
+ * Returns 0 on success, non-zero on failure.
+ */
+static i64 doc_generate(const sds project_dir, manifest_t *m)
 {
-	(void)opts;
-	/* Find and parse manifest */
-	char *manifest_path = project_find_manifest(nullptr);
-	if (manifest_path == nullptr) {
-		fprintf_safe(stderr, "Error: Could not find Coffee.toml\n");
-		return 1;
-	}
-
-	/* Extract project directory */
-	sds   project_dir = sdsnew(manifest_path);
-	char *last_slash  = strrchr(project_dir, '/');
-	if (last_slash) {
-		*last_slash = '\0';
-	} else {
-		sdsfree(project_dir);
-		project_dir = sdsnew(".");
-	}
-
-	manifest_t *m = manifest_parse(manifest_path);
-	sdsfree(manifest_path);
-
-	if (m == nullptr) {
-		fprintf_safe(stderr, "Error: Could not parse Coffee.toml\n");
-		sdsfree(project_dir);
-		return 1;
-	}
-
 	printf("Generating documentation...\n");
 
 	/* Check for existing Doxyfile */
@@ -211,16 +199,12 @@ int64_t handle_doc(options *opts)
 			/* Generate Doxyfile from manifest */
 			if (doc_generate_doxyfile(m, project_dir) != 0) {
 				sdsfree(doxyfile_path);
-				manifest_free(m);
-				sdsfree(project_dir);
 				return 1;
 			}
 		} else {
 			printf("No Doxyfile or [doc] section found.\n");
 			printf("Tip: Run 'doxygen -g' to generate a default Doxyfile, or add a [doc] section to Coffee.toml\n");
 			sdsfree(doxyfile_path);
-			manifest_free(m);
-			sdsfree(project_dir);
 			return 0;
 		}
 	}
@@ -231,13 +215,55 @@ int64_t handle_doc(options *opts)
 	i64 ret = system("doxygen 2>/dev/null");
 	if (ret != 0) {
 		fprintf_safe(stderr, "Error: Documentation generation failed. Please ensure 'doxygen' is installed.\n");
-		manifest_free(m);
-		sdsfree(project_dir);
 		return 1;
 	}
 
 	printf("Documentation complete.\n");
+	return 0;
+}
+
+int64_t handle_doc(options *opts)
+{
+	/* Subcommand dispatch */
+	const char *sub = (opts->inputs_num > 1) ? opts->inputs[1] : nullptr;
+
+	if (sub && strcmp(sub, "check") == 0) {
+		return doc_check();
+	}
+
+	if (sub && strcmp(sub, "generate") != 0) {
+		fprintf_safe(stderr, "Unknown subcommand: %s\n", sub);
+		fprintf_safe(stderr, "Usage: coffee doc [generate|check]\n");
+		return 1;
+	}
+
+	/* Find and parse manifest */
+	char *manifest_path = project_find_manifest(nullptr);
+	if (manifest_path == nullptr) {
+		fprintf_safe(stderr, "Error: Could not find Coffee.toml\n");
+		return 1;
+	}
+
+	sds   project_dir = sdsnew(manifest_path);
+	char *last_slash  = strrchr(project_dir, '/');
+	if (last_slash) {
+		*last_slash = '\0';
+	} else {
+		sdsfree(project_dir);
+		project_dir = sdsnew(".");
+	}
+
+	manifest_t *m = manifest_parse(manifest_path);
+	sdsfree(manifest_path);
+
+	if (m == nullptr) {
+		fprintf_safe(stderr, "Error: Could not parse Coffee.toml\n");
+		sdsfree(project_dir);
+		return 1;
+	}
+
+	i64 ret = doc_generate(project_dir, m);
 	manifest_free(m);
 	sdsfree(project_dir);
-	return 0;
+	return ret;
 }

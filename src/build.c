@@ -199,6 +199,54 @@ sds dep_parse_name(const char *entry)
 	return name;
 }
 
+i64 compile_sources(sds *src_files, size_t n, sds output, char *cc, const char *flags_in, bool verbose)
+{
+	if (n == 0) {
+		fprintf_safe(stderr, "Error: No source files to compile\n");
+		return 1;
+	}
+
+	/* Count space-separated tokens in flags */
+	i64 max_tokens = 1;
+	for (const char *p = flags_in; *p != '\0'; p++) {
+		if (*p == ' ') {
+			max_tokens++;
+		}
+	}
+
+	/* argv: cc + flags + -o output + src_files + NULL */
+	size_t argc_total = 1 + (size_t)max_tokens + 2 + n + 1;
+	char **argv       = (char **)malloc(sizeof(char *) * argc_total);
+	if (argv == nullptr) {
+		return 1;
+	}
+
+	size_t idx  = 0;
+	argv[idx++] = cc;
+
+	sds   flags_copy = sdsnew(flags_in);
+	char *saveptr;
+	char *token = strtok_r(flags_copy, " ", &saveptr);
+	while (token) {
+		argv[idx++] = token;
+	}
+
+	argv[idx++] = (char *)"-o";
+	argv[idx++] = output;
+
+	for (size_t i = 0; i < n; i++) {
+		argv[idx++] = src_files[i];
+	}
+	argv[idx] = nullptr;
+
+	i64 ret = run_command(argv, verbose);
+
+	sdsfree(flags_copy);
+	free((void *)argv);
+
+	return ret;
+}
+
 i64 build_project(manifest_t *manifest, build_opts_t *opts)
 {
 	if (manifest == nullptr || manifest->package.name == nullptr) {

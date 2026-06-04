@@ -51,12 +51,20 @@ typedef struct {
 } binary_target_t;
 
 typedef struct {
+	sds   *sources;
+	size_t sources_count;
+	sds    harness;
+	sds    framework;
+} test_section_t;
+
+typedef struct {
 	package_t        package;
 	dependencies_t   dependencies;
 	feature_def_t   *features;
 	size_t           features_count;
 	binary_target_t *bin;
 	size_t           bin_count;
+	test_section_t   test;
 } manifest_t;
 
 manifest_t *manifest_parse(sds path);
