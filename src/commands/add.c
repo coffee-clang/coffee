@@ -109,8 +109,8 @@ int64_t handle_add(options *opts)
 
 	printf("Added dependency: %s\n", package_name);
 
-	/* Auto-fetch the dependency */
-	{
+	/* Auto-fetch registry deps only; git/path deps handled by `coffee fetch` */
+	if (!opts->git && !opts->path) {
 		sds ver = nullptr;
 		if (opts->pkg_version != nullptr && strcmp(opts->pkg_version, "*") != 0) {
 			ver = sdsnew(opts->pkg_version);

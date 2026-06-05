@@ -12,6 +12,62 @@
 #include <toml.h>
 #include <unistd.h>
 
+/*
+ * Resolve git commit SHA for a dependency directory.
+ * Runs "git rev-parse HEAD" in dep_dir.
+ * Returns a new sds with the SHA, or nullptr on error.
+ */
+static sds resolve_git_commit(const char *dep_dir)
+{
+	if (dep_dir == nullptr || dep_dir[0] == '\0') {
+		return nullptr;
+	}
+	/* Check if it's a git repo */
+	sds git_dir = sdscatprintf(sdsempty(), "%s/.git", dep_dir);
+	if (access(git_dir, F_OK) != 0) {
+		sdsfree(git_dir);
+		return nullptr;
+	}
+	sdsfree(git_dir);
+
+	/* Run git rev-parse HEAD */
+	sds   cmd  = sdscatprintf(sdsempty(), "cd '%s' && git rev-parse HEAD 2>/dev/null", dep_dir);
+	FILE *pipe = popen(cmd, "r");
+	sdsfree(cmd);
+	if (pipe == nullptr) {
+		return nullptr;
+	}
+	char buf[128] = { 0 };
+	if (fgets(buf, sizeof(buf), pipe) == nullptr) {
+		pclose(pipe);
+		return nullptr;
+	}
+	pclose(pipe);
+	/* Strip trailing newline */
+	size_t len = strlen(buf);
+	if (len > 0 && buf[len - 1] == '\n') {
+		buf[len - 1] = '\0';
+	}
+	if (buf[0] == '\0') {
+		return nullptr;
+	}
+	return sdsnew(buf);
+}
+
+/* Find a dependency_t by name in the manifest's structured deps */
+static dependency_t *find_dep_by_name(manifest_t *m, const char *name)
+{
+	if (m == nullptr || name == nullptr) {
+		return nullptr;
+	}
+	for (size_t i = 0; i < m->dependencies.deps_count; i++) {
+		if (m->dependencies.deps[i].name != nullptr && strcmp(m->dependencies.deps[i].name, name) == 0) {
+			return &m->dependencies.deps[i];
+		}
+	}
+	return nullptr;
+}
+
 int64_t handle_generate_lockfile(options *opts)
 {
 	(void)opts;
@@ -62,11 +118,24 @@ int64_t handle_generate_lockfile(options *opts)
 
 			lf.deps[i].name = sdsnew(dep_name);
 
+			/* Check if this is a git dependency — store the git URL in path for reference */
+			dependency_t *structured = find_dep_by_name(manifest, dep_name);
+			bool          is_git_dep = (structured != nullptr && structured->git != nullptr);
+
 			/* Resolve the dep directory */
 			sds dep_dir = dep_resolve_dir(dep_name);
 			if (dep_dir != nullptr) {
 				lf.deps[i].path    = sdsnew(dep_dir);
 				lf.deps[i].version = resolve_dep_version(dep_dir);
+
+				/* For git deps, record the pinned commit SHA */
+				if (is_git_dep) {
+					sds commit = resolve_git_commit(dep_dir);
+					if (commit != nullptr) {
+						lf.deps[i].commit = commit;
+					}
+				}
+
 				sdsfree(dep_dir);
 			} else {
 				/* Dep not found locally; record the manifest version as-is */
@@ -88,6 +157,7 @@ int64_t handle_generate_lockfile(options *opts)
 		sdsfree(lf.deps[i].name);
 		sdsfree(lf.deps[i].version);
 		sdsfree(lf.deps[i].path);
+		sdsfree(lf.deps[i].commit);
 	}
 	free(lf.deps);
 

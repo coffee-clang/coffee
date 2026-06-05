@@ -83,6 +83,11 @@ lockfile_t *lockfile_parse(sds path)
 					lf->deps[i].path = sdsnew(dep_path.u.s);
 					free(dep_path.u.s);
 				}
+				toml_datum_t dep_commit = toml_string_in(dep_tbl, "commit");
+				if (dep_commit.ok) {
+					lf->deps[i].commit = sdsnew(dep_commit.u.s);
+					free(dep_commit.u.s);
+				}
 			}
 		}
 	}
@@ -102,6 +107,7 @@ void lockfile_free(lockfile_t *lf)
 		sdsfree(lf->deps[i].name);
 		sdsfree(lf->deps[i].version);
 		sdsfree(lf->deps[i].path);
+		sdsfree(lf->deps[i].commit);
 	}
 	free(lf->deps);
 	free(lf);
@@ -140,6 +146,9 @@ i64 lockfile_write(sds path, lockfile_t *lf)
 		}
 		if (lf->deps[i].path) {
 			fprintf_safe(fp, "path = \"%s\"\n", lf->deps[i].path);
+		}
+		if (lf->deps[i].commit) {
+			fprintf_safe(fp, "commit = \"%s\"\n", lf->deps[i].commit);
 		}
 	}
 

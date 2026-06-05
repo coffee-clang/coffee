@@ -340,6 +340,76 @@ manifest_t *manifest_parse(sds path)
 		}
 	}
 
+	/* Parse [dependencies] inline tables into structured dependency_t */
+	/* Parse [dependencies] inline tables into structured dependency_t */
+	{
+		toml_table_t *dt = toml_table_in(conf, "dependencies");
+		if (dt) {
+			size_t count = 0;
+			for (i64 ii = 0;; ii++) {
+				const char *key = toml_key_in(dt, ii);
+				if (key == nullptr) {
+					break;
+				}
+				/* Check if this key is an inline table (not a plain string) */
+				toml_table_t *inline_tbl = toml_table_in(dt, key);
+				if (inline_tbl) {
+					count++;
+				}
+			}
+			if (count > 0) {
+				m->dependencies.deps_count = count;
+				m->dependencies.deps       = calloc(count, sizeof(dependency_t));
+				if (m->dependencies.deps == nullptr) {
+					manifest_free(m);
+					toml_free(conf);
+					return nullptr;
+				}
+				size_t idx = 0;
+				for (i64 ii = 0; idx < count; ii++) {
+					const char *key = toml_key_in(dt, ii);
+					if (key == nullptr) {
+						break;
+					}
+					toml_table_t *inline_tbl = toml_table_in(dt, key);
+					if (inline_tbl == nullptr) {
+						continue;
+					}
+					m->dependencies.deps[idx].name = sdsnew(key);
+					toml_datum_t v                 = toml_string_in(inline_tbl, "version");
+					if (v.ok) {
+						m->dependencies.deps[idx].version = toml_datum_to_string(v);
+					}
+					toml_datum_t p = toml_string_in(inline_tbl, "path");
+					if (p.ok) {
+						m->dependencies.deps[idx].path = toml_datum_to_string(p);
+					}
+					toml_datum_t g = toml_string_in(inline_tbl, "git");
+					if (g.ok) {
+						m->dependencies.deps[idx].git = toml_datum_to_string(g);
+					}
+					toml_datum_t b = toml_string_in(inline_tbl, "branch");
+					if (b.ok) {
+						m->dependencies.deps[idx].branch = toml_datum_to_string(b);
+					}
+					toml_datum_t t = toml_string_in(inline_tbl, "tag");
+					if (t.ok) {
+						m->dependencies.deps[idx].tag = toml_datum_to_string(t);
+					}
+					toml_datum_t r = toml_string_in(inline_tbl, "rev");
+					if (r.ok) {
+						m->dependencies.deps[idx].rev = toml_datum_to_string(r);
+					}
+					toml_datum_t opt = toml_bool_in(inline_tbl, "optional");
+					if (opt.ok) {
+						m->dependencies.deps[idx].optional = opt.u.b;
+					}
+					idx++;
+				}
+			}
+		}
+	}
+
 	/* Parse [test] section */
 	toml_table_t *test_tab = toml_table_in(conf, "test");
 	if (test_tab) {

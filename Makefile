@@ -29,19 +29,13 @@ UNITY_ALL_SRCS := $(UNITY_CORE_SRCS) $(sort $(COMMANDS_SRCS))
 
 # Suppress noisy clang -Weverything warnings that are not bugs in C23
 WNO := \
-	-Wno-declaration-after-statement \
-	-Wno-pre-c11-compat \
 	-Wno-pre-c23-compat \
-	-Wno-implicit-void-ptr-cast \
-	-Wno-unsafe-buffer-usage \
+	-Wno-pre-c11-compat \
+	-Wno-declaration-after-statement \
 	-Wno-disabled-macro-expansion \
+	-Wno-implicit-void-ptr-cast \
 	-Wno-padded \
-	-Wno-format-nonliteral \
-	-Wno-covered-switch-default \
-	-Wno-documentation \
-	-Wno-documentation-unknown-command \
-	-Wno-reserved-id-macro \
-	-Wno-gnu-include-next
+	-Wno-unsafe-buffer-usage
 
 CFLAGS_COMMON := -g -Weverything -O3 -std=$(CSTD) $(WNO)
 CFLAGS_COMMON += -D_GNU_SOURCE -include $(SRC_DIR)/compat_limits.h -iquote$(SRC_DIR) -isysteminclude -iquoteinclude/sds
