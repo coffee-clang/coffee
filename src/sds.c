@@ -73,7 +73,7 @@ static inline char sdsReqType(size_t string_size)
 		return SDS_TYPE_16;
 	}
 #if (LONG_MAX == LLONG_MAX)
-	if (string_size < 1ll << 32) {
+	if (string_size < 1LL << 32) {
 		return SDS_TYPE_32;
 	}
 	return SDS_TYPE_64;
@@ -1333,7 +1333,7 @@ void sds_free(void *ptr)
 	s_free(ptr);
 }
 
-#if defined(SDS_TEST_MAIN)
+#ifdef SDS_TEST_MAIN
 # include "limits.h"
 # include "testhelp.h"
 
