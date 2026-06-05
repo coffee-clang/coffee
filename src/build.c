@@ -262,7 +262,7 @@ i64 build_project(manifest_t *manifest, build_opts_t *opts)
 		verbose = opts->verbose;
 	}
 
-	char *mkdir_argv[] = { (char *)"mkdir", (char *)"-p", (char *)output_dir, nullptr };
+	char *mkdir_argv[] = { "mkdir", "-p", output_dir, nullptr };
 	i64   ret          = run_command(mkdir_argv, verbose);
 	if (ret != 0) {
 		return 1;
@@ -413,7 +413,7 @@ i64 build_project(manifest_t *manifest, build_opts_t *opts)
 	}
 
 	i64 idx              = 0;
-	compiler_argv[idx++] = (char *)cc;
+	compiler_argv[idx++] = cc;
 
 	sds   flags_copy = sdsdup(flags);
 	char *saveptr;

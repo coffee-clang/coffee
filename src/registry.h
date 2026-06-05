@@ -44,7 +44,7 @@ sds coffee_home_dir(void);
 
 recipe_list_t *registry_search(sds query);
 recipe_t      *registry_get(sds name);
-i64            registry_fetch(sds name, sds version, sds dest_dir);
+i64            registry_fetch(sds name, const char *version, sds dest_dir);
 void           registry_free_recipes(recipe_list_t *list);
 void           registry_free_recipe(recipe_t *r);
 

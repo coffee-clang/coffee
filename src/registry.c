@@ -356,7 +356,7 @@ recipe_t *registry_get(sds name)
 	return r;
 }
 
-i64 registry_fetch(sds name, sds version, sds dest_dir)
+i64 registry_fetch(sds name, const char *version, sds dest_dir)
 {
 	(void)version;
 	if (name == nullptr || !dest_dir) {

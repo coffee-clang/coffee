@@ -157,7 +157,7 @@ int64_t handle_test(options *opts)
 		all_srcs[src_idx] = sdsdup(test_srcs[i]);
 	}
 
-	ret = compile_sources(all_srcs, total_src, output, cc, flags, opts->verbose || opts->verbose2);
+	ret = compile_sources(all_srcs, total_src, output, cc, flags, (bool)(opts->verbose || opts->verbose2));
 
 	for (size_t i = 0; i < total_src; i++) {
 		sdsfree(all_srcs[i]);

@@ -402,7 +402,7 @@ manifest_t *manifest_parse(sds path)
 					}
 					toml_datum_t opt = toml_bool_in(inline_tbl, "optional");
 					if (opt.ok) {
-						m->dependencies.deps[idx].optional = opt.u.b;
+						m->dependencies.deps[idx].optional = opt.u.b != 0;
 					}
 					idx++;
 				}

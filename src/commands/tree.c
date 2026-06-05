@@ -51,7 +51,7 @@ static void print_tree(const char *dep_dir, const char *dep_name, const char *ve
 		return;
 	}
 
-	const char *connector = is_last ? "└── " : "├── ";
+	const char *connector = (int)is_last ? "└── " : "├── ";
 	printf("%s%s%s", prefix, connector, dep_name != nullptr ? dep_name : "?");
 
 	if (version != nullptr && strcmp(version, "*") != 0) {
@@ -85,7 +85,7 @@ static void print_tree(const char *dep_dir, const char *dep_name, const char *ve
 		dep_count++;
 	}
 
-	sds child_prefix = sdscatfmt(sdsnew(prefix), "%s", is_last ? "    " : "│   ");
+	sds child_prefix = sdscatfmt(sdsnew(prefix), "%s", (int)is_last ? "    " : "│   ");
 
 	size_t idx = 0;
 	for (i64 i = 0; idx < dep_count; i++) {

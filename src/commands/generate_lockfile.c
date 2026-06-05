@@ -120,7 +120,7 @@ int64_t handle_generate_lockfile(options *opts)
 
 			/* Check if this is a git dependency — store the git URL in path for reference */
 			dependency_t *structured = find_dep_by_name(manifest, dep_name);
-			bool          is_git_dep = (structured != nullptr && structured->git != nullptr);
+			bool          is_git_dep = (structured != nullptr && structured->git != nullptr) != 0;
 
 			/* Resolve the dep directory */
 			sds dep_dir = dep_resolve_dir(dep_name);
