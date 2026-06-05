@@ -226,7 +226,8 @@ int64_t handle_install(options *opts)
 				continue;
 			}
 			ret = compile_binary(cc, bt->name, bt->src, bt->src_count, dep_flags, bin_dir,
-			    			     (opts != nullptr && opts->verbose) != 0);			if (ret == 0) {
+			                     (opts != nullptr && opts->verbose) != 0);
+			if (ret == 0) {
 				printf("  Binary: %s/%s\n", bin_dir, bt->name);
 			} else {
 				fprintf_safe(stderr, "Error: Failed to compile binary '%s'\n", bt->name);

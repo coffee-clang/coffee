@@ -23,6 +23,7 @@ Checks: '
   -readability-identifier-length,
   -readability-magic-numbers,
   -readability-function-cognitive-complexity,
+  -readability-isolate-declaration,
   
   # 6. EXPLICITLY DISABLE C++ SPECIFIC RULESETS (Prevents C23 compiler friction)
   -modernize-*,

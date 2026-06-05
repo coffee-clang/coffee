@@ -1,5 +1,5 @@
-#include "../coffee.h"
 #include "../build.h"
+#include "../coffee.h"
 #include "../lockfile.h"
 #include "../manifest.h"
 #include "../project.h"
