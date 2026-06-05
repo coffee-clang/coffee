@@ -44,7 +44,7 @@
 
 const char *SDS_NOINIT = "SDS_NOINIT";
 
-static inline i64 sdsHdrSize(char type)
+static inline i64 sds_hdr_size(char type)
 {
 	switch (type & SDS_TYPE_MASK) {
 	case SDS_TYPE_5:
@@ -61,7 +61,7 @@ static inline i64 sdsHdrSize(char type)
 	return 0;
 }
 
-static inline char sdsReqType(size_t string_size)
+static inline char sds_req_type(size_t string_size)
 {
 	if (string_size < 1 << 5) {
 		return SDS_TYPE_5;
@@ -99,13 +99,13 @@ sds sdsnewlen(const void *init, size_t initlen)
 {
 	void *sh;
 	sds   s;
-	char  type = sdsReqType(initlen);
+	char  type = sds_req_type(initlen);
 	/* Empty strings are usually created in order to append. Use type 8
 	 * since type 5 is not good at this. */
 	if (type == SDS_TYPE_5 && initlen == 0) {
 		type = SDS_TYPE_8;
 	}
-	i64            hdrlen = sdsHdrSize(type);
+	i64            hdrlen = sds_hdr_size(type);
 	unsigned char *fp; /* flags pointer. */
 
 	sh = s_malloc(hdrlen + initlen + 1);
@@ -186,7 +186,7 @@ void sdsfree(sds s)
 	if (s == NULL) {
 		return;
 	}
-	s_free((char *)s - sdsHdrSize(s[-1]));
+	s_free((char *)s - sds_hdr_size(s[-1]));
 }
 
 /* Set the sds string length to the length as obtained with strlen(), so
@@ -239,7 +239,7 @@ sds sdsMakeRoomFor(sds s, size_t addlen)
 	}
 
 	len    = sdslen(s);
-	sh     = (char *)s - sdsHdrSize(oldtype);
+	sh     = (char *)s - sds_hdr_size(oldtype);
 	reqlen = newlen = (len + addlen);
 	if (newlen < SDS_MAX_PREALLOC) {
 		newlen *= 2;
@@ -247,7 +247,7 @@ sds sdsMakeRoomFor(sds s, size_t addlen)
 		newlen += SDS_MAX_PREALLOC;
 	}
 
-	type = sdsReqType(newlen);
+	type = sds_req_type(newlen);
 
 	/* Don't use type 5: the user is appending to the string and type 5 is
 	 * not able to remember empty space, so sdsMakeRoomFor() must be called
@@ -256,7 +256,7 @@ sds sdsMakeRoomFor(sds s, size_t addlen)
 		type = SDS_TYPE_8;
 	}
 
-	hdrlen = sdsHdrSize(type);
+	hdrlen = sds_hdr_size(type);
 	assert(hdrlen + newlen + 1 > reqlen); /* Catch size_t overflow */
 	if (oldtype == type) {
 		newsh = s_realloc(sh, hdrlen + newlen + 1);
@@ -291,7 +291,7 @@ sds sdsRemoveFreeSpace(sds s)
 {
 	void  *sh, *newsh;
 	char   type, oldtype     = s[-1] & SDS_TYPE_MASK;
-	i64    hdrlen, oldhdrlen = sdsHdrSize(oldtype);
+	i64    hdrlen, oldhdrlen = sds_hdr_size(oldtype);
 	size_t len   = sdslen(s);
 	size_t avail = sdsavail(s);
 	sh           = (char *)s - oldhdrlen;
@@ -303,8 +303,8 @@ sds sdsRemoveFreeSpace(sds s)
 
 	/* Check what would be the minimum SDS header that is just good enough to
 	 * fit this string. */
-	type   = sdsReqType(len);
-	hdrlen = sdsHdrSize(type);
+	type   = sds_req_type(len);
+	hdrlen = sds_hdr_size(type);
 
 	/* If the type is the same, or at least a large enough type is still
 	 * required, we just realloc(), letting the allocator to do the copy
@@ -341,14 +341,14 @@ sds sdsRemoveFreeSpace(sds s)
 size_t sdsAllocSize(sds s)
 {
 	size_t alloc = sdsalloc(s);
-	return sdsHdrSize(s[-1]) + alloc + 1;
+	return sds_hdr_size(s[-1]) + alloc + 1;
 }
 
 /* Return the pointer of the actual SDS allocation (normally SDS strings
  * are referenced by the start of the string buffer). */
 void *sdsAllocPtr(sds s)
 {
-	return (void *)(s - sdsHdrSize(s[-1]));
+	return (void *)(s - sds_hdr_size(s[-1]));
 }
 
 /* Increment the sds length and decrements the left free space at the
@@ -699,7 +699,7 @@ sds sdscatfmt(sds s, const char *fmt, ...)
 	/* To avoid continuous reallocations, let's start with a buffer that
 	 * can hold at least two times the format string itself. It's not the
 	 * best heuristic but seems to work in practice. */
-	s = sdsMakeRoomFor(s, initlen + strlen(fmt) * 2);
+	s = sdsMakeRoomFor(s, initlen + (strlen(fmt) * 2));
 	va_start(ap, fmt);
 	f = fmt;     /* Next format specifier byte to process. */
 	i = initlen; /* Position of the next byte to write to dest str. */

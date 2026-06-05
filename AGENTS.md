@@ -75,7 +75,7 @@ We follow the example of [curl](https://curl.se) and [Sqlite](https://sqlite.org
 inspired by them.
 
 We deviate from curl on indentation: we use tabs (tab width 4) with
-continuation indent 4 and column limit 120.  Curl uses 2-space indent
+continuation indent 4 and column limit 120. Curl uses 2-space indent
 and 79-column limit.
 
 After each change, follow the instructions in the README.md. When those instructions conflict with AGENTS.md or the
@@ -104,6 +104,8 @@ We follow the [curl conventions](https://curl.se/dev/code-style.html), except:
 - We use tabs for indentation (tab width 4, continuation indent 4), not spaces
 - We use a 120-column limit, not 79
 - We use the most recent C standard (C23)
+
+You cannot change the files `.clang-tidy` and `.clang-format` that are configuration files for `clang-tidy` and `clang-format`.
 
 ## Compilation
 
