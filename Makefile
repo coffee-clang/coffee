@@ -173,7 +173,7 @@ test: $(TARGET) $(TEST_RUNNER)
 	fi
 
 tidy:
-	find src tests -name "*.c" -exec clang-tidy --quiet '{}' \;
+	find src tests -name "*.c" -exec clang-tidy --quiet '{}' -- -Isrc -Iinclude -I. -Ideps -std=c23 -D_GNU_SOURCE \;
 
 INSTALL_DIR ?= $(HOME)/.coffee/bin
 install: $(TARGET)
