@@ -172,6 +172,9 @@ test: $(TARGET) $(TEST_RUNNER)
 		$(TEST_RUNNER); \
 	fi
 
+tidy:
+	find src tests -name "*.c" -exec clang-tidy --quiet '{}' \;
+
 INSTALL_DIR ?= $(HOME)/.coffee/bin
 install: $(TARGET)
 	@mkdir -p $(INSTALL_DIR)
