@@ -41,60 +41,13 @@
 static void *(*ppmalloc)(size_t) = malloc;
 static void (*ppfree)(void *)    = free;
 
-void toml_set_memutil(void *(*xxmalloc)(size_t), void (*xxfree)(void *))
+static void *ppcalloc(size_t nmemb, size_t sz)
 {
-	if (xxmalloc) {
-		ppmalloc = xxmalloc;
-	}
-	if (xxfree) {
-		ppfree = xxfree;
-	}
-}
-
-#define ALIGN8(sz) (((sz) + 7) & ~7)
-#define MALLOC(a)  ppmalloc(a)
-#define FREE(a)    ppfree(a)
-
-#define malloc(x)    error - forbidden - use MALLOC instead
-#define free(x)      error - forbidden - use FREE instead
-#define calloc(x, y) error - forbidden - use CALLOC instead
-
-static void *CALLOC(size_t nmemb, size_t sz)
-{
-	i64   nb = ALIGN8(sz) * nmemb;
-	void *p  = MALLOC(nb);
+	/* nb is the memory to allocate. It must be a multiple of 8 bytes */
+	i64   nb = ((sz + 7) & ~7) * nmemb;
+	void *p  = ppmalloc(nb);
 	if (p) {
 		memset(p, 0, nb);
-	}
-	return p;
-}
-
-// some old platforms define strdup macro -- drop it.
-#undef strdup
-#define strdup(x) error - forbidden - use STRDUP instead
-
-static char *STRDUP(const char *s)
-{
-	i64   len = strlen(s);
-	char *p   = MALLOC(len + 1);
-	if (p) {
-		memcpy(p, s, len);
-		p[len] = 0;
-	}
-	return p;
-}
-
-// some old platforms define strndup macro -- drop it.
-#undef strndup
-#define strndup(x) error - forbiden - use STRNDUP instead
-
-static char *STRNDUP(const char *s, size_t n)
-{
-	size_t len = strnlen(s, n);
-	char  *p   = MALLOC(len + 1);
-	if (p) {
-		memcpy(p, s, len);
-		p[len] = 0;
 	}
 	return p;
 }
@@ -350,7 +303,7 @@ struct toml_table_t {
 static inline void xfree(const void *x)
 {
 	if (x) {
-		FREE((void *)(intptr_t)x);
+		ppfree((void *)(intptr_t)x);
 	}
 }
 
@@ -442,21 +395,21 @@ static i64 e_forbid(context_t *ctx, i64 lineno, const char *msg)
 
 static void *expand(void *p, i64 sz, i64 newsz)
 {
-	void *s = MALLOC(newsz);
+	void *s = ppmalloc(newsz);
 	if (!s) {
 		return 0;
 	}
 
 	if (p) {
 		memcpy(s, p, sz);
-		FREE(p);
+		ppfree(p);
 	}
 	return s;
 }
 
 static void **expand_ptrarr(void **p, i64 n)
 {
-	void **s = MALLOC((n + 1) * sizeof(void *));
+	void **s = ppmalloc((n + 1) * sizeof(void *));
 	if (!s) {
 		return 0;
 	}
@@ -464,7 +417,7 @@ static void **expand_ptrarr(void **p, i64 n)
 	s[n] = 0;
 	if (p) {
 		memcpy(s, p, n * sizeof(void *));
-		FREE(p);
+		ppfree(p);
 	}
 	return s;
 }
@@ -605,14 +558,21 @@ static char *norm_basic_str(const char *src, i64 srclen, i64 multiline, char *er
 					xfree(dst);
 					return 0;
 				}
-				ch    = *sp++;
-				i64 v = ('0' <= ch && ch <= '9') ? ch - '0' : (('A' <= ch && ch <= 'F') ? ch - 'A' + 10 : -1);
+				ch = *sp++;
+				i64 v;
+				if ('0' <= ch && ch <= '9') {
+					v = ch - '0';
+				} else if ('A' <= ch && ch <= 'F') {
+					v = ch - 'A' + 10;
+				} else {
+					v = -1;
+				}
 				if (-1 == v) {
 					snprintf(errbuf, errbufsz, "invalid hex chars for \\u or \\U");
 					xfree(dst);
 					return 0;
 				}
-				ucs = ucs * 16 + v;
+				ucs = (ucs * 16) + v;
 			}
 			i64 n = toml_ucs_to_utf8(ucs, &dst[off]);
 			if (-1 == n) {
@@ -682,7 +642,7 @@ static char *normalize_key(context_t *ctx, token_t strtok)
 
 		if (ch == '\'') {
 			/* for single quote, take it verbatim. */
-			if (!(ret = STRNDUP(sp, sq - sp))) {
+			if (!(ret = strndup(sp, sq - sp))) {
 				e_outofmemory(ctx, FLINE);
 				return 0;
 			}
@@ -719,7 +679,7 @@ static char *normalize_key(context_t *ctx, token_t strtok)
 	}
 
 	/* dup and return it */
-	if (!(ret = STRNDUP(sp, sq - sp))) {
+	if (!(ret = strndup(sp, sq - sp))) {
 		e_outofmemory(ctx, FLINE);
 		return 0;
 	}
@@ -781,7 +741,7 @@ static i64 key_kind(toml_table_t *tab, const char *key)
 static toml_keyval_t *create_keyval_in_table(context_t *ctx, toml_table_t *tab, token_t keytok)
 {
 	/* first, normalize the key to be used for lookup.
-	 * remember to free it if we error out.
+	 * remember to ppfree it if we error out.
 	 */
 	char *newkey = normalize_key(ctx, keytok);
 	if (!newkey) {
@@ -806,7 +766,7 @@ static toml_keyval_t *create_keyval_in_table(context_t *ctx, toml_table_t *tab, 
 	}
 	tab->kval = base;
 
-	if (0 == (base[n] = (toml_keyval_t *)CALLOC(1, sizeof(*base[n])))) {
+	if (0 == (base[n] = (toml_keyval_t *)ppcalloc(1, sizeof(*base[n])))) {
 		xfree(newkey);
 		e_outofmemory(ctx, FLINE);
 		return 0;
@@ -855,7 +815,7 @@ static toml_table_t *create_keytable_in_table(context_t *ctx, toml_table_t *tab,
 	}
 	tab->tab = base;
 
-	if (0 == (base[n] = (toml_table_t *)CALLOC(1, sizeof(*base[n])))) {
+	if (0 == (base[n] = (toml_table_t *)ppcalloc(1, sizeof(*base[n])))) {
 		xfree(newkey);
 		e_outofmemory(ctx, FLINE);
 		return 0;
@@ -896,7 +856,7 @@ static toml_array_t *create_keyarray_in_table(context_t *ctx, toml_table_t *tab,
 	}
 	tab->arr = base;
 
-	if (0 == (base[n] = (toml_array_t *)CALLOC(1, sizeof(*base[n])))) {
+	if (0 == (base[n] = (toml_array_t *)ppcalloc(1, sizeof(*base[n])))) {
 		xfree(newkey);
 		e_outofmemory(ctx, FLINE);
 		return 0;
@@ -932,7 +892,7 @@ static toml_array_t *create_array_in_array(context_t *ctx, toml_array_t *parent)
 		e_outofmemory(ctx, FLINE);
 		return 0;
 	}
-	toml_array_t *ret = (toml_array_t *)CALLOC(1, sizeof(toml_array_t));
+	toml_array_t *ret = (toml_array_t *)ppcalloc(1, sizeof(toml_array_t));
 	if (!ret) {
 		e_outofmemory(ctx, FLINE);
 		return 0;
@@ -953,7 +913,7 @@ static toml_table_t *create_table_in_array(context_t *ctx, toml_array_t *parent)
 		e_outofmemory(ctx, FLINE);
 		return 0;
 	}
-	toml_table_t *ret = (toml_table_t *)CALLOC(1, sizeof(toml_table_t));
+	toml_table_t *ret = (toml_table_t *)ppcalloc(1, sizeof(toml_table_t));
 	if (!ret) {
 		e_outofmemory(ctx, FLINE);
 		return 0;
@@ -1037,7 +997,7 @@ static i64 parse_inline_table(context_t *ctx, toml_table_t *tab)
 		return -1;
 	}
 
-	tab->readonly = 1;
+	tab->readonly = true;
 
 	return 0;
 }
@@ -1104,7 +1064,7 @@ static i64 parse_array(context_t *ctx, toml_array_t *arr)
 				return e_outofmemory(ctx, FLINE);
 			}
 
-			if (!(newval->val = STRNDUP(val, vlen))) {
+			if (!(newval->val = strndup(val, vlen))) {
 				return e_outofmemory(ctx, FLINE);
 			}
 
@@ -1247,7 +1207,7 @@ static i64 parse_keyval(context_t *ctx, toml_table_t *tab)
 		token_t val = ctx->tok;
 
 		assert(keyval->val == 0);
-		if (!(keyval->val = STRNDUP(val.ptr, val.len))) {
+		if (!(keyval->val = strndup(val.ptr, val.len))) {
 			return e_outofmemory(ctx, FLINE);
 		}
 
@@ -1394,11 +1354,11 @@ static i64 walk_tabpath(context_t *ctx)
 
 			curtab->tab = base;
 
-			if (0 == (base[n] = (toml_table_t *)CALLOC(1, sizeof(*base[n])))) {
+			if (0 == (base[n] = (toml_table_t *)ppcalloc(1, sizeof(*base[n])))) {
 				return e_outofmemory(ctx, FLINE);
 			}
 
-			if (0 == (base[n]->key = STRDUP(key))) {
+			if (0 == (base[n]->key = strdup(key))) {
 				return e_outofmemory(ctx, FLINE);
 			}
 
@@ -1491,7 +1451,7 @@ static i64 parse_select(context_t *ctx)
 				return -1;
 			}
 
-			if (0 == (t->key = STRDUP("__anon__"))) {
+			if (0 == (t->key = strdup("__anon__"))) {
 				return e_outofmemory(ctx, FLINE);
 			}
 
@@ -1550,7 +1510,7 @@ toml_table_t *toml_parse(char *conf, char *errbuf, i64 errbufsz)
 	ctx.tok.len    = 0;
 
 	// make a root table
-	if (0 == (ctx.root = CALLOC(1, sizeof(*ctx.root)))) {
+	if (0 == (ctx.root = ppcalloc(1, sizeof(*ctx.root)))) {
 		e_outofmemory(&ctx, FLINE);
 		// Do not goto fail, root table not set up yet
 		return 0;
@@ -1749,7 +1709,7 @@ static i64 scan_digits(const char *p, i64 n)
 {
 	i64 ret = 0;
 	for (; n > 0 && isdigit(*p); n--, p++) {
-		ret = 10 * ret + (*p - '0');
+		ret = (10 * ret) + (*p - '0');
 	}
 	return n ? -1 : ret;
 }
@@ -1876,8 +1836,9 @@ static i64 scan_string(context_t *ctx, char *p, i64 lineno, i64 dotisspecial)
 	}
 
 	if ('\'' == *p) {
-		for (p++; *p && *p != '\n' && *p != '\''; p++)
+		for (p++; *p && *p != '\n' && *p != '\''; p++) {
 			;
+		}
 		if (*p != '\'') {
 			return e_syntax(ctx, lineno, "unterminated s-quote");
 		}
@@ -1942,8 +1903,9 @@ static i64 scan_string(context_t *ctx, char *p, i64 lineno, i64 dotisspecial)
 		// forward thru the timestamp
 		p += strspn(p, "0123456789.:+-Tt Zz");
 		// squeeze out any spaces at end of string
-		for (; p[-1] == ' '; p--)
+		for (; p[-1] == ' '; p--) {
 			;
+		}
 		// tokenize
 		set_token(ctx, STRING, lineno, orig, p - orig);
 		return 0;
@@ -1988,8 +1950,9 @@ static i64 next_token(context_t *ctx, i64 dotisspecial)
 	while (p < ctx->stop) {
 		/* skip comment. stop just before the \n. */
 		if (*p == '#') {
-			for (p++; p < ctx->stop && *p != '\n'; p++)
+			for (p++; p < ctx->stop && *p != '\n'; p++) {
 				;
+			}
 			continue;
 		}
 
@@ -2541,7 +2504,7 @@ toml_datum_t toml_timestamp_at(const toml_array_t *arr, i64 idx)
 	memset(&ret, 0, sizeof(ret));
 	ret.ok = (0 == toml_rtots(toml_raw_at(arr, idx), &ts));
 	if (ret.ok) {
-		ret.ok = !!(ret.u.ts = MALLOC(sizeof(*ret.u.ts)));
+		ret.ok = !!(ret.u.ts = ppmalloc(sizeof(*ret.u.ts)));
 		if (ret.ok) {
 			*ret.u.ts = ts;
 			if (ret.u.ts->year) {
@@ -2615,7 +2578,7 @@ toml_datum_t toml_timestamp_in(const toml_table_t *arr, const char *key)
 	memset(&ret, 0, sizeof(ret));
 	ret.ok = (0 == toml_rtots(toml_raw_in(arr, key), &ts));
 	if (ret.ok) {
-		ret.ok = !!(ret.u.ts = MALLOC(sizeof(*ret.u.ts)));
+		ret.ok = !!(ret.u.ts = ppmalloc(sizeof(*ret.u.ts)));
 		if (ret.ok) {
 			*ret.u.ts = ts;
 			if (ret.u.ts->year) {

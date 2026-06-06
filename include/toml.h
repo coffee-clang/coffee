@@ -26,24 +26,20 @@
 #define TOML_H
 
 #ifdef _MSC_VER
-#pragma warning(disable : 4996)
+# pragma warning(disable:4996)
 #endif
 
 #include <stdint.h>
+
 #include <stdio.h>
 
-typedef int64_t i64;
-
-#ifdef __cplusplus
-#define TOML_EXTERN extern "C"
-#else
 #define TOML_EXTERN extern
-#endif
 
+typedef int64_t                 i64;
 typedef struct toml_timestamp_t toml_timestamp_t;
-typedef struct toml_table_t toml_table_t;
-typedef struct toml_array_t toml_array_t;
-typedef struct toml_datum_t toml_datum_t;
+typedef struct toml_table_t     toml_table_t;
+typedef struct toml_array_t     toml_array_t;
+typedef struct toml_datum_t     toml_datum_t;
 
 /* Parse a file. Return a table on success, or 0 otherwise.
  * Caller must toml_free(the-return-value) after use.
@@ -69,12 +65,12 @@ TOML_EXTERN void toml_free(toml_table_t *tab);
  */
 struct toml_timestamp_t {
   struct { /* internal. do not use. */
-    i64 year, month, day;
-    i64 hour, minute, second, millisec;
+    i64  year, month, day;
+    i64  hour, minute, second, millisec;
     char z[10];
   } __buffer;
-  i64 *year, *month, *day;
-  i64 *hour, *minute, *second, *millisec;
+  i64  *year, *month, *day;
+  i64  *hour, *minute, *second, *millisec;
   char *z;
 };
 
@@ -85,45 +81,40 @@ struct toml_datum_t {
   i64 ok;
   union {
     toml_timestamp_t *ts; /* ts must be freed after use */
-    char *s;              /* string value. s must be freed after use */
-    i64 b;                /* bool value */
-    int64_t i;            /* int value */
-    double d;             /* double value */
+    char             *s;  /* string value. s must be freed after use */
+    i64               b;  /* bool value */
+    int64_t           i;  /* int value */
+    double            d;  /* double value */
   } u;
 };
 
 /* on arrays: */
 /* ... retrieve size of array. */
-TOML_EXTERN i64 toml_array_nelem(const toml_array_t *arr);
+TOML_EXTERN i64           toml_array_nelem(const toml_array_t *arr);
 /* ... retrieve values using index. */
-TOML_EXTERN toml_datum_t toml_string_at(const toml_array_t *arr, i64 idx);
-TOML_EXTERN toml_datum_t toml_bool_at(const toml_array_t *arr, i64 idx);
-TOML_EXTERN toml_datum_t toml_int_at(const toml_array_t *arr, i64 idx);
-TOML_EXTERN toml_datum_t toml_double_at(const toml_array_t *arr, i64 idx);
-TOML_EXTERN toml_datum_t toml_timestamp_at(const toml_array_t *arr, i64 idx);
+TOML_EXTERN toml_datum_t  toml_string_at(const toml_array_t *arr, i64 idx);
+TOML_EXTERN toml_datum_t  toml_bool_at(const toml_array_t *arr, i64 idx);
+TOML_EXTERN toml_datum_t  toml_int_at(const toml_array_t *arr, i64 idx);
+TOML_EXTERN toml_datum_t  toml_double_at(const toml_array_t *arr, i64 idx);
+TOML_EXTERN toml_datum_t  toml_timestamp_at(const toml_array_t *arr, i64 idx);
 /* ... retrieve array or table using index. */
 TOML_EXTERN toml_array_t *toml_array_at(const toml_array_t *arr, i64 idx);
 TOML_EXTERN toml_table_t *toml_table_at(const toml_array_t *arr, i64 idx);
 
 /* on tables: */
 /* ... retrieve the key in table at keyidx. Return 0 if out of range. */
-TOML_EXTERN const char *toml_key_in(const toml_table_t *tab, i64 keyidx);
+TOML_EXTERN const char   *toml_key_in(const toml_table_t *tab, i64 keyidx);
 /* ... returns 1 if key exists in tab, 0 otherwise */
-TOML_EXTERN i64 toml_key_exists(const toml_table_t *tab, const char *key);
+TOML_EXTERN i64           toml_key_exists(const toml_table_t *tab, const char *key);
 /* ... retrieve values using key. */
-TOML_EXTERN toml_datum_t toml_string_in(const toml_table_t *arr,
-                                        const char *key);
-TOML_EXTERN toml_datum_t toml_bool_in(const toml_table_t *arr, const char *key);
-TOML_EXTERN toml_datum_t toml_int_in(const toml_table_t *arr, const char *key);
-TOML_EXTERN toml_datum_t toml_double_in(const toml_table_t *arr,
-                                        const char *key);
-TOML_EXTERN toml_datum_t toml_timestamp_in(const toml_table_t *arr,
-                                           const char *key);
+TOML_EXTERN toml_datum_t  toml_string_in(const toml_table_t *arr, const char *key);
+TOML_EXTERN toml_datum_t  toml_bool_in(const toml_table_t *arr, const char *key);
+TOML_EXTERN toml_datum_t  toml_int_in(const toml_table_t *arr, const char *key);
+TOML_EXTERN toml_datum_t  toml_double_in(const toml_table_t *arr, const char *key);
+TOML_EXTERN toml_datum_t  toml_timestamp_in(const toml_table_t *arr, const char *key);
 /* .. retrieve array or table using key. */
-TOML_EXTERN toml_array_t *toml_array_in(const toml_table_t *tab,
-                                        const char *key);
-TOML_EXTERN toml_table_t *toml_table_in(const toml_table_t *tab,
-                                        const char *key);
+TOML_EXTERN toml_array_t *toml_array_in(const toml_table_t *tab, const char *key);
+TOML_EXTERN toml_table_t *toml_table_in(const toml_table_t *tab, const char *key);
 
 /*-----------------------------------------------------------------
  * lesser used
@@ -157,21 +148,19 @@ TOML_EXTERN const char *toml_table_key(const toml_table_t *tab);
  */
 TOML_EXTERN i64 toml_utf8_to_ucs(const char *orig, i64 len, int64_t *ret);
 TOML_EXTERN i64 toml_ucs_to_utf8(int64_t code, char buf[6]);
-TOML_EXTERN void toml_set_memutil(void *(*xxmalloc)(size_t),
-                                  void (*xxfree)(void *));
 
 /*--------------------------------------------------------------
  *  deprecated
  */
 /* A raw value, must be processed by toml_rto* before using. */
-typedef const char *toml_raw_t;
+typedef const char    *toml_raw_t;
 TOML_EXTERN toml_raw_t toml_raw_in(const toml_table_t *tab, const char *key);
 TOML_EXTERN toml_raw_t toml_raw_at(const toml_array_t *arr, i64 idx);
-TOML_EXTERN i64 toml_rtos(toml_raw_t s, char **ret);
-TOML_EXTERN i64 toml_rtob(toml_raw_t s, i64 *ret);
-TOML_EXTERN i64 toml_rtoi(toml_raw_t s, int64_t *ret);
-TOML_EXTERN i64 toml_rtod(toml_raw_t s, double *ret);
-TOML_EXTERN i64 toml_rtod_ex(toml_raw_t s, double *ret, char *buf, i64 buflen);
-TOML_EXTERN i64 toml_rtots(toml_raw_t s, toml_timestamp_t *ret);
+TOML_EXTERN i64        toml_rtos(toml_raw_t s, char **ret);
+TOML_EXTERN i64        toml_rtob(toml_raw_t s, i64 *ret);
+TOML_EXTERN i64        toml_rtoi(toml_raw_t s, int64_t *ret);
+TOML_EXTERN i64        toml_rtod(toml_raw_t s, double *ret);
+TOML_EXTERN i64        toml_rtod_ex(toml_raw_t s, double *ret, char *buf, i64 buflen);
+TOML_EXTERN i64        toml_rtots(toml_raw_t s, toml_timestamp_t *ret);
 
 #endif /* TOML_H */
