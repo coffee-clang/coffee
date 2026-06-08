@@ -1,6 +1,6 @@
 [package]
 name = "Coffee"
-version = "0.1.0"
+version = "0.1.0.20260101T0000"
 edition = "c23"
 description = "Coffee: C manager"
 license = "MIT"

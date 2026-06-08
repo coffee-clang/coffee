@@ -188,4 +188,8 @@ docs:
 serve:
 	$(MDBOOK) serve
 
-.PHONY: all bootstrap clean format test install docs serve
+release:
+	sed -i 's/\(version = "[0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}\.\)[0-9T]\{1,\}/\1'"$$(date +%Y%m%dT%H%M)"'/' Coffee.toml
+	@echo "Updated Coffee.toml version to include timestamp $$(date +%Y%m%dT%H%M)"
+
+.PHONY: all bootstrap clean format test install docs serve release
