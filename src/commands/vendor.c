@@ -1,7 +1,6 @@
 #include "../coffee.h"
 #include "../manifest.h"
 #include "../project.h"
-#include "../registry.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -57,11 +56,36 @@ int64_t handle_vendor(options *opts)
 
 		printf("  Vendoring: %s\n", name);
 
-		mkdir(dest_dir, 0755);
+		/* Look for git or path info in structured deps */
+		bool found = false;
+		for (size_t j = 0; j < m->dependencies.deps_count; j++) {
+			if (m->dependencies.deps[j].name != nullptr && strcmp(m->dependencies.deps[j].name, name) == 0) {
+				if (m->dependencies.deps[j].git != nullptr) {
+					sds cmd = sdscatprintf(sdsempty(), "git clone --depth 1 '%s' '%s' 2>/dev/null",
+					                       m->dependencies.deps[j].git, dest_dir);
+					i64 ret = system(cmd);
+					sdsfree(cmd);
+					if (ret != 0) {
+						fprintf_safe(stderr, "  Error: Failed to vendor git dep %s\n", name);
+					}
+				} else if (m->dependencies.deps[j].path != nullptr) {
+					sds cmd =
+					    sdscatprintf(sdsempty(), "cp -r '%s' '%s' 2>/dev/null", m->dependencies.deps[j].path, dest_dir);
+					i64 ret = system(cmd);
+					sdsfree(cmd);
+					if (ret != 0) {
+						fprintf_safe(stderr, "  Error: Failed to vendor path dep %s\n", name);
+					}
+				} else {
+					fprintf_safe(stderr, "  Warning: %s has no git or path source — skipping\n", name);
+				}
+				found = true;
+				break;
+			}
+		}
 
-		i64 ret = registry_fetch(name, nullptr, dest_dir);
-		if (ret != 0) {
-			fprintf_safe(stderr, "Error: Failed to vendor %s\n", name);
+		if (!found) {
+			fprintf_safe(stderr, "  Warning: %s has no structured dep info — skipping\n", name);
 		}
 
 		sdsfree(dest_dir);

@@ -11,3 +11,4 @@ target/
 /bin/
 /fuzz/corpus/
 /docs/theme/index.hbs
+/gcov_out/

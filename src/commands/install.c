@@ -159,25 +159,19 @@ int64_t handle_install(options *opts)
 {
 	if (opts->inputs_num < 2) {
 		fprintf_safe(stderr, "Error: Package name required\n");
-		fprintf_safe(stderr, "Usage: coffee install <package> [version]\n");
+		fprintf_safe(stderr, "Usage: coffee install --git <url> <package>\n");
+		return 1;
+	}
+
+	if (!opts->git) {
+		fprintf_safe(stderr, "Error: --git <url> is required\n");
+		fprintf_safe(stderr, "Usage: coffee install --git https://github.com/user/repo.git <package>\n");
 		return 1;
 	}
 
 	char *package = opts->inputs[1];
-	sds   version = (opts->inputs_num > 2) ? sdsnew(opts->inputs[2]) : nullptr;
 
-	if (version == nullptr) {
-		version_list_t *versions = registry_get_versions(package);
-		if (versions != nullptr && versions->count > 0) {
-			version = sdsnew(versions->versions[0]);
-			registry_free_versions(versions);
-		} else {
-			fprintf_safe(stderr, "Error: Package '%s' not found in registry\n", package);
-			return 1;
-		}
-	}
-
-	printf("Installing package: %s@%s\n", package, version);
+	printf("Installing package: %s\n", package);
 
 	const char *coffee_home = coffee_home_dir();
 	sds         bin_dir     = sdscatprintf(sdsempty(), "%s/bin", coffee_home);
@@ -186,15 +180,16 @@ int64_t handle_install(options *opts)
 	sds global_deps = sdscatprintf(sdsempty(), "%s/deps", coffee_home);
 	mkdir(global_deps, 0755);
 
-	sds cache_path = sdscatprintf(sdsempty(), "%s/%s/%s", global_deps, package, version);
+	sds cache_path = sdscatprintf(sdsempty(), "%s/%s", global_deps, package);
 	sdsfree(global_deps);
 
-	i64 ret = registry_fetch(package, version, cache_path);
+	/* Clone from git URL */
+	sds cmd = sdscatprintf(sdsempty(), "git clone --depth 1 '%s' '%s' 2>/dev/null", opts->git, cache_path);
+	i64 ret = system(cmd);
+	sdsfree(cmd);
 	if (ret != 0) {
 		sdsfree(cache_path);
-		fprintf_safe(stderr, "Error: Failed to install %s\n", package);
-		fprintf_safe(stderr, "Package not found in registry\n");
-		sdsfree(version);
+		fprintf_safe(stderr, "Error: Failed to clone %s from %s\n", package, opts->git);
 		sdsfree(bin_dir);
 		return 1;
 	}
@@ -260,8 +255,7 @@ int64_t handle_install(options *opts)
 	}
 
 	sdsfree(cache_path);
-	printf("Installed: %s@%s\n", package, version);
-	sdsfree(version);
+	printf("Installed: %s\n", package);
 	sdsfree(bin_dir);
 	return 0;
 }

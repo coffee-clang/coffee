@@ -2,48 +2,31 @@
 #include "../registry.h"
 
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 int64_t handle_search(options *opts)
 {
-	char *query = nullptr;
-
-	if (opts->inputs_num > 1) {
-		query = opts->inputs[1];
+	sds query = sdsempty();
+	if (opts->inputs_num > 1 && opts->inputs[1] != nullptr) {
+		query = sdscpy(query, opts->inputs[1]);
 	}
 
-	if (query == nullptr) {
-		query = "";
-	}
+	recipe_list_t *results = registry_search(query);
+	sdsfree(query);
 
-	printf("Searching for packages matching '%s'...\n\n", query);
-
-	recipe_list_t *list = registry_search(query);
-
-	if (list == nullptr || list->count == 0) {
+	if (results == nullptr || results->count == 0) {
 		printf("No packages found.\n");
+		if (results != nullptr) {
+			registry_free_recipes(results);
+		}
 		return 0;
 	}
 
-	printf("%-20s %-10s %s\n", "NAME", "VERSION", "DESCRIPTION");
-	printf("%-20s %-10s %s\n", "----", "-------", "-----------");
-
-	for (size_t i = 0; i < list->count; i++) {
-		recipe_t   *r       = &list->recipes[i];
-		const char *name    = r->name != nullptr ? r->name : "-";
-		const char *version = r->version != nullptr ? r->version : "-";
-		const char *desc    = r->description != nullptr ? r->description : "";
-
-		if (strlen(desc) > 50) {
-			printf("%-20s %-10s %.50s...\n", name, version, desc);
-		} else {
-			printf("%-20s %-10s %s\n", name, version, desc);
-		}
+	for (size_t i = 0; i < results->count; i++) {
+		recipe_t *r = &results->recipes[i];
+		printf("%-30s %-12s %s\n", r->name ? r->name : "", r->version ? r->version : "",
+		       r->description ? r->description : "");
 	}
 
-	printf("\nTotal: %zu packages\n", list->count);
-
-	registry_free_recipes(list);
+	registry_free_recipes(results);
 	return 0;
 }

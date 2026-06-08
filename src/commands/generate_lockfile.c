@@ -1,6 +1,6 @@
 #include "../build.h"
 #include "../coffee.h"
-#include "../coffee_features.h"
+#include "../dep_graph.h"
 #include "../lockfile.h"
 #include "../manifest.h"
 #include "../project.h"
@@ -11,62 +11,6 @@
 
 #include <toml.h>
 #include <unistd.h>
-
-/*
- * Resolve git commit SHA for a dependency directory.
- * Runs "git rev-parse HEAD" in dep_dir.
- * Returns a new sds with the SHA, or nullptr on error.
- */
-static sds resolve_git_commit(const char *dep_dir)
-{
-	if (dep_dir == nullptr || dep_dir[0] == '\0') {
-		return nullptr;
-	}
-	/* Check if it's a git repo */
-	sds git_dir = sdscatprintf(sdsempty(), "%s/.git", dep_dir);
-	if (access(git_dir, F_OK) != 0) {
-		sdsfree(git_dir);
-		return nullptr;
-	}
-	sdsfree(git_dir);
-
-	/* Run git rev-parse HEAD */
-	sds   cmd  = sdscatprintf(sdsempty(), "cd '%s' && git rev-parse HEAD 2>/dev/null", dep_dir);
-	FILE *pipe = popen(cmd, "r");
-	sdsfree(cmd);
-	if (pipe == nullptr) {
-		return nullptr;
-	}
-	char buf[128] = { 0 };
-	if (fgets(buf, sizeof(buf), pipe) == nullptr) {
-		pclose(pipe);
-		return nullptr;
-	}
-	pclose(pipe);
-	/* Strip trailing newline */
-	size_t len = strlen(buf);
-	if (len > 0 && buf[len - 1] == '\n') {
-		buf[len - 1] = '\0';
-	}
-	if (buf[0] == '\0') {
-		return nullptr;
-	}
-	return sdsnew(buf);
-}
-
-/* Find a dependency_t by name in the manifest's structured deps */
-static dependency_t *find_dep_by_name(manifest_t *m, const char *name)
-{
-	if (m == nullptr || name == nullptr) {
-		return nullptr;
-	}
-	for (size_t i = 0; i < m->dependencies.deps_count; i++) {
-		if (m->dependencies.deps[i].name != nullptr && strcmp(m->dependencies.deps[i].name, name) == 0) {
-			return &m->dependencies.deps[i];
-		}
-	}
-	return nullptr;
-}
 
 int64_t handle_generate_lockfile(options *opts)
 {
@@ -88,6 +32,14 @@ int64_t handle_generate_lockfile(options *opts)
 
 	printf("Generating lockfile: Coffee.lock\n");
 
+	/* Resolve full transitive graph */
+	dep_graph_t *g = dep_graph_create(manifest, nullptr, true);
+	if (g == nullptr) {
+		manifest_free(manifest);
+		fprintf_safe(stderr, "Error: Could not resolve dependency graph\n");
+		return 1;
+	}
+
 	lockfile_t lf;
 	memset(&lf, 0, sizeof(lf));
 	lf.version = 1;
@@ -99,58 +51,67 @@ int64_t handle_generate_lockfile(options *opts)
 		lf.package_version = sdsnew(manifest->package.version);
 	}
 
-	/* Resolve each dependency */
-	lf.deps_count = manifest->package.dependencies_count;
-	if (lf.deps_count > 0) {
-		lf.deps = calloc(lf.deps_count, sizeof(lockfile_dep_t));
+	size_t total_nodes = dep_graph_count(g);
+	size_t dep_count   = total_nodes > 0 ? total_nodes - 1 : 0;
+
+	if (dep_count > 0) {
+		lf.deps = calloc(dep_count, sizeof(lockfile_dep_t));
 		if (lf.deps == nullptr) {
+			dep_graph_free(g);
 			manifest_free(manifest);
 			return 1;
 		}
-		for (size_t i = 0; i < lf.deps_count; i++) {
-			sds dep_name = nullptr;
-			sds dep_vers = nullptr;
-			manifest_extract_dep_info(manifest->package.dependencies[i], &dep_name, &dep_vers);
 
+		size_t dep_idx = 0;
+		for (size_t gi = 1; gi < total_nodes; gi++) {
+			const char *dep_name = g->nodes[gi].name;
 			if (dep_name == nullptr) {
 				continue;
 			}
 
-			lf.deps[i].name = sdsnew(dep_name);
+			lf.deps[dep_idx].name = sdsnew(dep_name);
 
-			/* Check if this is a git dependency — store the git URL in path for reference */
-			dependency_t *structured = find_dep_by_name(manifest, dep_name);
-			bool          is_git_dep = (structured != nullptr && structured->git != nullptr) != 0;
-
-			/* Resolve the dep directory */
-			sds dep_dir = dep_resolve_dir(dep_name);
-			if (dep_dir != nullptr) {
-				lf.deps[i].path    = sdsnew(dep_dir);
-				lf.deps[i].version = resolve_dep_version(dep_dir);
-
-				/* For git deps, record the pinned commit SHA */
-				if (is_git_dep) {
-					sds commit = resolve_git_commit(dep_dir);
-					if (commit != nullptr) {
-						lf.deps[i].commit = commit;
-					}
-				}
-
-				sdsfree(dep_dir);
+			/* Path */
+			const char *p = dep_graph_path(g, dep_name);
+			if (p != nullptr) {
+				lf.deps[dep_idx].path = sdsnew(p);
 			} else {
-				/* Dep not found locally; record the manifest version as-is */
-				lf.deps[i].path    = sdsnew("");
-				lf.deps[i].version = dep_vers != nullptr ? sdsnew(dep_vers) : sdsnew("*");
+				lf.deps[dep_idx].path = sdsnew("");
 			}
 
-			sdsfree(dep_name);
-			sdsfree(dep_vers);
+			/* Version */
+			lf.deps[dep_idx].version = sdsnew("*");
+
+			/* Commit SHA for git deps */
+			if (dep_graph_is_git(g, dep_name)) {
+				const char *dep_path = dep_graph_path(g, dep_name);
+				if (dep_path != nullptr) {
+					sds   cmd  = sdscatprintf(sdsempty(), "cd '%s' && git rev-parse HEAD 2>/dev/null", dep_path);
+					FILE *pipe = popen(cmd, "r");
+					sdsfree(cmd);
+					if (pipe != nullptr) {
+						char buf[128] = { 0 };
+						if (fgets(buf, sizeof(buf), pipe) != nullptr) {
+							size_t len = strlen(buf);
+							if (len > 0 && buf[len - 1] == '\n') {
+								buf[len - 1] = '\0';
+							}
+							if (buf[0] != '\0') {
+								lf.deps[dep_idx].commit = sdsnew(buf);
+							}
+						}
+						pclose(pipe);
+					}
+				}
+			}
+
+			lf.deps_count = dep_idx + 1;
+			dep_idx++;
 		}
 	}
 
 	i64 ret = lockfile_write("Coffee.lock", &lf);
 
-	/* Clean up lockfile_t contents (no lockfile_free since it's stack-allocated) */
 	sdsfree(lf.package_name);
 	sdsfree(lf.package_version);
 	for (size_t i = 0; i < lf.deps_count; i++) {
@@ -161,6 +122,7 @@ int64_t handle_generate_lockfile(options *opts)
 	}
 	free(lf.deps);
 
+	dep_graph_free(g);
 	manifest_free(manifest);
 
 	if (ret != 0) {

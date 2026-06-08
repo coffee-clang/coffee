@@ -1,5 +1,6 @@
 #include "build.h"
 
+#include "dep_graph.h"
 #include "lockfile.h"
 #include "manifest.h"
 #include "registry.h"
@@ -333,35 +334,43 @@ i64 build_project(manifest_t *manifest, build_opts_t *opts)
 		}
 	}
 
-	/* Resolve dependencies: add -I/-L/-l flags and collect dep source files */
-	size_t dep_src_cap  = 64;
+	/* Resolve dependencies via dep_graph */
+	dep_graph_t *dep_graph = dep_graph_create(manifest, lockfile, true);
+	sds         *dep_names = nullptr;
+	size_t       dep_total = 0;
+	if (dep_graph != nullptr) {
+		dep_names = dep_graph_names(dep_graph, &dep_total);
+	}
+
 	size_t dep_src_cnt  = 0;
+	size_t dep_src_cap  = 64;
 	sds   *dep_src_list = (sds *)malloc(sizeof(sds) * dep_src_cap);
 
-	for (size_t i = 0; i < manifest->package.dependencies_count; i++) {
-		sds dep_name = dep_parse_name(manifest->package.dependencies[i]);
-
-		/* Use lockfile path if available, otherwise resolve from filesystem */
-		sds dep_dir = nullptr;
-		if (lockfile != nullptr) {
-			lockfile_dep_t *locked = lockfile_find_dep(lockfile, dep_name);
-			if (locked != nullptr && locked->path != nullptr) {
-				dep_dir = sdsnew(locked->path);
-			}
+	for (size_t gi = 0; gi < dep_total; gi++) {
+		sds dep_name = dep_names[gi];
+		if (dep_name == nullptr) {
+			continue;
 		}
-		if (dep_dir == nullptr) {
-			dep_dir = dep_resolve_dir(dep_name);
+		/* Skip root (at index 0) */
+		if (gi == 0 && manifest->package.name != nullptr && strcmp(dep_name, manifest->package.name) == 0) {
+			continue;
 		}
 
-		if (dep_dir != nullptr) {
-			dep_add_flags(dep_dir, dep_name, &flags, dep_src_list, &dep_src_cnt);
-			if (dep_src_cnt + 8 > dep_src_cap) {
+		/* Add compiler flags */
+		sds dep_flags = dep_graph_flags(dep_graph, dep_name);
+		flags         = sdscatfmt(flags, " %s", dep_flags);
+		sdsfree(dep_flags);
+
+		/* Add source files */
+		size_t     src_cnt = 0;
+		const sds *srcs    = dep_graph_sources(dep_graph, dep_name, &src_cnt);
+		for (size_t j = 0; j < src_cnt; j++) {
+			if (dep_src_cnt >= dep_src_cap) {
 				dep_src_cap *= 2;
 				dep_src_list = (sds *)realloc(dep_src_list, sizeof(sds) * dep_src_cap);
 			}
-			sdsfree(dep_dir);
+			dep_src_list[dep_src_cnt++] = sdsnew(srcs[j]);
 		}
-		sdsfree(dep_name);
 	}
 
 	glob_t globbuf;
@@ -372,6 +381,8 @@ i64 build_project(manifest_t *manifest, build_opts_t *opts)
 		free(dep_src_list);
 		lockfile_free(lockfile);
 		sdsfree(lockfile_path);
+		dep_graph_free(dep_graph);
+		free(dep_names);
 		if (resolved) {
 			features_free(resolved);
 		}
@@ -385,6 +396,8 @@ i64 build_project(manifest_t *manifest, build_opts_t *opts)
 		free(dep_src_list);
 		lockfile_free(lockfile);
 		sdsfree(lockfile_path);
+		dep_graph_free(dep_graph);
+		free(dep_names);
 		if (resolved) {
 			features_free(resolved);
 		}
@@ -406,6 +419,8 @@ i64 build_project(manifest_t *manifest, build_opts_t *opts)
 		free(dep_src_list);
 		lockfile_free(lockfile);
 		sdsfree(lockfile_path);
+		dep_graph_free(dep_graph);
+		free(dep_names);
 		if (resolved) {
 			features_free(resolved);
 		}
@@ -449,6 +464,9 @@ i64 build_project(manifest_t *manifest, build_opts_t *opts)
 
 	lockfile_free(lockfile);
 	sdsfree(lockfile_path);
+
+	dep_graph_free(dep_graph);
+	free(dep_names);
 
 	if (resolved) {
 		features_free(resolved);

@@ -1,78 +1,13 @@
 #include "../coffee.h"
 #include "../coffee_features.h"
+#include "../dep_graph.h"
+#include "../lockfile.h"
 #include "../manifest.h"
 #include "../project.h"
-#include "../registry.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-static void print_transitive_json(sds name, const char *version, i64 depth, i64 max_depth)
-{
-	if (depth > max_depth || name == nullptr) {
-		return;
-	}
-
-	sds ver = version != nullptr ? sdsnew(version) : nullptr;
-	printf("{\n");
-	printf("  \"name\": \"%s\",\n", name);
-	printf("  \"version\": \"%s\"", ver != nullptr ? ver : "?");
-	sdsfree(ver);
-
-	if (depth < max_depth) {
-		recipe_t *recipe = registry_get(name);
-		if (recipe) {
-			char **dep_names = nullptr;
-			size_t dep_count = 0;
-
-			if (recipe->dependencies) {
-				const char *p = recipe->dependencies;
-				while (*p != '\0') {
-					while (*p == ' ' || *p == ',') {
-						p++;
-					}
-					if (*p == '\0') {
-						break;
-					}
-					const char *start = p;
-					while (*p != '\0' && *p != ',' && *p != ' ') {
-						p++;
-					}
-					size_t len = (size_t)(p - start);
-					if (len > 0) {
-						const char *slash    = (const char *)memchr(start, '/', len);
-						size_t      name_len = slash != nullptr ? (size_t)(slash - start) : len;
-						dep_names            = realloc(dep_names, (dep_count + 1) * sizeof(sds));
-						dep_names[dep_count] = sdsnewlen(start, name_len);
-						dep_count++;
-					}
-				}
-			}
-
-			if (dep_count > 0) {
-				printf(",\n  \"dependencies\": [\n");
-				for (size_t i = 0; i < dep_count; i++) {
-					printf("    ");
-					print_transitive_json(dep_names[i], nullptr, depth + 1, max_depth);
-					if (i < dep_count - 1) {
-						printf(",");
-					}
-					printf("\n");
-				}
-				printf("  ]");
-			}
-
-			for (size_t i = 0; i < dep_count; i++) {
-				sdsfree(dep_names[i]);
-			}
-			free(dep_names);
-			registry_free_recipe(recipe);
-		}
-	}
-
-	printf("\n}");
-}
 
 int64_t handle_metadata(options *opts)
 {
@@ -124,34 +59,52 @@ int64_t handle_metadata(options *opts)
 		features_free(rf);
 	}
 
-	/* Dependencies */
+	/* Dependencies from manifest */
 	printf("  \"dependencies\": [\n");
 	for (size_t i = 0; i < m->package.dependencies_count; i++) {
 		printf("    \"%s\"%s\n", m->package.dependencies[i], (i < m->package.dependencies_count - 1) ? "," : "");
 	}
 	printf("  ]");
 
-	/* Transitive dependency tree */
-	if (m->package.dependencies_count > 0) {
-		printf(",\n  \"transitive_deps\": [\n");
-		for (size_t i = 0; i < m->package.dependencies_count; i++) {
-			const char *entry    = m->package.dependencies[i];
-			sds         dep_name = nullptr;
-			sds         dep_ver  = nullptr;
-			manifest_extract_dep_info(entry, &dep_name, &dep_ver);
+	/* Transitive dep graph */
+	lockfile_t  *lf = lockfile_parse("Coffee.lock");
+	dep_graph_t *g  = dep_graph_create(m, lf, true);
+	lockfile_free(lf);
 
-			if (dep_name) {
-				printf("    ");
-				print_transitive_json(dep_name, dep_ver, 0, 3);
-				if (i < m->package.dependencies_count - 1) {
-					printf(",");
-				}
-				printf("\n");
-				sdsfree(dep_name);
-				sdsfree(dep_ver);
+	if (g != nullptr) {
+		printf(",\n  \"transitive_deps\": [\n");
+		size_t total = dep_graph_count(g);
+		bool   first = true;
+		for (size_t gi = 1; gi < total; gi++) {
+			const char *dep_name = g->nodes[gi].name;
+			if (dep_name == nullptr) {
+				continue;
 			}
+			/* Skip root (which is at index 0 and matches the package name) */
+			if (m->package.name != nullptr && strcmp(dep_name, m->package.name) == 0) {
+				continue;
+			}
+
+			if (!first) {
+				printf(",\n");
+			}
+			first = false;
+
+			printf("    {\n");
+			printf("      \"name\": \"%s\",\n", dep_name);
+			const char *path = dep_graph_path(g, dep_name);
+			if (path != nullptr) {
+				printf("      \"path\": \"%s\",\n", path);
+			}
+			printf("      \"git\": %s", !!(dep_graph_is_git(g, dep_name)) ? "true" : "false");
+			const char *ref = dep_graph_git_ref(g, dep_name);
+			if (ref != nullptr) {
+				printf(",\n      \"ref\": \"%s\"", ref);
+			}
+			printf("\n    }");
 		}
-		printf("  ]\n");
+		printf("\n  ]\n");
+		dep_graph_free(g);
 	} else {
 		printf("\n");
 	}

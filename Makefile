@@ -23,6 +23,7 @@ UNITY_CORE_SRCS := \
 	$(SRC_DIR)/coffee_features.c \
 	$(SRC_DIR)/build.c \
 	$(SRC_DIR)/lockfile.c \
+	$(SRC_DIR)/dep_graph.c \
 	$(SRC_DIR)/coffee.c
 
 UNITY_ALL_SRCS := $(UNITY_CORE_SRCS) $(sort $(COMMANDS_SRCS))

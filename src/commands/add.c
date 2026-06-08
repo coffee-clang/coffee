@@ -31,6 +31,8 @@ int64_t handle_add(options *opts)
 {
 	if (opts->inputs_num < 2) {
 		fprintf_safe(stderr, "Error: No package specified\n");
+		fprintf_safe(stderr, "Usage: coffee add <package>\n");
+		fprintf_safe(stderr, "  Use --git <url> or --path <path> to specify the source\n");
 		return 1;
 	}
 
@@ -49,7 +51,7 @@ int64_t handle_add(options *opts)
 		return 1;
 	}
 
-	// Check if dependency already exists
+	/* Check if dependency already exists */
 	for (size_t i = 0; i < m->package.dependencies_count; i++) {
 		if (m->package.dependencies[i] != nullptr &&
 		    strncmp(m->package.dependencies[i], package_name, strlen(package_name)) == 0) {
@@ -60,32 +62,31 @@ int64_t handle_add(options *opts)
 		}
 	}
 
-	// Add new dependency
+	/* Add new dependency */
 	sds dep_str;
-	if (opts->path) {
+	if (!opts->git && !opts->path) {
+		recipe_t *recipe = registry_get(sdsnew(package_name));
+		if (recipe == nullptr || recipe->version == nullptr) {
+			fprintf_safe(stderr, "Error: Package '%s' not found in registry\n", package_name);
+			fprintf_safe(stderr, "Use --git <url> or --path <path> to specify the source\n");
+			if (recipe != nullptr) {
+				registry_free_recipe(recipe);
+			}
+			manifest_free(m);
+			sdsfree(manifest_path);
+			return 1;
+		}
+		dep_str = sdscatprintf(sdsempty(), "%s = \"%s\"", package_name, recipe->version);
+		registry_free_recipe(recipe);
+	} else if (opts->path) {
 		if (opts->pkg_version) {
 			dep_str = sdscatprintf(sdsempty(), "%s = { path = \"%s\", version = \"%s\" }", package_name, opts->path,
 			                       opts->pkg_version);
 		} else {
 			dep_str = sdscatprintf(sdsempty(), "%s = { path = \"%s\" }", package_name, opts->path);
 		}
-	} else if (opts->git) {
-		dep_str = sdscatprintf(sdsempty(), "%s = { git = \"%s\" }", package_name, opts->git);
 	} else {
-		const char *version = opts->pkg_version != nullptr ? opts->pkg_version : "*";
-
-		if (opts->features != nullptr || (i64)opts->optional) {
-			dep_str = sdscatprintf(sdsempty(), "%s = { version = \"%s\"", package_name, version);
-			if (opts->features) {
-				dep_str = sdscatprintf(dep_str, ", features = [\"%s\"]", opts->features);
-			}
-			if (opts->optional) {
-				dep_str = sdscatprintf(dep_str, ", optional = true");
-			}
-			dep_str = sdscatprintf(dep_str, " }");
-		} else {
-			dep_str = sdscatprintf(sdsempty(), "%s = \"%s\"", package_name, version);
-		}
+		dep_str = sdscatprintf(sdsempty(), "%s = { git = \"%s\" }", package_name, opts->git);
 	}
 
 	/* Prefix for dev/build deps */
@@ -108,44 +109,7 @@ int64_t handle_add(options *opts)
 	}
 
 	printf("Added dependency: %s\n", package_name);
-
-	/* Auto-fetch registry deps only; git/path deps handled by `coffee fetch` */
-	if (!opts->git && !opts->path) {
-		sds ver = nullptr;
-		if (opts->pkg_version != nullptr && strcmp(opts->pkg_version, "*") != 0) {
-			ver = sdsnew(opts->pkg_version);
-		} else {
-			version_list_t *versions = registry_get_versions(package_name);
-			if (versions != nullptr && versions->count > 0) {
-				ver = sdsnew(versions->versions[0]);
-				registry_free_versions(versions);
-			}
-		}
-
-		if (ver != nullptr) {
-			const char *coffee_home = coffee_home_dir();
-			sds         global_deps = sdscatprintf(sdsempty(), "%s/deps", coffee_home);
-			mkdir(global_deps, 0755);
-			mkdir("deps", 0755);
-
-			sds cache_path = sdscatprintf(sdsempty(), "%s/%s/%s", global_deps, package_name, ver);
-			i64 fetch_ret  = registry_fetch(package_name, ver, cache_path);
-			if (fetch_ret == 0) {
-				sds         local_link = sdscatprintf(sdsempty(), "deps/%s", package_name);
-				struct stat st;
-				if (lstat(local_link, &st) == 0) {
-					sds rm_cmd = sdscatprintf(sdsempty(), "rm -rf %s", local_link);
-					system(rm_cmd);
-					sdsfree(rm_cmd);
-				}
-				symlink(cache_path, local_link);
-				sdsfree(local_link);
-			}
-			sdsfree(global_deps);
-			sdsfree(cache_path);
-			sdsfree(ver);
-		}
-	}
+	printf("Run 'coffee fetch' to fetch the new dependency.\n");
 
 	/* Append dependency flags to Makefile if it exists */
 	char  *dir_end = strrchr(manifest_path, '/');

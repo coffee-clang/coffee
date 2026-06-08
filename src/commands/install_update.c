@@ -1,5 +1,4 @@
 #include "../coffee.h"
-#include "../registry.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -42,13 +41,12 @@ int64_t handle_install_update(options *opts)
 
 		printf("Updating %s...\n", target);
 
-		sds cmd = sdscatprintf(sdsempty(), "rm -rf %s", pkg_dir);
-		system(cmd);
+		sds cmd = sdscatprintf(sdsempty(), "cd '%s' && git pull --ff-only 2>/dev/null", pkg_dir);
+		i64 ret = system(cmd);
 		sdsfree(cmd);
-
-		i64 ret = registry_fetch(target, nullptr, pkg_dir);
 		sdsfree(pkg_dir);
 		sdsfree(deps_dir);
+
 		if (ret != 0) {
 			fprintf_safe(stderr, "Error: Failed to update %s\n", target);
 			return 1;
@@ -76,11 +74,10 @@ int64_t handle_install_update(options *opts)
 
 		printf("Updating %s...\n", entry->d_name);
 
-		sds cmd = sdscatprintf(sdsempty(), "rm -rf %s", pkg_dir);
-		system(cmd);
+		sds cmd = sdscatprintf(sdsempty(), "cd '%s' && git pull --ff-only 2>/dev/null", pkg_dir);
+		i64 ret = system(cmd);
 		sdsfree(cmd);
 
-		i64 ret = registry_fetch(entry->d_name, nullptr, pkg_dir);
 		if (ret != 0) {
 			fprintf_safe(stderr, "Error: Failed to update %s\n", entry->d_name);
 		} else {
