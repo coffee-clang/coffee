@@ -1,6 +1,6 @@
 # Coffee Project TODO
 
-> Generated from `coffee`-equivalent analysis. Overall completeness: **~78%**
+> Generated from `coffee`-equivalent analysis. Overall completeness: **~85%**
 
 ## Priority Legend
 
@@ -23,6 +23,14 @@
 
 ✅ **DONE** — Runs `make` without arguments when a Makefile is present. Falls back to `build_project()` for projects without Makefile. Supports `--release`, `--debug`, `-j`, and feature flags.
 
+### Transitive dependency resolution
+
+✅ **DONE** — New `dep_graph` module (`src/dep_graph.h/.c`) resolves the full transitive dependency graph via DFS. Reads each dep's `Coffee.toml` or `library.toml` recursively. Used by fetch, build, generate-lockfile, outdated, update, and metadata commands.
+
+### Git ref checkout
+
+✅ **DONE** — `coffee fetch` now checks out the configured `branch`/`tag`/`rev` from `Coffee.toml` instead of always using `origin/HEAD`.
+
 ---
 
 ## P1 — Major Usability Gaps
@@ -37,23 +45,35 @@
 
 ### `coffee add` — support version, features, optional
 
-✅ **DONE** — Supports `--version` (via `opts->pkg_version`), `--features`, `--optional`, `--dev`, `--build`. Appends dependency flags to Makefile.
+✅ **DONE** — Supports `--version` (via `opts->pkg_version`), `--features`, `--optional`, `--dev`, `--build`. Appends dependency flags to Makefile. Removed registry fallback — `--git` or `--path` is required.
 
 ### `coffee remove` — clean up Makefile
 
 ✅ **DONE** — When removing a dependency, its `# Dep: <name>` section is removed from the Makefile.
 
-### `coffee update` — semver-aware resolution
+### `coffee update` — git-aware resolution
 
-✅ **DONE** — Parses version constraints (`^1.0`, `>=2.0`, `=1.2.3`, `*`), uses registry version list to find matching version, writes `Coffee.lock`.
+✅ **DONE** — Uses `dep_graph` to resolve all transitive deps. For git deps, runs `git fetch` + checkout ref, records new commit SHA in lockfile. Supports selective update of a single dep.
+
+### `coffee outdated` — git-aware comparison
+
+✅ **DONE** — Compares pinned commit SHA against remote tracking ref for git deps. Reports commits behind. Non-git deps shown as informational.
 
 ### `coffee tree` — show transitive dependencies
 
-✅ **DONE** — Fetches and displays the full dependency tree recursively (up to depth 3). Uses registry to look up transitive deps.
+✅ **DONE** — Fetches and displays the full dependency tree recursively (up to depth 3). Uses filesystem resolution (via `dep_resolve_dir`) rather than registry.
 
 ### `coffee new` — support `--lib` / `--bin`
 
 ✅ **DONE** — `--lib` generates `src/lib.c` + `include/<name>/<name>.h` + library Makefile, no `main()`. `--bin` (default) keeps current behavior with `src/main.c`.
+
+### `coffee generate-lockfile` — transitive deps
+
+✅ **DONE** — Now records all transitive dependencies (from dep_graph) in `Coffee.lock`, including git commit SHAs.
+
+### Remove registry dependency
+
+✅ **DONE** — `search`, `logout`, `info` commands stubbed with "No registry configured" message. `vendor` uses git clone. `add` requires `--git`/`--path`. `install` uses `--git`. `metadata` and `report audit` use `dep_graph` instead of registry lookups.
 
 ---
 
@@ -76,7 +96,7 @@
 
 ### `coffee metadata` — add resolved features + transitive deps
 
-✅ **DONE** — Outputs JSON with package name, version, edition, description, license, dependencies, resolved feature set, and full transitive dependency tree (up to depth 3 via registry).
+✅ **DONE** — Outputs JSON with package name, version, edition, description, license, dependencies, resolved feature set, and full transitive dependency tree (via dep_graph, no registry).
 
 ---
 
@@ -90,12 +110,9 @@
 
 ✅ **DONE** — Runs `clang-tidy` on source files with project-specific include paths. Supports `--fix` flag to apply fixes inline.
 
-### `coffee install` — compile binaries
+### `coffee install` — compile binaries from git
 
-⚠️ **PARTIAL** — Fetches packages from registry and creates symlinks in `.coffee/deps/`. Does **not** detect `[[bin]]` tables or compile binaries to `~/.coffee/bin/`.
-
-- [ ] Detect `[[bin]]` table in `library.toml`
-- [ ] Compile and install binaries to `~/.coffee/bin/`
+✅ **DONE** — Accepts `--git <url>` to clone and compile binaries from git repos. Installs to `~/.coffee/bin/`. No registry fallback.
 
 ### `coffee version` — show dependency versions
 
@@ -104,6 +121,13 @@
 ### `coffee help` — per-command help
 
 ✅ **DONE** — `coffee help` lists all available commands with descriptions.
+
+### Transitive dependency caching / offline build
+
+❌ **NOT IMPLEMENTED** — dep_graph resolves deps every time. No incremental cache.
+
+- [ ] Cache resolved dep paths in `.coffee/build-cache/`
+- [ ] Only re-resolve when `Coffee.toml` or `Coffee.lock` changes
 
 ---
 
@@ -114,8 +138,8 @@
 | **v0.2** — "Just runs"         | 55%      | P0 items: script-mode run, check uses flags, build incremental   |
 | **v0.3** — "Testable"          | 65%      | P1: test/bench improvements, semver update, tree with transitive |
 | **v0.4** — "Publishable"       | 78%      | P2: metadata features+deps, fix/lint --fix, bench Makefile       |
-| **v0.5** — "Feature complete"  | 85%      | P2: publish, yank, owner, config subcommands, doc generation     |
-| **v1.0** — "Coffee-competitive" | 90%+     | P3 polish: install [[bin]], ecosystem, edge cases                |
+| **v0.5** — "Dep management"    | 85%      | Transitive deps, git ref checkout, git-aware outdated/update     |
+| **v1.0** — "Coffee-competitive" | 90%+     | P3 polish: build caching, config subcommands, edge cases         |
 
 ---
 

@@ -1,5 +1,11 @@
 # Coffee Design Document
 
+## Relationship to ARCHITECTURE.md
+
+**ARCHITECTURE.md** is the canonical reference for understanding the codebase. It documents the directory layout, all key types and their relationships, control flow, data flow, design decisions, external dependencies, and entry points. It is kept current as the codebase evolves and should be read first by anyone new to the project.
+
+**DESIGN.md** (this file) captures higher-level design principles, rationales, and the intended direction for features still under development. It is more speculative than ARCHITECTURE.md — it may describe plans that are not yet implemented, alternatives considered, and design tradeoffs. When the two files disagree, ARCHITECTURE.md reflects what actually exists.
+
 ## Data Structures
 
 ### `manifest_t` — Parsed Coffee.toml (`src/manifest.h`)
@@ -18,10 +24,26 @@ manifest_t
 │       branch, tag, rev, optional)
 ├── features[] — feature_def_t entries
 │   └── name, deps[] — feature name and its dependent package list
-└── features_count
+├── bin[] — binary_target_t entries (name + src[] per binary)
+├── test (test_section_t) — sources[], harness
+└── features_count, bin_count, dependencies_count
 ```
 
 **Lifecycle:** Created by `manifest_parse(path)` which reads TOML via `toml.c`, freed by `manifest_free()`. Written back by `manifest_write(path, m)`.
+
+### `dep_graph_t` — Transitive Dependency Graph (`src/dep_graph.h`)
+
+Resolves the full transitive dependency DAG from `Coffee.toml` dependencies.
+
+```
+dep_graph_t
+├── nodes[] — dep_graph_node_t entries
+│   ├── name, version, path, commit (git SHA)
+│   └── deps[] — indices into nodes[], out_count
+└── count
+```
+
+**Lifecycle:** Built by `dep_graph_resolve(manifest, lockfile)` via DFS over each dep's `Coffee.toml`. Freed by `dep_graph_free()`. Used by `fetch`, `build`, `update`, `outdated`, `metadata`, `generate-lockfile`.
 
 ### `options_s` — CLI State (`src/coffee.h`)
 
@@ -44,24 +66,18 @@ options_s
 command_s { name, description, action(options*) -> i64 }
 ```
 
-Static array indexed by command name from `argv[1]`. Returns exit code. Aliases (`b`→`build`, `c`→`check`, `t`→`test`) are separate entries pointing to the same handler.
+Static array indexed by command name from `argv[1]`. Returns exit code. Aliases (`b`→`build`, `c`→`check`, `t`→`test`) are separate entries pointing to the same handler. Currently 42 subcommands.
 
-### `recipe_t` / `recipe_list_t` — Registry Data (`src/registry.h`)
-
-```
-recipe_t { name, version, license, repo, description, download_url, dependencies }
-recipe_list_t { recipes[], count }
-```
-
-Parsed from JSON index fetched from `coffee-clang.github.io/recipes/`. Used by `search`, `info`, `update`, `tree`.
-
-### `version_list_t` — Registry Versions (`src/registry.h`)
+### `lockfile_t` — Pinned Dependency Versions (`src/lockfile.h`)
 
 ```
-version_list_t { versions[], count }
+lockfile_t
+├── package_name, package_version
+└── deps[] — lockfile_dep_t entries
+    └── name, version, path, commit (git SHA)
 ```
 
-Fetched from per-package `library.toml` in recipes repo. Needs expansion to return all available versions (currently returns just the latest).
+Parsed from `Coffee.lock` (TOML). Used for reproducible builds. Written by `generate-lockfile` and `fetch`.
 
 ### `resolved_features_t` — Feature Resolution (`src/coffee_features.h`)
 
@@ -82,7 +98,7 @@ build_opts_t { verbose, release, debug, target, target_dir, jobs,
                no_default_features }
 ```
 
-Passed to `build_project()` and `build_run()`.
+Passed to `build_project()` and `compile_sources()`.
 
 ## Architecture Overview
 
@@ -92,83 +108,49 @@ main() in coffee.c
 ├── options_s populated from args_info
 ├── command lookup by name → handler
 └── handler runs (each in src/commands/<name>.c)
-    ├── may call project_find_manifest() to locate Coffee.toml
-    ├── may call manifest_parse() to read it
-    ├── may call registry_*() for remote lookups
-    ├── delegates to make, clang, curl via system()/exec()
+    ├── project_find_manifest() locates Coffee.toml
+    ├── manifest_parse() reads it
+    ├── dep_graph_resolve() computes transitive deps (build, fetch, update...)
+    ├── lockfile_parse() / lockfile_write() for pinning
+    ├── build_project() / compile_sources() → fork+exec $CC (clang)
+    ├── registry_*() for remote lookups (search, metadata)
     └── returns exit code
 ```
 
-Commands that build or analyze code follow one of two patterns:
-- **Makefile-delegated:** `build`, `test`, `bench`, `check` — find project, delegate to `make`
-- **Manifest-aware:** `add`, `remove`, `update`, `tree`, `new` — read/write `Coffee.toml`, interact with registry
+Commands follow one of these patterns:
+- **Build:** `build`, `test`, `check`, `run` — collect sources, resolve deps, fork+exec clang
+- **Dependency management:** `add`, `remove`, `update`, `fetch`, `tree`, `outdated` — read/write Coffee.toml, resolve dep graph, manage lockfile
+- **Project scaffolding:** `new`, `init` — generate project skeleton
+- **Tooling:** `fix`, `lint`, `doc`, `fmt`, `clean` — wrap clang-tidy, clang-format, doxygen
+- **Registry queries:** `search`, `metadata`, `info` — query the remote package index
 
 ## Coding Style
 
-Formatted by `.clang-format` and linted by `.clang-tidy` via `make check`.
+Formatted by `.clang-format` and linted by `.clang-tidy` via `make tidy`.
 
 Key enforced rules:
-- Tabs for indentation (8-width), 120 column limit
+- Tabs for indentation (width 4, continuation indent 4), 120 column limit
 - Linux brace style (`BreakBeforeBraces: Linux`)
 - Pointer alignment right (`int *p`)
 - `snake_case` for functions, `lower_case` for variables
 - No typedef structs
 - Space before parens on control statements
-- `InsertBraces: true` — no omitted braces
-- Sort includes with regroup: local headers → C types → stdlib → system
+- No omitted braces
+- C23: `nullptr` not `NULL`, `[[nodiscard]]`, `<stdckdint.h>`
+- Banned functions: `malloc`/`calloc`/`free` allowed (clang-tidy checks suppressed); `sprintf`/`strcpy`/`strcat` families must use safe wrappers from `include/safe.h` or SDS alternatives from `strings.h`
 
-## P0/P1 Implementation Design
+## Current Status (~85% complete, targeting v1.0)
 
-### P0: coffee check
+All P0 and P1 items from the original plan are implemented:
 
-1. Parse `Coffee.toml`
-2. Validate manifest (package name, version required; warn on missing optional fields)
-3. Collect files: from `[lib]` sources/headers, plus `src/*.c`, `include/**/*.h`
-4. Build include flags: `-Iinclude`, `-Ideps/<dep>/include`, plus any from `[lib]`
-5. Run `clang -fsyntax-only <flags> <files>`
-6. Pass exit code
+- **P0 — Must-Have:** `check` uses project flags, `build` with incremental awareness, transitive dependency resolution via `dep_graph`, git ref checkout
+- **P1 — Major Usability:** `test` and `bench` compilation, `add` with version/features/optional, `remove` cleanups, `update` git-aware, `outdated` git comparison, `tree` transitive display, `new --lib/--bin`, lockfile records transitive deps, registry stubbed
 
-### P0: coffee build
+### Remaining P2 items
 
-1. Find `Coffee.toml` → project dir
-2. Run bare `make -C <dir>` (default goal `all`)
-3. Pass `RELEASE=1`, `DEBUG=1`, `-j N`, `CFLAGS_EXTRA=...` as make variables
+- **`coffee doc`:** Manifest-driven Doxyfile generation (currently just runs pre-existing Doxyfile)
+- **`coffee config`:** Subcommand support (`--list`, `get`, `set`) with `~/.coffee/config.toml`
 
-### P1: coffee test / bench
+### Remaining P3 items
 
-- `coffee test` → `make test`
-- `coffee test --test <name>` → `TEST_FILTER=<name> make test`
-- `coffee bench` → `make bench`
-- Makefile test target supports `TEST_FILTER` env variable for filtering
-
-### P1: coffee add
-
-- Change `pkg-version` from flag to string argument
-- Format: with version → `name = "1.0"`, with features → `name = { version = "1.0", features = ["feat1"] }`
-- `--optional` → `optional = true`
-- `--dev` → `[dev-dependencies]` table, `--build` → `[build-dependencies]` table
-- Append Makefile flags as before
-
-### P1: coffee remove
-
-- Remove manifest entry (existing)
-- Scan Makefile for `# Dep: <name>` section and remove it
-
-### P1: coffee update — semver
-
-- Parse `^1.0`, `>=2.0`, `=1.2.3`, `*` constraints
-- Extend `registry_get_versions()` to return all versions from registry
-- Match constraint against available versions, pick latest
-- Update `Coffee.lock`
-
-### P1: coffee tree — transitive
-
-- For each direct dep, fetch recipe via `registry_get()`
-- Parse recipe's `dependencies` field
-- Recurse, display with tree-drawing characters
-
-### P1: coffee new --lib
-
-- `--lib` → `src/lib.c` + `include/<name>/<name>.h`, no `main()`
-- Makefile builds `build/lib<name>.a` (static library)
-- `--bin` (default): current behavior unchanged
+- **Transitive dependency caching:** Incremental cache in `.coffee/build-cache/` to avoid re-resolving when `Coffee.toml`/`Coffee.lock` unchanged
