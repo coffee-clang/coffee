@@ -239,20 +239,6 @@ TEST(install_update_config_basic)
 }
 
 /* ---------------------------------------------------------------
- * logout
- * --------------------------------------------------------------- */
-TEST(logout_not_logged_in)
-{
-	options opt = {
-		.inputs     = (char *[]){ "logout" },
-		.inputs_num = 1,
-	};
-	i64 ret = handle_logout(&opt);
-	ASSERT(ret == 0, "logout when not logged in should return 0");
-	PASS();
-}
-
-/* ---------------------------------------------------------------
  * new
  * --------------------------------------------------------------- */
 TEST(new_creates_project)
@@ -388,7 +374,6 @@ void coffee_register_commands_basic_tests(void)
 	TEST_REGISTER(init_initializes_project);
 	TEST_REGISTER(install_update_no_packages);
 	TEST_REGISTER(install_update_config_basic);
-	TEST_REGISTER(logout_not_logged_in);
 	TEST_REGISTER(new_creates_project);
 	TEST_REGISTER(new_no_arg);
 	TEST_REGISTER(search_no_query);

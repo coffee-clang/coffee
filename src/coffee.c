@@ -43,7 +43,6 @@ command_s commands[] = {
 	{ .name        = "locate-project",
 	  .description = "Print the location of a project's manifest file",
 	  .action      = &handle_locate_project },
-	{ .name = "logout", .description = "Remove an API token for the registry locally", .action = &handle_logout },
 	{ .name = "machete", .description = "Detect unused dependencies", .action = &handle_machete },
 	{ .name        = "metadata",
 	  .description = "Output the resolved dependencies of a package in machine-readable format",

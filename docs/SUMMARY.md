@@ -40,7 +40,6 @@
 - [info](commands/info.md)
 - [install](commands/install.md)
 - [uninstall](commands/uninstall.md)
- - [logout](commands/logout.md)
 
 ## Configuration & Metadata
 

@@ -117,7 +117,6 @@ extern i64 handle_install_update(options *);
 extern i64 handle_install_update_config(options *);
 extern i64 handle_list(options *);
 extern i64 handle_locate_project(options *);
-extern i64 handle_logout(options *);
 extern i64 handle_machete(options *);
 extern i64 handle_metadata(options *);
 extern i64 handle_new(options *);

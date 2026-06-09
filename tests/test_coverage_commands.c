@@ -351,17 +351,6 @@ TEST(cov_list_project)
 	PASS();
 }
 
-/* ---------- logout when already logged in ---------- */
-TEST(cov_logout_not_logged_in)
-{
-	/* We already have a test for this, but ensure the code path runs */
-	options opt = { .inputs = (char *[]){ "logout" }, .inputs_num = 1 };
-	i64     ret = handle_logout(&opt);
-	ASSERT(ret == 0, "logout");
-
-	PASS();
-}
-
 /* ---------- uninstall success ---------- */
 TEST(cov_uninstall_not_installed)
 {
@@ -1211,15 +1200,6 @@ TEST(cov_install_update_config_basic)
 	PASS();
 }
 
-/* ===== logout: already logged in (no-op) ===== */
-TEST(cov_logout_again)
-{
-	options opt = { .inputs = (char *[]){ "logout" }, .inputs_num = 1 };
-	i64     ret = handle_logout(&opt);
-	ASSERT(ret == 0, "logout again");
-	PASS();
-}
-
 /* ===== tree: with deps that have library.toml ===== */
 TEST(cov_tree_with_library_toml)
 {
@@ -1578,33 +1558,6 @@ TEST(cov_init_with_path)
 	system(cmd);
 	sdsfree(cmd);
 	sdsfree(tmpdir);
-	PASS();
-}
-
-/* ===== logout: with actual credentials file ===== */
-TEST(cov_logout_with_creds)
-{
-	const char *home = getenv("HOME");
-	if (home == nullptr) {
-		home = "/tmp";
-	}
-	sds coffee_dir = sdscatprintf(sdsempty(), "%s/.coffee", home);
-	sds cred_path  = sdscatprintf(sdsempty(), "%s/credentials", coffee_dir);
-	mkdir(coffee_dir, 0755);
-	FILE *cf = fopen(cred_path, "w");
-	if (cf) {
-		fprintf_safe(cf, "token = \"test-token\"\n");
-		fclose(cf);
-	}
-
-	options opt = { .inputs = (char *[]){ "logout" }, .inputs_num = 1 };
-	i64     ret = handle_logout(&opt);
-	ASSERT(ret == 0, "logout with creds should succeed");
-
-	remove(cred_path);
-	rmdir(coffee_dir);
-	sdsfree(cred_path);
-	sdsfree(coffee_dir);
 	PASS();
 }
 
@@ -1993,7 +1946,6 @@ void coffee_register_coverage_commands_tests(void)
 	TEST_REGISTER(cov_check_valid);
 	TEST_REGISTER(cov_fetch_with_deps);
 	TEST_REGISTER(cov_list_project);
-	TEST_REGISTER(cov_logout_not_logged_in);
 	TEST_REGISTER(cov_uninstall_not_installed);
 	TEST_REGISTER(cov_report_deps_licenses);
 	TEST_REGISTER(cov_test_with_manifest);
@@ -2037,7 +1989,6 @@ void coffee_register_coverage_commands_tests(void)
 	TEST_REGISTER(cov_test_verbose);
 	TEST_REGISTER(cov_install_update_with_package);
 	TEST_REGISTER(cov_install_update_config_basic);
-	TEST_REGISTER(cov_logout_again);
 	TEST_REGISTER(cov_init_with_path);
 	/* Coverage batch 3: targeted path coverage */
 	TEST_REGISTER(cov_tree_with_library_toml);
@@ -2055,9 +2006,6 @@ void coffee_register_coverage_commands_tests(void)
 	TEST_REGISTER(cov_build_manifest_path);
 	TEST_REGISTER(cov_build_with_features);
 	TEST_REGISTER(cov_install_update_update_pkg);
-
-	/* ===== logout: with actual credentials file ===== */
-	TEST_REGISTER(cov_logout_with_creds);
 
 	/* ===== uninstall: with actual installed package ===== */
 	TEST_REGISTER(cov_uninstall_installed);

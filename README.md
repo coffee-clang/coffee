@@ -2,6 +2,14 @@
 
 A modern package manager for C
 
+## Registry
+
+Coffee uses a **read-only** central package registry hosted at <https://coffee-clang.github.io/recipes/>.
+The registry is maintained externally. Coffee can search it and download packages from it, but cannot
+publish, modify, or manage it in any way — there is no `coffee publish` command.
+
+The primary dependency model is git-based and path-based; the registry is a convenience layer on top.
+
 ## Project structure
 
 We enforce a canonical structure on each project.

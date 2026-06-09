@@ -151,4 +151,14 @@ All P0, P1, P2, and P3 items from the original plan are implemented:
 ### Known Issues
 
 - `cov_new_lib_mode` was a test isolation failure (use-after-free in `handle_new` lib-mode Makefile path) — fixed
-- Registry is intentionally stubbed; the project is designed for git/path-based dependency management without a central registry
+
+### External Registry
+
+Coffee uses a **read-only** central registry hosted at <https://coffee-clang.github.io/recipes/>. The package index
+(`packages.json.zstd`) is downloaded and cached locally. Coffee can search the registry and discover packages, but it
+**cannot** publish, modify, or manage the registry in any way. There is no `coffee publish` command. The registry is
+maintained externally and updated through the
+[coffee-clang/recipes](https://github.com/coffee-clang/recipes) repository.
+
+The project's primary dependency model remains git-based and path-based; the registry is a secondary, convenience path
+for discovering and adding simple dependencies.
