@@ -5,6 +5,7 @@
 # Reference
 
 - [Feature System](features.md)
+- [Design Document](../DESIGN.md)
 
 # Commands
 

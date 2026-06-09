@@ -78,7 +78,7 @@ coffee build
 - **[Feature System Guide](features.md)** — Learn about Coffee's conditional compilation
   and optional dependency features
 - **[Command Reference](commands/README.md)** — Detailed documentation for every command
-- **[Design Document](TODO: link to DESIGN.md)** — Architecture and internals
+- **[Design Document](../DESIGN.md)** — Architecture, design philosophy, and complete command reference
 
 ## Project Status
 

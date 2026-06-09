@@ -12,3 +12,4 @@ target/
 /fuzz/corpus/
 /docs/theme/index.hbs
 /gcov_out/
+/.coffee/build-cache
