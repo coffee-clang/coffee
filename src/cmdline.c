@@ -199,12 +199,12 @@ static i64 check_enum_value(const char *val, const char *values[], i64 *out_inde
 
 void cmdline_parser_print_version(void)
 {
-	printf("coffee %s\n", CMDLINE_PARSER_VERSION);
+	printf_safe("coffee %s\n", CMDLINE_PARSER_VERSION);
 }
 
 void cmdline_parser_print_help(void)
 {
-	printf("%s", usage_str);
+	printf_safe("%s", usage_str);
 }
 
 /* ------------------------------------------------------------------ */

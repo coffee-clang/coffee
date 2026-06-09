@@ -43,6 +43,15 @@ i64 build_run(manifest_t *manifest, build_opts_t *opts, sds *args, i64 argc);
 sds dep_resolve_dir(const char *name);
 
 /*
+ * Resolve a dependency directory with version constraint.
+ * When constraint is non-null, searches ~/.coffee/deps/<name>/ for
+ * versioned subdirectories and returns the highest satisfying version.
+ * Falls back to dep_resolve_dir() for null/empty/"*" constraints or
+ * if no versioned match is found.
+ */
+sds dep_resolve_dir_constraint(const char *name, const char *constraint);
+
+/*
  * Append compiler flags for a single dependency to the flags string.
  * Returns the number of .c source files found (appended to src_argv).
  * Pass nullptr for src_list/src_count if only flags are needed.

@@ -29,14 +29,14 @@ int64_t handle_vendor(options *opts)
 	}
 
 	if (m->package.dependencies_count == 0) {
-		printf("No dependencies to vendor.\n");
+		printf_safe("No dependencies to vendor.\n");
 		manifest_free(m);
 		return 0;
 	}
 
 	mkdir("vendor", 0755);
 
-	printf("Vendoring dependencies...\n");
+	printf_safe("Vendoring dependencies...\n");
 
 	for (size_t i = 0; i < m->package.dependencies_count; i++) {
 		const char *entry = m->package.dependencies[i];
@@ -54,7 +54,7 @@ int64_t handle_vendor(options *opts)
 
 		sds dest_dir = sdscatprintf(sdsempty(), "vendor/%s", name);
 
-		printf("  Vendoring: %s\n", name);
+		printf_safe("  Vendoring: %s\n", name);
 
 		/* Look for git or path info in structured deps */
 		bool found = false;
@@ -93,6 +93,6 @@ int64_t handle_vendor(options *opts)
 	}
 
 	manifest_free(m);
-	printf("Vendoring complete.\n");
+	printf_safe("Vendoring complete.\n");
 	return 0;
 }

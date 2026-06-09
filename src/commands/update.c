@@ -35,7 +35,7 @@ int64_t handle_update(options *opts)
 		target = opts->inputs[1];
 	}
 
-	printf("Updating dependencies...\n");
+	printf_safe("Updating dependencies...\n");
 
 	/* Build dep graph with lockfile */
 	lockfile_t  *lf = lockfile_parse("Coffee.lock");
@@ -98,7 +98,7 @@ int64_t handle_update(options *opts)
 				continue;
 			}
 
-			printf("  Updating: %s\n", dep_name);
+			printf_safe("  Updating: %s\n", dep_name);
 
 			new_lf.deps[dep_idx].name = sdsnew(dep_name);
 
@@ -160,6 +160,6 @@ int64_t handle_update(options *opts)
 		return 1;
 	}
 
-	printf("Lockfile updated.\n");
+	printf_safe("Lockfile updated.\n");
 	return 0;
 }

@@ -17,10 +17,11 @@
 
 /* A single node in the dependency graph */
 typedef struct {
-	sds    name;    /* package name */
-	sds    path;    /* resolved filesystem path */
-	sds    version; /* version from library.toml or "*" */
-	sds    commit;  /* pinned git commit SHA */
+	sds    name;               /* package name */
+	sds    path;               /* resolved filesystem path */
+	sds    version;            /* version from library.toml or "*" */
+	sds    version_constraint; /* constraint from parent manifest (e.g. ">= 2.0") */
+	sds    commit;             /* pinned git commit SHA */
 	bool   is_git;
 	sds    git_ref; /* branch, tag, or rev to track */
 	sds    flags;   /* accumulated compiler flags (-I/-L/-l) */
@@ -121,5 +122,18 @@ i64 dep_graph_compare_remote(const dep_graph_t *g, const char *dep_name, sds *be
  * Returns 0 on success.
  */
 i64 dep_graph_fetch_git(dep_graph_t *g, const char *dep_name, bool verbose);
+
+/*
+ * Get or create a dependency graph with caching.
+ *
+ * If project_dir is non-null, loads from cache at
+ * <project_dir>/.coffee/build-cache/<package>.graph when valid.
+ * A cache is valid when it exists and its stored mtimes for
+ * Coffee.toml and Coffee.lock match the current filesystem.
+ * On cache miss, falls back to dep_graph_create() and writes the
+ * result to cache. If project_dir is null, behaves like
+ * dep_graph_create() without caching.
+ */
+dep_graph_t *dep_graph_get(manifest_t *m, lockfile_t *lf, bool offline, const char *project_dir);
 
 #endif /* DEP_GRAPH_H_ */

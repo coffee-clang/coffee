@@ -63,7 +63,7 @@ int64_t handle_test(options *opts)
 		sdsfree(pattern);
 
 		if (test_count == 0) {
-			printf("No test sources found.\n");
+			printf_safe("No test sources found.\n");
 			manifest_free(m);
 			sdsfree(project_dir);
 			return 0;
@@ -202,7 +202,7 @@ int64_t handle_test(options *opts)
 		run_cmd = sdscatprintf(run_cmd, " '%s'", test_filter);
 	}
 	if (opts->verbose) {
-		printf("Running: %s\n", run_cmd);
+		printf_safe("Running: %s\n", run_cmd);
 	}
 
 	ret = system(run_cmd);

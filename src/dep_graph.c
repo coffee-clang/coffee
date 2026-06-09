@@ -2,6 +2,7 @@
 
 #include "build.h"
 #include "strings.h"
+#include "version.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,6 +17,96 @@
 /* ------------------------------------------------------------------ */
 /* Internal helpers                                                    */
 /* ------------------------------------------------------------------ */
+
+/*
+ * Extract version constraint from a TOML table entry.
+ * The value at key can be:
+ *   - a plain string (e.g. ">= 2.0")  -> return it
+ *   - an inline table with a "version" field (e.g. { version = ">= 2.0" }) -> return the version
+ * Returns an sds the caller must free, or nullptr.
+ */
+static sds get_toml_constraint(toml_table_t *table, const char *key)
+{
+	toml_datum_t str_val = toml_string_in(table, key);
+	if (str_val.ok) {
+		sds result = sdsnew(str_val.u.s);
+		free(str_val.u.s);
+		return result;
+	}
+
+	toml_table_t *inline_tbl = toml_table_in(table, key);
+	if (inline_tbl != nullptr) {
+		toml_datum_t ver = toml_string_in(inline_tbl, "version");
+		if (ver.ok) {
+			sds result = sdsnew(ver.u.s);
+			free(ver.u.s);
+			return result;
+		}
+	}
+
+	return nullptr;
+}
+
+/*
+ * Extract version constraint from a raw dependency string (from root manifest).
+ * Handles:
+ *   "name"                  -> nullptr
+ *   "name >= 2.0"           -> ">= 2.0"
+ *   "name = \"1.0.0\""      -> "1.0.0"
+ *   "name = \">= 2.0\""     -> ">= 2.0"
+ *   "name = { ... }"        -> nullptr (inline table)
+ * Returns an sds the caller must free, or nullptr.
+ */
+static sds dep_extract_constraint(const char *entry)
+{
+	if (entry == nullptr) {
+		return nullptr;
+	}
+
+	const char *eq = strchr(entry, '=');
+	if (eq == nullptr) {
+		/* No '=' — try to find inline constraint operator after the name */
+		const char *space = entry;
+		while (*space != '\0' && *space != ' ' && *space != '\t') {
+			space++;
+		}
+		while (*space == ' ' || *space == '\t') {
+			space++;
+		}
+		if (*space == '>' || *space == '<' || *space == '=' || *space == '!') {
+			return sdsnew(space);
+		}
+		return nullptr;
+	}
+
+	/* '=' found — parse part after '=' */
+	const char *after_eq = eq + 1;
+	while (*after_eq == ' ' || *after_eq == '\t') {
+		after_eq++;
+	}
+
+	if (*after_eq == '{') {
+		return nullptr; /* inline table */
+	}
+
+	/* Extract value, stripping quotes */
+	if (*after_eq == '"') {
+		after_eq++;
+		sds result = sdsempty();
+		while (*after_eq != '\0' && *after_eq != '"') {
+			result = sdscatlen(result, after_eq, 1);
+			after_eq++;
+		}
+		return result;
+	}
+
+	/* No quotes — take remaining, trimming trailing whitespace */
+	const char *end = after_eq + strlen(after_eq);
+	while (end > after_eq && (*(end - 1) == ' ' || *(end - 1) == '\t')) {
+		end--;
+	}
+	return sdsnewlen(after_eq, (size_t)(end - after_eq));
+}
 
 static bool node_contains_name(dep_node_t *nodes, size_t n, const char *name)
 {
@@ -267,7 +358,7 @@ dep_graph_t *dep_graph_create(manifest_t *m, lockfile_t *lf, bool offline)
 				}
 			}
 			if (dep_dir == nullptr) {
-				dep_dir = dep_resolve_dir(cur->name);
+				dep_dir = dep_resolve_dir_constraint(cur->name, cur->version_constraint);
 			}
 			if (dep_dir != nullptr) {
 				sdsfree(cur->path);
@@ -318,17 +409,33 @@ dep_graph_t *dep_graph_create(manifest_t *m, lockfile_t *lf, bool offline)
 					if (cur->name != nullptr && strcmp(dep_key, cur->name) == 0) {
 						continue;
 					}
-					/* Skip if already in graph */
-					if (node_contains_name(g->nodes, g->count, dep_key)) {
+					/* Extract version constraint for this dep */
+					sds constraint = get_toml_constraint(transitive_deps, dep_key);
+
+					/* Check if already in graph — validate version constraint */
+					i64 existing = find_node(g, dep_key);
+					if (existing >= 0) {
+						if (constraint != nullptr && g->nodes[existing].version != nullptr) {
+							if (!version_satisfies(g->nodes[existing].version, constraint)) {
+								fprintf_safe(stderr, "Warning: %s requires %s %s but %s is resolved\n",
+								             cur->name != nullptr ? cur->name : "(root)", dep_key, constraint,
+								             g->nodes[existing].version);
+							}
+						}
+						sdsfree(constraint);
 						continue;
 					}
 					/* Add as a new node */
 					i64 child_idx = add_node(g, dep_key);
 					if (child_idx < 0) {
+						sdsfree(constraint);
 						toml_free(dep_conf);
 						sdsfree(dep_dir);
 						dep_graph_free(g);
 						return nullptr;
+					}
+					if (constraint != nullptr) {
+						g->nodes[child_idx].version_constraint = constraint;
 					}
 				}
 				toml_free(dep_conf);
@@ -343,13 +450,47 @@ dep_graph_t *dep_graph_create(manifest_t *m, lockfile_t *lf, bool offline)
 				if (dep_name == nullptr) {
 					continue;
 				}
-				if (!node_contains_name(g->nodes, g->count, dep_name)) {
-					i64 child_idx = add_node(g, dep_name);
-					if (child_idx < 0) {
-						sdsfree(dep_name);
-						dep_graph_free(g);
-						return nullptr;
+
+				/* Extract version constraint from raw string or structured deps */
+				sds constraint = nullptr;
+				/* Check structured deps for inline table version */
+				for (size_t j = 0; j < m->dependencies.deps_count; j++) {
+					if (m->dependencies.deps[j].name != nullptr &&
+					    strcmp(m->dependencies.deps[j].name, dep_name) == 0) {
+						if (m->dependencies.deps[j].version != nullptr) {
+							constraint = sdsnew(m->dependencies.deps[j].version);
+						}
+						break;
 					}
+				}
+				if (constraint == nullptr) {
+					constraint = dep_extract_constraint(m->package.dependencies[i]);
+				}
+
+				/* Check if already in graph — validate version constraint */
+				i64 existing = find_node(g, dep_name);
+				if (existing >= 0) {
+					if (constraint != nullptr && g->nodes[existing].version != nullptr) {
+						if (!version_satisfies(g->nodes[existing].version, constraint)) {
+							fprintf_safe(stderr, "Warning: %s requires %s %s but %s is resolved\n",
+							             m->package.name != nullptr ? m->package.name : "(root)", dep_name, constraint,
+							             g->nodes[existing].version);
+						}
+					}
+					sdsfree(constraint);
+					sdsfree(dep_name);
+					continue;
+				}
+
+				i64 child_idx = add_node(g, dep_name);
+				if (child_idx < 0) {
+					sdsfree(constraint);
+					sdsfree(dep_name);
+					dep_graph_free(g);
+					return nullptr;
+				}
+				if (constraint != nullptr) {
+					g->nodes[child_idx].version_constraint = constraint;
 				}
 				sdsfree(dep_name);
 			}
@@ -370,6 +511,7 @@ void dep_graph_free(dep_graph_t *g)
 		sdsfree(g->nodes[i].name);
 		sdsfree(g->nodes[i].path);
 		sdsfree(g->nodes[i].version);
+		sdsfree(g->nodes[i].version_constraint);
 		sdsfree(g->nodes[i].commit);
 		sdsfree(g->nodes[i].git_ref);
 		sdsfree(g->nodes[i].flags);
@@ -573,14 +715,14 @@ i64 dep_graph_fetch_git(dep_graph_t *g, const char *dep_name, bool verbose)
 	if (ref != nullptr) {
 		/* Check out the configured ref */
 		if (verbose) {
-			printf("    Fetching %s (%s)...\n", dep_name, ref);
+			printf_safe("    Fetching %s (%s)...\n", dep_name, ref);
 		}
 		cmd = sdscatprintf(sdsempty(),
 		                   "cd '%s' && git fetch origin --depth 1 '%s' 2>/dev/null && git checkout '%s' 2>/dev/null",
 		                   dep_path, ref, ref);
 	} else {
 		if (verbose) {
-			printf("    Fetching %s...\n", dep_name);
+			printf_safe("    Fetching %s...\n", dep_name);
 		}
 		cmd = sdscatprintf(
 		    sdsempty(), "cd '%s' && git fetch --depth 1 origin 2>/dev/null && git reset --hard origin/HEAD 2>/dev/null",
@@ -611,4 +753,310 @@ i64 dep_graph_fetch_git(dep_graph_t *g, const char *dep_name, bool verbose)
 		}
 	}
 	return ret;
+}
+
+/* ------------------------------------------------------------------ */
+/* Graph cache — read / write to .coffee/build-cache/                   */
+/* ------------------------------------------------------------------ */
+
+static sds toml_escape(const char *s)
+{
+	if (s == nullptr) {
+		return sdsempty();
+	}
+	sds out = sdsempty();
+	for (const char *p = s; *p != '\0'; p++) {
+		if (*p == '\\') {
+			out = sdscatlen(out, "\\\\", 2);
+		} else if (*p == '"') {
+			out = sdscatlen(out, "\\\"", 2);
+		} else if (*p == '\n') {
+			out = sdscatlen(out, "\\n", 2);
+		} else if (*p == '\r') {
+			out = sdscatlen(out, "\\r", 2);
+		} else if (*p == '\t') {
+			out = sdscatlen(out, "\\t", 2);
+		} else {
+			out = sdscatlen(out, p, 1);
+		}
+	}
+	return out;
+}
+
+static i64 dep_graph_cache_write(const dep_graph_t *g, const char *cache_path, i64 toml_mtime, i64 lock_mtime)
+{
+	FILE *fp = fopen(cache_path, "w");
+	if (fp == nullptr) {
+		return -1;
+	}
+
+	fprintf_safe(fp, "# This file is automatically generated by coffee.\n");
+	fprintf_safe(fp, "# It caches the resolved dependency graph for faster builds.\n");
+	fprintf_safe(fp, "[metadata]\n");
+	fprintf_safe(fp, "coffee_toml_mtime = %lld\n", (long long)toml_mtime);
+	fprintf_safe(fp, "coffee_lock_mtime = %lld\n", (long long)lock_mtime);
+	fprintf_safe(fp, "cache_version = 1\n");
+	fprintf_safe(fp, "offline = %s\n", (int)g->offline ? "true" : "false");
+
+	for (size_t i = 0; i < g->count; i++) {
+		dep_node_t *n = &g->nodes[i];
+		fprintf_safe(fp, "\n[[nodes]]\n");
+		fprintf_safe(fp, "name = \"%s\"\n", n->name != nullptr ? n->name : "");
+
+		if (n->path != nullptr) {
+			sds esc = toml_escape(n->path);
+			fprintf_safe(fp, "path = \"%s\"\n", esc);
+			sdsfree(esc);
+		}
+		if (n->version != nullptr) {
+			sds esc = toml_escape(n->version);
+			fprintf_safe(fp, "version = \"%s\"\n", esc);
+			sdsfree(esc);
+		}
+		if (n->version_constraint != nullptr) {
+			sds esc = toml_escape(n->version_constraint);
+			fprintf_safe(fp, "version_constraint = \"%s\"\n", esc);
+			sdsfree(esc);
+		}
+		if (n->commit != nullptr) {
+			sds esc = toml_escape(n->commit);
+			fprintf_safe(fp, "commit = \"%s\"\n", esc);
+			sdsfree(esc);
+		}
+		fprintf_safe(fp, "is_git = %s\n", (int)n->is_git ? "true" : "false");
+		if (n->git_ref != nullptr) {
+			sds esc = toml_escape(n->git_ref);
+			fprintf_safe(fp, "git_ref = \"%s\"\n", esc);
+			sdsfree(esc);
+		}
+		if (n->flags != nullptr) {
+			sds esc = toml_escape(n->flags);
+			fprintf_safe(fp, "flags = \"%s\"\n", esc);
+			sdsfree(esc);
+		}
+		if (n->src_count > 0 && n->sources != nullptr) {
+			fprintf_safe(fp, "sources = [");
+			for (size_t j = 0; j < n->src_count; j++) {
+				sds esc = toml_escape(n->sources[j]);
+				fprintf_safe(fp, "\"%s\"%s", esc, (j + 1 < n->src_count) ? ", " : "");
+				sdsfree(esc);
+			}
+			fprintf_safe(fp, "]\n");
+		}
+	}
+
+	fclose(fp);
+	return 0;
+}
+
+static dep_graph_t *dep_graph_load_cached(const char *cache_path, i64 toml_mtime, i64 lock_mtime)
+{
+	FILE *fp = fopen(cache_path, "r");
+	if (fp == nullptr) {
+		return nullptr;
+	}
+
+	char          errbuf[256];
+	toml_table_t *conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
+	fclose(fp);
+
+	if (conf == nullptr) {
+		return nullptr;
+	}
+
+	/* Validate metadata */
+	toml_table_t *meta = toml_table_in(conf, "metadata");
+	if (meta == nullptr) {
+		toml_free(conf);
+		return nullptr;
+	}
+
+	toml_datum_t cached_ver = toml_int_in(meta, "cache_version");
+	if (!cached_ver.ok || cached_ver.u.i != 1) {
+		toml_free(conf);
+		return nullptr;
+	}
+
+	toml_datum_t cached_toml_mtime = toml_int_in(meta, "coffee_toml_mtime");
+	if (!cached_toml_mtime.ok || cached_toml_mtime.u.i != toml_mtime) {
+		toml_free(conf);
+		return nullptr;
+	}
+
+	toml_datum_t cached_lock_mtime = toml_int_in(meta, "coffee_lock_mtime");
+	if (!cached_lock_mtime.ok || cached_lock_mtime.u.i != lock_mtime) {
+		toml_free(conf);
+		return nullptr;
+	}
+
+	/* Read nodes */
+	toml_array_t *nodes_arr = toml_array_in(conf, "nodes");
+	if (nodes_arr == nullptr) {
+		toml_free(conf);
+		return nullptr;
+	}
+
+	i64 ncount = toml_array_nelem(nodes_arr);
+	if (ncount <= 0) {
+		toml_free(conf);
+		return nullptr;
+	}
+
+	dep_graph_t *g = calloc(1, sizeof(dep_graph_t));
+	if (g == nullptr) {
+		toml_free(conf);
+		return nullptr;
+	}
+
+	g->capacity = (size_t)ncount;
+	g->nodes    = calloc(g->capacity, sizeof(dep_node_t));
+	if (g->nodes == nullptr) {
+		free(g);
+		toml_free(conf);
+		return nullptr;
+	}
+
+	/* Read offline flag from metadata */
+	toml_datum_t cached_offline = toml_bool_in(meta, "offline");
+	if (cached_offline.ok != 0) {
+		g->offline = (cached_offline.u.b != 0);
+	} else {
+		g->offline = false;
+	}
+
+	for (i64 i = 0; i < ncount; i++) {
+		toml_table_t *ntbl = toml_table_at(nodes_arr, i);
+		if (ntbl == nullptr) {
+			continue;
+		}
+
+		toml_datum_t name_d = toml_string_in(ntbl, "name");
+		if (name_d.ok) {
+			g->nodes[i].name = sdsnew(name_d.u.s);
+			free(name_d.u.s);
+		}
+
+		toml_datum_t path_d = toml_string_in(ntbl, "path");
+		if (path_d.ok) {
+			g->nodes[i].path = sdsnew(path_d.u.s);
+			free(path_d.u.s);
+		}
+
+		toml_datum_t ver_d = toml_string_in(ntbl, "version");
+		if (ver_d.ok) {
+			g->nodes[i].version = sdsnew(ver_d.u.s);
+			free(ver_d.u.s);
+		}
+
+		toml_datum_t vc_d = toml_string_in(ntbl, "version_constraint");
+		if (vc_d.ok) {
+			g->nodes[i].version_constraint = sdsnew(vc_d.u.s);
+			free(vc_d.u.s);
+		}
+
+		toml_datum_t commit_d = toml_string_in(ntbl, "commit");
+		if (commit_d.ok) {
+			g->nodes[i].commit = sdsnew(commit_d.u.s);
+			free(commit_d.u.s);
+		}
+
+		toml_datum_t git_d = toml_bool_in(ntbl, "is_git");
+		if (git_d.ok != 0) {
+			g->nodes[i].is_git = (git_d.u.b != 0);
+		} else {
+			g->nodes[i].is_git = false;
+		}
+
+		toml_datum_t ref_d = toml_string_in(ntbl, "git_ref");
+		if (ref_d.ok) {
+			g->nodes[i].git_ref = sdsnew(ref_d.u.s);
+			free(ref_d.u.s);
+		}
+
+		toml_datum_t flags_d = toml_string_in(ntbl, "flags");
+		if (flags_d.ok) {
+			g->nodes[i].flags = sdsnew(flags_d.u.s);
+			free(flags_d.u.s);
+		}
+
+		toml_array_t *src_arr = toml_array_in(ntbl, "sources");
+		if (src_arr != nullptr) {
+			i64 src_count = toml_array_nelem(src_arr);
+			if (src_count > 0) {
+				g->nodes[i].sources   = calloc((size_t)src_count, sizeof(sds));
+				g->nodes[i].src_count = 0;
+				if (g->nodes[i].sources != nullptr) {
+					for (i64 j = 0; j < src_count; j++) {
+						toml_datum_t s = toml_string_at(src_arr, j);
+						if (s.ok) {
+							g->nodes[i].sources[g->nodes[i].src_count] = sdsnew(s.u.s);
+							g->nodes[i].src_count++;
+							free(s.u.s);
+						}
+					}
+				}
+			}
+		}
+	}
+
+	g->count = (size_t)ncount;
+	toml_free(conf);
+	return g;
+}
+
+dep_graph_t *dep_graph_get(manifest_t *m, lockfile_t *lf, bool offline, const char *project_dir)
+{
+	if (m == nullptr) {
+		return nullptr;
+	}
+	if (project_dir == nullptr) {
+		return dep_graph_create(m, lf, offline);
+	}
+
+	/* Stat Coffee.toml and Coffee.lock for cache validation */
+	i64 toml_mtime = 0;
+	i64 lock_mtime = 0;
+
+	struct stat st;
+	sds         toml_path = sdscatprintf(sdsempty(), "%s/Coffee.toml", project_dir);
+	if (stat(toml_path, &st) == 0) {
+		toml_mtime = (i64)st.st_mtime;
+	}
+	sdsfree(toml_path);
+
+	sds lock_path = sdscatprintf(sdsempty(), "%s/Coffee.lock", project_dir);
+	if (stat(lock_path, &st) == 0) {
+		lock_mtime = (i64)st.st_mtime;
+	}
+	sdsfree(lock_path);
+
+	/* Build cache path — create directory tree if needed */
+	sds coffee_dir = sdscatprintf(sdsempty(), "%s/.coffee", project_dir);
+	mkdir(coffee_dir, 0755);
+
+	sds cache_dir = sdscatprintf(sdsempty(), "%s/build-cache", coffee_dir);
+	mkdir(cache_dir, 0755);
+
+	sdsfree(coffee_dir);
+
+	const char *pkg_name   = m->package.name != nullptr ? m->package.name : "unnamed";
+	sds         cache_path = sdscatprintf(sdsempty(), "%s/%s.graph", cache_dir, pkg_name);
+
+	/* Try cache */
+	dep_graph_t *g = dep_graph_load_cached(cache_path, toml_mtime, lock_mtime);
+	if (g != nullptr) {
+		sdsfree(cache_path);
+		sdsfree(cache_dir);
+		return g;
+	}
+
+	/* Cache miss — build from scratch */
+	g = dep_graph_create(m, lf, offline);
+	if (g != nullptr) {
+		dep_graph_cache_write(g, cache_path, toml_mtime, lock_mtime);
+	}
+
+	sdsfree(cache_path);
+	sdsfree(cache_dir);
+	return g;
 }

@@ -34,7 +34,7 @@ int64_t handle_outdated(options *opts)
 	}
 
 	if (lf->deps_count == 0) {
-		printf("No dependencies in lockfile.\n");
+		printf_safe("No dependencies in lockfile.\n");
 		lockfile_free(lf);
 		manifest_free(m);
 		return 0;
@@ -48,8 +48,8 @@ int64_t handle_outdated(options *opts)
 		return 1;
 	}
 
-	printf("%-20s %-15s %s\n", "PACKAGE", "PINNED", "STATUS");
-	printf("%-20s %-15s %s\n", "-------", "------", "------");
+	printf_safe("%-20s %-15s %s\n", "PACKAGE", "PINNED", "STATUS");
+	printf_safe("%-20s %-15s %s\n", "-------", "------", "------");
 
 	i64 outdated_count = 0;
 
@@ -59,7 +59,7 @@ int64_t handle_outdated(options *opts)
 		if (!dep_graph_is_git(g, pkg)) {
 			/* Non-git deps: show pinned version but no remote check */
 			const char *pinned = lf->deps[i].version ? lf->deps[i].version : "*";
-			printf("%-20s %-15s %s\n", pkg, pinned, "(not a git dep)");
+			printf_safe("%-20s %-15s %s\n", pkg, pinned, "(not a git dep)");
 			continue;
 		}
 
@@ -90,16 +90,16 @@ int64_t handle_outdated(options *opts)
 			snprintf_safe(pinned_short, sizeof(pinned_short), "-");
 		}
 
-		printf("%-20s %-15s %s\n", pkg, pinned_short, status);
+		printf_safe("%-20s %-15s %s\n", pkg, pinned_short, status);
 		sdsfree(behind_str);
 	}
 
-	printf("\n");
+	printf_safe("\n");
 	if (outdated_count > 0) {
-		printf("%lld %s outdated.\n", (long long)outdated_count,
-		       outdated_count == 1 ? "dependency is" : "dependencies are");
+		printf_safe("%lld %s outdated.\n", (long long)outdated_count,
+		            outdated_count == 1 ? "dependency is" : "dependencies are");
 	} else {
-		printf("All dependencies are up-to-date.\n");
+		printf_safe("All dependencies are up-to-date.\n");
 	}
 
 	dep_graph_free(g);

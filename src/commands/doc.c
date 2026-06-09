@@ -21,10 +21,10 @@ static i64 doc_check(void)
 {
 	i64 ret = system("command -v doxygen >/dev/null 2>&1");
 	if (ret != 0) {
-		printf("doxygen not found. Install it to generate documentation.\n");
+		printf_safe("doxygen not found. Install it to generate documentation.\n");
 		return 1;
 	}
-	printf("doxygen found.\n");
+	printf_safe("doxygen found.\n");
 	return 0;
 }
 
@@ -162,7 +162,7 @@ static i64 doc_generate_doxyfile(manifest_t *m, const sds project_dir)
 
 	fclose(df);
 	doc_settings_free(&cfg);
-	printf("Generated Doxyfile\n");
+	printf_safe("Generated Doxyfile\n");
 	sdsfree(doxyfile_path);
 	return 0;
 }
@@ -173,7 +173,7 @@ static i64 doc_generate_doxyfile(manifest_t *m, const sds project_dir)
  */
 static i64 doc_generate(const sds project_dir, manifest_t *m)
 {
-	printf("Generating documentation...\n");
+	printf_safe("Generating documentation...\n");
 
 	/* Check for existing Doxyfile */
 	sds doxyfile_path = sdscatprintf(sdsempty(), "%s/Doxyfile", project_dir);
@@ -202,8 +202,9 @@ static i64 doc_generate(const sds project_dir, manifest_t *m)
 				return 1;
 			}
 		} else {
-			printf("No Doxyfile or [doc] section found.\n");
-			printf("Tip: Run 'doxygen -g' to generate a default Doxyfile, or add a [doc] section to Coffee.toml\n");
+			printf_safe("No Doxyfile or [doc] section found.\n");
+			printf_safe(
+			    "Tip: Run 'doxygen -g' to generate a default Doxyfile, or add a [doc] section to Coffee.toml\n");
 			sdsfree(doxyfile_path);
 			return 0;
 		}
@@ -218,7 +219,7 @@ static i64 doc_generate(const sds project_dir, manifest_t *m)
 		return 1;
 	}
 
-	printf("Documentation complete.\n");
+	printf_safe("Documentation complete.\n");
 	return 0;
 }
 

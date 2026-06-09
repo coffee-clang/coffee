@@ -26,7 +26,7 @@ int64_t handle_locate_project(options *opts)
 		return 1;
 	}
 
-	printf("{ \"root\": \"%s\" }\n", abs_path);
+	printf_safe("{ \"root\": \"%s\" }\n", abs_path);
 	sdsfree(abs_path);
 
 	sdsfree(manifest_path);

@@ -27,7 +27,7 @@ int64_t handle_pkgid(options *opts)
 	const char *name    = m->package.name != nullptr ? m->package.name : "project";
 	const char *version = m->package.version != nullptr ? m->package.version : "0.1.0";
 
-	printf("%s:%s\n", name, version);
+	printf_safe("%s:%s\n", name, version);
 
 	manifest_free(m);
 	return 0;

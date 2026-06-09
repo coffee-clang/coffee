@@ -5,7 +5,7 @@
 int64_t handle_logout(options *opts)
 {
 	(void)opts;
-	printf("This project does not use a central registry.\n");
-	printf("No credentials to remove.\n");
+	printf_safe("This project does not use a central registry.\n");
+	printf_safe("No credentials to remove.\n");
 	return 0;
 }

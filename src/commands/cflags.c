@@ -114,7 +114,7 @@ int64_t handle_cflags(options *opts)
 		sdsupdatelen(buf);
 	}
 
-	printf("%s\n", buf);
+	printf_safe("%s\n", buf);
 	sdsfree(buf);
 	return 0;
 }

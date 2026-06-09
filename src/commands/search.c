@@ -14,7 +14,7 @@ int64_t handle_search(options *opts)
 	sdsfree(query);
 
 	if (results == nullptr || results->count == 0) {
-		printf("No packages found.\n");
+		printf_safe("No packages found.\n");
 		if (results != nullptr) {
 			registry_free_recipes(results);
 		}
@@ -23,8 +23,8 @@ int64_t handle_search(options *opts)
 
 	for (size_t i = 0; i < results->count; i++) {
 		recipe_t *r = &results->recipes[i];
-		printf("%-30s %-12s %s\n", r->name ? r->name : "", r->version ? r->version : "",
-		       r->description ? r->description : "");
+		printf_safe("%-30s %-12s %s\n", r->name ? r->name : "", r->version ? r->version : "",
+		            r->description ? r->description : "");
 	}
 
 	registry_free_recipes(results);

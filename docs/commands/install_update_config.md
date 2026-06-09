@@ -1,10 +1,10 @@
 # install-update-config
 
-Install or update configuration for the project.
+Install or update the Coffee configuration file with default values.
 
 ## Description
 
-This command is a placeholder for updating project-specific configuration. It is not yet implemented.
+Bootstraps `~/.coffee/config.toml` if it does not exist, and ensures all expected configuration keys are present. Missing keys are added with sensible defaults; existing user settings are never overwritten.
 
 ## Usage
 
@@ -12,7 +12,18 @@ This command is a placeholder for updating project-specific configuration. It is
 coffee install-update-config
 ```
 
+## Defaults
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `default-target` | `"debug"` | Default build target when not specified |
+| `default-edition` | `"c23"` | Default C standard edition |
+| `build.jobs` | `"0"` | Parallel build jobs (0 = auto-detect) |
+| `registry.index-url` | `"https://coffee-clang.github.io/recipes/.well-known/packages.json.zstd"` | Registry index URL |
+
 ## Implementation Notes
 
-- Currently returns an error with message: "not yet supported"
-- Intended to sync configuration between the project and system-level settings
+- Creates `~/.coffee/` directory if it doesn't exist
+- Reads existing config line-by-line to preserve formatting and comments
+- Inserts missing keys in the appropriate `[section]` block
+- Reports "Configuration is up-to-date." if no changes were needed

@@ -8,7 +8,7 @@
 
 int64_t handle_lint(options *opts)
 {
-	printf("Linting source code...\n");
+	printf_safe("Linting source code...\n");
 
 	char *manifest_path = project_find_manifest(nullptr);
 	if (manifest_path == nullptr) {
@@ -33,7 +33,7 @@ int64_t handle_lint(options *opts)
 	sdsfree(inc_flags);
 
 	if (opts->verbose) {
-		printf("Running: %s\n", cmd);
+		printf_safe("Running: %s\n", cmd);
 	}
 
 	i64 ret = system(cmd);
@@ -48,6 +48,6 @@ int64_t handle_lint(options *opts)
 		return 1;
 	}
 
-	printf("Linting complete.\n");
+	printf_safe("Linting complete.\n");
 	return 0;
 }

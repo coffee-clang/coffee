@@ -24,27 +24,27 @@ int64_t handle_info(options *opts)
 		return 1;
 	}
 
-	printf("Package Information:\n");
+	printf_safe("Package Information:\n");
 	if (m->package.name) {
-		printf("  Name:        %s\n", m->package.name);
+		printf_safe("  Name:        %s\n", m->package.name);
 	}
 	if (m->package.version) {
-		printf("  Version:     %s\n", m->package.version);
+		printf_safe("  Version:     %s\n", m->package.version);
 	}
 	if (m->package.edition) {
-		printf("  Edition:     %s\n", m->package.edition);
+		printf_safe("  Edition:     %s\n", m->package.edition);
 	}
 	if (m->package.description) {
-		printf("  Description: %s\n", m->package.description);
+		printf_safe("  Description: %s\n", m->package.description);
 	}
 	if (m->package.license) {
-		printf("  License:     %s\n", m->package.license);
+		printf_safe("  License:     %s\n", m->package.license);
 	}
 
 	if (m->package.dependencies_count > 0) {
-		printf("  Dependencies (%zu):\n", m->package.dependencies_count);
+		printf_safe("  Dependencies (%zu):\n", m->package.dependencies_count);
 		for (size_t i = 0; i < m->package.dependencies_count; i++) {
-			printf("    - %s\n", m->package.dependencies[i]);
+			printf_safe("    - %s\n", m->package.dependencies[i]);
 		}
 	}
 

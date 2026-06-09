@@ -101,6 +101,37 @@ static void create_dep(const char *dep_name, const char *transitive_deps_str)
 	sdsfree(dep_dir);
 }
 
+static void create_dep_ver(const char *dep_name, const char *version, const char *transitive_deps_str)
+{
+	sds dep_dir = sdscatprintf(sdsempty(), "deps/%s", dep_name);
+	mkdir(dep_dir, 0755);
+
+	sds src_dir = sdscatprintf(sdsempty(), "deps/%s/src", dep_name);
+	mkdir(src_dir, 0755);
+
+	sds src_file    = sdscatprintf(sdsempty(), "deps/%s/src/%s.c", dep_name, dep_name);
+	sds src_content = sdscatprintf(sdsempty(), "int %s_do(void) { return 0; }\n", dep_name);
+	write_file(src_file, src_content);
+
+	sds lt_path    = sdscatprintf(sdsempty(), "deps/%s/library.toml", dep_name);
+	sds lt_content = sdscatprintf(sdsempty(),
+	                              "[package]\n"
+	                              "name = \"%s\"\n"
+	                              "version = \"%s\"\n",
+	                              dep_name, version);
+	if (transitive_deps_str) {
+		lt_content = sdscat(lt_content, transitive_deps_str);
+	}
+	write_file(lt_path, lt_content);
+
+	sdsfree(lt_content);
+	sdsfree(lt_path);
+	sdsfree(src_content);
+	sdsfree(src_file);
+	sdsfree(src_dir);
+	sdsfree(dep_dir);
+}
+
 /* ===================== NULL / EMPTY MANIFEST ===================== */
 
 TEST(dep_graph_null_manifest)
@@ -720,6 +751,396 @@ TEST(dep_graph_multiple_transitive)
 	PASS();
 }
 
+/* ===================== VERSION CONSTRAINT FIELD ===================== */
+
+TEST(dep_graph_version_constraint_field)
+{
+	setup_tmpdir("vconstraint");
+	mkdir("src", 0755);
+	mkdir("deps", 0755);
+	create_dep("libCstr", nullptr);
+	write_manifest("vconstraint", "dependencies = [\"libCstr = \\\">= 2.0\\\"\"]\n");
+
+	manifest_t *m = manifest_parse("Coffee.toml");
+	ASSERT(m != nullptr, "parse");
+
+	dep_graph_t *g = dep_graph_create(m, nullptr, false);
+	ASSERT(g != nullptr, "graph created");
+	ASSERT(dep_graph_count(g) == 2, "root + dep");
+
+	/* version_constraint should be set from the raw dependency string */
+	ASSERT(g->nodes[1].version_constraint != nullptr, "constraint field set");
+	ASSERT(strcmp(g->nodes[1].version_constraint, ">= 2.0") == 0, "constraint value correct");
+
+	dep_graph_free(g);
+	manifest_free(m);
+	teardown_tmpdir("vconstraint");
+	PASS();
+}
+
+/* ===================== TRANSITIVE CONSTRAINT SATISFIED ===================== */
+
+TEST(dep_graph_transitive_constraint_satisfied)
+{
+	setup_tmpdir("tcsat");
+	mkdir("src", 0755);
+	mkdir("deps", 0755);
+
+	/* libB version 2.0.0 — satisfies >= 1.0 constraint from libA */
+	create_dep_ver("libB", "2.0.0", nullptr);
+	create_dep("libA", "[dependencies]\nlibB = \">= 1.0.0\"\n");
+	write_manifest("tcsat", "dependencies = [\"libA\"]\n");
+
+	manifest_t *m = manifest_parse("Coffee.toml");
+	ASSERT(m != nullptr, "parse");
+
+	dep_graph_t *g = dep_graph_create(m, nullptr, false);
+	ASSERT(g != nullptr, "graph created");
+	ASSERT(dep_graph_count(g) == 3, "root + libA + libB");
+
+	/* libB has version_constraint from libA */
+	bool found_lib_b = false;
+	for (size_t j = 0; j < g->count; j++) {
+		if (g->nodes[j].name != nullptr && strcmp(g->nodes[j].name, "libB") == 0) {
+			found_lib_b = true;
+			ASSERT(g->nodes[j].version_constraint != nullptr, "libB has constraint");
+			ASSERT(strcmp(g->nodes[j].version_constraint, ">= 1.0.0") == 0, "constraint correct");
+			break;
+		}
+	}
+	ASSERT(found_lib_b, "libB found in graph");
+
+	dep_graph_free(g);
+	manifest_free(m);
+	teardown_tmpdir("tcsat");
+	PASS();
+}
+
+/* ===================== TRANSITIVE CONSTRAINT UNSATISFIED ===================== */
+
+TEST(dep_graph_transitive_constraint_unsatisfied)
+{
+	setup_tmpdir("tcunsat");
+	mkdir("src", 0755);
+	mkdir("deps", 0755);
+
+	/* libB version 1.0.0 — does NOT satisfy >= 2.0 constraint from libA */
+	create_dep_ver("libB", "1.0.0", nullptr);
+	create_dep("libA", "[dependencies]\nlibB = \">= 2.0.0\"\n");
+	write_manifest("tcunsat", "dependencies = [\"libA\"]\n");
+
+	manifest_t *m = manifest_parse("Coffee.toml");
+	ASSERT(m != nullptr, "parse");
+
+	dep_graph_t *g = dep_graph_create(m, nullptr, false);
+	ASSERT(g != nullptr, "graph created even with unsatisfied constraint");
+	ASSERT(dep_graph_count(g) == 3, "all deps still in graph (warning only)");
+
+	dep_graph_free(g);
+	manifest_free(m);
+	teardown_tmpdir("tcunsat");
+	PASS();
+}
+
+/* ===================== ROOT CONSTRAINT FROM RAW STRING ===================== */
+
+TEST(dep_graph_root_constraint)
+{
+	setup_tmpdir("rcsat");
+	mkdir("src", 0755);
+	mkdir("deps", 0755);
+
+	/* libUse version 1.5.0 — satisfies == 1.5.0 constraint */
+	create_dep_ver("libUse", "1.5.0", nullptr);
+	write_manifest("rcsat", "dependencies = [\"libUse = \\\"== 1.5.0\\\"\"]\n");
+
+	manifest_t *m = manifest_parse("Coffee.toml");
+	ASSERT(m != nullptr, "parse");
+
+	dep_graph_t *g = dep_graph_create(m, nullptr, false);
+	ASSERT(g != nullptr, "graph created");
+	ASSERT(dep_graph_count(g) == 2, "root + dep");
+
+	dep_graph_free(g);
+	manifest_free(m);
+	teardown_tmpdir("rcsat");
+	PASS();
+}
+
+/* ===================== DIAMOND WITH MIXED CONSTRAINTS ===================== */
+
+TEST(dep_graph_constraint_diamond)
+{
+	setup_tmpdir("cdiamond");
+	mkdir("src", 0755);
+	mkdir("deps", 0755);
+
+	/* libShared version 2.3.0 */
+	create_dep_ver("libShared", "2.3.0", nullptr);
+	/* libTop requires libShared >= 2.0 */
+	create_dep("libTop", "[dependencies]\nlibShared = \">= 2.0.0\"\n");
+	/* libSide requires libShared >= 2.0, <= 2.4 */
+	create_dep("libSide", "[dependencies]\nlibShared = \">= 2.0.0, <= 2.4.0\"\n");
+	write_manifest("cdiamond", "dependencies = [\"libTop\", \"libSide\"]\n");
+
+	manifest_t *m = manifest_parse("Coffee.toml");
+	ASSERT(m != nullptr, "parse");
+
+	dep_graph_t *g = dep_graph_create(m, nullptr, false);
+	ASSERT(g != nullptr, "graph created");
+
+	/* root + libTop + libSide + libShared = 4 (deduplicated) */
+	ASSERT(dep_graph_count(g) == 4, "diamond deduplicated with constraints");
+
+	/* libShared is present */
+	ASSERT(dep_graph_path(g, "libShared") != nullptr, "libShared resolved");
+
+	dep_graph_free(g);
+	manifest_free(m);
+	teardown_tmpdir("cdiamond");
+	PASS();
+}
+
+/* ===================== WILDCARD CONSTRAINT ===================== */
+
+TEST(dep_graph_constraint_wildcard)
+{
+	setup_tmpdir("cwild");
+	mkdir("src", 0755);
+	mkdir("deps", 0755);
+
+	create_dep_ver("libW", "0.0.1", nullptr);
+	create_dep("libA", "[dependencies]\nlibW = \"*\"\n");
+	write_manifest("cwild", "dependencies = [\"libA\"]\n");
+
+	manifest_t *m = manifest_parse("Coffee.toml");
+	ASSERT(m != nullptr, "parse");
+
+	dep_graph_t *g = dep_graph_create(m, nullptr, false);
+	ASSERT(g != nullptr, "graph created");
+	ASSERT(dep_graph_count(g) == 3, "root + libA + libW (wildcard always satisfied)");
+
+	dep_graph_free(g);
+	manifest_free(m);
+	teardown_tmpdir("cwild");
+	PASS();
+}
+
+/* ===================== CACHE TESTS ===================== */
+
+TEST(dep_graph_cache_hit)
+{
+	setup_tmpdir("cachehit");
+	mkdir("src", 0755);
+	mkdir("deps", 0755);
+	create_dep("libFoo", nullptr);
+	write_manifest("cachehit", "dependencies = [\"libFoo\"]\n");
+
+	manifest_t *m = manifest_parse("Coffee.toml");
+	ASSERT(m != nullptr, "parse");
+
+	/* First call: builds from scratch, writes cache */
+	dep_graph_t *g1 = dep_graph_get(m, nullptr, true, ".");
+	ASSERT(g1 != nullptr, "first get succeeds");
+	ASSERT(dep_graph_count(g1) == 2, "root + libFoo");
+
+	/* Second call: should hit cache */
+	dep_graph_t *g2 = dep_graph_get(m, nullptr, true, ".");
+	ASSERT(g2 != nullptr, "second get succeeds");
+	ASSERT(dep_graph_count(g2) == 2, "same node count from cache");
+
+	ASSERT(dep_graph_path(g2, "libFoo") != nullptr, "cached path resolved");
+
+	dep_graph_free(g2);
+	dep_graph_free(g1);
+	manifest_free(m);
+	teardown_tmpdir("cachehit");
+	PASS();
+}
+
+TEST(dep_graph_cache_stale_toml)
+{
+	setup_tmpdir("cachestale");
+	mkdir("src", 0755);
+	mkdir("deps", 0755);
+	create_dep("libBar", nullptr);
+	write_manifest("cachestale", "dependencies = [\"libBar\"]\n");
+
+	manifest_t *m = manifest_parse("Coffee.toml");
+	ASSERT(m != nullptr, "parse");
+
+	/* Build graph and cache it */
+	dep_graph_t *g1 = dep_graph_get(m, nullptr, true, ".");
+	ASSERT(g1 != nullptr, "first get succeeds");
+	ASSERT(dep_graph_count(g1) == 2, "root + libBar");
+	dep_graph_free(g1);
+
+	/* Touch Coffee.toml to invalidate cache */
+	sleep(1);
+	FILE *fp = fopen("Coffee.toml", "a");
+	ASSERT(fp != nullptr, "reopen Coffee.toml");
+	fprintf_safe(fp, "\n");
+	fclose(fp);
+
+	/* Second call: should miss cache, rebuild */
+	dep_graph_t *g2 = dep_graph_get(m, nullptr, true, ".");
+	ASSERT(g2 != nullptr, "second get succeeds after invalidation");
+	ASSERT(dep_graph_count(g2) == 2, "same count after rebuild");
+
+	dep_graph_free(g2);
+	manifest_free(m);
+	teardown_tmpdir("cachestale");
+	PASS();
+}
+
+TEST(dep_graph_get_null_project_dir)
+{
+	setup_tmpdir("nulldir");
+	mkdir("src", 0755);
+	mkdir("deps", 0755);
+	create_dep("libNull", nullptr);
+	write_manifest("nulldir", "dependencies = [\"libNull\"]\n");
+
+	manifest_t *m = manifest_parse("Coffee.toml");
+	ASSERT(m != nullptr, "parse");
+
+	/* Null project_dir: falls back to dep_graph_create, no caching */
+	dep_graph_t *g = dep_graph_get(m, nullptr, true, nullptr);
+	ASSERT(g != nullptr, "graph created without caching");
+	ASSERT(dep_graph_count(g) == 2, "root + libNull");
+
+	dep_graph_free(g);
+	manifest_free(m);
+	teardown_tmpdir("nulldir");
+	PASS();
+}
+
+TEST(dep_graph_cache_corrupt_recovery)
+{
+	setup_tmpdir("cachecorrupt");
+	mkdir("src", 0755);
+	mkdir("deps", 0755);
+	create_dep("libCorrupt", nullptr);
+	write_manifest("cachecorrupt", "dependencies = [\"libCorrupt\"]\n");
+
+	manifest_t *m = manifest_parse("Coffee.toml");
+	ASSERT(m != nullptr, "parse");
+
+	/* Build graph and cache it */
+	dep_graph_t *g1 = dep_graph_get(m, nullptr, true, ".");
+	ASSERT(g1 != nullptr, "first get succeeds");
+	dep_graph_free(g1);
+
+	/* Corrupt the cache file */
+	sds   cache_path = sdscatprintf(sdsempty(), ".coffee/build-cache/cachecorrupt.graph");
+	FILE *cfp        = fopen(cache_path, "w");
+	ASSERT(cfp != nullptr, "open cache for corruption");
+	fprintf_safe(cfp, "this is not valid toml {{{");
+	fclose(cfp);
+	sdsfree(cache_path);
+
+	/* Second call: should recover from corrupt cache */
+	dep_graph_t *g2 = dep_graph_get(m, nullptr, true, ".");
+	ASSERT(g2 != nullptr, "recovers from corrupt cache");
+	ASSERT(dep_graph_count(g2) == 2, "correct count after recovery");
+
+	dep_graph_free(g2);
+	manifest_free(m);
+	teardown_tmpdir("cachecorrupt");
+	PASS();
+}
+
+TEST(dep_graph_cache_with_lockfile)
+{
+	setup_tmpdir("cachelock");
+	mkdir("src", 0755);
+	mkdir("deps", 0755);
+	create_dep("libLocked", nullptr);
+	write_manifest("cachelock", "dependencies = [\"libLocked\"]\n");
+
+	char cwd_buf[4096];
+	ASSERT(getcwd(cwd_buf, sizeof(cwd_buf)) != nullptr, "getcwd");
+	sds lockpath = sdscatprintf(sdsempty(), "%s/deps/libLocked", cwd_buf);
+
+	FILE *lfp = fopen("Coffee.lock", "w");
+	ASSERT(lfp != nullptr, "create Coffee.lock");
+	fprintf_safe(lfp, "[[dependency]]\n");
+	fprintf_safe(lfp, "name = \"libLocked\"\n");
+	fprintf_safe(lfp, "version = \"1.0.0\"\n");
+	fprintf_safe(lfp, "path = \"%s\"\n", lockpath);
+	fclose(lfp);
+	sdsfree(lockpath);
+
+	manifest_t *m = manifest_parse("Coffee.toml");
+	ASSERT(m != nullptr, "parse manifest");
+
+	lockfile_t *lock = lockfile_parse("Coffee.lock");
+	ASSERT(lock != nullptr, "parse lockfile");
+
+	/* Build with lockfile */
+	dep_graph_t *g1 = dep_graph_get(m, lock, true, ".");
+	ASSERT(g1 != nullptr, "first get with lockfile");
+	ASSERT(dep_graph_count(g1) == 2, "root + dep via lockfile");
+	const char *path1 = dep_graph_path(g1, "libLocked");
+	ASSERT(path1 != nullptr, "path from lockfile in g1");
+
+	/* Second get: should hit cache */
+	dep_graph_t *g2 = dep_graph_get(m, lock, true, ".");
+	ASSERT(g2 != nullptr, "cache hit with lockfile");
+	const char *path2 = dep_graph_path(g2, "libLocked");
+	ASSERT(path2 != nullptr, "path from lockfile in g2");
+	ASSERT(strcmp(path1, path2) == 0, "same path from cache");
+
+	dep_graph_free(g2);
+	dep_graph_free(g1);
+	lockfile_free(lock);
+	manifest_free(m);
+	teardown_tmpdir("cachelock");
+	PASS();
+}
+
+TEST(dep_graph_cache_lockfile_mtime_change)
+{
+	setup_tmpdir("lockmtime");
+	mkdir("src", 0755);
+	mkdir("deps", 0755);
+	create_dep("libMT", nullptr);
+	write_manifest("lockmtime", "dependencies = [\"libMT\"]\n");
+
+	/* Create initial lockfile */
+	FILE *lfp = fopen("Coffee.lock", "w");
+	ASSERT(lfp != nullptr, "create Coffee.lock");
+	fprintf_safe(lfp, "[[dependency]]\nname = \"libMT\"\nversion = \"1.0.0\"\n");
+	fclose(lfp);
+
+	manifest_t *m = manifest_parse("Coffee.toml");
+	ASSERT(m != nullptr, "parse");
+
+	lockfile_t *lock = lockfile_parse("Coffee.lock");
+	ASSERT(lock != nullptr, "parse lockfile");
+
+	dep_graph_t *g1 = dep_graph_get(m, lock, true, ".");
+	ASSERT(g1 != nullptr, "first get");
+	dep_graph_free(g1);
+
+	/* Touch Coffee.lock to invalidate cache */
+	sleep(1);
+	lfp = fopen("Coffee.lock", "a");
+	ASSERT(lfp != nullptr, "reopen Coffee.lock");
+	fprintf_safe(lfp, "\n");
+	fclose(lfp);
+
+	dep_graph_t *g2 = dep_graph_get(m, lock, true, ".");
+	ASSERT(g2 != nullptr, "rebuild after lockfile change");
+	ASSERT(dep_graph_count(g2) == 2, "correct count after lockfile invalidation");
+
+	dep_graph_free(g2);
+	lockfile_free(lock);
+	manifest_free(m);
+	teardown_tmpdir("lockmtime");
+	PASS();
+}
+
 void coffee_register_dep_graph_tests(void)
 {
 	TEST_REGISTER(dep_graph_null_manifest);
@@ -741,4 +1162,16 @@ void coffee_register_dep_graph_tests(void)
 	TEST_REGISTER(dep_graph_root_properties);
 	TEST_REGISTER(dep_graph_missing_dep_dir);
 	TEST_REGISTER(dep_graph_multiple_transitive);
+	TEST_REGISTER(dep_graph_version_constraint_field);
+	TEST_REGISTER(dep_graph_transitive_constraint_satisfied);
+	TEST_REGISTER(dep_graph_transitive_constraint_unsatisfied);
+	TEST_REGISTER(dep_graph_root_constraint);
+	TEST_REGISTER(dep_graph_constraint_diamond);
+	TEST_REGISTER(dep_graph_constraint_wildcard);
+	TEST_REGISTER(dep_graph_cache_hit);
+	TEST_REGISTER(dep_graph_cache_stale_toml);
+	TEST_REGISTER(dep_graph_get_null_project_dir);
+	TEST_REGISTER(dep_graph_cache_corrupt_recovery);
+	TEST_REGISTER(dep_graph_cache_with_lockfile);
+	TEST_REGISTER(dep_graph_cache_lockfile_mtime_change);
 }

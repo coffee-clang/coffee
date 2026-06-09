@@ -40,6 +40,6 @@ int64_t handle_uninstall(options *opts)
 		return 1;
 	}
 
-	printf("Removed: %s\n", package);
+	printf_safe("Removed: %s\n", package);
 	return 0;
 }

@@ -27,7 +27,7 @@ int64_t handle_package(options *opts)
 		return 1;
 	}
 
-	printf("Packaging project...\n");
+	printf_safe("Packaging project...\n");
 
 	const char *name    = m->package.name != nullptr ? m->package.name : "project";
 	const char *version = m->package.version != nullptr ? m->package.version : "0.1.0";
@@ -43,7 +43,7 @@ int64_t handle_package(options *opts)
 	i64 ret = system(cmd);
 
 	if (ret == 0) {
-		printf("Package created: %s\n", tarball);
+		printf_safe("Package created: %s\n", tarball);
 	} else {
 		fprintf_safe(stderr, "Error: Packaging failed.\n");
 	}

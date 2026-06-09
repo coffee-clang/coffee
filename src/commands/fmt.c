@@ -7,7 +7,7 @@
 int64_t handle_fmt(options *opts)
 {
 	(void)opts;
-	printf("Formatting source code...\n");
+	printf_safe("Formatting source code...\n");
 
 	// Use find to get all .c and .h files in src and tests
 	// and run clang-format -i on them.
@@ -18,6 +18,6 @@ int64_t handle_fmt(options *opts)
 		return 1;
 	}
 
-	printf("Formatting complete.\n");
+	printf_safe("Formatting complete.\n");
 	return 0;
 }

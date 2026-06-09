@@ -193,16 +193,48 @@ TEST(install_update_no_packages)
 }
 
 /* ---------------------------------------------------------------
- * install_update_config (stub)
+ * install_update_config
  * --------------------------------------------------------------- */
-TEST(install_update_config_stub)
+TEST(install_update_config_basic)
 {
+	char        old_home[4096] = { 0 };
+	const char *env            = getenv("COFFEE_HOME");
+	if (env != nullptr) {
+		strncpy(old_home, env, sizeof(old_home) - 1);
+	}
+	sds tmp_home = sdsnew("/tmp/coffee-test-install-update-config");
+	sds rmcmd    = sdscatprintf(sdsempty(), "rm -rf %s", tmp_home);
+	system(rmcmd);
+	sdsfree(rmcmd);
+	mkdir(tmp_home, 0755);
+	setenv("COFFEE_HOME", tmp_home, 1);
+
 	options opt = {
 		.inputs     = (char *[]){ "install-update-config" },
 		.inputs_num = 1,
 	};
 	i64 ret = handle_install_update_config(&opt);
-	ASSERT(ret == 1, "install-update-config should return 1 (not yet supported)");
+	ASSERT(ret == 0, "install-update-config should return 0");
+
+	/* Verify config.toml was created */
+	sds cfg_path = sdscatprintf(sdsempty(), "%s/config.toml", tmp_home);
+	i64 exists   = (access(cfg_path, F_OK) == 0);
+	ASSERT(exists, "config.toml should exist after install-update-config");
+
+	/* Run again - should report up-to-date */
+	ret = handle_install_update_config(&opt);
+	ASSERT(ret == 0, "second install-update-config should return 0");
+
+	sdsfree(cfg_path);
+	if (old_home[0] != '\0') {
+		setenv("COFFEE_HOME", old_home, 1);
+	} else {
+		unsetenv("COFFEE_HOME");
+	}
+	rmcmd = sdscatprintf(sdsempty(), "rm -rf %s", tmp_home);
+	system(rmcmd);
+	sdsfree(rmcmd);
+	sdsfree(tmp_home);
 	PASS();
 }
 
@@ -355,7 +387,7 @@ void coffee_register_commands_basic_tests(void)
 	TEST_REGISTER(help_basic);
 	TEST_REGISTER(init_initializes_project);
 	TEST_REGISTER(install_update_no_packages);
-	TEST_REGISTER(install_update_config_stub);
+	TEST_REGISTER(install_update_config_basic);
 	TEST_REGISTER(logout_not_logged_in);
 	TEST_REGISTER(new_creates_project);
 	TEST_REGISTER(new_no_arg);

@@ -20,7 +20,7 @@ int64_t handle_install_update(options *opts)
 	struct stat st;
 	if (stat(deps_dir, &st) != 0) {
 		sdsfree(deps_dir);
-		printf("No packages to update.\n");
+		printf_safe("No packages to update.\n");
 		return 0;
 	}
 
@@ -39,7 +39,7 @@ int64_t handle_install_update(options *opts)
 			return 1;
 		}
 
-		printf("Updating %s...\n", target);
+		printf_safe("Updating %s...\n", target);
 
 		sds cmd = sdscatprintf(sdsempty(), "cd '%s' && git pull --ff-only 2>/dev/null", pkg_dir);
 		i64 ret = system(cmd);
@@ -52,14 +52,14 @@ int64_t handle_install_update(options *opts)
 			return 1;
 		}
 
-		printf("Updated: %s\n", target);
+		printf_safe("Updated: %s\n", target);
 		return 0;
 	}
 
 	DIR *dir = opendir(deps_dir);
 	if (dir == nullptr) {
 		sdsfree(deps_dir);
-		printf("No packages to update.\n");
+		printf_safe("No packages to update.\n");
 		return 0;
 	}
 
@@ -72,7 +72,7 @@ int64_t handle_install_update(options *opts)
 
 		sds pkg_dir = sdscatprintf(sdsempty(), "%s/%s", deps_dir, entry->d_name);
 
-		printf("Updating %s...\n", entry->d_name);
+		printf_safe("Updating %s...\n", entry->d_name);
 
 		sds cmd = sdscatprintf(sdsempty(), "cd '%s' && git pull --ff-only 2>/dev/null", pkg_dir);
 		i64 ret = system(cmd);
@@ -81,7 +81,7 @@ int64_t handle_install_update(options *opts)
 		if (ret != 0) {
 			fprintf_safe(stderr, "Error: Failed to update %s\n", entry->d_name);
 		} else {
-			printf("Updated: %s\n", entry->d_name);
+			printf_safe("Updated: %s\n", entry->d_name);
 		}
 		sdsfree(pkg_dir);
 		count++;
@@ -91,7 +91,7 @@ int64_t handle_install_update(options *opts)
 	sdsfree(deps_dir);
 
 	if (count == 0) {
-		printf("No packages to update.\n");
+		printf_safe("No packages to update.\n");
 	}
 
 	return 0;

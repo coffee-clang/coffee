@@ -255,7 +255,7 @@ int64_t handle_new(options *opts)
 	sds main_content = sdsnew("#include <stdio.h>\n"
 	                          "\n"
 	                          "int main(i64 argc, char **argv) {\n"
-	                          "    printf(\"Hello, world!\\n\");\n"
+	                          "    printf_safe(\"Hello, world!\\n\");\n"
 	                          "    return 0;\n"
 	                          "}\n");
 
@@ -312,6 +312,7 @@ int64_t handle_new(options *opts)
 		sdsfree(lib_content);
 
 		/* Library Makefile — builds static library */
+		makefile_path    = sdscatprintf(sdsempty(), "%s/Makefile", path);
 		makefile_content = sdscatprintf(sdsempty(),
 		                                "CC ?= clang\n"
 		                                "CFLAGS += -std=c23 -O3 -g\n"
@@ -348,11 +349,13 @@ int64_t handle_new(options *opts)
 		                                name, name, name);
 
 		if (create_file(makefile_path, makefile_content) != 0) {
+			sdsfree(makefile_path);
 			sdsfree(makefile_content);
 			fprintf_safe(stderr, "Error: Could not create Makefile\n");
 			sdsfree(name);
 			return 1;
 		}
+		sdsfree(makefile_path);
 		sdsfree(makefile_content);
 
 		/* Library manifest with [lib] section */
@@ -378,19 +381,19 @@ int64_t handle_new(options *opts)
 		}
 		sdsfree(manifest_content);
 
-		printf("Created new C library: %s\n", name);
-		printf("  - Coffee.toml\n");
-		printf("  - .gitignore\n");
-		printf("  - LICENSE\n");
-		printf("  - README.md\n");
-		printf("  - Makefile\n");
-		printf("  - include/%s/%s.h\n", name, name);
-		printf("  - src/lib.c\n");
-		printf("  - deps/\n");
-		printf("  - tests/\n");
-		printf("  - docs/index.md\n");
-		printf("  - scripts/\n");
-		printf("  - build/\n");
+		printf_safe("Created new C library: %s\n", name);
+		printf_safe("  - Coffee.toml\n");
+		printf_safe("  - .gitignore\n");
+		printf_safe("  - LICENSE\n");
+		printf_safe("  - README.md\n");
+		printf_safe("  - Makefile\n");
+		printf_safe("  - include/%s/%s.h\n", name, name);
+		printf_safe("  - src/lib.c\n");
+		printf_safe("  - deps/\n");
+		printf_safe("  - tests/\n");
+		printf_safe("  - docs/index.md\n");
+		printf_safe("  - scripts/\n");
+		printf_safe("  - build/\n");
 
 		sdsfree(name);
 		return 0;
@@ -406,19 +409,19 @@ int64_t handle_new(options *opts)
 	}
 	sdsfree(docs_placeholder_path);
 
-	printf("Created new C project: %s\n", name);
-	printf("  - Coffee.toml\n");
-	printf("  - .gitignore\n");
-	printf("  - LICENSE\n");
-	printf("  - README.md\n");
-	printf("  - Makefile\n");
-	printf("  - include/%s/%s.h\n", name, name);
-	printf("  - src/main.c\n");
-	printf("  - deps/\n");
-	printf("  - tests/\n");
-	printf("  - docs/index.md\n");
-	printf("  - scripts/\n");
-	printf("  - build/\n");
+	printf_safe("Created new C project: %s\n", name);
+	printf_safe("  - Coffee.toml\n");
+	printf_safe("  - .gitignore\n");
+	printf_safe("  - LICENSE\n");
+	printf_safe("  - README.md\n");
+	printf_safe("  - Makefile\n");
+	printf_safe("  - include/%s/%s.h\n", name, name);
+	printf_safe("  - src/main.c\n");
+	printf_safe("  - deps/\n");
+	printf_safe("  - tests/\n");
+	printf_safe("  - docs/index.md\n");
+	printf_safe("  - scripts/\n");
+	printf_safe("  - build/\n");
 
 	sdsfree(name);
 	return 0;

@@ -92,7 +92,7 @@ static i64 config_list(void)
 	sdsfree(path);
 
 	if (fp == nullptr) {
-		printf("(no config file)\n");
+		printf_safe("(no config file)\n");
 		return 0;
 	}
 
@@ -101,7 +101,7 @@ static i64 config_list(void)
 	fclose(fp);
 
 	if (conf == nullptr) {
-		printf("(empty config)\n");
+		printf_safe("(empty config)\n");
 		return 0;
 	}
 
@@ -113,7 +113,7 @@ static i64 config_list(void)
 		if (raw) {
 			char *s;
 			if (toml_rtos(raw, &s) == 0 && s) {
-				printf("%s = \"%s\"\n", k, s);
+				printf_safe("%s = \"%s\"\n", k, s);
 				free(s);
 			}
 		}
@@ -134,7 +134,7 @@ static i64 config_list(void)
 			if (raw) {
 				char *s;
 				if (toml_rtos(raw, &s) == 0 && s) {
-					printf("%s.%s = \"%s\"\n", tabname, k, s);
+					printf_safe("%s.%s = \"%s\"\n", tabname, k, s);
 					free(s);
 				}
 			}
@@ -373,7 +373,7 @@ int64_t handle_config(options *opts)
 			sdsfree(section);
 			return 1;
 		}
-		printf("%s\n", val);
+		printf_safe("%s\n", val);
 		sdsfree(val);
 		sdsfree(section);
 		return 0;

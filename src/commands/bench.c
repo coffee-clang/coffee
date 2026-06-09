@@ -56,7 +56,7 @@ int64_t handle_bench(options *opts)
 	sdsfree(project_dir);
 
 	if (opts->verbose) {
-		printf("Running: %s\n", cmd);
+		printf_safe("Running: %s\n", cmd);
 	}
 
 	i64 ret = system(cmd);
@@ -72,6 +72,6 @@ int64_t handle_bench(options *opts)
 		return 1;
 	}
 
-	printf("Bench complete.\n");
+	printf_safe("Bench complete.\n");
 	return 0;
 }

@@ -8,7 +8,7 @@
 
 int64_t handle_fix(options *opts)
 {
-	printf("Attempting to automatically fix warnings...\n");
+	printf_safe("Attempting to automatically fix warnings...\n");
 
 	char *manifest_path = project_find_manifest(nullptr);
 	if (manifest_path == nullptr) {
@@ -32,7 +32,7 @@ int64_t handle_fix(options *opts)
 	sdsfree(inc_flags);
 
 	if (opts->verbose) {
-		printf("Running: %s\n", cmd);
+		printf_safe("Running: %s\n", cmd);
 	}
 
 	i64 ret = system(cmd);
@@ -48,6 +48,6 @@ int64_t handle_fix(options *opts)
 		return 1;
 	}
 
-	printf("Fixes applied successfully where possible.\n");
+	printf_safe("Fixes applied successfully where possible.\n");
 	return 0;
 }

@@ -12,7 +12,7 @@ int64_t handle_grep(options *opts)
 	}
 
 	char *pattern = opts->inputs[1];
-	printf("Searching for '%s'...\n", pattern);
+	printf_safe("Searching for '%s'...\n", pattern);
 
 	sds cmd = sdscatprintf(sdsempty(), "grep -rn --exclude-dir=target --exclude-dir=.git \"%s\" src tests", pattern);
 
@@ -20,7 +20,7 @@ int64_t handle_grep(options *opts)
 	sdsfree(cmd);
 
 	if (ret != 0) {
-		printf("Pattern not found.\n");
+		printf_safe("Pattern not found.\n");
 	}
 
 	return 0;

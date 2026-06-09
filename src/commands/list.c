@@ -21,19 +21,19 @@ int64_t handle_list(options *opts)
 
 		struct stat st;
 		if (stat(bin_dir, &st) != 0) {
-			printf("No installed binaries.\n");
+			printf_safe("No installed binaries.\n");
 			sdsfree(bin_dir);
 			return 0;
 		}
 
 		DIR *dir = opendir(bin_dir);
 		if (dir == nullptr) {
-			printf("No installed binaries.\n");
+			printf_safe("No installed binaries.\n");
 			sdsfree(bin_dir);
 			return 0;
 		}
 
-		printf("Installed binaries:\n");
+		printf_safe("Installed binaries:\n");
 		i64            count = 0;
 		struct dirent *entry;
 		while ((entry = readdir(dir)) != nullptr) {
@@ -42,7 +42,7 @@ int64_t handle_list(options *opts)
 			}
 			sds full_path = sdscatprintf(sdsempty(), "%s/%s", bin_dir, entry->d_name);
 			if (access(full_path, X_OK) == 0) {
-				printf("  %s\n", entry->d_name);
+				printf_safe("  %s\n", entry->d_name);
 				count++;
 			}
 			sdsfree(full_path);
@@ -51,7 +51,7 @@ int64_t handle_list(options *opts)
 		sdsfree(bin_dir);
 
 		if (count == 0) {
-			printf("  (none)\n");
+			printf_safe("  (none)\n");
 		}
 		return 0;
 	}
@@ -70,19 +70,19 @@ int64_t handle_list(options *opts)
 		return 1;
 	}
 
-	printf("Package: %s\n", m->package.name ? m->package.name : "(unnamed)");
-	printf("Dependencies:\n");
+	printf_safe("Package: %s\n", m->package.name ? m->package.name : "(unnamed)");
+	printf_safe("Dependencies:\n");
 	for (size_t i = 0; i < m->package.dependencies_count; i++) {
 		if (m->package.dependencies[i]) {
-			printf("  %s\n", m->package.dependencies[i]);
+			printf_safe("  %s\n", m->package.dependencies[i]);
 		}
 	}
 
 	if (m->bin_count > 0) {
-		printf("Binaries:\n");
+		printf_safe("Binaries:\n");
 		for (size_t i = 0; i < m->bin_count; i++) {
 			if (m->bin[i].name) {
-				printf("  %s\n", m->bin[i].name);
+				printf_safe("  %s\n", m->bin[i].name);
 			}
 		}
 	}

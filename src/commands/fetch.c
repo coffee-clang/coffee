@@ -25,7 +25,7 @@ static i64 fetch_git_dep(const char *name, const char *url, const char *global_d
 	if (access(git_dir, F_OK) == 0) {
 		sdsfree(git_dir);
 		if (verbose) {
-			printf("    Updating %s...\n", name);
+			printf_safe("    Updating %s...\n", name);
 		}
 		sds cmd;
 		if (ref != nullptr) {
@@ -55,7 +55,7 @@ static i64 fetch_git_dep(const char *name, const char *url, const char *global_d
 		cmd = sdscatprintf(sdsempty(), "git clone --depth 1 '%s' '%s' 2>/dev/null", url, target_dir);
 	}
 	if (verbose) {
-		printf("    Cloning %s...\n", name);
+		printf_safe("    Cloning %s...\n", name);
 	}
 	i64 ret = system(cmd);
 	sdsfree(cmd);
@@ -143,7 +143,7 @@ int64_t handle_fetch(options *opts)
 	mkdir(global_deps, 0755);
 	mkdir("deps", 0755);
 
-	printf("Fetching dependencies...\n");
+	printf_safe("Fetching dependencies...\n");
 
 	i64 overall = 0;
 
@@ -176,7 +176,7 @@ int64_t handle_fetch(options *opts)
 				continue;
 			}
 
-			printf("  %s\n", dep_name);
+			printf_safe("  %s\n", dep_name);
 
 			dependency_t *structured = find_dep(m, dep_name);
 			i64           ret        = -1;
@@ -272,7 +272,7 @@ int64_t handle_fetch(options *opts)
 	manifest_free(m);
 
 	if (overall == 0) {
-		printf("Fetch complete.\n");
+		printf_safe("Fetch complete.\n");
 	} else {
 		fprintf_safe(stderr, "Fetch completed with errors.\n");
 	}

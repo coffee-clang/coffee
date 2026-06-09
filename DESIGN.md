@@ -139,18 +139,16 @@ Key enforced rules:
 - C23: `nullptr` not `NULL`, `[[nodiscard]]`, `<stdckdint.h>`
 - Banned functions: `malloc`/`calloc`/`free` allowed (clang-tidy checks suppressed); `sprintf`/`strcpy`/`strcat` families must use safe wrappers from `include/safe.h` or SDS alternatives from `strings.h`
 
-## Current Status (~85% complete, targeting v1.0)
+## Current Status (~94% complete, targeting v1.0)
 
-All P0 and P1 items from the original plan are implemented:
+All P0, P1, P2, and P3 items from the original plan are implemented:
 
 - **P0 — Must-Have:** `check` uses project flags, `build` with incremental awareness, transitive dependency resolution via `dep_graph`, git ref checkout
-- **P1 — Major Usability:** `test` and `bench` compilation, `add` with version/features/optional, `remove` cleanups, `update` git-aware, `outdated` git comparison, `tree` transitive display, `new --lib/--bin`, lockfile records transitive deps, registry stubbed
+- **P1 — Major Usability:** `test` and `bench` compilation, `add` with version/features/optional, `remove` cleanups, `update` git-aware, `outdated` git comparison, `tree` transitive display, `new --lib/--bin`, lockfile records transitive deps
+- **P2 — Tooling & Config:** `doc` with manifest-driven Doxyfile generation, `config` with subcommand support (`list`, `get`, `set`, `unset`), `install-update-config` bootstraps `~/.coffee/config.toml` with defaults
+- **P3 — Performance:** Transitive dependency caching in `.coffee/build-cache/` to avoid re-resolving when `Coffee.toml`/`Coffee.lock` unchanged
 
-### Remaining P2 items
+### Known Issues
 
-- **`coffee doc`:** Manifest-driven Doxyfile generation (currently just runs pre-existing Doxyfile)
-- **`coffee config`:** Subcommand support (`--list`, `get`, `set`) with `~/.coffee/config.toml`
-
-### Remaining P3 items
-
-- **Transitive dependency caching:** Incremental cache in `.coffee/build-cache/` to avoid re-resolving when `Coffee.toml`/`Coffee.lock` unchanged
+- `cov_new_lib_mode` was a test isolation failure (use-after-free in `handle_new` lib-mode Makefile path) — fixed
+- Registry is intentionally stubbed; the project is designed for git/path-based dependency management without a central registry

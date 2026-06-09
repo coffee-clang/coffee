@@ -103,7 +103,7 @@ int64_t handle_build(options *opts)
 		}
 
 		if (opts->verbose) {
-			printf("Running: %s\n", cmd);
+			printf_safe("Running: %s\n", cmd);
 		}
 
 		i64 status = system(cmd);
@@ -117,7 +117,7 @@ int64_t handle_build(options *opts)
 		}
 		i64 ret = WEXITSTATUS(status);
 		if (ret == 0) {
-			printf("Build successful\n");
+			printf_safe("Build successful\n");
 		} else {
 			fprintf_safe(stderr, "Build failed\n");
 		}
@@ -166,7 +166,7 @@ int64_t handle_build(options *opts)
 	sdsfree(makefile_path);
 
 	if (ret == 0) {
-		printf("Build successful\n");
+		printf_safe("Build successful\n");
 	}
 
 	return ret;

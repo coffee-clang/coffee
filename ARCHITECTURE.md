@@ -14,7 +14,7 @@ them on every exploration.
 ├── .clang-format        # Formatting: tabs (width 4), 120-column limit
 ├── .clang-tidy          # Linting: aggressive C-only checks, warnings-as-errors
 ├── DESIGN.md            # Design philosophy and rationale
-├── TODO.md              # ~85% complete, targeting v0.4 "Publishable"
+├── TODO.md              # ~94% complete, targeting v1.0
 ├── ARCHITECTURE.md      # This file
 │
 ├── src/
@@ -48,12 +48,19 @@ them on every exploration.
 │   ├── test_framework.h/.c   # Custom lightweight test framework (macros + runner)
 │   ├── test_main.c           # Test entry point: registers suites, runs filters
 │   ├── test_features.c       # Feature resolution tests
+│   ├── test_dep_graph.c      # Dependency graph resolution + cache tests (31 tests)
+│   ├── test_lockfile.c       # Lockfile parsing/writing tests
+│   ├── test_config.c         # Config get/set/unset tests
+│   ├── test_doc.c            # Doc generation tests
+│   ├── test_version.c        # Version comparison tests
+│   ├── test_install.c        # Install command tests
 │   ├── test_makefile.c       # Makefile generation tests
 │   ├── test_cflags_libs.c    # Compiler/linker flags tests
 │   ├── test_manifest_version.c  # Version extraction tests
-│   ├── test_stubs.c          # Stub command tests
-│   ├── test_registry_*.c     # Registry fetch/version tests
-│   └── test_framework_test.c # Meta-tests for the framework itself
+│   ├── test_manifest_bin.c   # Binary target tests
+│   ├── test_framework_test.c # Meta-tests for the framework itself
+│   ├── test_coverage_*.c     # Coverage tests for commands, build, cmdline, core, install, manifest
+│   └── test_commands_*.c     # Command integration tests (basic, deps, manifest)
 │
 ├── docs/                # mdBook documentation (42 command reference pages)
 │   ├── index.md         # Introduction / quick start
@@ -187,6 +194,13 @@ dep_graph_create(manifest, lockfile, offline)
       → Recurse: parse dep's library.toml or Coffee.toml for transitive deps
       → DFS with visited set for cycle detection (warns, does not error)
     → Return dep_graph_t with flat array of all transitive deps
+
+dep_graph_get(manifest, lockfile, offline, project_dir)
+    → Check .coffee/build-cache/<package>.graph for cached dep_graph_t
+    → Validate cache: compare stored mtimes of Coffee.toml/Coffee.lock against current
+    → On cache hit: deserialize and return
+    → On cache miss: call dep_graph_create(), serialize to cache, return
+    → When project_dir is null: fall back to uncached dep_graph_create()
 ```
 
 **Doc flow** (`src/commands/doc.c`):
@@ -197,8 +211,19 @@ handle_doc(&opt)
     → Dispatch: "doc generate" or bare "doc" → doc_generate()
       → Find and parse manifest
       → If Doxyfile exists, run doxygen
-      → If [doc] section exists without Doxyfile, generate Doxyfile then run doxygen
+      → If [doc] section exists without Doxyfile, read settings (project-name, output-dir,
+        input-dirs, exclude-patterns) and generate Doxyfile, then run doxygen
       → Otherwise print tip
+```
+
+**Config flow** (`src/commands/config.c`):
+
+```
+handle_config(&opt)
+    → No args / "list" / "--list" → config_list() — prints all key=value pairs from ~/.coffee/config.toml
+    → "get <key>" → config_read_raw(section, key) — supports dotted keys (section.key)
+    → "set <key> <value>" → config_set_raw(section, key, value) — updates file in-place
+    → "unset <key>" → config_unset_raw(section, key) — removes the line from file
 ```
 
 **Lockfile generation** (`src/commands/generate_lockfile.c`):
@@ -268,6 +293,8 @@ Reproducible builds with pinned git SHAs
 - **Transitive dependency graph.** `dep_graph.c` resolves the full transitive dependency tree via DFS, producing a flat array with the root at index 0. Each node carries resolved paths, compiler flags, source files, and git metadata. This replaces the older ad-hoc `dep_resolve_dir()` / `dep_add_flags()` approach with a single, cacheable data structure shared across `build`, `test`, `tree`, and `outdated` commands.
 
 - **Arena allocator in safe.h.** `include/safe.h` provides a bump-pointer arena (`struct arena`) with block chaining. Allocations from an arena are freed together via `arena_reset()` or `arena_destroy()`. Individual `arena_alloc()` pointers cannot be freed separately. Default block size is 64 KiB. This is used internally by `dep_graph` and other modules that need bulk temporary allocations.
+
+- **Dep graph caching.** `dep_graph_get()` caches resolved dependency graphs as TOML files in `.coffee/build-cache/<package>.graph`. Cache invalidation compares the mtimes of `Coffee.toml` and `Coffee.lock` against stored timestamps, plus a `cache_version` field for format evolution. Used by `build`, `metadata`, and `generate-lockfile` to avoid repeated DFS resolution.
 
 ## External dependencies
 

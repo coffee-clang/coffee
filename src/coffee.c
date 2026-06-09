@@ -94,7 +94,7 @@ int main(int argc, char **argv)
 		if (toolchain == nullptr) {
 			toolchain = sdsnew(args_info.inputs[i] + 1);
 		} else {
-			fprintf(stderr, "error: multiple +toolchain arguments\n");
+			fprintf_safe(stderr, "error: multiple +toolchain arguments\n");
 			exit(EXIT_FAILURE);
 		}
 	}
@@ -139,8 +139,8 @@ int main(int argc, char **argv)
 		.lib                 = args_info.lib_given,
 		.fix                 = args_info.fix_given,
 	};
-	/* printf("command_idx: %d\n", command_idx); */
-	/* printf("num commands: %d\n", lengthof(commands)); */
+	/* printf_safe("command_idx: %d\n", command_idx); */
+	/* printf_safe("num commands: %d\n", lengthof(commands)); */
 	/* Find the command, if it has been given */
 	if (command_idx >= 0) {
 		char *cmd = args_info.inputs[command_idx];
@@ -152,7 +152,7 @@ int main(int argc, char **argv)
 		}
 
 		/* Check if we have received a command, but it's not in the list */
-		printf("Command '%s' is not recognized.\n", cmd);
+		printf_safe("Command '%s' is not recognized.\n", cmd);
 		cmdline_parser_print_help();
 		exit(EXIT_FAILURE);
 	}

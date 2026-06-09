@@ -1173,12 +1173,40 @@ TEST(cov_install_update_with_package)
 /* ===== install_update_config: basic run ===== */
 TEST(cov_install_update_config_basic)
 {
+	char        old_home[4096] = { 0 };
+	const char *env            = getenv("COFFEE_HOME");
+	if (env != nullptr) {
+		strncpy(old_home, env, sizeof(old_home) - 1);
+	}
+	sds tmp_home = sdsnew("/tmp/coverage-cmd-install-update-config");
+	sds rmcmd    = sdscatprintf(sdsempty(), "rm -rf %s", tmp_home);
+	system(rmcmd);
+	sdsfree(rmcmd);
+	mkdir(tmp_home, 0755);
+	setenv("COFFEE_HOME", tmp_home, 1);
+
 	options opt = {
 		.inputs     = (char *[]){ "install-update-config" },
 		.inputs_num = 1,
 	};
 	i64 ret = handle_install_update_config(&opt);
-	ASSERT(ret == 1, "install_update_config returns 1 (not yet supported)");
+	ASSERT(ret == 0, "install_update_config should return 0");
+
+	/* Verify config file was created */
+	sds cfg_path = sdscatprintf(sdsempty(), "%s/config.toml", tmp_home);
+	i64 exists   = (access(cfg_path, F_OK) == 0);
+	sdsfree(cfg_path);
+	ASSERT(exists, "config.toml should exist after install_update_config");
+
+	if (old_home[0] != '\0') {
+		setenv("COFFEE_HOME", old_home, 1);
+	} else {
+		unsetenv("COFFEE_HOME");
+	}
+	rmcmd = sdscatprintf(sdsempty(), "rm -rf %s", tmp_home);
+	system(rmcmd);
+	sdsfree(rmcmd);
+	sdsfree(tmp_home);
 
 	PASS();
 }

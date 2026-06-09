@@ -1,6 +1,6 @@
 # Coffee Project TODO
 
-> Generated from `coffee`-equivalent analysis. Overall completeness: **~85%**
+> Overall completeness: **~94%** — targeting v1.0
 
 ## Priority Legend
 
@@ -81,18 +81,11 @@
 
 ### `coffee doc` — manifest-driven doc generation
 
-❌ **NOT IMPLEMENTED** — Currently just checks for a pre-existing `Doxyfile` and runs `doxygen`. No manifest-driven config generation.
-
-- [ ] Generate a default Doxyfile or read doc config from `Coffee.toml` `[doc]` section
+✅ **DONE** — `doc generate` reads `[doc]` section from `Coffee.toml` (project-name, output-dir, input-dirs, exclude-patterns), generates a Doxyfile, then runs doxygen. Falls back to pre-existing Doxyfile if no `[doc]` section. `doc check` verifies doxygen is installed.
 
 ### `coffee config` — subcommand support
 
-❌ **NOT IMPLEMENTED** — Currently prints environment variables only. No `--list`, `get <key>`, `set <key> <value>`.
-
-- [ ] Implement `coffee config --list`
-- [ ] Implement `coffee config get <key>`
-- [ ] Implement `coffee config set <key> <value>`
-- [ ] Store config in `~/.coffee/config.toml`
+✅ **DONE** — Supports `--list` (print all config), `get <key>`, `set <key> <value>`, `unset <key>`. Stores config in `~/.coffee/config.toml`. Supports dotted keys (`section.key`). Default (no args) prints all config.
 
 ### `coffee metadata` — add resolved features + transitive deps
 
@@ -124,10 +117,11 @@
 
 ### Transitive dependency caching / offline build
 
-❌ **NOT IMPLEMENTED** — dep_graph resolves deps every time. No incremental cache.
+✅ **DONE** — `dep_graph_get()` caches resolved dependency graphs in `.coffee/build-cache/<package>.graph`. Cache is invalidated when `Coffee.toml` or `Coffee.lock` mtimes change, or when the cache format version changes.
 
-- [ ] Cache resolved dep paths in `.coffee/build-cache/`
-- [ ] Only re-resolve when `Coffee.toml` or `Coffee.lock` changes
+- [x] Cache resolved dep paths in `.coffee/build-cache/`
+- [x] Only re-resolve when `Coffee.toml` or `Coffee.lock` changes
+- [x] Used by `build`, `metadata`, `generate-lockfile` commands
 
 ---
 
@@ -139,7 +133,16 @@
 | **v0.3** — "Testable"          | 65%      | P1: test/bench improvements, semver update, tree with transitive |
 | **v0.4** — "Publishable"       | 78%      | P2: metadata features+deps, fix/lint --fix, bench Makefile       |
 | **v0.5** — "Dep management"    | 85%      | Transitive deps, git ref checkout, git-aware outdated/update     |
-| **v1.0** — "Coffee-competitive" | 90%+     | P3 polish: build caching, config subcommands, edge cases         |
+| **v1.0** — "Coffee-competitive" | 94%+     | All P0–P3 done. 368 tests (1 pre-existing flaky).                |
+
+---
+
+## Known Issues
+
+| Issue                          | Severity | Detail                                                           |
+| ------------------------------ | -------- | ---------------------------------------------------------------- |
+| `cov_new_lib_mode` flaky       | Low      | Passes individually, fails in full suite ("Could not create Makefile"). Likely a test-order / tmpdir cleanup race. |
+| `doc_generate` test            | Low      | Emits "doxygen not installed" error when doxygen is absent; test handles gracefully but user experience could be smoother. |
 
 ---
 

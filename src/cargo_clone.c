@@ -57,10 +57,10 @@ int main(int argc, char *argv[])
 	}
 
 	// Print the substring of the command line with the command and its unnamed options
-	printf("Command line substring: %s\n", cmd_line_substring);
+	printf_safe("Command line substring: %s\n", cmd_line_substring);
 
 	// Simulate execution of the coffee command
-	printf("Executing coffee %s command...\n", command);
+	printf_safe("Executing coffee %s command...\n", command);
 
 	sdsfree(cmd_line_substring);
 	cmdline_parser_free(&args_info);

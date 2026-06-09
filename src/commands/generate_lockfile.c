@@ -22,20 +22,31 @@ int64_t handle_generate_lockfile(options *opts)
 		return 1;
 	}
 
+	/* Extract project directory from manifest path */
+	sds   project_dir;
+	char *dir_end = strrchr(manifest_path, '/');
+	if (dir_end != nullptr) {
+		project_dir = sdsnewlen(manifest_path, (size_t)(dir_end - manifest_path));
+	} else {
+		project_dir = sdsnew(".");
+	}
+
 	manifest_t *manifest = manifest_parse(manifest_path);
 	sdsfree(manifest_path);
 
 	if (manifest == nullptr) {
 		fprintf_safe(stderr, "Error: Could not parse Coffee.toml\n");
+		sdsfree(project_dir);
 		return 1;
 	}
 
-	printf("Generating lockfile: Coffee.lock\n");
+	printf_safe("Generating lockfile: Coffee.lock\n");
 
 	/* Resolve full transitive graph */
-	dep_graph_t *g = dep_graph_create(manifest, nullptr, true);
+	dep_graph_t *g = dep_graph_get(manifest, nullptr, true, project_dir);
 	if (g == nullptr) {
 		manifest_free(manifest);
+		sdsfree(project_dir);
 		fprintf_safe(stderr, "Error: Could not resolve dependency graph\n");
 		return 1;
 	}
@@ -124,12 +135,13 @@ int64_t handle_generate_lockfile(options *opts)
 
 	dep_graph_free(g);
 	manifest_free(manifest);
+	sdsfree(project_dir);
 
 	if (ret != 0) {
 		fprintf_safe(stderr, "Error: Could not write Coffee.lock\n");
 		return 1;
 	}
 
-	printf("Lockfile generated successfully.\n");
+	printf_safe("Lockfile generated successfully.\n");
 	return 0;
 }

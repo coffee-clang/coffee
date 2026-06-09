@@ -57,7 +57,7 @@ int64_t handle_remove(options *opts)
 		return 1;
 	}
 
-	printf("Removed dependency: %s\n", package_name);
+	printf_safe("Removed dependency: %s\n", package_name);
 
 	/* Clean up Makefile section for this dependency */
 	char *dir_end = strrchr(manifest_path, '/');
@@ -105,7 +105,7 @@ int64_t handle_remove(options *opts)
 					fwrite(content, 1, before_len, mf);
 					fwrite(dep_end, 1, after_len, mf);
 					fclose(mf);
-					printf("  Cleaned up Makefile section for %s\n", package_name);
+					printf_safe("  Cleaned up Makefile section for %s\n", package_name);
 					mf = nullptr; /* Prevent double-close */
 				}
 			}

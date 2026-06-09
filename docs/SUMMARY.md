@@ -21,6 +21,8 @@
 - [test](commands/test.md)
 - [bench](commands/bench.md)
 - [compile](commands/compile.md)
+- [cflags](commands/cflags.md)
+- [libs](commands/libs.md)
 - [clean](commands/clean.md)
 
 ## Dependencies
@@ -43,6 +45,7 @@
 ## Configuration & Metadata
 
 - [config](commands/config.md)
+- [list](commands/list.md)
 - [metadata](commands/metadata.md)
 - [generate-lockfile](commands/generate_lockfile.md)
 

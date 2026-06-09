@@ -5,6 +5,7 @@
 #include "manifest.h"
 #include "registry.h"
 #include "strings.h"
+#include "version.h"
 
 #include <stdbool.h>
 
@@ -12,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <dirent.h>
 #include <glob.h>
 #include <sds/sds.h>
 #include <sys/stat.h>
@@ -23,11 +25,11 @@
 static i64 run_command(char **argv, bool verbose)
 {
 	if (verbose) {
-		printf("Running:");
+		printf_safe("Running:");
 		for (char *const *a = argv; *a; a++) {
-			printf(" %s", *a);
+			printf_safe(" %s", *a);
 		}
-		printf("\n");
+		printf_safe("\n");
 	}
 
 	pid_t pid = fork();
@@ -85,7 +87,146 @@ sds dep_resolve_dir(const char *name)
 }
 
 /*
+ * Resolve a dependency directory with version constraint.
+ * If constraint is null, empty, or "*", behaves like dep_resolve_dir().
+ * Otherwise, searches ~/.coffee/deps/<name>/ for versioned subdirectories,
+ * filters by constraint, and returns the highest satisfying version path.
+ * Falls back to the flat (non-versioned) path if no versioned match is found.
+ * Returns the path (caller frees) or nullptr if not found.
+ */
+sds dep_resolve_dir_constraint(const char *name, const char *constraint)
+{
+	/* No constraint — fall back to flat resolution */
+	if (constraint == nullptr || constraint[0] == '\0' || constraint[0] == '*') {
+		return dep_resolve_dir(name);
+	}
+
+	/* First check local and vendor paths (flat) */
+	sds local = sdscatprintf(sdsempty(), "deps/%s", name);
+	if (access(local, F_OK) == 0) {
+		return local;
+	}
+	sdsfree(local);
+
+	sds vendor_dir = sdscatprintf(sdsempty(), "vendor/%s", name);
+	if (access(vendor_dir, F_OK) == 0) {
+		return vendor_dir;
+	}
+	sdsfree(vendor_dir);
+
+	/* Check global versioned directory */
+	const char *home = getenv("HOME");
+	if (home == nullptr) {
+		home = "/tmp";
+	}
+
+	sds  global_base = sdscatfmt(sdsnew(home), "/.coffee/deps/%s", name);
+	DIR *dir         = opendir(global_base);
+	if (dir == nullptr) {
+		/* No versioned directory — try flat global path */
+		sdsfree(global_base);
+		sds global_flat = sdscatfmt(sdsnew(home), "/.coffee/deps/%s", name);
+		if (access(global_flat, F_OK) == 0) {
+			return global_flat;
+		}
+		sdsfree(global_flat);
+		return nullptr;
+	}
+
+	/* Enumerate versioned subdirectories, find best match */
+	sds       best_path   = nullptr;
+	version_t best_ver    = { 0, 0, 0 };
+	bool      found_match = false;
+
+	struct dirent *entry;
+	while ((entry = readdir(dir)) != nullptr) {
+		if (entry->d_name[0] == '.') {
+			continue;
+		}
+
+		sds sub_path = sdscatprintf(sdsempty(), "%s/%s", global_base, entry->d_name);
+
+		/* Read version from library.toml */
+		sds   lt_path = sdscatprintf(sdsempty(), "%s/library.toml", sub_path);
+		FILE *fp      = fopen(lt_path, "r");
+		sdsfree(lt_path);
+
+		if (fp == nullptr) {
+			sdsfree(sub_path);
+			continue;
+		}
+
+		char          errbuf[256];
+		toml_table_t *conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
+		fclose(fp);
+
+		if (conf == nullptr) {
+			sdsfree(sub_path);
+			continue;
+		}
+
+		toml_table_t *pkg = toml_table_in(conf, "package");
+		if (pkg == nullptr) {
+			toml_free(conf);
+			sdsfree(sub_path);
+			continue;
+		}
+
+		toml_datum_t ver = toml_string_in(pkg, "version");
+		if (!ver.ok) {
+			toml_free(conf);
+			sdsfree(sub_path);
+			continue;
+		}
+
+		/* Check if this version satisfies the constraint */
+		if (!version_satisfies(ver.u.s, constraint)) {
+			free(ver.u.s);
+			toml_free(conf);
+			sdsfree(sub_path);
+			continue;
+		}
+
+		/* Parse version for comparison */
+		version_t parsed;
+		bool      ok = version_parse(ver.u.s, &parsed);
+		free(ver.u.s);
+		toml_free(conf);
+
+		if (!ok) {
+			sdsfree(sub_path);
+			continue;
+		}
+
+		/* Keep the highest version */
+		if (!found_match || version_cmp(&parsed, &best_ver) > 0) {
+			sdsfree(best_path);
+			best_path   = sub_path;
+			best_ver    = parsed;
+			found_match = true;
+		} else {
+			sdsfree(sub_path);
+		}
+	}
+	closedir(dir);
+	sdsfree(global_base);
+
+	if (found_match) {
+		return best_path;
+	}
+
+	/* Fall back to flat global path */
+	sds global_flat = sdscatfmt(sdsnew(home), "/.coffee/deps/%s", name);
+	if (access(global_flat, F_OK) == 0) {
+		return global_flat;
+	}
+	sdsfree(global_flat);
+	return nullptr;
+}
+
+/*
  * Append compiler flags for a single dependency to the flags string.
+=======
  * Returns the number of .c source files found (appended to src_argv).
  */
 size_t dep_add_flags(const char *dep_dir, const char *dep_name, sds *flags, sds *src_list, size_t *src_count)
@@ -334,8 +475,8 @@ i64 build_project(manifest_t *manifest, build_opts_t *opts)
 		}
 	}
 
-	/* Resolve dependencies via dep_graph */
-	dep_graph_t *dep_graph = dep_graph_create(manifest, lockfile, true);
+	/* Resolve dependencies via dep_graph (with caching) */
+	dep_graph_t *dep_graph = dep_graph_get(manifest, lockfile, true, ".");
 	sds         *dep_names = nullptr;
 	size_t       dep_total = 0;
 	if (dep_graph != nullptr) {

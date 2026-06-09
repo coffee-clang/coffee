@@ -185,7 +185,7 @@ int64_t handle_init(options *opts)
 	sds main_content = sdsnew("#include <stdio.h>\n"
 	                          "\n"
 	                          "int main(i64 argc, char **argv) {\n"
-	                          "    printf(\"Hello, world!\\n\");\n"
+	                          "    printf_safe(\"Hello, world!\\n\");\n"
 	                          "    return 0;\n"
 	                          "}\n");
 
@@ -295,18 +295,18 @@ int64_t handle_init(options *opts)
 	}
 	sdsfree(manifest_content);
 
-	printf("Initialized C project: %s\n", name);
-	printf("  - Coffee.toml\n");
-	printf("  - .gitignore\n");
-	printf("  - LICENSE\n");
-	printf("  - README.md\n");
-	printf("  - include/%s/%s.h\n", name, name);
-	printf("  - src/main.c\n");
-	printf("  - deps/\n");
-	printf("  - tests/\n");
-	printf("  - docs/index.md\n");
-	printf("  - scripts/\n");
-	printf("  - build/\n");
+	printf_safe("Initialized C project: %s\n", name);
+	printf_safe("  - Coffee.toml\n");
+	printf_safe("  - .gitignore\n");
+	printf_safe("  - LICENSE\n");
+	printf_safe("  - README.md\n");
+	printf_safe("  - include/%s/%s.h\n", name, name);
+	printf_safe("  - src/main.c\n");
+	printf_safe("  - deps/\n");
+	printf_safe("  - tests/\n");
+	printf_safe("  - docs/index.md\n");
+	printf_safe("  - scripts/\n");
+	printf_safe("  - build/\n");
 
 	sdsfree(name);
 	return 0;

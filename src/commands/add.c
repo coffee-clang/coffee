@@ -55,7 +55,7 @@ int64_t handle_add(options *opts)
 	for (size_t i = 0; i < m->package.dependencies_count; i++) {
 		if (m->package.dependencies[i] != nullptr &&
 		    strncmp(m->package.dependencies[i], package_name, strlen(package_name)) == 0) {
-			printf("Dependency %s already exists\n", package_name);
+			printf_safe("Dependency %s already exists\n", package_name);
 			manifest_free(m);
 			sdsfree(manifest_path);
 			return 0;
@@ -108,8 +108,8 @@ int64_t handle_add(options *opts)
 		return 1;
 	}
 
-	printf("Added dependency: %s\n", package_name);
-	printf("Run 'coffee fetch' to fetch the new dependency.\n");
+	printf_safe("Added dependency: %s\n", package_name);
+	printf_safe("Run 'coffee fetch' to fetch the new dependency.\n");
 
 	/* Append dependency flags to Makefile if it exists */
 	char  *dir_end = strrchr(manifest_path, '/');

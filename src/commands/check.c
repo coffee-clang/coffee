@@ -50,14 +50,14 @@ int64_t handle_check(options *opts)
 		return 1;
 	}
 
-	printf("Validating Coffee.toml...\n");
+	printf_safe("Validating Coffee.toml...\n");
 	if (validate_manifest(m) > 0) {
 		manifest_free(m);
 		return 1;
 	}
-	printf("Manifest is valid.\n");
+	printf_safe("Manifest is valid.\n");
 
-	printf("Checking source code for syntax errors...\n");
+	printf_safe("Checking source code for syntax errors...\n");
 
 	const char *cc = getenv("CC") != nullptr ? getenv("CC") : "clang";
 
@@ -126,7 +126,7 @@ int64_t handle_check(options *opts)
 	cmd = sdscatprintf(cmd, " 2>&1");
 
 	if (opts->verbose) {
-		printf("Running: %s\n", cmd);
+		printf_safe("Running: %s\n", cmd);
 	}
 
 	i64 ret = system(cmd);
@@ -139,6 +139,6 @@ int64_t handle_check(options *opts)
 		return 1;
 	}
 
-	printf("Check complete. No syntax errors found.\n");
+	printf_safe("Check complete. No syntax errors found.\n");
 	return 0;
 }

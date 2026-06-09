@@ -52,12 +52,12 @@ static void print_tree(const char *dep_dir, const char *dep_name, const char *ve
 	}
 
 	const char *connector = (int)is_last ? "└── " : "├── ";
-	printf("%s%s%s", prefix, connector, dep_name != nullptr ? dep_name : "?");
+	printf_safe("%s%s%s", prefix, connector, dep_name != nullptr ? dep_name : "?");
 
 	if (version != nullptr && strcmp(version, "*") != 0) {
-		printf(" v%s", version);
+		printf_safe(" v%s", version);
 	}
-	printf("\n");
+	printf_safe("\n");
 
 	if (depth >= max_depth || dep_dir == nullptr || dep_dir[0] == '\0') {
 		return;
@@ -137,7 +137,7 @@ int64_t handle_tree(options *opts)
 	const char *name    = m->package.name != nullptr ? m->package.name : "project";
 	const char *version = m->package.version != nullptr ? m->package.version : "0.1.0";
 
-	printf("%s v%s\n", name, version);
+	printf_safe("%s v%s\n", name, version);
 
 	/* Try to use lockfile first for resolved paths */
 	lockfile_t *lf = lockfile_parse("Coffee.lock");

@@ -11,12 +11,12 @@
 static void report_deps(manifest_t *m)
 {
 	if (m->package.dependencies_count == 0) {
-		printf("No dependencies declared.\n");
+		printf_safe("No dependencies declared.\n");
 		return;
 	}
 
-	printf("%-20s %s\n", "NAME", "SOURCE");
-	printf("%-20s %s\n", "----", "------");
+	printf_safe("%-20s %s\n", "NAME", "SOURCE");
+	printf_safe("%-20s %s\n", "----", "------");
 
 	for (size_t i = 0; i < m->package.dependencies_count; i++) {
 		const char *entry = m->package.dependencies[i];
@@ -44,23 +44,23 @@ static void report_deps(manifest_t *m)
 		}
 
 		if (is_git) {
-			printf("%-20s git\n", name);
+			printf_safe("%-20s git\n", name);
 		} else if (is_path) {
-			printf("%-20s path\n", name);
+			printf_safe("%-20s path\n", name);
 		} else {
-			printf("%-20s unknown\n", name);
+			printf_safe("%-20s unknown\n", name);
 		}
 
 		sdsfree(name);
 	}
 
-	printf("\nTotal: %zu dependencies\n", m->package.dependencies_count);
+	printf_safe("\nTotal: %zu dependencies\n", m->package.dependencies_count);
 }
 
 static void report_audit(manifest_t *m)
 {
 	if (m->package.dependencies_count == 0) {
-		printf("No dependencies to audit.\n");
+		printf_safe("No dependencies to audit.\n");
 		return;
 	}
 
@@ -69,11 +69,11 @@ static void report_audit(manifest_t *m)
 	lockfile_free(lf);
 
 	if (g == nullptr) {
-		printf("Could not resolve dependency graph.\n");
+		printf_safe("Could not resolve dependency graph.\n");
 		return;
 	}
 
-	printf("Auditing dependencies...\n\n");
+	printf_safe("Auditing dependencies...\n\n");
 
 	for (size_t i = 0; i < m->package.dependencies_count; i++) {
 		const char *entry = m->package.dependencies[i];
@@ -97,19 +97,19 @@ static void report_audit(manifest_t *m)
 			i64 behind     = dep_graph_compare_remote(g, name, &behind_str);
 
 			if (behind == 0) {
-				printf("  %-20s OK (%s up-to-date)\n", name, ref_display);
+				printf_safe("  %-20s OK (%s up-to-date)\n", name, ref_display);
 			} else if (behind > 0) {
-				printf("  %-20s OUTDATED (%lld commits behind %s)\n", name, (long long)behind, ref_display);
+				printf_safe("  %-20s OUTDATED (%lld commits behind %s)\n", name, (long long)behind, ref_display);
 			} else {
-				printf("  %-20s %s\n", name, behind_str != nullptr ? behind_str : "?");
+				printf_safe("  %-20s %s\n", name, behind_str != nullptr ? behind_str : "?");
 			}
 			sdsfree(behind_str);
 		} else {
 			const char *path = dep_graph_path(g, name);
 			if (path != nullptr) {
-				printf("  %-20s OK (path: %s)\n", name, path);
+				printf_safe("  %-20s OK (path: %s)\n", name, path);
 			} else {
-				printf("  %-20s NOT FOUND\n", name);
+				printf_safe("  %-20s NOT FOUND\n", name);
 			}
 		}
 

@@ -10,7 +10,7 @@ int64_t handle_clean(options *opts)
 
 	sds cmd = sdscatprintf(sdsempty(), "rm -rf %s", target_dir);
 
-	printf("Cleaning %s\n", target_dir);
+	printf_safe("Cleaning %s\n", target_dir);
 	if (system(cmd) != 0) {
 		sdsfree(cmd);
 		fprintf_safe(stderr, "Error: Could not clean target directory\n");

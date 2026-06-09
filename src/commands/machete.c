@@ -116,7 +116,7 @@ int64_t handle_machete(options *opts)
 	}
 
 	if (m->package.dependencies_count == 0) {
-		printf("No dependencies declared.\n");
+		printf_safe("No dependencies declared.\n");
 		manifest_free(m);
 		return 0;
 	}
@@ -140,9 +140,9 @@ int64_t handle_machete(options *opts)
 		i64 used = scan_dir_for_dep(".", name);
 		if (!used) {
 			if (unused_count == 0) {
-				printf("Unused dependencies:\n");
+				printf_safe("Unused dependencies:\n");
 			}
-			printf("  %s\n", name);
+			printf_safe("  %s\n", name);
 			unused_count++;
 		}
 
@@ -150,7 +150,7 @@ int64_t handle_machete(options *opts)
 	}
 
 	if (unused_count == 0) {
-		printf("No unused dependencies found.\n");
+		printf_safe("No unused dependencies found.\n");
 	}
 
 	manifest_free(m);

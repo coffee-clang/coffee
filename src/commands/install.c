@@ -3,6 +3,7 @@
 #include "../manifest.h"
 #include "../project.h"
 #include "../registry.h"
+#include "../version.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -84,7 +85,7 @@ static i64 compile_binary(char *cc, sds bin_name, sds *src_globs, size_t src_cou
 	argv[idx] = nullptr;
 
 	if (verbose) {
-		printf("  Compiling %s\n", bin_name);
+		printf_safe("  Compiling %s\n", bin_name);
 	}
 
 	pid_t pid = fork();
@@ -159,19 +160,24 @@ int64_t handle_install(options *opts)
 {
 	if (opts->inputs_num < 2) {
 		fprintf_safe(stderr, "Error: Package name required\n");
-		fprintf_safe(stderr, "Usage: coffee install --git <url> <package>\n");
+		fprintf_safe(stderr, "Usage: coffee install --git <url> <package> [version]\n");
 		return 1;
 	}
 
 	if (!opts->git) {
 		fprintf_safe(stderr, "Error: --git <url> is required\n");
-		fprintf_safe(stderr, "Usage: coffee install --git https://github.com/user/repo.git <package>\n");
+		fprintf_safe(stderr, "Usage: coffee install --git https://github.com/user/repo.git <package> [version]\n");
 		return 1;
 	}
 
-	char *package = opts->inputs[1];
+	char       *package     = opts->inputs[1];
+	const char *req_version = opts->inputs_num >= 3 ? opts->inputs[2] : nullptr;
 
-	printf("Installing package: %s\n", package);
+	if (req_version != nullptr) {
+		printf_safe("Installing package: %s (version %s)\n", package, req_version);
+	} else {
+		printf_safe("Installing package: %s\n", package);
+	}
 
 	const char *coffee_home = coffee_home_dir();
 	sds         bin_dir     = sdscatprintf(sdsempty(), "%s/bin", coffee_home);
@@ -180,24 +186,66 @@ int64_t handle_install(options *opts)
 	sds global_deps = sdscatprintf(sdsempty(), "%s/deps", coffee_home);
 	mkdir(global_deps, 0755);
 
-	sds cache_path = sdscatprintf(sdsempty(), "%s/%s", global_deps, package);
+	/* Clone to temporary location first */
+	sds clone_path = sdscatprintf(sdsempty(), "%s/%s", global_deps, package);
 	sdsfree(global_deps);
 
-	/* Clone from git URL */
-	sds cmd = sdscatprintf(sdsempty(), "git clone --depth 1 '%s' '%s' 2>/dev/null", opts->git, cache_path);
+	/* If clone already exists, remove it */
+	sds cmd = sdscatprintf(sdsempty(), "rm -rf '%s' 2>/dev/null", clone_path);
+	system(cmd);
+	sdsfree(cmd);
+
+	cmd     = sdscatprintf(sdsempty(), "git clone --depth 1 '%s' '%s' 2>/dev/null", opts->git, clone_path);
 	i64 ret = system(cmd);
 	sdsfree(cmd);
 	if (ret != 0) {
-		sdsfree(cache_path);
+		sdsfree(clone_path);
 		fprintf_safe(stderr, "Error: Failed to clone %s from %s\n", package, opts->git);
 		sdsfree(bin_dir);
 		return 1;
 	}
 
-	/* Read the downloaded library.toml to find [[bin]] targets */
-	sds         lib_toml     = sdscatprintf(sdsempty(), "%s/library.toml", cache_path);
+	/* Read the cloned library.toml to get version and [[bin]] targets */
+	sds         lib_toml     = sdscatprintf(sdsempty(), "%s/library.toml", clone_path);
 	manifest_t *pkg_manifest = manifest_parse(lib_toml);
 	sdsfree(lib_toml);
+
+	/* Determine the actual version and final install path */
+	sds cache_path = nullptr;
+	sds final_ver  = nullptr;
+
+	if (pkg_manifest != nullptr && pkg_manifest->package.version != nullptr) {
+		final_ver = sdsnew(pkg_manifest->package.version);
+	} else {
+		final_ver = sdsnew("*");
+	}
+
+	/* If requested version is specified and doesn't match, warn */
+	if (req_version != nullptr && !version_satisfies(final_ver, req_version)) {
+		fprintf_safe(stderr, "Warning: requested version %s but cloned version is %s\n", req_version, final_ver);
+	}
+
+	/* Install to versioned directory */
+	{
+		sds global_base = sdscatprintf(sdsempty(), "%s/deps", coffee_home);
+		cache_path      = sdscatprintf(sdsempty(), "%s/%s/%s", global_base, package, final_ver);
+		sdsfree(global_base);
+
+		/* Create versioned directory */
+		sds mkdir_cmd = sdscatprintf(sdsempty(), "rm -rf '%s' 2>/dev/null && mkdir -p '%s'", cache_path, cache_path);
+		system(mkdir_cmd);
+		sdsfree(mkdir_cmd);
+
+		/* Move cloned files into versioned directory */
+		/* Use rename for atomicity; if that fails (cross-device), fall back to mv */
+		if (rename(clone_path, cache_path) != 0) {
+			sds mv_cmd = sdscatprintf(sdsempty(), "mv '%s'/* '%s'/ 2>/dev/null && rm -rf '%s'", clone_path, cache_path,
+			                          clone_path);
+			system(mv_cmd);
+			sdsfree(mv_cmd);
+		}
+	}
+	sdsfree(clone_path);
 
 	char *cc = getenv("CC") != nullptr ? getenv("CC") : "clang";
 
@@ -223,19 +271,19 @@ int64_t handle_install(options *opts)
 			ret = compile_binary(cc, bt->name, bt->src, bt->src_count, dep_flags, bin_dir,
 			                     (opts != nullptr && opts->verbose) != 0);
 			if (ret == 0) {
-				printf("  Binary: %s/%s\n", bin_dir, bt->name);
+				printf_safe("  Binary: %s/%s\n", bin_dir, bt->name);
 			} else {
 				fprintf_safe(stderr, "Error: Failed to compile binary '%s'\n", bt->name);
 			}
 		}
 		sdsfree(dep_flags);
 	} else {
-		/* No [[bin]] targets — just print what was downloaded */
-		printf("  Source downloaded to %s\n", cache_path);
+		printf_safe("  Source installed to %s\n", cache_path);
 	}
 
 	manifest_free(pkg_manifest);
 
+	/* Symlink into project deps/ directory */
 	char *manifest_path = project_find_manifest(nullptr);
 	if (manifest_path) {
 		sds project_deps = sdsnew("deps");
@@ -248,14 +296,15 @@ int64_t handle_install(options *opts)
 		if (symret != 0) {
 			fprintf_safe(stderr, "Warning: Failed to create project symlink\n");
 		} else {
-			printf("Linked to project: %s\n", project_link_path);
+			printf_safe("Linked to project: %s\n", project_link_path);
 		}
 		sdsfree(project_link_path);
 		sdsfree(manifest_path);
 	}
 
 	sdsfree(cache_path);
-	printf("Installed: %s\n", package);
+	sdsfree(final_ver);
+	printf_safe("Installed: %s\n", package);
 	sdsfree(bin_dir);
 	return 0;
 }
