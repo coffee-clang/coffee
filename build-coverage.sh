@@ -7,7 +7,7 @@ LDFLAGS="-static /usr/lib/x86_64-linux-gnu/libz.a --coverage"
 
 rm -rf "$COV_DIR"
 
-mkdir -p "$COV_DIR/src/commands" "$COV_DIR/tests" "$COV_DIR/deps/toml" "$COV_DIR/deps/sds"
+mkdir -p "$COV_DIR/src/commands" "$COV_DIR/tests"
 
 # Compile source files
 for f in src/*.c src/commands/*.c; do
@@ -20,9 +20,6 @@ for f in src/*.c src/commands/*.c; do
     fi
 done
 
-# Compile deps
-$CC $CFLAGS -c deps/toml/toml.c -o "$COV_DIR/deps/toml/toml.o" 2>/dev/null || true
-$CC $CFLAGS -c deps/sds/sds.c -o "$COV_DIR/deps/sds/sds.o" 2>/dev/null || true
 
 # Compile test files
 for f in tests/*.c; do

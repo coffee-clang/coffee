@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 
-int64_t handle_search(options *opts)
+i64 handle_search(options *opts)
 {
 	sds query = sdsempty();
 	if (opts->inputs_num > 1 && opts->inputs[1] != nullptr) {

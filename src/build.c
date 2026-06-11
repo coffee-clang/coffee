@@ -39,8 +39,8 @@ static i64 run_command(char **argv, bool verbose)
 		perror("execvp");
 		exit(1);
 	} else if (pid > 0) {
-		i64 wstatus;
-		waitpid(pid, (int *)&wstatus, 0);
+		int wstatus;
+		waitpid(pid, &wstatus, 0);
 		if (WIFEXITED(wstatus)) {
 			return WEXITSTATUS(wstatus);
 		}

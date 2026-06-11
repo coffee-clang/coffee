@@ -96,8 +96,8 @@ static i64 compile_binary(char *cc, sds bin_name, sds *src_globs, size_t src_cou
 		perror("execvp");
 		exit(1);
 	} else if (pid > 0) {
-		i64 wstatus;
-		waitpid(pid, (int *)&wstatus, 0);
+		int wstatus;
+		waitpid(pid, &wstatus, 0);
 		if (WIFEXITED(wstatus)) {
 			ret = WEXITSTATUS(wstatus);
 		} else {

@@ -569,9 +569,10 @@ TEST(cov_new_lib_mode)
 {
 	char old_cwd[4096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd");
-	/* Clean up any stale state first */
-	system("rm -rf /tmp/coverage-cmd-new-lib");
-	sds tmpdir = sdsnew("/tmp/coverage-cmd-new-lib");
+	sds tmpdir = sdscatprintf(sdsempty(), "/tmp/coverage-cmd-new-lib-%d", getpid());
+	sds rmcmd  = sdscatprintf(sdsempty(), "rm -rf %s", tmpdir);
+	system(rmcmd);
+	sdsfree(rmcmd);
 	mkdir(tmpdir, 0755);
 	ASSERT(chdir(tmpdir) == 0, "chdir");
 
