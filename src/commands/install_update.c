@@ -1,4 +1,5 @@
 #include "../coffee.h"
+#include "../registry.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,12 +11,7 @@
 
 int64_t handle_install_update(options *opts)
 {
-	const char *home = getenv("HOME");
-	if (home == nullptr) {
-		home = "/tmp";
-	}
-
-	sds deps_dir = sdscatprintf(sdsempty(), "%s/.coffee/deps", home);
+	sds deps_dir = sdscatprintf(sdsempty(), "%s/deps", coffee_home_dir());
 
 	struct stat st;
 	if (stat(deps_dir, &st) != 0) {

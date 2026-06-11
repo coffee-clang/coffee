@@ -1,4 +1,5 @@
 #include "../coffee.h"
+#include "../registry.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,12 +17,7 @@ int64_t handle_uninstall(options *opts)
 
 	char *package = opts->inputs[1];
 
-	const char *home = getenv("HOME");
-	if (home == nullptr) {
-		home = "/tmp";
-	}
-
-	sds pkg_dir = sdscatprintf(sdsempty(), "%s/.coffee/deps/%s", home, package);
+	sds pkg_dir = sdscatprintf(sdsempty(), "%s/deps/%s", coffee_home_dir(), package);
 
 	struct stat st;
 	if (stat(pkg_dir, &st) != 0) {

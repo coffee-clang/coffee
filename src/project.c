@@ -1,5 +1,7 @@
 #include "project.h"
 
+#include "registry.h"
+
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -82,11 +84,7 @@ sds pkg_dir(const char *name)
 	sdsfree(vendor_dir);
 
 	/* Fallback to global cache */
-	const char *home = getenv("HOME");
-	if (home == nullptr) {
-		home = "/tmp";
-	}
-	return sdscatfmt(sdsnew(home), "/.coffee/deps/%s", name);
+	return sdscatfmt(sdsempty(), "%s/deps/%s", coffee_home_dir(), name);
 }
 
 i64 create_dir(const char *path)

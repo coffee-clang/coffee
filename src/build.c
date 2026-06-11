@@ -73,11 +73,7 @@ sds dep_resolve_dir(const char *name)
 	}
 	sdsfree(vendor_dir);
 
-	const char *home = getenv("HOME");
-	if (home == nullptr) {
-		home = "/tmp";
-	}
-	sds global = sdscatfmt(sdsnew(home), "/.coffee/deps/%s", name);
+	sds global = sdscatfmt(sdsempty(), "%s/deps/%s", coffee_home_dir(), name);
 	if (access(global, F_OK) == 0) {
 		return global;
 	}
@@ -115,17 +111,12 @@ sds dep_resolve_dir_constraint(const char *name, const char *constraint)
 	sdsfree(vendor_dir);
 
 	/* Check global versioned directory */
-	const char *home = getenv("HOME");
-	if (home == nullptr) {
-		home = "/tmp";
-	}
-
-	sds  global_base = sdscatfmt(sdsnew(home), "/.coffee/deps/%s", name);
+	sds  global_base = sdscatfmt(sdsempty(), "%s/deps/%s", coffee_home_dir(), name);
 	DIR *dir         = opendir(global_base);
 	if (dir == nullptr) {
 		/* No versioned directory — try flat global path */
 		sdsfree(global_base);
-		sds global_flat = sdscatfmt(sdsnew(home), "/.coffee/deps/%s", name);
+		sds global_flat = sdscatfmt(sdsempty(), "%s/deps/%s", coffee_home_dir(), name);
 		if (access(global_flat, F_OK) == 0) {
 			return global_flat;
 		}
@@ -216,7 +207,7 @@ sds dep_resolve_dir_constraint(const char *name, const char *constraint)
 	}
 
 	/* Fall back to flat global path */
-	sds global_flat = sdscatfmt(sdsnew(home), "/.coffee/deps/%s", name);
+	sds global_flat = sdscatfmt(sdsempty(), "%s/deps/%s", coffee_home_dir(), name);
 	if (access(global_flat, F_OK) == 0) {
 		return global_flat;
 	}
