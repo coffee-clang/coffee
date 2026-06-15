@@ -17,6 +17,7 @@ TARGET     := $(BIN_DIR)/$(P)
 
 UNITY_CORE_SRCS := \
 	$(SRC_DIR)/cmdline.c \
+	$(SRC_DIR)/toolcheck.c \
 	$(SRC_DIR)/manifest.c \
 	$(SRC_DIR)/registry.c \
 	$(SRC_DIR)/project.c \

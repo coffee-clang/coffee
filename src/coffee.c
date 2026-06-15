@@ -4,6 +4,8 @@
 
 #include "coffee.h"
 
+#include "toolcheck.h"
+
 command_s commands[] = {
 	{ .name = "add", .description = "Add dependencies to a manifest file", .action = &handle_add },
 	{ .name = "bench", .description = "Benchmark", .action = &handle_bench },
@@ -145,6 +147,9 @@ int main(int argc, char **argv)
 		char *cmd = args_info.inputs[command_idx];
 		for (i64 i = 0; i < lengthof(commands); i++) {
 			if (strcmp(cmd, commands[i].name) == 0) {
+				if (toolcheck_run(cmd) != 0) {
+					exit(EXIT_FAILURE);
+				}
 				commands[i].action(&opt);
 				exit(EXIT_SUCCESS);
 			}
