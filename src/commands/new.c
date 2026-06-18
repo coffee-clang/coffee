@@ -1,6 +1,7 @@
 #include "../coffee.h"
 #include "../manifest.h"
 #include "../project.h"
+#include "../skeleton.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -120,12 +121,7 @@ int64_t handle_new(options *opts)
 
 	/* Create .gitignore */
 	sds gitignore_path    = sdscatprintf(sdsempty(), "%s/.gitignore", path);
-	sds gitignore_content = sdsnew("build/\n"
-	                               "target/\n"
-	                               "*.o\n"
-	                               "*.a\n"
-	                               "*.so\n"
-	                               ".tidy_stamps/\n");
+	sds gitignore_content = sdsnew(skeleton_gitignore);
 	if (create_file(gitignore_path, gitignore_content) != 0) {
 		sdsfree(gitignore_path);
 		sdsfree(gitignore_content);
@@ -138,27 +134,7 @@ int64_t handle_new(options *opts)
 
 	/* Create LICENSE */
 	sds license_path    = sdscatprintf(sdsempty(), "%s/LICENSE", path);
-	sds license_content = sdsnew("MIT License\n"
-	                             "\n"
-	                             "Copyright (c) 2024\n"
-	                             "\n"
-	                             "Permission is hereby granted, free of charge, to any person obtaining a copy\n"
-	                             "of this software and associated documentation files (the \"Software\"), to deal\n"
-	                             "in the Software without restriction, including without limitation the rights\n"
-	                             "to use, copy, modify, merge, publish, distribute, sublicense, and/or sell\n"
-	                             "copies of the Software, and to permit persons to whom the Software is\n"
-	                             "furnished to do so, subject to the following conditions:\n"
-	                             "\n"
-	                             "The above copyright notice and this permission notice shall be included in all\n"
-	                             "copies or substantial portions of the Software.\n"
-	                             "\n"
-	                             "THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\n"
-	                             "IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\n"
-	                             "FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\n"
-	                             "AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\n"
-	                             "LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\n"
-	                             "OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\n"
-	                             "SOFTWARE.\n");
+	sds license_content = sdsnew(skeleton_LICENSE);
 	if (create_file(license_path, license_content) != 0) {
 		sdsfree(license_path);
 		sdsfree(license_content);
@@ -171,11 +147,7 @@ int64_t handle_new(options *opts)
 
 	/* Create README.md */
 	sds readme_path    = sdscatprintf(sdsempty(), "%s/README.md", path);
-	sds readme_content = sdscatprintf(sdsempty(),
-	                                  "# %s\n"
-	                                  "\n"
-	                                  "A modern C project.\n",
-	                                  name);
+	sds readme_content = skeleton_substitute(skeleton_README_md, name);
 	if (create_file(readme_path, readme_content) != 0) {
 		sdsfree(readme_path);
 		sdsfree(readme_content);
@@ -188,34 +160,7 @@ int64_t handle_new(options *opts)
 
 	/* Create Makefile */
 	sds makefile_path    = sdscatprintf(sdsempty(), "%s/Makefile", path);
-	sds makefile_content = sdscatprintf(sdsempty(),
-	                                    "CC ?= clang\n"
-	                                    "CFLAGS += -std=c23 -O3 -g\n"
-	                                    "CFLAGS += -Wall -Wextra -Wshadow -Wpedantic\n"
-	                                    "CFLAGS += -Wconversion -Wsign-conversion -Wunused\n"
-	                                    "CFLAGS += -Iinclude/%s\n"
-	                                    "\n"
-	                                    "# Dependency flags via coffee\n"
-	                                    "CFLAGS += $(shell coffee cflags 2>/dev/null)\n"
-	                                    "LDFLAGS += $(shell coffee libs 2>/dev/null)\n"
-	                                    "\n"
-	                                    "TARGET := build/%s\n"
-	                                    "SOURCES := $(wildcard src/*.c)\n"
-	                                    "\n"
-	                                    ".PHONY: build clean format tidy\n"
-	                                    "\n"
-	                                    "build: $(SOURCES)\n"
-	                                    "\t$(CC) $(CFLAGS) -o $(TARGET) $(SOURCES) $(LDFLAGS)\n"
-	                                    "\n"
-	                                    "clean:\n"
-	                                    "\trm -rf build/\n"
-	                                    "\n"
-	                                    "format:\n"
-	                                    "\tclang-format -i src/*.c include/%s/*.h\n"
-	                                    "\n"
-	                                    "tidy:\n"
-	                                    "\tclang-tidy src/*.c -- $(CFLAGS)\n",
-	                                    name, name, name);
+	sds makefile_content = skeleton_substitute(skeleton_Makefile, name);
 	if (create_file(makefile_path, makefile_content) != 0) {
 		sdsfree(makefile_path);
 		sdsfree(makefile_content);
@@ -227,20 +172,7 @@ int64_t handle_new(options *opts)
 	sdsfree(makefile_content);
 
 	/* Create manifest */
-	sds manifest_content = sdscatprintf(sdsempty(),
-	                                    "[package]\n"
-	                                    "name = \"%s\"\n"
-	                                    "version = \"0.1.0\"\n"
-	                                    "edition = \"c23\"\n"
-	                                    "description = \"A new C project\"\n"
-	                                    "license = \"MIT\"\n"
-	                                    "\n"
-	                                    "[dependencies]\n"
-	                                    "\n"
-	                                    "[lib]\n"
-	                                    "sources = [\"src/*.c\"]\n"
-	                                    "headers = [\"include/%s/*.h\"]\n",
-	                                    name, name);
+	sds manifest_content = skeleton_substitute(skeleton_Coffee_toml, name);
 
 	if (create_file(manifest_path, manifest_content) != 0) {
 		sdsfree(manifest_content);
@@ -252,12 +184,7 @@ int64_t handle_new(options *opts)
 
 	/* Create main.c */
 	sds src_main     = sdscatprintf(sdsempty(), "%s/main.c", src_dir);
-	sds main_content = sdsnew("#include <stdio.h>\n"
-	                          "\n"
-	                          "int main(int argc, char **argv) {\n"
-	                          "    printf(\"Hello, world!\\n\");\n"
-	                          "    return 0;\n"
-	                          "}\n");
+	sds main_content = sdsnew(skeleton_main_c);
 
 	if (create_file(src_main, main_content) != 0) {
 		sdsfree(src_main);
@@ -271,14 +198,7 @@ int64_t handle_new(options *opts)
 
 	/* Create main header */
 	sds main_header_path = sdscatprintf(sdsempty(), "%s/include/%s/%s.h", path, name, name);
-	sds header_content   = sdscatprintf(sdsempty(),
-	                                    "#ifndef %s_H\n"
-	                                    "#define %s_H\n"
-	                                    "\n"
-	                                    "// Your declarations here\n"
-	                                    "\n"
-	                                    "#endif // %s_H\n",
-	                                    name, name, name);
+	sds header_content   = skeleton_substitute(skeleton_header_h, name);
 	if (create_file(main_header_path, header_content) != 0) {
 		sdsfree(main_header_path);
 		sdsfree(header_content);
@@ -292,14 +212,7 @@ int64_t handle_new(options *opts)
 	if (opts->lib) {
 		/* Library mode: lib.c, library Makefile, [lib] manifest */
 		sds src_lib     = sdscatprintf(sdsempty(), "%s/lib.c", src_dir);
-		sds lib_content = sdscatprintf(sdsempty(),
-		                               "#include \"%s/%s.h\"\n"
-		                               "\n"
-		                               "int add(int a, int b)\n"
-		                               "{\n"
-		                               "    return a + b;\n"
-		                               "}\n",
-		                               name, name);
+		sds lib_content = skeleton_substitute(skeleton_lib_c, name);
 
 		if (create_file(src_lib, lib_content) != 0) {
 			sdsfree(src_lib);
@@ -313,40 +226,7 @@ int64_t handle_new(options *opts)
 
 		/* Library Makefile — builds static library */
 		makefile_path    = sdscatprintf(sdsempty(), "%s/Makefile", path);
-		makefile_content = sdscatprintf(sdsempty(),
-		                                "CC ?= clang\n"
-		                                "CFLAGS += -std=c23 -O3 -g\n"
-		                                "CFLAGS += -Wall -Wextra -Wshadow -Wpedantic\n"
-		                                "CFLAGS += -Wconversion -Wsign-conversion -Wunused\n"
-		                                "CFLAGS += -Iinclude/%s\n"
-		                                "\n"
-		                                "# Dependency flags via coffee\n"
-		                                "CFLAGS += $(shell coffee cflags 2>/dev/null)\n"
-		                                "LDFLAGS += $(shell coffee libs 2>/dev/null)\n"
-		                                "\n"
-		                                "TARGET := build/lib%s.a\n"
-		                                "SOURCES := $(wildcard src/*.c)\n"
-		                                "OBJECTS := $(SOURCES:src/%%.c=build/%%.o)\n"
-		                                "\n"
-		                                ".PHONY: build clean format tidy\n"
-		                                "\n"
-		                                "build: $(TARGET)\n"
-		                                "\n"
-		                                "$(TARGET): $(OBJECTS)\n"
-		                                "\t$(AR) $(ARFLAGS) $@ $^\n"
-		                                "\n"
-		                                "build/%%.o: src/%%.c\n"
-		                                "\t$(CC) $(CFLAGS) -c $< -o $@\n"
-		                                "\n"
-		                                "clean:\n"
-		                                "\trm -rf build/\n"
-		                                "\n"
-		                                "format:\n"
-		                                "\tclang-format -i src/*.c include/%s/*.h\n"
-		                                "\n"
-		                                "tidy:\n"
-		                                "\tclang-tidy src/*.c -- $(CFLAGS)\n",
-		                                name, name, name);
+		makefile_content = skeleton_substitute(skeleton_Makefile_lib, name);
 
 		if (create_file(makefile_path, makefile_content) != 0) {
 			sdsfree(makefile_path);
@@ -359,19 +239,7 @@ int64_t handle_new(options *opts)
 		sdsfree(makefile_content);
 
 		/* Library manifest with [lib] section */
-		manifest_content = sdscatprintf(sdsempty(),
-		                                "[package]\n"
-		                                "name = \"%s\"\n"
-		                                "version = \"0.1.0\"\n"
-		                                "edition = \"c23\"\n"
-		                                "description = \"A new C project\"\n"
-		                                "license = \"MIT\"\n"
-		                                "\n"
-		                                "[lib]\n"
-		                                "name = \"%s\"\n"
-		                                "src = [\"src/lib.c\"]\n"
-		                                "include = [\"include\"]\n",
-		                                name, name);
+		manifest_content = skeleton_substitute(skeleton_Coffee_toml_lib, name);
 
 		if (create_file(manifest_path, manifest_content) != 0) {
 			sdsfree(manifest_content);
@@ -401,7 +269,7 @@ int64_t handle_new(options *opts)
 
 	/* Create placeholder files */
 	sds docs_placeholder_path = sdscatprintf(sdsempty(), "%s/docs/index.md", path);
-	if (create_file(docs_placeholder_path, "# Documentation\n") != 0) {
+	if (create_file(docs_placeholder_path, skeleton_index_md) != 0) {
 		sdsfree(docs_placeholder_path);
 		fprintf_safe(stderr, "Error: Could not create docs/index.md\n");
 		sdsfree(name);

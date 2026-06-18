@@ -46,6 +46,11 @@ LDFLAGS := -static
 
 MDBOOK := $(if $(wildcard ./mdbook),./mdbook,mdbook)
 
+SKELETONS_H := $(SRC_DIR)/skeletons.h
+
+$(SKELETONS_H): $(wildcard skeletons/*)
+	./scripts/embed_skeletons.sh skeletons $@
+
 # Generate the unity file
 $(UNITY_FILE): $(UNITY_ALL_SRCS)
 	@mkdir -p $(BIN_DIR)
@@ -79,7 +84,7 @@ $(UNITY_FILE): $(UNITY_ALL_SRCS)
 		done; \
 	} > $@
 
-$(UNITY_OBJ): $(UNITY_FILE)
+$(UNITY_OBJ): $(UNITY_FILE) $(SKELETONS_H)
 	$(CC) $(CFLAGS_COMMON) -c $(UNITY_FILE) -o $@
 
 $(TARGET): $(UNITY_OBJ)
@@ -125,7 +130,7 @@ $(TEST_SUPPORT_FILE): $(TEST_SUPPORT_SRCS)
 		done; \
 	} > $@
 
-$(TEST_SUPPORT_OBJ): $(TEST_SUPPORT_FILE)
+$(TEST_SUPPORT_OBJ): $(TEST_SUPPORT_FILE) $(SKELETONS_H)
 	$(CC) $(CFLAGS_COMMON) -c $(TEST_SUPPORT_FILE) -o $@
 
 $(TEST_COFFEE_OBJ): $(SRC_DIR)/coffee.c

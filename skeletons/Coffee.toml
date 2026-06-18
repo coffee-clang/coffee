@@ -1,0 +1,12 @@
+[package]
+name = "__NAME__"
+version = "0.1.0"
+edition = "c23"
+description = "A new C project"
+license = "MIT"
+
+[dependencies]
+
+[lib]
+sources = ["src/*.c"]
+headers = ["include/__NAME__/*.h"]
