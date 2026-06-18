@@ -254,8 +254,8 @@ int64_t handle_new(options *opts)
 	sds src_main     = sdscatprintf(sdsempty(), "%s/main.c", src_dir);
 	sds main_content = sdsnew("#include <stdio.h>\n"
 	                          "\n"
-	                          "int main(i64 argc, char **argv) {\n"
-	                          "    printf_safe(\"Hello, world!\\n\");\n"
+	                          "int main(int argc, char **argv) {\n"
+	                          "    printf(\"Hello, world!\\n\");\n"
 	                          "    return 0;\n"
 	                          "}\n");
 
@@ -295,7 +295,7 @@ int64_t handle_new(options *opts)
 		sds lib_content = sdscatprintf(sdsempty(),
 		                               "#include \"%s/%s.h\"\n"
 		                               "\n"
-		                               "i64 add(i64 a, i64 b)\n"
+		                               "int add(int a, int b)\n"
 		                               "{\n"
 		                               "    return a + b;\n"
 		                               "}\n",

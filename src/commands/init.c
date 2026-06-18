@@ -184,8 +184,8 @@ int64_t handle_init(options *opts)
 	/* Create main.c */
 	sds main_content = sdsnew("#include <stdio.h>\n"
 	                          "\n"
-	                          "int main(i64 argc, char **argv) {\n"
-	                          "    printf_safe(\"Hello, world!\\n\");\n"
+	                          "int main(int argc, char **argv) {\n"
+	                          "    printf(\"Hello, world!\\n\");\n"
 	                          "    return 0;\n"
 	                          "}\n");
 
@@ -196,6 +196,43 @@ int64_t handle_init(options *opts)
 		return 1;
 	}
 	sdsfree(main_content);
+
+	/* Create Makefile */
+	sds makefile_content = sdscatprintf(sdsempty(),
+	                                    "CC ?= clang\n"
+	                                    "CFLAGS += -std=c23 -O3 -g\n"
+	                                    "CFLAGS += -Wall -Wextra -Wshadow -Wpedantic\n"
+	                                    "CFLAGS += -Wconversion -Wsign-conversion -Wunused\n"
+	                                    "CFLAGS += -Iinclude/%s\n"
+	                                    "\n"
+	                                    "# Dependency flags via coffee\n"
+	                                    "CFLAGS += $(shell coffee cflags 2>/dev/null)\n"
+	                                    "LDFLAGS += $(shell coffee libs 2>/dev/null)\n"
+	                                    "\n"
+	                                    "TARGET := build/%s\n"
+	                                    "SOURCES := $(wildcard src/*.c)\n"
+	                                    "\n"
+	                                    ".PHONY: build clean format tidy\n"
+	                                    "\n"
+	                                    "build: $(SOURCES)\n"
+	                                    "\t$(CC) $(CFLAGS) -o $(TARGET) $(SOURCES) $(LDFLAGS)\n"
+	                                    "\n"
+	                                    "clean:\n"
+	                                    "\trm -rf build/\n"
+	                                    "\n"
+	                                    "format:\n"
+	                                    "\tclang-format -i src/*.c include/%s/*.h\n"
+	                                    "\n"
+	                                    "tidy:\n"
+	                                    "\tclang-tidy src/*.c -- $(CFLAGS)\n",
+	                                    name, name, name);
+	if (create_file("Makefile", makefile_content) != 0) {
+		sdsfree(makefile_content);
+		fprintf_safe(stderr, "Error: Could not create Makefile\n");
+		sdsfree(name);
+		return 1;
+	}
+	sdsfree(makefile_content);
 
 	/* Create main header */
 	sds main_header_path = sdscatprintf(sdsempty(), "include/%s/%s.h", name, name);
@@ -300,6 +337,7 @@ int64_t handle_init(options *opts)
 	printf_safe("  - .gitignore\n");
 	printf_safe("  - LICENSE\n");
 	printf_safe("  - README.md\n");
+	printf_safe("  - Makefile\n");
 	printf_safe("  - include/%s/%s.h\n", name, name);
 	printf_safe("  - src/main.c\n");
 	printf_safe("  - deps/\n");
