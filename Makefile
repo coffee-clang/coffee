@@ -41,6 +41,18 @@ WNO := \
 	-Wno-unsafe-buffer-usage
 
 CFLAGS_COMMON := -g -Weverything -O3 -std=$(CSTD) $(WNO)
+
+# Release mode: strip debug symbols
+ifdef RELEASE
+  CFLAGS_COMMON := $(filter-out -g, $(CFLAGS_COMMON))
+endif
+# Debug mode: no optimization, add DEBUG define
+ifdef DEBUG
+  CFLAGS_COMMON := $(subst -O3, -O0, $(CFLAGS_COMMON))
+  CFLAGS_COMMON += -DDEBUG
+endif
+# External CFLAGS overlay (feature flags from coffee build)
+CFLAGS_COMMON += $(CFLAGS_EXTRA)
 CFLAGS_COMMON += -D_GNU_SOURCE -include $(SRC_DIR)/compat_limits.h -iquote$(SRC_DIR) -isysteminclude -iquoteinclude/sds
 LDFLAGS := -static
 
@@ -145,7 +157,7 @@ $(TEST_RUNNER): $(TEST_OBJS) $(TEST_SUPPORT_OBJ) $(TEST_COFFEE_OBJ)
 	@mkdir -p $(BIN_DIR)/tests
 	$(CC) $(LDFLAGS) -o $@ $^
 
-all: format $(TARGET) docs
+all: $(TARGET) docs
 
 bootstrap:
 	@mkdir -p include/sds
@@ -173,7 +185,7 @@ clean:
 format:
 	clang-format -i $(SRC_DIR)/*.c $(SRC_DIR)/*.h $(SRC_DIR)/commands/*.c tests/*.c tests/*.h
 
-test: $(TARGET) $(TEST_RUNNER)
+test: $(TEST_RUNNER)
 	@if [ -n "$(TEST_FILTER)" ]; then \
 		$(TEST_RUNNER) "$(TEST_FILTER)"; \
 	else \
@@ -181,7 +193,7 @@ test: $(TARGET) $(TEST_RUNNER)
 	fi
 
 tidy:
-	find src tests -name "*.c" -exec clang-tidy --quiet '{}' -- -Isrc -Iinclude -Iinclude/sds -I. -Ideps -std=c23 -D_GNU_SOURCE \;
+	find src tests -name "*.c" -print0 | xargs -0 -I{} clang-tidy --quiet --warnings-as-errors='*' {} -- -Isrc -Iinclude -Iinclude/sds -I. -Ideps -std=c23 -D_GNU_SOURCE
 
 INSTALL_DIR ?= $(HOME)/.coffee/bin
 install: $(TARGET)
@@ -199,4 +211,4 @@ release:
 	sed -i 's/\(version = "[0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}\.\)[0-9T]\{1,\}/\1'"$$(date +%Y%m%dT%H%M)"'/' Coffee.toml
 	@echo "Updated Coffee.toml version to include timestamp $$(date +%Y%m%dT%H%M)"
 
-.PHONY: all bootstrap clean format test install docs serve release
+.PHONY: all bootstrap clean format test tidy install docs serve release

@@ -108,16 +108,6 @@ static sds dep_extract_constraint(const char *entry)
 	return sdsnewlen(after_eq, (size_t)(end - after_eq));
 }
 
-static bool node_contains_name(dep_node_t *nodes, size_t n, const char *name)
-{
-	for (size_t i = 0; i < n; i++) {
-		if (nodes[i].name != nullptr && strcmp(nodes[i].name, name) == 0) {
-			return true;
-		}
-	}
-	return false;
-}
-
 /*
  * Find a dep in the graph by name. Returns -1 if not found.
  */
