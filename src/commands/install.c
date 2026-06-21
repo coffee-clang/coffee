@@ -4,118 +4,51 @@
 #include "../project.h"
 #include "../registry.h"
 #include "../version.h"
+#include "safe.h"
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
-#include <glob.h>
 #include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/wait.h>
 #include <unistd.h>
 
-static i64 compile_binary(char *cc, sds bin_name, sds *src_globs, size_t src_count, sds dep_flags, sds out_dir,
-                          bool verbose)
+static i64 compile_binary(char *cc, sds name, sds *srcs, size_t src_cnt, sds flags, sds bin_dir, bool verbose)
 {
-	/* Collect source files from globs */
-	size_t src_cap  = 64;
-	size_t src_cnt  = 0;
-	sds   *src_list = malloc(sizeof(sds) * src_cap);
+	(void)bin_dir;
 
-	for (size_t i = 0; i < src_count; i++) {
-		glob_t gbuf;
-		i64    ret = (i64)glob(src_globs[i], 0, nullptr, &gbuf);
-		if (ret == 0) {
-			for (size_t j = 0; j < gbuf.gl_pathc; j++) {
-				if (src_cnt >= src_cap) {
-					src_cap *= 2;
-					src_list = realloc(src_list, sizeof(sds) * src_cap);
-				}
-				src_list[src_cnt++] = sdsnew(gbuf.gl_pathv[j]);
-			}
-			globfree(&gbuf);
-		}
-	}
-
-	if (src_cnt == 0) {
-		fprintf_safe(stderr, "Error: No source files for binary '%s'\n", bin_name);
-		free(src_list);
+	sds outpath = sdscatprintf(sdsempty(), "%s/%s", bin_dir, name);
+	if (outpath == nullptr) {
 		return 1;
 	}
 
-	sds outpath = sdscatprintf(sdsempty(), "%s/%s", out_dir, bin_name);
+	size_t flag_tokens = count_flag_tokens(flags);
+	size_t argc_total  = 1 + flag_tokens + 2 + src_cnt + 1;
+	char **argv        = (char **)safe_malloc(sizeof(char *) * argc_total);
 
-	/* Count tokens for argv */
-	i64 max_tokens = 0;
-	for (const char *p = dep_flags; *p != '\0'; p++) {
-		if (*p == ' ') {
-			max_tokens++;
-		}
-	}
-
-	size_t argc_total = 1 + (size_t)max_tokens + 2 + src_cnt + 1;
-	char **argv       = malloc(sizeof(char *) * (argc_total + 1));
-	if (argv == nullptr) {
-		for (size_t i = 0; i < src_cnt; i++) {
-			sdsfree(src_list[i]);
-		}
-		free(src_list);
-		sdsfree(outpath);
-		return 1;
-	}
-
-	i64 idx     = 0;
+	size_t idx  = 0;
 	argv[idx++] = cc;
 
-	sds   flags_copy = sdsdup(dep_flags);
-	char *saveptr;
-	char *token = strtok_r(flags_copy, " ", &saveptr);
-	while (token) {
-		argv[idx++] = token;
-		token       = strtok_r(nullptr, " ", &saveptr);
-	}
+	size_t end_idx;
+	sds    flags_copy = split_flags_to_argv(flags, argv, idx, &end_idx);
+	idx               = end_idx;
 
 	argv[idx++] = (char *)"-o";
 	argv[idx++] = outpath;
 
 	for (size_t i = 0; i < src_cnt; i++) {
-		argv[idx++] = src_list[i];
+		argv[idx++] = srcs[i];
 	}
 	argv[idx] = nullptr;
 
-	if (verbose) {
-		printf_safe("  Compiling %s\n", bin_name);
-	}
-
-	pid_t pid = fork();
-	i64   ret;
-
-	if (pid == 0) {
-		execvp(argv[0], argv);
-		perror("execvp");
-		exit(1);
-	} else if (pid > 0) {
-		int wstatus;
-		waitpid(pid, &wstatus, 0);
-		if (WIFEXITED(wstatus)) {
-			ret = WEXITSTATUS(wstatus);
-		} else {
-			fprintf_safe(stderr, "Error: Compiler terminated abnormally (signal %d)\n", WTERMSIG(wstatus));
-			ret = 1;
-		}
-	} else {
-		perror("fork");
-		ret = 1;
-	}
+	i64 ret = run_command(argv, (int)verbose ? RUN_CMD_VERBOSE : 0);
 
 	sdsfree(outpath);
 	sdsfree(flags_copy);
-	free(argv);
+	safe_free(argv);
 	for (size_t i = 0; i < src_cnt; i++) {
-		sdsfree(src_list[i]);
+		sdsfree(srcs[i]);
 	}
-	free(src_list);
+	safe_free(srcs);
 
 	return ret;
 }
@@ -125,26 +58,22 @@ static i64 create_symlink(const char *target, const char *link_path)
 	struct stat st;
 	if (lstat(link_path, &st) == 0) {
 		if (S_ISLNK(st.st_mode) || S_ISDIR(st.st_mode)) {
-			sds cmd = sdscatprintf(sdsempty(), "rm -rf %s", link_path);
-			if (system(cmd) != 0) {
-				sdsfree(cmd);
+			char *rm_argv[] = { "rm", "-rf", (char *)link_path, nullptr };
+			if (run_command(rm_argv, 0) != 0) {
 				return -1;
 			}
-			sdsfree(cmd);
 		}
 	}
 
 	sds   link_copy  = sdsnew(link_path);
 	char *last_slash = strrchr(link_copy, '/');
 	if (last_slash) {
-		*last_slash = '\0';
-		sds cmd     = sdscatprintf(sdsempty(), "mkdir -p %s", link_copy);
+		*last_slash        = '\0';
+		char *mkdir_argv[] = { "mkdir", "-p", link_copy, nullptr };
 		sdsfree(link_copy);
-		if (system(cmd) != 0) {
-			sdsfree(cmd);
+		if (run_command(mkdir_argv, 0) != 0) {
 			return -1;
 		}
-		sdsfree(cmd);
 	} else {
 		sdsfree(link_copy);
 	}
@@ -191,18 +120,20 @@ int64_t handle_install(options *opts)
 	sdsfree(global_deps);
 
 	/* If clone already exists, remove it */
-	sds cmd = sdscatprintf(sdsempty(), "rm -rf '%s' 2>/dev/null", clone_path);
-	system(cmd);
-	sdsfree(cmd);
+	{
+		char *rm_argv[] = { "rm", "-rf", clone_path, nullptr };
+		run_command(rm_argv, RUN_CMD_QUIET);
+	}
 
-	cmd     = sdscatprintf(sdsempty(), "git clone --depth 1 '%s' '%s' 2>/dev/null", opts->git, clone_path);
-	i64 ret = system(cmd);
-	sdsfree(cmd);
-	if (ret != 0) {
-		sdsfree(clone_path);
-		fprintf_safe(stderr, "Error: Failed to clone %s from %s\n", package, opts->git);
-		sdsfree(bin_dir);
-		return 1;
+	{
+		char *clone_argv[] = { "git", "clone", "--depth", "1", opts->git, clone_path, nullptr };
+		i64   ret          = run_command(clone_argv, RUN_CMD_QUIET);
+		if (ret != 0) {
+			sdsfree(clone_path);
+			fprintf_safe(stderr, "Error: Failed to clone %s from %s\n", package, opts->git);
+			sdsfree(bin_dir);
+			return 1;
+		}
 	}
 
 	/* Read the cloned library.toml to get version and [[bin]] targets */
@@ -232,17 +163,21 @@ int64_t handle_install(options *opts)
 		sdsfree(global_base);
 
 		/* Create versioned directory */
-		sds mkdir_cmd = sdscatprintf(sdsempty(), "rm -rf '%s' 2>/dev/null && mkdir -p '%s'", cache_path, cache_path);
-		system(mkdir_cmd);
-		sdsfree(mkdir_cmd);
+		{
+			char *rm_argv[]    = { "rm", "-rf", cache_path, nullptr };
+			char *mkdir_argv[] = { "mkdir", "-p", cache_path, nullptr };
+			run_command(rm_argv, RUN_CMD_QUIET);
+			run_command(mkdir_argv, 0);
+		}
 
 		/* Move cloned files into versioned directory */
-		/* Use rename for atomicity; if that fails (cross-device), fall back to mv */
 		if (rename(clone_path, cache_path) != 0) {
-			sds mv_cmd = sdscatprintf(sdsempty(), "mv '%s'/* '%s'/ 2>/dev/null && rm -rf '%s'", clone_path, cache_path,
-			                          clone_path);
-			system(mv_cmd);
-			sdsfree(mv_cmd);
+			char *mv_argv[] = { "mv", clone_path, cache_path, nullptr };
+			i64   mv_ret    = run_command(mv_argv, RUN_CMD_QUIET);
+			if (mv_ret == 0) {
+				char *rm2_argv[] = { "rm", "-rf", clone_path, nullptr };
+				run_command(rm2_argv, RUN_CMD_QUIET);
+			}
 		}
 	}
 	sdsfree(clone_path);
@@ -268,8 +203,8 @@ int64_t handle_install(options *opts)
 			if (bt->name == nullptr) {
 				continue;
 			}
-			ret = compile_binary(cc, bt->name, bt->src, bt->src_count, dep_flags, bin_dir,
-			                     (opts != nullptr && opts->verbose) != 0);
+			i64 ret = compile_binary(cc, bt->name, bt->src, bt->src_count, dep_flags, bin_dir,
+			                         (opts != nullptr && opts->verbose) != 0);
 			if (ret == 0) {
 				printf_safe("  Binary: %s/%s\n", bin_dir, bt->name);
 			} else {

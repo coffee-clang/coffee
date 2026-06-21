@@ -1,20 +1,21 @@
 #include "toolcheck.h"
 
+#include "build.h"
 #include "strings.h"
 
 #include <stdbool.h>
 
-#include <stdlib.h>
 #include <string.h>
+
+#include <sds/sds.h>
 
 static bool tool_exists(const char *name)
 {
-	char cmd[256];
-	i64  n = snprintf_safe(cmd, sizeof(cmd), "command -v %s >/dev/null 2>&1", name);
-	if (n < 0 || (size_t)n >= sizeof(cmd)) {
-		return false;
-	}
-	return system(cmd) == 0;
+	sds   my_name = sdsnew(name);
+	char *argv[]  = { my_name, "--version", nullptr };
+	bool  result  = (run_command(argv, RUN_CMD_QUIET) == 0);
+	sdsfree(my_name);
+	return result;
 }
 
 i64 toolcheck_run(const char *command_name)

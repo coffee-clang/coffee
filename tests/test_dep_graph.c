@@ -1,3 +1,4 @@
+#include "safe.h"
 /*
  * Unit tests for dep_graph.c — transitive dependency graph resolution.
  *
@@ -238,7 +239,7 @@ TEST(dep_graph_multiple_deps)
 		}
 	}
 	ASSERT(found_a && found_b && found_c, "all deps in names array");
-	free(names);
+	safe_free(names);
 
 	dep_graph_free(g);
 	manifest_free(m);

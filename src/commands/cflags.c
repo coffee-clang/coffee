@@ -1,6 +1,7 @@
 #include "../coffee.h"
 #include "../manifest.h"
 #include "../project.h"
+#include "safe.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -38,7 +39,7 @@ static void append_cflags_for_pkg(const char *name, sds *buf)
 						char *s;
 						if (toml_rtos(raw, &s) == 0 && s) {
 							*buf = sdscatprintf(*buf, "-I%s/%s ", dir, s);
-							free(s);
+							safe_free(s);
 							found = 1;
 						}
 					}

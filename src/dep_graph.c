@@ -1,6 +1,7 @@
 #include "dep_graph.h"
 
 #include "build.h"
+#include "safe.h"
 #include "strings.h"
 #include "version.h"
 
@@ -30,7 +31,7 @@ static sds get_toml_constraint(toml_table_t *table, const char *key)
 	toml_datum_t str_val = toml_string_in(table, key);
 	if (str_val.ok) {
 		sds result = sdsnew(str_val.u.s);
-		free(str_val.u.s);
+		safe_free(str_val.u.s);
 		return result;
 	}
 
@@ -39,7 +40,7 @@ static sds get_toml_constraint(toml_table_t *table, const char *key)
 		toml_datum_t ver = toml_string_in(inline_tbl, "version");
 		if (ver.ok) {
 			sds result = sdsnew(ver.u.s);
-			free(ver.u.s);
+			safe_free(ver.u.s);
 			return result;
 		}
 	}
@@ -131,7 +132,7 @@ static i64 add_node(dep_graph_t *g, const char *name)
 {
 	if (g->count >= g->capacity) {
 		size_t new_cap = g->capacity == 0 ? 32 : g->capacity * 2;
-		g->nodes       = realloc(g->nodes, new_cap * sizeof(dep_node_t));
+		g->nodes       = safe_realloc(g->nodes, new_cap * sizeof(dep_node_t));
 		if (g->nodes == nullptr) {
 			return -1;
 		}
@@ -208,7 +209,7 @@ static sds read_version(const char *dep_dir)
 	sds          result;
 	if (ver.ok) {
 		result = sdsnew(ver.u.s);
-		free(ver.u.s);
+		safe_free(ver.u.s);
 	} else {
 		result = sdsnew("*");
 	}
@@ -259,19 +260,19 @@ static sds get_git_ref_from_manifest(const char *dep_dir)
 			toml_datum_t tag = toml_string_in(tbl, "tag");
 			if (tag.ok) {
 				ref = sdsnew(tag.u.s);
-				free(tag.u.s);
+				safe_free(tag.u.s);
 				break;
 			}
 			toml_datum_t branch = toml_string_in(tbl, "branch");
 			if (branch.ok) {
 				ref = sdsnew(branch.u.s);
-				free(branch.u.s);
+				safe_free(branch.u.s);
 				break;
 			}
 			toml_datum_t rev = toml_string_in(tbl, "rev");
 			if (rev.ok) {
 				ref = sdsnew(rev.u.s);
-				free(rev.u.s);
+				safe_free(rev.u.s);
 				break;
 			}
 		}
@@ -292,7 +293,7 @@ static void collect_sources(const char *dep_dir, sds **out_src, size_t *out_coun
 	sds    pattern = sdscatprintf(sdsempty(), "%s/src/*.c", dep_dir);
 	if (glob(pattern, 0, nullptr, &gbuf) == 0) {
 		if (gbuf.gl_pathc > 0) {
-			*out_src = calloc((size_t)gbuf.gl_pathc, sizeof(sds));
+			*out_src = safe_calloc((size_t)gbuf.gl_pathc, sizeof(sds));
 			if (*out_src) {
 				for (size_t i = 0; i < (size_t)gbuf.gl_pathc; i++) {
 					(*out_src)[i] = sdsnew(gbuf.gl_pathv[i]);
@@ -315,7 +316,7 @@ dep_graph_t *dep_graph_create(manifest_t *m, lockfile_t *lf, bool offline)
 		return nullptr;
 	}
 
-	dep_graph_t *g = calloc(1, sizeof(dep_graph_t));
+	dep_graph_t *g = safe_calloc(1, sizeof(dep_graph_t));
 	if (g == nullptr) {
 		return nullptr;
 	}
@@ -508,10 +509,10 @@ void dep_graph_free(dep_graph_t *g)
 		for (size_t j = 0; j < g->nodes[i].src_count; j++) {
 			sdsfree(g->nodes[i].sources[j]);
 		}
-		free(g->nodes[i].sources);
+		safe_free(g->nodes[i].sources);
 	}
-	free(g->nodes);
-	free(g);
+	safe_free(g->nodes);
+	safe_free(g);
 }
 
 size_t dep_graph_count(const dep_graph_t *g)
@@ -533,7 +534,7 @@ sds *dep_graph_names(const dep_graph_t *g, size_t *count)
 		return nullptr;
 	}
 	/* Build a flat array of name sds pointers */
-	sds *names = calloc(g->count, sizeof(sds));
+	sds *names = safe_calloc(g->count, sizeof(sds));
 	if (names == nullptr) {
 		*count = 0;
 		return nullptr;
@@ -640,9 +641,9 @@ i64 dep_graph_compare_remote(const dep_graph_t *g, const char *dep_name, sds *be
 	}
 
 	/* git fetch origin */
-	sds cmd = sdscatprintf(sdsempty(), "cd '%s' && git fetch origin --depth 1 2>/dev/null", dep_path);
-	i64 ret = system(cmd);
-	sdsfree(cmd);
+	char *fetch_argv[] = { "git", "-C", (char *)dep_path, "fetch", "origin", "--depth", "1", nullptr };
+	i64   ret          = run_command(fetch_argv, RUN_CMD_QUIET);
+
 	if (ret != 0) {
 		if (behind_by) {
 			*behind_by = sdsnew("(fetch failed)");
@@ -701,26 +702,28 @@ i64 dep_graph_fetch_git(dep_graph_t *g, const char *dep_name, bool verbose)
 		return -1;
 	}
 
-	sds cmd;
+	i64 ret;
 	if (ref != nullptr) {
-		/* Check out the configured ref */
 		if (verbose) {
 			printf_safe("    Fetching %s (%s)...\n", dep_name, ref);
 		}
-		cmd = sdscatprintf(sdsempty(),
-		                   "cd '%s' && git fetch origin --depth 1 '%s' 2>/dev/null && git checkout '%s' 2>/dev/null",
-		                   dep_path, ref, ref);
+		char *fetch_argv[] = { "git", "-C", (char *)dep_path, "fetch", "origin", "--depth", "1", (char *)ref, nullptr };
+		ret                = run_command(fetch_argv, RUN_CMD_QUIET);
+		if (ret == 0) {
+			char *co_argv[] = { "git", "-C", (char *)dep_path, "checkout", (char *)ref, nullptr };
+			ret             = run_command(co_argv, RUN_CMD_QUIET);
+		}
 	} else {
 		if (verbose) {
 			printf_safe("    Fetching %s...\n", dep_name);
 		}
-		cmd = sdscatprintf(
-		    sdsempty(), "cd '%s' && git fetch --depth 1 origin 2>/dev/null && git reset --hard origin/HEAD 2>/dev/null",
-		    dep_path);
+		char *fetch_argv[] = { "git", "-C", (char *)dep_path, "fetch", "--depth", "1", "origin", nullptr };
+		ret                = run_command(fetch_argv, RUN_CMD_QUIET);
+		if (ret == 0) {
+			char *reset_argv[] = { "git", "-C", (char *)dep_path, "reset", "--hard", "origin/HEAD", nullptr };
+			ret                = run_command(reset_argv, RUN_CMD_QUIET);
+		}
 	}
-
-	i64 ret = system(cmd);
-	sdsfree(cmd);
 
 	if (ret == 0) {
 		/* Update commit SHA in the node */
@@ -892,16 +895,16 @@ static dep_graph_t *dep_graph_load_cached(const char *cache_path, i64 toml_mtime
 		return nullptr;
 	}
 
-	dep_graph_t *g = calloc(1, sizeof(dep_graph_t));
+	dep_graph_t *g = safe_calloc(1, sizeof(dep_graph_t));
 	if (g == nullptr) {
 		toml_free(conf);
 		return nullptr;
 	}
 
 	g->capacity = (size_t)ncount;
-	g->nodes    = calloc(g->capacity, sizeof(dep_node_t));
+	g->nodes    = safe_calloc(g->capacity, sizeof(dep_node_t));
 	if (g->nodes == nullptr) {
-		free(g);
+		safe_free(g);
 		toml_free(conf);
 		return nullptr;
 	}
@@ -923,31 +926,31 @@ static dep_graph_t *dep_graph_load_cached(const char *cache_path, i64 toml_mtime
 		toml_datum_t name_d = toml_string_in(ntbl, "name");
 		if (name_d.ok) {
 			g->nodes[i].name = sdsnew(name_d.u.s);
-			free(name_d.u.s);
+			safe_free(name_d.u.s);
 		}
 
 		toml_datum_t path_d = toml_string_in(ntbl, "path");
 		if (path_d.ok) {
 			g->nodes[i].path = sdsnew(path_d.u.s);
-			free(path_d.u.s);
+			safe_free(path_d.u.s);
 		}
 
 		toml_datum_t ver_d = toml_string_in(ntbl, "version");
 		if (ver_d.ok) {
 			g->nodes[i].version = sdsnew(ver_d.u.s);
-			free(ver_d.u.s);
+			safe_free(ver_d.u.s);
 		}
 
 		toml_datum_t vc_d = toml_string_in(ntbl, "version_constraint");
 		if (vc_d.ok) {
 			g->nodes[i].version_constraint = sdsnew(vc_d.u.s);
-			free(vc_d.u.s);
+			safe_free(vc_d.u.s);
 		}
 
 		toml_datum_t commit_d = toml_string_in(ntbl, "commit");
 		if (commit_d.ok) {
 			g->nodes[i].commit = sdsnew(commit_d.u.s);
-			free(commit_d.u.s);
+			safe_free(commit_d.u.s);
 		}
 
 		toml_datum_t git_d = toml_bool_in(ntbl, "is_git");
@@ -960,20 +963,20 @@ static dep_graph_t *dep_graph_load_cached(const char *cache_path, i64 toml_mtime
 		toml_datum_t ref_d = toml_string_in(ntbl, "git_ref");
 		if (ref_d.ok) {
 			g->nodes[i].git_ref = sdsnew(ref_d.u.s);
-			free(ref_d.u.s);
+			safe_free(ref_d.u.s);
 		}
 
 		toml_datum_t flags_d = toml_string_in(ntbl, "flags");
 		if (flags_d.ok) {
 			g->nodes[i].flags = sdsnew(flags_d.u.s);
-			free(flags_d.u.s);
+			safe_free(flags_d.u.s);
 		}
 
 		toml_array_t *src_arr = toml_array_in(ntbl, "sources");
 		if (src_arr != nullptr) {
 			i64 src_count = toml_array_nelem(src_arr);
 			if (src_count > 0) {
-				g->nodes[i].sources   = calloc((size_t)src_count, sizeof(sds));
+				g->nodes[i].sources   = safe_calloc((size_t)src_count, sizeof(sds));
 				g->nodes[i].src_count = 0;
 				if (g->nodes[i].sources != nullptr) {
 					for (i64 j = 0; j < src_count; j++) {
@@ -981,7 +984,7 @@ static dep_graph_t *dep_graph_load_cached(const char *cache_path, i64 toml_mtime
 						if (s.ok) {
 							g->nodes[i].sources[g->nodes[i].src_count] = sdsnew(s.u.s);
 							g->nodes[i].src_count++;
-							free(s.u.s);
+							safe_free(s.u.s);
 						}
 					}
 				}

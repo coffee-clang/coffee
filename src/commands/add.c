@@ -2,6 +2,7 @@
 #include "../manifest.h"
 #include "../project.h"
 #include "../registry.h"
+#include "safe.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -97,7 +98,7 @@ int64_t handle_add(options *opts)
 	}
 
 	m->package.dependencies_count++;
-	m->package.dependencies = realloc(m->package.dependencies, m->package.dependencies_count * sizeof(sds));
+	m->package.dependencies = safe_realloc(m->package.dependencies, m->package.dependencies_count * sizeof(sds));
 	m->package.dependencies[m->package.dependencies_count - 1] = sdsnew(dep_str);
 	sdsfree(dep_str);
 

@@ -1,9 +1,10 @@
+#include "../build.h"
 #include "../coffee.h"
 #include "../registry.h"
+#include "safe.h"
 
 #include <inttypes.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include <toml.h>
@@ -67,7 +68,7 @@ static sds config_read_raw(const char *section, const char *key)
 			char *s;
 			if (toml_rtos(raw, &s) == 0 && s) {
 				ret = sdsnew(s);
-				free(s);
+				safe_free(s);
 			} else {
 				/* Try as integer */
 				int64_t ival;
@@ -114,7 +115,7 @@ static i64 config_list(void)
 			char *s;
 			if (toml_rtos(raw, &s) == 0 && s) {
 				printf_safe("%s = \"%s\"\n", k, s);
-				free(s);
+				safe_free(s);
 			}
 		}
 	}
@@ -135,7 +136,7 @@ static i64 config_list(void)
 				char *s;
 				if (toml_rtos(raw, &s) == 0 && s) {
 					printf_safe("%s.%s = \"%s\"\n", tabname, k, s);
-					free(s);
+					safe_free(s);
 				}
 			}
 		}
@@ -165,7 +166,7 @@ static i64 config_set_raw(const char *section, const char *key, const char *valu
 		while (fgets(buf, (int)sizeof(buf), fp)) {
 			if (nlines >= cap) {
 				cap   = cap ? cap * 2 : 64;
-				lines = (sds *)realloc(lines, sizeof(sds) * cap);
+				lines = (sds *)safe_realloc(lines, sizeof(sds) * cap);
 			}
 			lines[nlines] = sdsnew(buf);
 			nlines++;
@@ -177,10 +178,9 @@ static i64 config_set_raw(const char *section, const char *key, const char *valu
 	sds   dir        = sdsnew(path);
 	char *last_slash = strrchr(dir, '/');
 	if (last_slash) {
-		*last_slash = '\0';
-		sds mkcmd   = sdscatprintf(sdsempty(), "mkdir -p %s", dir);
-		system(mkcmd);
-		sdsfree(mkcmd);
+		*last_slash  = '\0';
+		char *argv[] = { "mkdir", "-p", dir, nullptr };
+		run_command(argv, 0);
 	}
 	sdsfree(dir);
 
@@ -196,7 +196,7 @@ static i64 config_set_raw(const char *section, const char *key, const char *valu
 		for (size_t i = 0; i < nlines; i++) {
 			sdsfree(lines[i]);
 		}
-		free(lines);
+		safe_free(lines);
 		return 1;
 	}
 
@@ -274,7 +274,7 @@ static i64 config_set_raw(const char *section, const char *key, const char *valu
 	for (size_t i = 0; i < nlines; i++) {
 		sdsfree(lines[i]);
 	}
-	free(lines);
+	safe_free(lines);
 	return 0;
 }
 
@@ -300,7 +300,7 @@ static i64 config_unset_raw(const char *section, const char *key)
 	while (fgets(buf, (int)sizeof(buf), fp)) {
 		if (nlines >= cap) {
 			cap   = cap ? cap * 2 : 64;
-			lines = (sds *)realloc(lines, sizeof(sds) * cap);
+			lines = (sds *)safe_realloc(lines, sizeof(sds) * cap);
 		}
 		lines[nlines] = sdsnew(buf);
 		nlines++;
@@ -314,7 +314,7 @@ static i64 config_unset_raw(const char *section, const char *key)
 		for (size_t i = 0; i < nlines; i++) {
 			sdsfree(lines[i]);
 		}
-		free(lines);
+		safe_free(lines);
 		return 1;
 	}
 
@@ -340,7 +340,7 @@ static i64 config_unset_raw(const char *section, const char *key)
 	for (size_t i = 0; i < nlines; i++) {
 		sdsfree(lines[i]);
 	}
-	free(lines);
+	safe_free(lines);
 	return 0;
 }
 

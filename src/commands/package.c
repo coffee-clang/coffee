@@ -1,9 +1,9 @@
+#include "../build.h"
 #include "../coffee.h"
 #include "../manifest.h"
 #include "../project.h"
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include <sys/stat.h>
@@ -38,9 +38,9 @@ int64_t handle_package(options *opts)
 
 	sds tarball = sdscatprintf(sdsempty(), "%s/%s-%s.tar.gz", package_dir, name, version);
 
-	sds cmd = sdscatprintf(sdsempty(), "tar -czf %s Coffee.toml src/ tests/ 2>/dev/null", tarball);
+	char *tar_argv[] = { "tar", "-czf", tarball, "Coffee.toml", "src/", "tests/", nullptr };
 
-	i64 ret = system(cmd);
+	i64 ret = run_command(tar_argv, RUN_CMD_QUIET);
 
 	if (ret == 0) {
 		printf_safe("Package created: %s\n", tarball);
@@ -49,7 +49,7 @@ int64_t handle_package(options *opts)
 	}
 
 	sdsfree(tarball);
-	sdsfree(cmd);
+
 	manifest_free(m);
 	return ret;
 }

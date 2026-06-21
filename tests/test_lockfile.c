@@ -1,5 +1,6 @@
 #include "../src/lockfile.h"
 #include "../src/strings.h"
+#include "safe.h"
 #include "test_framework.h"
 
 /* Forward declaration */
@@ -121,14 +122,14 @@ TEST(lockfile_find_dep)
 
 TEST(lockfile_write_and_reparse)
 {
-	lockfile_t *lf = calloc(1, sizeof(lockfile_t));
+	lockfile_t *lf = safe_calloc(1, sizeof(lockfile_t));
 	ASSERT(lf != nullptr, "calloc failed");
 
 	lf->version         = 1;
 	lf->package_name    = sdsnew("testwrite");
 	lf->package_version = sdsnew("3.0.0");
 	lf->deps_count      = 2;
-	lf->deps            = calloc(2, sizeof(lockfile_dep_t));
+	lf->deps            = safe_calloc(2, sizeof(lockfile_dep_t));
 	ASSERT(lf->deps != nullptr, "calloc for deps failed");
 
 	lf->deps[0].name    = sdsnew("dep-a");

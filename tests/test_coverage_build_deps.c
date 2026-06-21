@@ -1,3 +1,4 @@
+#include "safe.h"
 /*
  * Coverage tests for build.c dependency resolution loop and
  * coffee_features.c transitive dependency resolution.
@@ -303,7 +304,7 @@ TEST(cov_features_to_flags_nonempty)
 	for (size_t i = 0; i < cnt; i++) {
 		sdsfree(flags[i]);
 	}
-	free(flags);
+	safe_free(flags);
 	sdsfree(requested[0]);
 	sdsfree(requested[1]);
 	features_free(rf);

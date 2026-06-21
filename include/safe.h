@@ -10,7 +10,7 @@
 
 /*
  * Wrappers for functions that clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
- * flags. These live in a system header (-isystem) so clang-tidy won't check them.
+ * flags. These live in a header directory filtered from clang-tidy checks.
  */
 
 /* ---------------------------------------------------------------------------
@@ -144,8 +144,46 @@ static inline void arena_destroy(struct arena *a)
 	a->current = nullptr;
 }
 
-static inline i64 safe_snprintf(char *buf, size_t size, const char *fmt, ...) {
-    i64 ret;
+/* ---------------------------------------------------------------------------
+ * safe_malloc / safe_calloc / safe_realloc — thin wrappers around the
+ * standard allocator that abort on OOM (they never return nullptr).
+ * safe_free is a simple wrapper that is null-safe (does nothing on nullptr).
+ * --------------------------------------------------------------------------- */
+
+[[nodiscard]] static inline void *safe_malloc(size_t size)
+{
+	void *p = malloc(size);
+	if (p == nullptr && size != 0) {
+		abort();
+	}
+	return p;
+}
+
+[[nodiscard]] static inline void *safe_calloc(size_t nmemb, size_t size)
+{
+	void *p = calloc(nmemb, size);
+	if (p == nullptr && nmemb != 0 && size != 0) {
+		abort();
+	}
+	return p;
+}
+
+[[nodiscard]] static inline void *safe_realloc(void *ptr, size_t size)
+{
+	void *p = realloc(ptr, size);
+	if (p == nullptr && size != 0) {
+		abort();
+	}
+	return p;
+}
+
+static inline void safe_free(void *ptr)
+{
+	free(ptr);
+}
+
+static inline int64_t safe_snprintf(char *buf, size_t size, const char *fmt, ...) {
+    int64_t ret;
     va_list ap;
     va_start(ap, fmt);
     ret = vsnprintf(buf, size, fmt, ap);
@@ -153,8 +191,8 @@ static inline i64 safe_snprintf(char *buf, size_t size, const char *fmt, ...) {
     return ret;
 }
 
-static inline i64 safe_fprintf(FILE *stream, const char *fmt, ...) {
-    i64 ret;
+static inline int64_t safe_fprintf(FILE *stream, const char *fmt, ...) {
+    int64_t ret;
     va_list ap;
     va_start(ap, fmt);
     ret = vfprintf(stream, fmt, ap);
@@ -162,8 +200,8 @@ static inline i64 safe_fprintf(FILE *stream, const char *fmt, ...) {
     return ret;
 }
 
-static inline i64 safe_printf(const char *fmt, ...) {
-    i64 ret;
+static inline int64_t safe_printf(const char *fmt, ...) {
+    int64_t ret;
     va_list ap;
     va_start(ap, fmt);
     ret = vprintf(fmt, ap);
@@ -179,8 +217,8 @@ static inline void *safe_memset(void *s, int c, size_t n) {
     return memset(s, c, n);
 }
 
-static inline i64 safe_sprintf(char *buf, const char *fmt, ...) {
-    i64 ret;
+static inline int64_t safe_sprintf(char *buf, const char *fmt, ...) {
+    int64_t ret;
     va_list ap;
     va_start(ap, fmt);
     ret = vsprintf(buf, fmt, ap);
@@ -192,8 +230,8 @@ static inline char *safe_strcpy(char *dest, const char *src) {
     return strcpy(dest, src);
 }
 
-static inline i64 safe_scanf(const char *fmt, ...) {
-    i64 ret;
+static inline int64_t safe_scanf(const char *fmt, ...) {
+    int64_t ret;
     va_list ap;
     va_start(ap, fmt);
     ret = vscanf(fmt, ap);
@@ -201,8 +239,8 @@ static inline i64 safe_scanf(const char *fmt, ...) {
     return ret;
 }
 
-static inline i64 safe_system(const char *command) {
-    return (i64)system(command);
+static inline int64_t safe_system(const char *command) {
+    return (int64_t)system(command);
 }
 
 static inline FILE *safe_popen(const char *command, const char *type) {

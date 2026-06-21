@@ -1,8 +1,8 @@
+#include "../build.h"
 #include "../coffee.h"
 #include "../registry.h"
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include <sys/stat.h>
@@ -26,11 +26,10 @@ int64_t handle_uninstall(options *opts)
 		return 1;
 	}
 
-	sds cmd = sdscatprintf(sdsempty(), "rm -rf %s", pkg_dir);
 	sdsfree(pkg_dir);
+	char *rm_argv[] = { "rm", "-rf", pkg_dir, nullptr };
+	i64   ret       = run_command(rm_argv, 0);
 
-	i64 ret = system(cmd);
-	sdsfree(cmd);
 	if (ret != 0) {
 		fprintf_safe(stderr, "Error: Failed to remove %s\n", package);
 		return 1;

@@ -1,5 +1,7 @@
 #include "version.h"
 
+#include "safe.h"
+
 #include <stdint.h>
 
 #include <stdio.h>
@@ -227,7 +229,7 @@ bool version_satisfies(const char *actual, const char *constraint)
 		}
 
 		/* Allocate a temporary buffer for this segment */
-		char *seg = calloc(seg_len + 1, 1);
+		char *seg = safe_calloc(seg_len + 1, 1);
 		if (seg == nullptr) {
 			return true;
 		}
@@ -235,7 +237,7 @@ bool version_satisfies(const char *actual, const char *constraint)
 		seg[seg_len] = '\0';
 
 		bool ok = check_single(&actual_ver, seg);
-		free(seg);
+		safe_free(seg);
 
 		if (!ok) {
 			return false;

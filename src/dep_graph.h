@@ -69,7 +69,7 @@ size_t dep_graph_count(const dep_graph_t *g);
 /*
  * All package names in the graph (including root at index 0).
  * Count is returned via *count.
- * The caller must free the returned array with free().
+ * The caller must free the returned array with safe_free().
  */
 sds *dep_graph_names(const dep_graph_t *g, size_t *count);
 

@@ -1,5 +1,6 @@
 #include "manifest.h"
 
+#include "safe.h"
 #include "strings.h"
 
 #include <stdio.h>
@@ -33,17 +34,17 @@ static void free_package(package_t *pkg)
 	for (size_t i = 0; i < pkg->dependencies_count; i++) {
 		sdsfree(pkg->dependencies[i]);
 	}
-	free(pkg->dependencies);
+	safe_free(pkg->dependencies);
 
 	for (size_t i = 0; i < pkg->sources_count; i++) {
 		sdsfree(pkg->sources[i]);
 	}
-	free(pkg->sources);
+	safe_free(pkg->sources);
 
 	for (size_t i = 0; i < pkg->headers_count; i++) {
 		sdsfree(pkg->headers[i]);
 	}
-	free(pkg->headers);
+	safe_free(pkg->headers);
 }
 
 static void free_feature(feature_def_t *feat)
@@ -52,7 +53,7 @@ static void free_feature(feature_def_t *feat)
 	for (size_t i = 0; i < feat->deps_count; i++) {
 		sdsfree(feat->deps[i]);
 	}
-	free(feat->deps);
+	safe_free(feat->deps);
 }
 
 static void free_dependency(dependency_t *dep)
@@ -72,7 +73,7 @@ static void free_binary(binary_target_t *bin)
 	for (size_t i = 0; i < bin->src_count; i++) {
 		sdsfree(bin->src[i]);
 	}
-	free(bin->src);
+	safe_free(bin->src);
 }
 
 static sds toml_datum_to_string(toml_datum_t datum)
@@ -81,7 +82,7 @@ static sds toml_datum_to_string(toml_datum_t datum)
 		return nullptr;
 	}
 	sds result = sdsnew(datum.u.s);
-	free(datum.u.s);
+	safe_free(datum.u.s);
 	return result;
 }
 
@@ -100,7 +101,7 @@ manifest_t *manifest_parse(sds path)
 		return nullptr;
 	}
 
-	manifest_t *m = calloc(1, sizeof(manifest_t));
+	manifest_t *m = safe_calloc(1, sizeof(manifest_t));
 	if (m == nullptr) {
 		toml_free(conf);
 		return nullptr;
@@ -133,7 +134,7 @@ manifest_t *manifest_parse(sds path)
 	toml_array_t *deps_arr = toml_array_in(conf, "dependencies");
 	if (deps_arr) {
 		m->package.dependencies_count = (size_t)toml_array_nelem(deps_arr);
-		m->package.dependencies       = calloc(m->package.dependencies_count, sizeof(sds));
+		m->package.dependencies       = safe_calloc(m->package.dependencies_count, sizeof(sds));
 		if (m->package.dependencies == nullptr && m->package.dependencies_count > 0) {
 			manifest_free(m);
 			toml_free(conf);
@@ -157,7 +158,7 @@ manifest_t *manifest_parse(sds path)
 				count++;
 			}
 			m->package.dependencies_count = count;
-			m->package.dependencies       = calloc(count, sizeof(sds));
+			m->package.dependencies       = safe_calloc(count, sizeof(sds));
 			if (m->package.dependencies == nullptr && count > 0) {
 				manifest_free(m);
 				toml_free(conf);
@@ -193,7 +194,7 @@ manifest_t *manifest_parse(sds path)
 	}
 	if (sources_arr) {
 		m->package.sources_count = (size_t)toml_array_nelem(sources_arr);
-		m->package.sources       = calloc(m->package.sources_count, sizeof(sds));
+		m->package.sources       = safe_calloc(m->package.sources_count, sizeof(sds));
 		if (m->package.sources == nullptr && m->package.sources_count > 0) {
 			manifest_free(m);
 			toml_free(conf);
@@ -211,7 +212,7 @@ manifest_t *manifest_parse(sds path)
 	}
 	if (headers_arr) {
 		m->package.headers_count = (size_t)toml_array_nelem(headers_arr);
-		m->package.headers       = calloc(m->package.headers_count, sizeof(sds));
+		m->package.headers       = safe_calloc(m->package.headers_count, sizeof(sds));
 		if (m->package.headers == nullptr && m->package.headers_count > 0) {
 			manifest_free(m);
 			toml_free(conf);
@@ -239,7 +240,7 @@ manifest_t *manifest_parse(sds path)
 		}
 
 		if (m->features_count > 0) {
-			m->features = calloc(m->features_count, sizeof(feature_def_t));
+			m->features = safe_calloc(m->features_count, sizeof(feature_def_t));
 			if (m->features == nullptr) {
 				manifest_free(m);
 				toml_free(conf);
@@ -261,7 +262,7 @@ manifest_t *manifest_parse(sds path)
 				}
 				m->features[idx].deps_count = (size_t)toml_array_nelem(arr);
 				if (m->features[idx].deps_count > 0) {
-					m->features[idx].deps = calloc(m->features[idx].deps_count, sizeof(sds));
+					m->features[idx].deps = safe_calloc(m->features[idx].deps_count, sizeof(sds));
 					if (m->features[idx].deps == nullptr) {
 						manifest_free(m);
 						toml_free(conf);
@@ -307,7 +308,7 @@ manifest_t *manifest_parse(sds path)
 	if (bin_arr) {
 		m->bin_count = (size_t)toml_array_nelem(bin_arr);
 		if (m->bin_count > 0) {
-			m->bin = calloc(m->bin_count, sizeof(binary_target_t));
+			m->bin = safe_calloc(m->bin_count, sizeof(binary_target_t));
 			if (m->bin == nullptr) {
 				manifest_free(m);
 				toml_free(conf);
@@ -324,7 +325,7 @@ manifest_t *manifest_parse(sds path)
 				if (src_arr) {
 					m->bin[i].src_count = (size_t)toml_array_nelem(src_arr);
 					if (m->bin[i].src_count > 0) {
-						m->bin[i].src = calloc(m->bin[i].src_count, sizeof(sds));
+						m->bin[i].src = safe_calloc(m->bin[i].src_count, sizeof(sds));
 						if (m->bin[i].src == nullptr) {
 							manifest_free(m);
 							toml_free(conf);
@@ -359,7 +360,7 @@ manifest_t *manifest_parse(sds path)
 			}
 			if (count > 0) {
 				m->dependencies.deps_count = count;
-				m->dependencies.deps       = calloc(count, sizeof(dependency_t));
+				m->dependencies.deps       = safe_calloc(count, sizeof(dependency_t));
 				if (m->dependencies.deps == nullptr) {
 					manifest_free(m);
 					toml_free(conf);
@@ -416,7 +417,7 @@ manifest_t *manifest_parse(sds path)
 		toml_array_t *src_arr = toml_array_in(test_tab, "sources");
 		if (src_arr) {
 			m->test.sources_count = (size_t)toml_array_nelem(src_arr);
-			m->test.sources       = calloc(m->test.sources_count, sizeof(sds));
+			m->test.sources       = safe_calloc(m->test.sources_count, sizeof(sds));
 			if (m->test.sources == nullptr && m->test.sources_count > 0) {
 				manifest_free(m);
 				toml_free(conf);
@@ -498,26 +499,26 @@ void manifest_free(manifest_t *m)
 	for (size_t i = 0; i < m->dependencies.deps_count; i++) {
 		free_dependency(&m->dependencies.deps[i]);
 	}
-	free(m->dependencies.deps);
+	safe_free(m->dependencies.deps);
 
 	for (size_t i = 0; i < m->features_count; i++) {
 		free_feature(&m->features[i]);
 	}
-	free(m->features);
+	safe_free(m->features);
 
 	for (size_t i = 0; i < m->bin_count; i++) {
 		free_binary(&m->bin[i]);
 	}
-	free(m->bin);
+	safe_free(m->bin);
 
 	for (size_t i = 0; i < m->test.sources_count; i++) {
 		sdsfree(m->test.sources[i]);
 	}
-	free(m->test.sources);
+	safe_free(m->test.sources);
 	sdsfree(m->test.harness);
 	sdsfree(m->test.framework);
 
-	free(m);
+	safe_free(m);
 }
 
 i64 manifest_write(sds path, manifest_t *m)

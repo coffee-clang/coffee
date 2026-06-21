@@ -353,11 +353,16 @@ TEST(run_with_manifest)
 {
 	setup_project("run", nullptr);
 
-	/* Create a Makefile that echoes a binary target */
+	/* Create a Makefile that actually builds the binary */
 	FILE *fp = fopen("Makefile", "w");
 	ASSERT(fp != nullptr, "could not create Makefile");
-	fprintf_safe(fp, "all:\n\t@echo 'build ok'\n");
-	fprintf_safe(fp, "run:\n\t@echo 'run ok'\n");
+	fprintf_safe(fp, "CC := clang\n");
+	fprintf_safe(fp, "CFLAGS := -std=c23 -O0 -g\n");
+	fprintf_safe(fp, "TARGET := target/debug/run\n");
+	fprintf_safe(fp, "all: $(TARGET)\n");
+	fprintf_safe(fp, "$(TARGET): src/main.c\n");
+	fprintf_safe(fp, "\t@mkdir -p target/debug\n");
+	fprintf_safe(fp, "\t$(CC) $(CFLAGS) -o $(TARGET) src/main.c\n");
 	fclose(fp);
 
 	options opt = {

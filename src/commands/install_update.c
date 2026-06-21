@@ -1,8 +1,8 @@
+#include "../build.h"
 #include "../coffee.h"
 #include "../registry.h"
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include <dirent.h>
@@ -37,9 +37,9 @@ int64_t handle_install_update(options *opts)
 
 		printf_safe("Updating %s...\n", target);
 
-		sds cmd = sdscatprintf(sdsempty(), "cd '%s' && git pull --ff-only 2>/dev/null", pkg_dir);
-		i64 ret = system(cmd);
-		sdsfree(cmd);
+		char *git_argv[] = { "git", "-C", pkg_dir, "pull", "--ff-only", nullptr };
+		i64   ret        = run_command(git_argv, RUN_CMD_QUIET);
+
 		sdsfree(pkg_dir);
 		sdsfree(deps_dir);
 
@@ -70,9 +70,8 @@ int64_t handle_install_update(options *opts)
 
 		printf_safe("Updating %s...\n", entry->d_name);
 
-		sds cmd = sdscatprintf(sdsempty(), "cd '%s' && git pull --ff-only 2>/dev/null", pkg_dir);
-		i64 ret = system(cmd);
-		sdsfree(cmd);
+		char *git_argv[] = { "git", "-C", pkg_dir, "pull", "--ff-only", nullptr };
+		i64   ret        = run_command(git_argv, RUN_CMD_QUIET);
 
 		if (ret != 0) {
 			fprintf_safe(stderr, "Error: Failed to update %s\n", entry->d_name);

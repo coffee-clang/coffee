@@ -46,8 +46,8 @@ root
 
 - **Manifest-driven builds** — `Coffee.toml` describes your project, its dependencies,
   and features
-- **Dependency management** — Add, remove, and update dependencies with semver-aware
-  resolution
+- **Dependency management** — Add, remove, and update dependencies with version-pinned
+  resolution via `Coffee.lock`
 - **Feature system** — Conditional compilation and optional dependencies via
   `[features]` in your manifest
 - **Registry** — Search and install packages from the [Coffee registry](https://github.com/coffee-clang)

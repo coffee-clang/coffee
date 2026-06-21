@@ -1,6 +1,7 @@
 #include "../coffee.h"
 #include "../manifest.h"
 #include "../project.h"
+#include "safe.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -38,7 +39,8 @@ int64_t handle_remove(options *opts)
 				m->package.dependencies[j] = m->package.dependencies[j + 1];
 			}
 			m->package.dependencies_count--;
-			m->package.dependencies = realloc(m->package.dependencies, m->package.dependencies_count * sizeof(sds));
+			m->package.dependencies =
+			    safe_realloc(m->package.dependencies, m->package.dependencies_count * sizeof(sds));
 			break;
 		}
 	}

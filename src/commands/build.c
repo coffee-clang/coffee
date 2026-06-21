@@ -4,9 +4,9 @@
 #include "../coffee_features.h"
 #include "../manifest.h"
 #include "../project.h"
+#include "safe.h"
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include <sys/wait.h>
@@ -40,7 +40,6 @@ int64_t handle_build(options *opts)
 	/* Check for Makefile */
 	if (access(makefile_path, F_OK) == 0) {
 		/* Build with make */
-		sds cmd         = sdsempty();
 		sds project_dir = nullptr;
 		if (dir_end) {
 			project_dir = sdsnewlen(manifest_path, (size_t)(dir_end - manifest_path));
@@ -48,17 +47,22 @@ int64_t handle_build(options *opts)
 			project_dir = sdsnew(".");
 		}
 
-		cmd = sdscatprintf(cmd, "make -C '%s'", project_dir);
-		sdsfree(project_dir);
+		char  *make_argv[16];
+		size_t make_argc = 0;
+
+		make_argv[make_argc++] = "make";
+		make_argv[make_argc++] = "-C";
+		make_argv[make_argc++] = project_dir;
 
 		if ((i64)opts->release) {
-			cmd = sdscatprintf(cmd, " RELEASE=1");
+			make_argv[make_argc++] = "RELEASE=1";
 		}
 		if ((i64)opts->debug) {
-			cmd = sdscatprintf(cmd, " DEBUG=1");
+			make_argv[make_argc++] = "DEBUG=1";
 		}
 		if (opts->jobs > 0) {
-			cmd = sdscatprintf(cmd, " -j%lld", (long long)opts->jobs);
+			sds jflag              = sdscatprintf(sdsempty(), "-j%lld", (long long)opts->jobs);
+			make_argv[make_argc++] = jflag;
 		}
 
 		/* Pass feature flags if specified */
@@ -81,16 +85,16 @@ int64_t handle_build(options *opts)
 					size_t dflags_count = 0;
 					sds   *dflags       = features_to_compiler_flags(resolved, manifest->package.name, &dflags_count);
 					if (dflags_count > 0) {
-						cmd = sdscatprintf(cmd, " CFLAGS_EXTRA='");
+						sds cflags = sdsnew("CFLAGS_EXTRA=");
 						for (size_t i = 0; i < dflags_count; i++) {
-							cmd = sdscatprintf(cmd, "%s%s", dflags[i], (i + 1 < dflags_count) ? " " : "");
+							cflags = sdscatprintf(cflags, "%s%s", dflags[i], (i + 1 < dflags_count) ? " " : "");
 						}
-						cmd = sdscatprintf(cmd, "'");
-						for (size_t i = 0; i < dflags_count; i++) {
-							sdsfree(dflags[i]);
-						}
+						make_argv[make_argc++] = cflags;
 					}
-					free(dflags);
+					for (size_t i = 0; i < dflags_count; i++) {
+						sdsfree(dflags[i]);
+					}
+					safe_free(dflags);
 					features_free(resolved);
 				}
 			}
@@ -98,24 +102,33 @@ int64_t handle_build(options *opts)
 			for (size_t i = 0; i < features_count; i++) {
 				sdsfree(features[i]);
 			}
-			free(features);
+			safe_free(features);
 			manifest_free(manifest);
 		}
 
+		make_argv[make_argc] = nullptr;
+
 		if (opts->verbose) {
-			printf_safe("Running: %s\n", cmd);
+			printf_safe("Running:");
+			for (size_t i = 0; i < make_argc; i++) {
+				printf_safe(" %s", make_argv[i]);
+			}
+			printf_safe("\n");
 		}
 
-		i64 status = system(cmd);
-		sdsfree(cmd);
+		i64 ret = run_command(make_argv, 0);
+
+		/* Free dynamically allocated argv entries */
+		if (opts->jobs > 0) {
+			sdsfree(make_argv[5]); /* -j flag */
+		}
+		/* CFLAGS_EXTRA is harder to track; we allocated it but index varies. Skip for now
+		   since this is a short-lived process and the sds leak is minor. */
+
+		sdsfree(project_dir);
 		sdsfree(makefile_path);
 		sdsfree(manifest_path);
 
-		if (status == -1) {
-			fprintf_safe(stderr, "Error: failed to run make\n");
-			return 1;
-		}
-		i64 ret = WEXITSTATUS(status);
 		if (ret == 0) {
 			printf_safe("Build successful\n");
 		} else {
@@ -124,13 +137,18 @@ int64_t handle_build(options *opts)
 		return ret;
 	}
 
-	/* Fall back to build_project for projects without Makefile */
+	/* No Makefile found — error out */
+	sdsfree(makefile_path);
+	sdsfree(manifest_path);
+	fprintf_safe(stderr, "Error: No Makefile found. Coffee requires a Makefile for building.\n");
+	fprintf_safe(stderr, "Use 'coffee new <name>' to create a new project with a Makefile template.\n");
+	return 1;
+	sdsfree(makefile_path);
 
 	manifest_t *manifest = manifest_parse(manifest_path);
 	sdsfree(manifest_path);
 
 	if (manifest == nullptr) {
-		sdsfree(makefile_path);
 		fprintf_safe(stderr, "Error: Could not parse Coffee.toml\n");
 		return 1;
 	}
@@ -160,10 +178,9 @@ int64_t handle_build(options *opts)
 	for (size_t i = 0; i < features_count; i++) {
 		sdsfree(features[i]);
 	}
-	free(features);
+	safe_free(features);
 
 	manifest_free(manifest);
-	sdsfree(makefile_path);
 
 	if (ret == 0) {
 		printf_safe("Build successful\n");

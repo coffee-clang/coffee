@@ -1,7 +1,7 @@
+#include "../build.h"
 #include "../coffee.h"
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 int64_t handle_grep(options *opts)
@@ -11,13 +11,13 @@ int64_t handle_grep(options *opts)
 		return 1;
 	}
 
-	char *pattern = opts->inputs[1];
+	char *pattern     = opts->inputs[1];
+	char *grep_argv[] = {
+		"grep", "-rn", "--exclude-dir=target", "--exclude-dir=.git", pattern, "src", "tests", nullptr
+	};
 	printf_safe("Searching for '%s'...\n", pattern);
 
-	sds cmd = sdscatprintf(sdsempty(), "grep -rn --exclude-dir=target --exclude-dir=.git \"%s\" src tests", pattern);
-
-	i64 ret = system(cmd);
-	sdsfree(cmd);
+	i64 ret = run_command(grep_argv, 0);
 
 	if (ret != 0) {
 		printf_safe("Pattern not found.\n");

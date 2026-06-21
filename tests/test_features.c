@@ -1,6 +1,7 @@
 #include "../src/coffee_features.h"
 #include "../src/manifest.h"
 #include "../src/strings.h"
+#include "safe.h"
 #include "test_framework.h"
 
 #include <stdio.h>
@@ -149,7 +150,7 @@ TEST(cli_parsing)
 	for (size_t i = 0; i < count; i++) {
 		sdsfree(features[i]);
 	}
-	free(features);
+	safe_free(features);
 
 	PASS();
 }
@@ -189,7 +190,7 @@ TEST(compiler_flags)
 		}
 		sdsfree(flags[i]);
 	}
-	free(flags);
+	safe_free(flags);
 
 	ASSERT(found_json, "-DFEATURE_JSON not found");
 	ASSERT(found_logging, "-DFEATURE_ADVANCED_LOGGING not found");

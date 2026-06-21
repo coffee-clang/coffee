@@ -1,9 +1,9 @@
+#include "../build.h"
 #include "../coffee.h"
 #include "../manifest.h"
 #include "../project.h"
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include <glob.h>
@@ -59,12 +59,9 @@ int64_t handle_check(options *opts)
 
 	printf_safe("Checking source code for syntax errors...\n");
 
-	const char *cc = getenv("CC") != nullptr ? getenv("CC") : "clang";
+	const char *cc        = getenv("CC") != nullptr ? getenv("CC") : "clang";
+	sds         inc_flags = sdsnew("-Ideps -Isrc -Iinclude -I.");
 
-	/* Build include flags */
-	sds inc_flags = sdsnew("-Ideps -Isrc -Iinclude -I.");
-
-	/* Add dependency include directories */
 	for (size_t i = 0; i < m->package.dependencies_count; i++) {
 		sds   name;
 		char *eq = strchr(m->package.dependencies[i], '=');
@@ -95,43 +92,90 @@ int64_t handle_check(options *opts)
 		inc_flags = sdscatprintf(inc_flags, " -Iinclude/%s", m->package.name);
 	}
 
-	/* Collect all source files */
-	sds cmd = sdscatprintf(sdsempty(), "%s -fsyntax-only %s", cc, inc_flags);
-	sdsfree(inc_flags);
+	/* Collect source and header files */
+	glob_t src_glob;
+	bool   have_src      = false;
+	bool   src_from_glob = false;
+	if (m->package.sources_count > 0) {
+		have_src = true;
+	} else {
+		have_src      = (glob("src/*.c", 0, nullptr, &src_glob) == 0);
+		src_from_glob = have_src;
+	}
 
-	/* Add sources from manifest */
+	glob_t hdr_glob;
+	bool   have_hdr      = false;
+	bool   hdr_from_glob = false;
+	if (m->package.headers_count > 0) {
+		have_hdr = true;
+	} else {
+		have_hdr      = (glob("include/**/*.h", 0, nullptr, &hdr_glob) == 0);
+		hdr_from_glob = have_hdr;
+	}
+
+	/* Build argv: cc -fsyntax-only <flags> <sources> <headers> */
+	size_t fl_toks   = count_flag_tokens(inc_flags);
+	size_t src_count = 0;
+	if (have_src) {
+		src_count = m->package.sources_count > 0 ? m->package.sources_count : (size_t)src_glob.gl_pathc;
+	}
+
+	size_t hdr_count = 0;
+	if (have_hdr) {
+		hdr_count = m->package.headers_count > 0 ? m->package.headers_count : (size_t)hdr_glob.gl_pathc;
+	}
+
+	size_t argc = 1 + 1 + fl_toks + src_count + hdr_count + 1;
+	char **argv = (char **)safe_malloc(sizeof(char *) * argc);
+	size_t idx  = 0;
+
+	argv[idx++] = (char *)cc;
+	argv[idx++] = "-fsyntax-only";
+
+	size_t end_idx;
+	sds    flags_copy = split_flags_to_argv(inc_flags, argv, idx, &end_idx);
+	idx               = end_idx;
+
 	if (m->package.sources_count > 0) {
 		for (size_t i = 0; i < m->package.sources_count; i++) {
-			cmd = sdscatprintf(cmd, " %s", m->package.sources[i]);
+			argv[idx++] = m->package.sources[i];
 		}
-	} else {
-		/* Fall back to all .c files in src/ */
-		cmd = sdscatprintf(cmd, " src/*.c");
+	} else if (have_src) {
+		for (size_t i = 0; i < (size_t)src_glob.gl_pathc; i++) {
+			argv[idx++] = src_glob.gl_pathv[i];
+		}
 	}
 
 	if (m->package.headers_count > 0) {
 		for (size_t i = 0; i < m->package.headers_count; i++) {
-			cmd = sdscatprintf(cmd, " %s", m->package.headers[i]);
+			argv[idx++] = m->package.headers[i];
 		}
-	} else {
-		glob_t globbuf;
-		if (glob("include/**/*.h", 0, nullptr, &globbuf) == 0) {
-			for (size_t i = 0; i < globbuf.gl_pathc; i++) {
-				cmd = sdscatprintf(cmd, " %s", globbuf.gl_pathv[i]);
-			}
-			globfree(&globbuf);
+	} else if (have_hdr) {
+		for (size_t i = 0; i < (size_t)hdr_glob.gl_pathc; i++) {
+			argv[idx++] = hdr_glob.gl_pathv[i];
 		}
 	}
-
-	cmd = sdscatprintf(cmd, " 2>&1");
+	argv[idx] = nullptr;
 
 	if (opts->verbose) {
-		printf_safe("Running: %s\n", cmd);
+		printf_safe("Running:");
+		for (size_t i = 0; i < idx; i++) {
+			printf_safe(" %s", argv[i]);
+		}
+		printf_safe("\n");
 	}
 
-	i64 ret = system(cmd);
-	sdsfree(cmd);
+	i64 ret = run_command(argv, 0);
 
+	sdsfree(flags_copy);
+	safe_free(argv);
+	sdsfree(inc_flags);
+	if (src_from_glob) {
+		globfree(&src_glob);
+	}
+	if (hdr_from_glob) {
+		globfree(&hdr_glob);
+	}
 	manifest_free(m);
 
 	if (ret != 0) {

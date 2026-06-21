@@ -1,6 +1,7 @@
 #include "project.h"
 
 #include "registry.h"
+#include "safe.h"
 
 #include <limits.h>
 #include <stdio.h>
@@ -29,7 +30,7 @@ sds project_find_manifest(sds start_dir)
 			return nullptr;
 		}
 		dir = sdsnew(cwd_buf);
-		free(cwd_buf);
+		safe_free(cwd_buf);
 	}
 
 	while (1) {
@@ -125,7 +126,7 @@ sds resolve_dep_version(const char *dep_dir)
 		toml_datum_t ver = toml_string_in(conf, "version");
 		if (ver.ok) {
 			version = sdsnew(ver.u.s);
-			free(ver.u.s);
+			safe_free(ver.u.s);
 		}
 		toml_free(conf);
 	}

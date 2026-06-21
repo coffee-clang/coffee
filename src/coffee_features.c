@@ -1,6 +1,7 @@
 #include "coffee_features.h"
 
 #include "build.h"
+#include "safe.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,15 +24,8 @@ static bool feature_set_add(feature_set_t *fs, const char *name)
 	if (feature_in_set(fs, name)) {
 		return true;
 	}
-	sds *new_names = realloc(fs->names, (fs->count + 1) * sizeof(sds));
-	if (new_names == nullptr) {
-		return false;
-	}
-	fs->names            = new_names;
+	fs->names            = safe_realloc(fs->names, (fs->count + 1) * sizeof(sds));
 	fs->names[fs->count] = sdsnew(name);
-	if (fs->names[fs->count] == nullptr) {
-		return false;
-	}
 	fs->count++;
 	return true;
 }
@@ -43,17 +37,10 @@ static feature_set_t *get_or_create_set(resolved_features_t *rf, const char *pac
 			return &rf->packages[i];
 		}
 	}
-	sds *new_names = realloc(rf->package_names, (rf->package_count + 1) * sizeof(sds));
-	if (new_names == nullptr) {
-		return nullptr;
-	}
-	rf->package_names = new_names;
+	rf->package_names = safe_realloc(rf->package_names, (rf->package_count + 1) * sizeof(sds));
 
-	feature_set_t *new_pkgs = realloc(rf->packages, (rf->package_count + 1) * sizeof(feature_set_t));
-	if (new_pkgs == nullptr) {
-		return nullptr;
-	}
-	rf->packages                          = new_pkgs;
+	rf->packages = safe_realloc(rf->packages, (rf->package_count + 1) * sizeof(feature_set_t));
+
 	rf->package_names[rf->package_count]  = sdsnew(package);
 	rf->packages[rf->package_count].names = nullptr;
 	rf->packages[rf->package_count].count = 0;
@@ -92,9 +79,8 @@ static void resolve_cross_package_refs(manifest_t *manifest, resolved_features_t
 				sds            pkg_name  = sdsnewlen(dep, pkg_len);
 				char          *feat_name = slash + 1;
 				feature_set_t *pkg_set   = get_or_create_set(rf, pkg_name);
-				if (pkg_set != nullptr) {
-					feature_set_add(pkg_set, feat_name);
-				}
+				feature_set_add(pkg_set, feat_name);
+
 				sdsfree(pkg_name);
 			}
 		}
@@ -108,16 +94,9 @@ resolved_features_t *features_resolve(manifest_t *root, sds *requested, size_t r
 		return nullptr;
 	}
 
-	resolved_features_t *rf = calloc(1, sizeof(resolved_features_t));
-	if (rf == nullptr) {
-		return nullptr;
-	}
+	resolved_features_t *rf = safe_calloc(1, sizeof(resolved_features_t));
 
 	feature_set_t *root_set = get_or_create_set(rf, root->package.name != nullptr ? root->package.name : "root");
-	if (root_set == nullptr) {
-		features_free(rf);
-		return nullptr;
-	}
 
 	if (all_features) {
 		for (size_t i = 0; i < root->features_count; i++) {
@@ -223,11 +202,11 @@ void features_free(resolved_features_t *rf)
 		for (size_t j = 0; j < rf->packages[i].count; j++) {
 			sdsfree(rf->packages[i].names[j]);
 		}
-		free(rf->packages[i].names);
+		safe_free(rf->packages[i].names);
 	}
-	free(rf->package_names);
-	free(rf->packages);
-	free(rf);
+	safe_free(rf->package_names);
+	safe_free(rf->packages);
+	safe_free(rf);
 }
 
 bool features_is_enabled(resolved_features_t *rf, sds package, sds feature)
@@ -263,10 +242,7 @@ sds *features_to_compiler_flags(resolved_features_t *rf, sds package, size_t *ou
 		return nullptr;
 	}
 
-	sds *flags = calloc(set->count, sizeof(sds));
-	if (flags == nullptr) {
-		return nullptr;
-	}
+	sds *flags = safe_calloc(set->count, sizeof(sds));
 
 	size_t idx = 0;
 	for (size_t i = 0; i < set->count; i++) {
@@ -308,12 +284,7 @@ void features_parse_cli(const char *cli_string, sds **out_features, size_t *out_
 		}
 	}
 
-	sds *features = calloc(count, sizeof(sds));
-	if (features == nullptr) {
-		*out_features = nullptr;
-		*out_count    = 0;
-		return;
-	}
+	sds *features = safe_calloc(count, sizeof(sds));
 
 	size_t      idx = 0;
 	const char *p   = cli_string;

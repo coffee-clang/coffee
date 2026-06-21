@@ -4,6 +4,7 @@
 #include "lockfile.h"
 #include "manifest.h"
 #include "registry.h"
+#include "safe.h"
 #include "strings.h"
 #include "version.h"
 
@@ -14,6 +15,7 @@
 #include <string.h>
 
 #include <dirent.h>
+#include <fcntl.h>
 #include <glob.h>
 #include <sds/sds.h>
 #include <sys/stat.h>
@@ -22,9 +24,9 @@
 #include <toml.h>
 #include <unistd.h>
 
-static i64 run_command(char **argv, bool verbose)
+i64 run_command(char **argv, int flags)
 {
-	if (verbose) {
+	if (flags & RUN_CMD_VERBOSE) {
 		printf_safe("Running:");
 		for (char *const *a = argv; *a; a++) {
 			printf_safe(" %s", *a);
@@ -35,7 +37,16 @@ static i64 run_command(char **argv, bool verbose)
 	pid_t pid = fork();
 
 	if (pid == 0) {
+		if (flags & RUN_CMD_QUIET) {
+			int devnull = open("/dev/null", O_WRONLY);
+			if (devnull >= 0) {
+				dup2(devnull, STDERR_FILENO);
+				close(devnull);
+			}
+		}
+
 		execvp(argv[0], argv);
+
 		perror("execvp");
 		exit(1);
 	} else if (pid > 0) {
@@ -44,7 +55,7 @@ static i64 run_command(char **argv, bool verbose)
 		if (WIFEXITED(wstatus)) {
 			return WEXITSTATUS(wstatus);
 		}
-		if (verbose) {
+		if (flags & RUN_CMD_VERBOSE) {
 			fprintf_safe(stderr, "Command terminated abnormally (signal %d)\n", WTERMSIG(wstatus));
 		}
 		return 1;
@@ -172,7 +183,7 @@ sds dep_resolve_dir_constraint(const char *name, const char *constraint)
 
 		/* Check if this version satisfies the constraint */
 		if (!version_satisfies(ver.u.s, constraint)) {
-			free(ver.u.s);
+			safe_free(ver.u.s);
 			toml_free(conf);
 			sdsfree(sub_path);
 			continue;
@@ -181,7 +192,7 @@ sds dep_resolve_dir_constraint(const char *name, const char *constraint)
 		/* Parse version for comparison */
 		version_t parsed;
 		bool      ok = version_parse(ver.u.s, &parsed);
-		free(ver.u.s);
+		safe_free(ver.u.s);
 		toml_free(conf);
 
 		if (!ok) {
@@ -245,7 +256,7 @@ size_t dep_add_flags(const char *dep_dir, const char *dep_name, sds *flags, sds 
 						char *s;
 						if (toml_rtos(raw, &s) == 0 && s) {
 							*flags = sdscatprintf(*flags, " -I%s/%s", dep_dir, s);
-							free(s);
+							safe_free(s);
 							found = 1;
 						}
 					}
@@ -262,7 +273,7 @@ size_t dep_add_flags(const char *dep_dir, const char *dep_name, sds *flags, sds 
 						char *s;
 						if (toml_rtos(raw, &s) == 0 && s) {
 							*flags = sdscatprintf(*flags, " -L%s/%s", dep_dir, s);
-							free(s);
+							safe_free(s);
 							found = 1;
 						}
 					}
@@ -332,6 +343,56 @@ sds dep_parse_name(const char *entry)
 	return name;
 }
 
+size_t count_flag_tokens(const char *flags)
+{
+	if (flags == nullptr || flags[0] == '\0') {
+		return 0;
+	}
+	size_t      count = 0;
+	const char *p     = flags;
+	while (*p != '\0') {
+		while (*p == ' ') {
+			p++;
+		}
+		if (*p == '\0') {
+			break;
+		}
+		count++;
+		while (*p != ' ' && *p != '\0') {
+			p++;
+		}
+	}
+	return count;
+}
+
+sds split_flags_to_argv(const char *flags, char **argv, size_t start_idx, size_t *end_idx)
+{
+	if (flags == nullptr || flags[0] == '\0') {
+		*end_idx = start_idx;
+		return sdsempty();
+	}
+	sds   copy = sdsnew(flags);
+	char *p    = copy;
+	while (*p != '\0') {
+		while (*p == ' ') {
+			p++;
+		}
+		if (*p == '\0') {
+			break;
+		}
+		argv[start_idx++] = p;
+		while (*p != ' ' && *p != '\0') {
+			p++;
+		}
+		if (*p == ' ') {
+			*p = '\0';
+			p++;
+		}
+	}
+	*end_idx = start_idx;
+	return copy;
+}
+
 i64 compile_sources(sds *src_files, size_t n, sds output, char *cc, const char *flags_in, bool verbose)
 {
 	if (n == 0) {
@@ -339,30 +400,16 @@ i64 compile_sources(sds *src_files, size_t n, sds output, char *cc, const char *
 		return 1;
 	}
 
-	/* Count space-separated tokens in flags */
-	i64 max_tokens = 1;
-	for (const char *p = flags_in; *p != '\0'; p++) {
-		if (*p == ' ') {
-			max_tokens++;
-		}
-	}
-
-	/* argv: cc + flags + -o output + src_files + NULL */
-	size_t argc_total = 1 + (size_t)max_tokens + 2 + n + 1;
-	char **argv       = (char **)malloc(sizeof(char *) * argc_total);
-	if (argv == nullptr) {
-		return 1;
-	}
+	size_t flag_tokens = count_flag_tokens(flags_in);
+	size_t argc_total  = 1 + flag_tokens + 2 + n + 1;
+	char **argv        = (char **)safe_malloc(sizeof(char *) * argc_total);
 
 	size_t idx  = 0;
 	argv[idx++] = cc;
 
-	sds   flags_copy = sdsnew(flags_in);
-	char *saveptr;
-	char *token = strtok_r(flags_copy, " ", &saveptr);
-	while (token) {
-		argv[idx++] = token;
-	}
+	size_t end_idx;
+	sds    flags_copy = split_flags_to_argv(flags_in, argv, idx, &end_idx);
+	idx               = end_idx;
 
 	argv[idx++] = (char *)"-o";
 	argv[idx++] = output;
@@ -372,10 +419,10 @@ i64 compile_sources(sds *src_files, size_t n, sds output, char *cc, const char *
 	}
 	argv[idx] = nullptr;
 
-	i64 ret = run_command(argv, verbose);
+	i64 ret = run_command(argv, (int)verbose ? RUN_CMD_VERBOSE : 0);
 
 	sdsfree(flags_copy);
-	free((void *)argv);
+	safe_free((void *)argv);
 
 	return ret;
 }
@@ -396,7 +443,7 @@ i64 build_project(manifest_t *manifest, build_opts_t *opts)
 	}
 
 	char *mkdir_argv[] = { "mkdir", "-p", output_dir, nullptr };
-	i64   ret          = run_command(mkdir_argv, verbose);
+	i64   ret          = run_command(mkdir_argv, (int)verbose ? RUN_CMD_VERBOSE : 0);
 	if (ret != 0) {
 		return 1;
 	}
@@ -462,7 +509,7 @@ i64 build_project(manifest_t *manifest, build_opts_t *opts)
 				flags = sdscatfmt(flags, " %s", dflags[i]);
 				sdsfree(dflags[i]);
 			}
-			free((void *)dflags);
+			safe_free((void *)dflags);
 		}
 	}
 
@@ -476,7 +523,7 @@ i64 build_project(manifest_t *manifest, build_opts_t *opts)
 
 	size_t dep_src_cnt  = 0;
 	size_t dep_src_cap  = 64;
-	sds   *dep_src_list = (sds *)malloc(sizeof(sds) * dep_src_cap);
+	sds   *dep_src_list = (sds *)safe_malloc(sizeof(sds) * dep_src_cap);
 
 	for (size_t gi = 0; gi < dep_total; gi++) {
 		sds dep_name = dep_names[gi];
@@ -499,7 +546,7 @@ i64 build_project(manifest_t *manifest, build_opts_t *opts)
 		for (size_t j = 0; j < src_cnt; j++) {
 			if (dep_src_cnt >= dep_src_cap) {
 				dep_src_cap *= 2;
-				dep_src_list = (sds *)realloc(dep_src_list, sizeof(sds) * dep_src_cap);
+				dep_src_list = (sds *)safe_realloc(dep_src_list, sizeof(sds) * dep_src_cap);
 			}
 			dep_src_list[dep_src_cnt++] = sdsnew(srcs[j]);
 		}
@@ -510,11 +557,11 @@ i64 build_project(manifest_t *manifest, build_opts_t *opts)
 	if (ret != 0 && dep_src_cnt == 0) {
 		fprintf_safe(stderr, "Error: No source files found in src/*.c\n");
 		sdsfree(flags);
-		free(dep_src_list);
+		safe_free(dep_src_list);
 		lockfile_free(lockfile);
 		sdsfree(lockfile_path);
 		dep_graph_free(dep_graph);
-		free(dep_names);
+		safe_free(dep_names);
 		if (resolved) {
 			features_free(resolved);
 		}
@@ -525,50 +572,27 @@ i64 build_project(manifest_t *manifest, build_opts_t *opts)
 	if (outpath == nullptr) {
 		sdsfree(flags);
 		globfree(&globbuf);
-		free(dep_src_list);
+		safe_free(dep_src_list);
 		lockfile_free(lockfile);
 		sdsfree(lockfile_path);
 		dep_graph_free(dep_graph);
-		free(dep_names);
+		safe_free(dep_names);
 		if (resolved) {
 			features_free(resolved);
 		}
 		return 1;
 	}
 
-	i64 max_tokens = 1;
-	for (const char *p = flags; *p != '\0'; p++) {
-		if (*p == ' ') {
-			max_tokens++;
-		}
-	}
-
-	size_t argc_total    = (size_t)(1 + max_tokens + 2) + globbuf.gl_pathc + dep_src_cnt + 1;
-	char **compiler_argv = (char **)malloc(sizeof(char *) * (argc_total + 1));
-	if (compiler_argv == nullptr) {
-		sdsfree(flags);
-		globfree(&globbuf);
-		free(dep_src_list);
-		lockfile_free(lockfile);
-		sdsfree(lockfile_path);
-		dep_graph_free(dep_graph);
-		free(dep_names);
-		if (resolved) {
-			features_free(resolved);
-		}
-		return 1;
-	}
+	size_t flag_tokens   = count_flag_tokens(flags);
+	size_t argc_total    = (size_t)(1 + flag_tokens + 2) + globbuf.gl_pathc + dep_src_cnt + 1;
+	char **compiler_argv = (char **)safe_malloc(sizeof(char *) * (argc_total + 1));
 
 	i64 idx              = 0;
 	compiler_argv[idx++] = cc;
 
-	sds   flags_copy = sdsdup(flags);
-	char *saveptr;
-	char *token = strtok_r(flags_copy, " ", &saveptr);
-	while (token) {
-		compiler_argv[idx++] = token;
-		token                = strtok_r(nullptr, " ", &saveptr);
-	}
+	size_t end_idx;
+	sds    flags_copy = split_flags_to_argv(flags, compiler_argv, (size_t)idx, &end_idx);
+	idx               = (i64)end_idx;
 
 	compiler_argv[idx++] = (char *)"-o";
 	compiler_argv[idx++] = outpath;
@@ -583,22 +607,22 @@ i64 build_project(manifest_t *manifest, build_opts_t *opts)
 
 	sdsfree(flags);
 
-	ret = run_command(compiler_argv, verbose);
+	ret = run_command(compiler_argv, (int)verbose ? RUN_CMD_VERBOSE : 0);
 
 	sdsfree(outpath);
 	sdsfree(flags_copy);
-	free((void *)compiler_argv);
+	safe_free((void *)compiler_argv);
 	globfree(&globbuf);
 	for (size_t i = 0; i < dep_src_cnt; i++) {
 		sdsfree(dep_src_list[i]);
 	}
-	free(dep_src_list);
+	safe_free(dep_src_list);
 
 	lockfile_free(lockfile);
 	sdsfree(lockfile_path);
 
 	dep_graph_free(dep_graph);
-	free(dep_names);
+	safe_free(dep_names);
 
 	if (resolved) {
 		features_free(resolved);
@@ -629,7 +653,7 @@ i64 build_run(manifest_t *manifest, build_opts_t *opts, sds *args, i64 argc)
 	}
 
 	i64    total    = 1 + (args != nullptr ? argc : 0) + 1;
-	char **run_argv = (char **)malloc(sizeof(char *) * (size_t)total);
+	char **run_argv = (char **)safe_malloc(sizeof(char *) * (size_t)total);
 	if (run_argv == nullptr) {
 		sdsfree(exe_path);
 		return 1;
@@ -646,8 +670,8 @@ i64 build_run(manifest_t *manifest, build_opts_t *opts, sds *args, i64 argc)
 	if (opts != nullptr) {
 		verbose = opts->verbose;
 	}
-	ret = run_command(run_argv, verbose);
+	ret = run_command(run_argv, (int)verbose ? RUN_CMD_VERBOSE : 0);
 	sdsfree(exe_path);
-	free((void *)run_argv);
+	safe_free((void *)run_argv);
 	return ret;
 }

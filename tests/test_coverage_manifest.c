@@ -1,3 +1,4 @@
+#include "safe.h"
 /*
  * Coverage tests for manifest.c uncovered paths.
  *
@@ -140,7 +141,7 @@ TEST(cov_manifest_circular_features)
 TEST(cov_manifest_write_full)
 {
 	/* Write a manifest with all sections, re-parse and verify */
-	manifest_t *m = calloc(1, sizeof(manifest_t));
+	manifest_t *m = safe_calloc(1, sizeof(manifest_t));
 	ASSERT(m != nullptr, "calloc");
 	m->package.name        = sdsnew("fulltest");
 	m->package.version     = sdsnew("3.0");
@@ -149,26 +150,26 @@ TEST(cov_manifest_write_full)
 
 	/* Simple deps as array strings for round-trip safety */
 	m->package.dependencies_count = 2;
-	m->package.dependencies       = calloc(2, sizeof(sds));
+	m->package.dependencies       = safe_calloc(2, sizeof(sds));
 	m->package.dependencies[0]    = sdsnew("dep_one = \"1.0\"");
 	m->package.dependencies[1]    = sdsnew("dep_two = \"2.0\"");
 
 	/* Sources */
 	m->package.sources_count = 1;
-	m->package.sources       = calloc(1, sizeof(sds));
+	m->package.sources       = safe_calloc(1, sizeof(sds));
 	m->package.sources[0]    = sdsnew("src/main.c");
 
 	/* Headers */
 	m->package.headers_count = 1;
-	m->package.headers       = calloc(1, sizeof(sds));
+	m->package.headers       = safe_calloc(1, sizeof(sds));
 	m->package.headers[0]    = sdsnew("include/main.h");
 
 	/* Features */
 	m->features_count         = 1;
-	m->features               = calloc(1, sizeof(feature_def_t));
+	m->features               = safe_calloc(1, sizeof(feature_def_t));
 	m->features[0].name       = sdsnew("json");
 	m->features[0].deps_count = 1;
-	m->features[0].deps       = calloc(1, sizeof(sds));
+	m->features[0].deps       = safe_calloc(1, sizeof(sds));
 	m->features[0].deps[0]    = sdsnew("serde");
 
 	i64 ret = manifest_write("/tmp/cov-manifest-write.toml", m);

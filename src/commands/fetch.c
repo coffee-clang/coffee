@@ -5,9 +5,9 @@
 #include "../manifest.h"
 #include "../project.h"
 #include "../registry.h"
+#include "safe.h"
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include <sys/stat.h>
@@ -27,20 +27,22 @@ static i64 fetch_git_dep(const char *name, const char *url, const char *global_d
 		if (verbose) {
 			printf_safe("    Updating %s...\n", name);
 		}
-		sds cmd;
+		i64 ret;
 		if (ref != nullptr) {
-			cmd = sdscatprintf(sdsempty(),
-			                   "cd '%s' && git fetch --depth 1 origin '%s' 2>/dev/null && git checkout "
-			                   "'%s' 2>/dev/null",
-			                   target_dir, ref, ref);
+			char *argv1[] = { "git", "-C", target_dir, "fetch", "--depth", "1", "origin", (char *)ref, nullptr };
+			ret           = run_command(argv1, RUN_CMD_QUIET);
+			if (ret == 0) {
+				char *argv2[] = { "git", "-C", target_dir, "checkout", (char *)ref, nullptr };
+				ret           = run_command(argv2, RUN_CMD_QUIET);
+			}
 		} else {
-			cmd = sdscatprintf(sdsempty(),
-			                   "cd '%s' && git fetch --depth 1 origin 2>/dev/null && git reset --hard "
-			                   "origin/HEAD 2>/dev/null",
-			                   target_dir);
+			char *argv1[] = { "git", "-C", target_dir, "fetch", "--depth", "1", "origin", nullptr };
+			ret           = run_command(argv1, RUN_CMD_QUIET);
+			if (ret == 0) {
+				char *argv2[] = { "git", "-C", target_dir, "reset", "--hard", "origin/HEAD", nullptr };
+				ret           = run_command(argv2, RUN_CMD_QUIET);
+			}
 		}
-		i64 ret = system(cmd);
-		sdsfree(cmd);
 		sdsfree(target_dir);
 		return ret;
 	}
@@ -48,17 +50,17 @@ static i64 fetch_git_dep(const char *name, const char *url, const char *global_d
 
 	rmdir(target_dir);
 
-	sds cmd;
+	i64 ret;
 	if (ref != nullptr) {
-		cmd = sdscatprintf(sdsempty(), "git clone --depth 1 --branch '%s' '%s' '%s' 2>/dev/null", ref, url, target_dir);
+		char *argv[] = { "git", "clone", "--depth", "1", "--branch", (char *)ref, (char *)url, target_dir, nullptr };
+		ret          = run_command(argv, RUN_CMD_QUIET);
 	} else {
-		cmd = sdscatprintf(sdsempty(), "git clone --depth 1 '%s' '%s' 2>/dev/null", url, target_dir);
+		char *argv[] = { "git", "clone", "--depth", "1", (char *)url, target_dir, nullptr };
+		ret          = run_command(argv, RUN_CMD_QUIET);
 	}
 	if (verbose) {
 		printf_safe("    Cloning %s...\n", name);
 	}
-	i64 ret = system(cmd);
-	sdsfree(cmd);
 	sdsfree(target_dir);
 	return ret;
 }
@@ -78,7 +80,7 @@ static i64 fetch_path_dep(const char *name, const char *path, const char *local_
 		}
 		sdsfree(target);
 		target = sdsnew(resolved);
-		free(resolved);
+		safe_free(resolved);
 	}
 
 	if (access(target, F_OK) != 0) {
@@ -90,9 +92,8 @@ static i64 fetch_path_dep(const char *name, const char *path, const char *local_
 	sds         link_path = sdscatprintf(sdsempty(), "%s/%s", local_deps_dir, name);
 	struct stat st;
 	if (lstat(link_path, &st) == 0) {
-		sds rm_cmd = sdscatprintf(sdsempty(), "rm -rf %s", link_path);
-		system(rm_cmd);
-		sdsfree(rm_cmd);
+		char *rm_argv[] = { "rm", "-rf", link_path, nullptr };
+		run_command(rm_argv, 0);
 	}
 	symlink(target, link_path);
 
@@ -161,7 +162,7 @@ int64_t handle_fetch(options *opts)
 	size_t non_root_deps = dep_count > 0 ? dep_count - 1 : 0;
 
 	if (non_root_deps > 0) {
-		lf.deps = calloc(non_root_deps, sizeof(lockfile_dep_t));
+		lf.deps = safe_calloc(non_root_deps, sizeof(lockfile_dep_t));
 		if (lf.deps == nullptr) {
 			dep_graph_free(g);
 			manifest_free(m);
@@ -197,9 +198,8 @@ int64_t handle_fetch(options *opts)
 					sds         dep_dir    = sdscatprintf(sdsempty(), "deps/%s", dep_name);
 					struct stat st;
 					if (lstat(dep_dir, &st) == 0) {
-						sds rm_cmd = sdscatprintf(sdsempty(), "rm -rf %s", dep_dir);
-						system(rm_cmd);
-						sdsfree(rm_cmd);
+						char *rm_argv[] = { "rm", "-rf", dep_dir, nullptr };
+						run_command(rm_argv, 0);
 					}
 					symlink(cache_path, dep_dir);
 
@@ -265,7 +265,7 @@ int64_t handle_fetch(options *opts)
 		sdsfree(lf.deps[i].path);
 		sdsfree(lf.deps[i].commit);
 	}
-	free(lf.deps);
+	safe_free(lf.deps);
 
 	sdsfree(global_deps);
 	dep_graph_free(g);

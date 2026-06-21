@@ -4,6 +4,7 @@
 #include "../lockfile.h"
 #include "../manifest.h"
 #include "../project.h"
+#include "safe.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -66,7 +67,7 @@ int64_t handle_generate_lockfile(options *opts)
 	size_t dep_count   = total_nodes > 0 ? total_nodes - 1 : 0;
 
 	if (dep_count > 0) {
-		lf.deps = calloc(dep_count, sizeof(lockfile_dep_t));
+		lf.deps = safe_calloc(dep_count, sizeof(lockfile_dep_t));
 		if (lf.deps == nullptr) {
 			dep_graph_free(g);
 			manifest_free(manifest);
@@ -131,7 +132,7 @@ int64_t handle_generate_lockfile(options *opts)
 		sdsfree(lf.deps[i].path);
 		sdsfree(lf.deps[i].commit);
 	}
-	free(lf.deps);
+	safe_free(lf.deps);
 
 	dep_graph_free(g);
 	manifest_free(manifest);

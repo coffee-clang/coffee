@@ -1,3 +1,4 @@
+#include "safe.h"
 /*
  * Coverage tests for core modules: build, project, registry, install,
  * cflags, libs — targeting uncovered code paths.
@@ -288,7 +289,7 @@ TEST(cov_registry_free_versions_null)
 /* registry_free_recipe with non-null fields */
 TEST(cov_registry_free_recipe_nonnull)
 {
-	recipe_t *r = calloc(1, sizeof(recipe_t));
+	recipe_t *r = safe_calloc(1, sizeof(recipe_t));
 	ASSERT(r != nullptr, "alloc");
 	r->name         = strdup("test-pkg");
 	r->version      = strdup("1.0.0");
@@ -304,10 +305,10 @@ TEST(cov_registry_free_recipe_nonnull)
 /* registry_free_recipes with non-null recipes (multiple entries) */
 TEST(cov_registry_free_recipes_nonnull)
 {
-	recipe_list_t *list = calloc(1, sizeof(recipe_list_t));
+	recipe_list_t *list = safe_calloc(1, sizeof(recipe_list_t));
 	ASSERT(list != nullptr, "alloc");
 	list->count   = 2;
-	list->recipes = calloc(2, sizeof(recipe_t));
+	list->recipes = safe_calloc(2, sizeof(recipe_t));
 	ASSERT(list->recipes != nullptr, "alloc recipes");
 	list->recipes[0].name         = strdup("pkg-a");
 	list->recipes[0].version      = strdup("1.0.0");
@@ -330,10 +331,10 @@ TEST(cov_registry_free_recipes_nonnull)
 /* registry_free_versions with non-null version list */
 TEST(cov_registry_free_versions_nonnull)
 {
-	version_list_t *list = calloc(1, sizeof(version_list_t));
+	version_list_t *list = safe_calloc(1, sizeof(version_list_t));
 	ASSERT(list != nullptr, "alloc");
 	list->count    = 3;
-	list->versions = malloc(3 * sizeof(char *));
+	list->versions = safe_malloc(3 * sizeof(char *));
 	ASSERT(list->versions != nullptr, "alloc versions");
 	list->versions[0] = strdup("1.0.0");
 	list->versions[1] = strdup("1.1.0");
@@ -438,7 +439,7 @@ TEST(cov_features_parse_cli_single)
 	for (size_t i = 0; i < cnt; i++) {
 		sdsfree(out[i]);
 	}
-	free(out);
+	safe_free(out);
 	PASS();
 }
 
@@ -454,7 +455,7 @@ TEST(cov_features_parse_cli_multi)
 	for (size_t i = 0; i < cnt; i++) {
 		sdsfree(out[i]);
 	}
-	free(out);
+	safe_free(out);
 	PASS();
 }
 

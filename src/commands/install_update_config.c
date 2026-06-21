@@ -1,8 +1,9 @@
+#include "../build.h"
 #include "../coffee.h"
 #include "../registry.h"
+#include "safe.h"
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include <sys/stat.h>
@@ -52,7 +53,7 @@ static size_t read_config_lines(const char *path, sds **lines_out)
 	while (fgets(buf, (int)sizeof(buf), fp)) {
 		if (nlines >= cap) {
 			cap   = cap ? cap * 2 : 64;
-			lines = (sds *)realloc(lines, sizeof(sds) * cap);
+			lines = (sds *)safe_realloc(lines, sizeof(sds) * cap);
 		}
 		lines[nlines] = sdsnew(buf);
 		nlines++;
@@ -117,7 +118,7 @@ static void append_key(sds **lines_out, size_t *nlines, size_t *cap, const char 
 		/* Top-level key: append at end */
 		if (*nlines >= *cap) {
 			*cap       = *cap ? *cap * 2 : 64;
-			*lines_out = (sds *)realloc(*lines_out, sizeof(sds) * *cap);
+			*lines_out = (sds *)safe_realloc(*lines_out, sizeof(sds) * *cap);
 		}
 		(*lines_out)[*nlines] = new_line;
 		(*nlines)++;
@@ -131,14 +132,14 @@ static void append_key(sds **lines_out, size_t *nlines, size_t *cap, const char 
 
 		if (*nlines >= *cap) {
 			*cap       = *cap ? *cap * 2 : 64;
-			*lines_out = (sds *)realloc(*lines_out, sizeof(sds) * *cap);
+			*lines_out = (sds *)safe_realloc(*lines_out, sizeof(sds) * *cap);
 		}
 		(*lines_out)[*nlines] = header;
 		(*nlines)++;
 
 		if (*nlines >= *cap) {
 			*cap       = *cap ? *cap * 2 : 64;
-			*lines_out = (sds *)realloc(*lines_out, sizeof(sds) * *cap);
+			*lines_out = (sds *)safe_realloc(*lines_out, sizeof(sds) * *cap);
 		}
 		(*lines_out)[*nlines] = new_line;
 		(*nlines)++;
@@ -170,7 +171,7 @@ static void append_key(sds **lines_out, size_t *nlines, size_t *cap, const char 
 	/* Shift lines down and insert */
 	if (*nlines >= *cap) {
 		*cap       = *cap ? *cap * 2 : 64;
-		*lines_out = (sds *)realloc(*lines_out, sizeof(sds) * *cap);
+		*lines_out = (sds *)safe_realloc(*lines_out, sizeof(sds) * *cap);
 	}
 	for (size_t i = *nlines; i > insert_at; i--) {
 		(*lines_out)[i] = (*lines_out)[i - 1];
@@ -185,10 +186,10 @@ int64_t handle_install_update_config(options *opts)
 {
 	(void)opts;
 
-	sds home  = sdsnew(coffee_home_dir());
-	sds mkcmd = sdscatprintf(sdsempty(), "mkdir -p %s", home);
-	system(mkcmd);
-	sdsfree(mkcmd);
+	sds   home   = sdsnew(coffee_home_dir());
+	char *argv[] = { "mkdir", "-p", home, nullptr };
+	run_command(argv, 0);
+
 	sdsfree(home);
 
 	sds    path   = cfg_path();
@@ -210,7 +211,7 @@ int64_t handle_install_update_config(options *opts)
 
 	size_t cap = nlines > 0 ? nlines : 64;
 	if (nlines == 0) {
-		lines = (sds *)malloc(sizeof(sds) * cap);
+		lines = (sds *)safe_malloc(sizeof(sds) * cap);
 	}
 	size_t added = 0;
 	size_t ndefs = sizeof(defaults) / sizeof(defaults[0]);
@@ -242,7 +243,7 @@ int64_t handle_install_update_config(options *opts)
 		for (size_t i = 0; i < nlines; i++) {
 			sdsfree(lines[i]);
 		}
-		free(lines);
+		safe_free(lines);
 		return 0;
 	}
 
@@ -254,7 +255,7 @@ int64_t handle_install_update_config(options *opts)
 		for (size_t i = 0; i < nlines; i++) {
 			sdsfree(lines[i]);
 		}
-		free(lines);
+		safe_free(lines);
 		return 1;
 	}
 
@@ -269,6 +270,6 @@ int64_t handle_install_update_config(options *opts)
 	for (size_t i = 0; i < nlines; i++) {
 		sdsfree(lines[i]);
 	}
-	free(lines);
+	safe_free(lines);
 	return 0;
 }

@@ -3,9 +3,9 @@
 #include "../lockfile.h"
 #include "../manifest.h"
 #include "../project.h"
+#include "safe.h"
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include <glob.h>
@@ -51,7 +51,7 @@ int64_t handle_test(options *opts)
 		sds    pattern = sdscatprintf(sdsempty(), "%s/tests/*.c", project_dir);
 		if (glob(pattern, 0, nullptr, &g) == 0 && g.gl_pathc > 0) {
 			test_count = g.gl_pathc;
-			test_srcs  = calloc(test_count, sizeof(sds));
+			test_srcs  = safe_calloc(test_count, sizeof(sds));
 			if (test_srcs) {
 				own_srcs = true;
 				for (size_t i = 0; i < test_count; i++) {
@@ -85,7 +85,7 @@ int64_t handle_test(options *opts)
 			for (size_t i = 0; i < test_count; i++) {
 				sdsfree(test_srcs[i]);
 			}
-			free(test_srcs);
+			safe_free(test_srcs);
 		}
 		manifest_free(m);
 		sdsfree(project_dir);
@@ -93,13 +93,15 @@ int64_t handle_test(options *opts)
 	}
 
 	/* Build output path */
-	const char *out_dir = opts->target_dir ? opts->target_dir : "target/debug";
-	sds         output  = sdscatprintf(sdsempty(), "%s/%s-tests", out_dir, m->package.name);
+	char *out_dir = opts->target_dir ? opts->target_dir : (char *)"target/debug";
+	sds   output  = sdscatprintf(sdsempty(), "%s/%s-tests", out_dir, m->package.name);
 
 	/* Ensure output directory exists */
-	sds mkdir_cmd = sdscatprintf(sdsempty(), "mkdir -p '%s'", out_dir);
-	i64 mk_ret    = system(mkdir_cmd);
-	sdsfree(mkdir_cmd);
+
+	i64   mk_ret;
+	char *mkdir_argv[] = { "mkdir", "-p", out_dir, nullptr };
+	mk_ret             = run_command(mkdir_argv, 0);
+
 	if (mk_ret != 0) {
 		fprintf_safe(stderr, "Error: Could not create output directory %s\n", out_dir);
 		globfree(&proj_src);
@@ -107,7 +109,7 @@ int64_t handle_test(options *opts)
 			for (size_t i = 0; i < test_count; i++) {
 				sdsfree(test_srcs[i]);
 			}
-			free(test_srcs);
+			safe_free(test_srcs);
 		}
 		manifest_free(m);
 		sdsfree(project_dir);
@@ -147,7 +149,7 @@ int64_t handle_test(options *opts)
 	/* Build the compiler argument array: project sources + test sources */
 	char  *cc        = getenv("CC") != nullptr ? getenv("CC") : "clang";
 	size_t total_src = (size_t)proj_src.gl_pathc + test_count;
-	sds   *all_srcs  = calloc(total_src, sizeof(sds));
+	sds   *all_srcs  = safe_calloc(total_src, sizeof(sds));
 	size_t src_idx   = 0;
 
 	for (size_t i = 0; i < (size_t)proj_src.gl_pathc; i++, src_idx++) {
@@ -162,7 +164,7 @@ int64_t handle_test(options *opts)
 	for (size_t i = 0; i < total_src; i++) {
 		sdsfree(all_srcs[i]);
 	}
-	free(all_srcs);
+	safe_free(all_srcs);
 	sdsfree(flags);
 
 	if (ret != 0) {
@@ -174,7 +176,7 @@ int64_t handle_test(options *opts)
 			for (size_t i = 0; i < test_count; i++) {
 				sdsfree(test_srcs[i]);
 			}
-			free(test_srcs);
+			safe_free(test_srcs);
 		}
 		manifest_free(m);
 		sdsfree(project_dir);
@@ -189,25 +191,26 @@ int64_t handle_test(options *opts)
 		for (size_t i = 0; i < test_count; i++) {
 			sdsfree(test_srcs[i]);
 		}
-		free(test_srcs);
+		safe_free(test_srcs);
 	}
 
 	/* Run the test binary */
-	sds         run_cmd     = sdsnew(output);
-	const char *test_filter = getenv("TEST_FILTER");
+	char *test_filter = getenv("TEST_FILTER");
 	if (!test_filter && opts->inputs_num > 1) {
 		test_filter = opts->inputs[1];
 	}
-	if (test_filter != nullptr && test_filter[0] != '\0') {
-		run_cmd = sdscatprintf(run_cmd, " '%s'", test_filter);
-	}
+
 	if (opts->verbose) {
-		printf_safe("Running: %s\n", run_cmd);
+		printf_safe("Running: %s", output);
+		if (test_filter && test_filter[0]) {
+			printf_safe(" %s", test_filter);
+		}
+		printf_safe("\n");
 	}
 
-	ret = system(run_cmd);
-
-	sdsfree(run_cmd);
+	char *filter_arg  = (test_filter && test_filter[0]) ? test_filter : nullptr;
+	char *run_argv[4] = { output, filter_arg, nullptr, nullptr };
+	ret               = run_command(run_argv, 0);
 
 	manifest_free(m);
 	sdsfree(project_dir);

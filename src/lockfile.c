@@ -1,5 +1,6 @@
 #include "lockfile.h"
 
+#include "safe.h"
 #include "strings.h"
 
 #include <stdio.h>
@@ -23,7 +24,7 @@ lockfile_t *lockfile_parse(sds path)
 		return nullptr;
 	}
 
-	lockfile_t *lf = calloc(1, sizeof(lockfile_t));
+	lockfile_t *lf = safe_calloc(1, sizeof(lockfile_t));
 	if (lf == nullptr) {
 		toml_free(conf);
 		return nullptr;
@@ -43,12 +44,12 @@ lockfile_t *lockfile_parse(sds path)
 		toml_datum_t name = toml_string_in(pkg, "name");
 		if (name.ok) {
 			lf->package_name = sdsnew(name.u.s);
-			free(name.u.s);
+			safe_free(name.u.s);
 		}
 		toml_datum_t pkg_ver = toml_string_in(pkg, "version");
 		if (pkg_ver.ok) {
 			lf->package_version = sdsnew(pkg_ver.u.s);
-			free(pkg_ver.u.s);
+			safe_free(pkg_ver.u.s);
 		}
 	}
 
@@ -57,7 +58,7 @@ lockfile_t *lockfile_parse(sds path)
 	if (deps_arr) {
 		lf->deps_count = (size_t)toml_array_nelem(deps_arr);
 		if (lf->deps_count > 0) {
-			lf->deps = calloc(lf->deps_count, sizeof(lockfile_dep_t));
+			lf->deps = safe_calloc(lf->deps_count, sizeof(lockfile_dep_t));
 			if (lf->deps == nullptr) {
 				lockfile_free(lf);
 				toml_free(conf);
@@ -71,22 +72,22 @@ lockfile_t *lockfile_parse(sds path)
 				toml_datum_t dep_name = toml_string_in(dep_tbl, "name");
 				if (dep_name.ok) {
 					lf->deps[i].name = sdsnew(dep_name.u.s);
-					free(dep_name.u.s);
+					safe_free(dep_name.u.s);
 				}
 				toml_datum_t dep_ver = toml_string_in(dep_tbl, "version");
 				if (dep_ver.ok) {
 					lf->deps[i].version = sdsnew(dep_ver.u.s);
-					free(dep_ver.u.s);
+					safe_free(dep_ver.u.s);
 				}
 				toml_datum_t dep_path = toml_string_in(dep_tbl, "path");
 				if (dep_path.ok) {
 					lf->deps[i].path = sdsnew(dep_path.u.s);
-					free(dep_path.u.s);
+					safe_free(dep_path.u.s);
 				}
 				toml_datum_t dep_commit = toml_string_in(dep_tbl, "commit");
 				if (dep_commit.ok) {
 					lf->deps[i].commit = sdsnew(dep_commit.u.s);
-					free(dep_commit.u.s);
+					safe_free(dep_commit.u.s);
 				}
 			}
 		}
@@ -109,8 +110,8 @@ void lockfile_free(lockfile_t *lf)
 		sdsfree(lf->deps[i].path);
 		sdsfree(lf->deps[i].commit);
 	}
-	free(lf->deps);
-	free(lf);
+	safe_free(lf->deps);
+	safe_free(lf);
 }
 
 i64 lockfile_write(sds path, lockfile_t *lf)

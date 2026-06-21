@@ -1,5 +1,6 @@
 #include "../src/manifest.h"
 #include "../src/strings.h"
+#include "safe.h"
 #include "test_framework.h"
 
 #include <stdio.h>
@@ -88,16 +89,16 @@ TEST(manifest_bin_no_bin_section)
 TEST(manifest_bin_round_trip)
 {
 	/* Write a manifest with [[bin]], parse it, write again, re-parse and verify */
-	manifest_t *m1 = calloc(1, sizeof(manifest_t));
+	manifest_t *m1 = safe_calloc(1, sizeof(manifest_t));
 	ASSERT(m1 != nullptr, "calloc failed");
 	m1->package.name    = sdsnew("roundtrip");
 	m1->package.version = sdsnew("2.0.0");
 	m1->bin_count       = 1;
-	m1->bin             = calloc(1, sizeof(binary_target_t));
+	m1->bin             = safe_calloc(1, sizeof(binary_target_t));
 	ASSERT(m1->bin != nullptr, "calloc for bin failed");
 	m1->bin[0].name      = sdsnew("roundtool");
 	m1->bin[0].src_count = 2;
-	m1->bin[0].src       = calloc(2, sizeof(sds));
+	m1->bin[0].src       = safe_calloc(2, sizeof(sds));
 	m1->bin[0].src[0]    = sdsnew("src/main.c");
 	m1->bin[0].src[1]    = sdsnew("src/helper.c");
 

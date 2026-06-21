@@ -1,6 +1,7 @@
 #include "../coffee.h"
 #include "../manifest.h"
 #include "../project.h"
+#include "safe.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -38,7 +39,7 @@ static void append_libs_for_pkg(const char *name, sds *buf)
 				if (toml_rtos(raw_libname, &s) == 0 && s) {
 					sdsfree(libname);
 					libname = sdsnew(s);
-					free(s);
+					safe_free(s);
 				}
 			}
 
@@ -52,7 +53,7 @@ static void append_libs_for_pkg(const char *name, sds *buf)
 						char *s;
 						if (toml_rtos(raw, &s) == 0 && s) {
 							*buf = sdscatprintf(*buf, "-L%s/%s ", dir, s);
-							free(s);
+							safe_free(s);
 							has_libdir = 1;
 						}
 					}

@@ -1,3 +1,4 @@
+#include "safe.h"
 /** @file cmdline.c
  *  @brief Command line option parser for coffee.
  *
@@ -6,7 +7,6 @@
  */
 
 #include "cmdline.h"
-
 #include "strings.h"
 
 #include <stdio.h>
@@ -149,7 +149,7 @@ void cmdline_parser_free(struct cli_args *args_info)
 	for (unsigned i = 0; i < args_info->inputs_num; i++) {
 		sdsfree(args_info->inputs[i]);
 	}
-	free(args_info->inputs);
+	safe_free(args_info->inputs);
 	args_info->inputs     = nullptr;
 	args_info->inputs_num = 0;
 
@@ -815,7 +815,7 @@ i64 cmdline_parser(i64 argc, char **argv, struct cli_args *args_info)
 	/* Collect positional arguments */
 	if (optind < argc) {
 		unsigned remaining = (unsigned)(argc - optind);
-		args_info->inputs  = (sds *)malloc((size_t)remaining * sizeof(sds));
+		args_info->inputs  = (sds *)safe_malloc((size_t)remaining * sizeof(sds));
 		if (!args_info->inputs) {
 			fprintf_safe(stderr, "coffee: out of memory\n");
 			cmdline_parser_free(args_info);

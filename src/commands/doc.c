@@ -1,9 +1,10 @@
+#include "../build.h"
 #include "../coffee.h"
 #include "../manifest.h"
 #include "../project.h"
+#include "safe.h"
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include <toml.h>
@@ -19,7 +20,8 @@ typedef struct {
 
 static i64 doc_check(void)
 {
-	i64 ret = system("command -v doxygen >/dev/null 2>&1");
+	char *argv[] = { "doxygen", "--version", nullptr };
+	i64   ret    = run_command(argv, RUN_CMD_QUIET);
 	if (ret != 0) {
 		printf_safe("doxygen not found. Install it to generate documentation.\n");
 		return 1;
@@ -46,7 +48,7 @@ static void doc_settings_read(doc_settings_t *cfg, toml_table_t *doc_tab, const 
 	raw = toml_raw_in(doc_tab, "project-name");
 	if (raw && toml_rtos(raw, &s) == 0 && s) {
 		cfg->project_name = sdsnew(s);
-		free(s);
+		safe_free(s);
 	} else {
 		cfg->project_name = sdsnew(def_name);
 	}
@@ -54,7 +56,7 @@ static void doc_settings_read(doc_settings_t *cfg, toml_table_t *doc_tab, const 
 	raw = toml_raw_in(doc_tab, "output-dir");
 	if (raw && toml_rtos(raw, &s) == 0 && s) {
 		cfg->output_dir = sdsnew(s);
-		free(s);
+		safe_free(s);
 	} else {
 		cfg->output_dir = sdsnew(def_out);
 	}
@@ -62,7 +64,7 @@ static void doc_settings_read(doc_settings_t *cfg, toml_table_t *doc_tab, const 
 	raw = toml_raw_in(doc_tab, "input-dirs");
 	if (raw && toml_rtos(raw, &s) == 0 && s) {
 		cfg->input_dirs = sdsnew(s);
-		free(s);
+		safe_free(s);
 	} else {
 		cfg->input_dirs = sdsnew(def_input);
 	}
@@ -70,7 +72,7 @@ static void doc_settings_read(doc_settings_t *cfg, toml_table_t *doc_tab, const 
 	raw = toml_raw_in(doc_tab, "exclude-patterns");
 	if (raw && toml_rtos(raw, &s) == 0 && s) {
 		cfg->exclude_patterns = sdsnew(s);
-		free(s);
+		safe_free(s);
 	} else {
 		cfg->exclude_patterns = sdsnew("");
 	}
@@ -213,7 +215,8 @@ static i64 doc_generate(const sds project_dir, manifest_t *m)
 	sdsfree(doxyfile_path);
 
 	/* Run doxygen */
-	i64 ret = system("doxygen 2>/dev/null");
+	char *doxy_argv[] = { "doxygen", nullptr };
+	i64   ret         = run_command(doxy_argv, RUN_CMD_QUIET);
 	if (ret != 0) {
 		fprintf_safe(stderr, "Error: Documentation generation failed. Please ensure 'doxygen' is installed.\n");
 		return 1;

@@ -3,6 +3,7 @@
 #include "../lockfile.h"
 #include "../manifest.h"
 #include "../project.h"
+#include "safe.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -103,7 +104,7 @@ static void print_tree(const char *dep_dir, const char *dep_name, const char *ve
 			toml_datum_t ver = toml_string_in(deps, key);
 			if (ver.ok) {
 				child_ver = sdsnew(ver.u.s);
-				free(ver.u.s);
+				safe_free(ver.u.s);
 			}
 		}
 

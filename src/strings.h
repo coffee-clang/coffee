@@ -41,6 +41,8 @@
 #include <sds/sds.h>
 #pragma GCC diagnostic pop
 
+#include "safe.h"
+
 #include <stdint.h>
 
 #include <stdarg.h>

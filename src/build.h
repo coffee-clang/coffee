@@ -6,6 +6,16 @@
 
 #include <stdbool.h>
 
+/* Flags for run_command */
+#define RUN_CMD_VERBOSE (1 << 0)
+#define RUN_CMD_QUIET   (1 << 1)
+
+/*
+ * Run an external command with fork+execvp. Returns exit code.
+ * Supports flags: RUN_CMD_VERBOSE (print command), RUN_CMD_QUIET (stderr to /dev/null).
+ */
+i64 run_command(char **argv, int flags);
+
 typedef struct {
 	bool   verbose;
 	bool   release;
@@ -30,7 +40,7 @@ typedef struct {
  * verbose: if true, print the compiler command
  * Returns 0 on success, non-zero on failure.
  */
-i64 compile_sources(sds *src_files, size_t n, sds output, char *cc, const char *flags, bool verbose);
+i64 compile_sources(sds *src_files, size_t n, sds output, char *cc, const char *flags_in, bool verbose);
 
 i64 build_project(manifest_t *manifest, build_opts_t *opts);
 i64 build_run(manifest_t *manifest, build_opts_t *opts, sds *args, i64 argc);
@@ -64,5 +74,9 @@ size_t dep_add_flags(const char *dep_dir, const char *dep_name, sds *flags, sds 
  * Returns a new sds with the bare name (caller frees).
  */
 sds dep_parse_name(const char *entry);
+
+size_t count_flag_tokens(const char *flags);
+
+sds split_flags_to_argv(const char *flags, char **argv, size_t start_idx, size_t *end_idx);
 
 #endif

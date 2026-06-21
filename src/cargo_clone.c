@@ -43,11 +43,6 @@ int main(int argc, char *argv[])
 	}
 	// Build a substring from the command and all unnamed options (values)
 	sds cmd_line_substring = sdsempty();
-	if (cmd_line_substring == nullptr) {
-		fprintf_safe(stderr, "Memory allocation error\n");
-		cmdline_parser_free(&args_info);
-		exit(1);
-	}
 
 	for (i64 i = 0; i < args_info.inputs_num; i++) {
 		cmd_line_substring = sdscat(cmd_line_substring, args_info.inputs[i]);

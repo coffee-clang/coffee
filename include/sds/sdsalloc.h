@@ -37,6 +37,14 @@
  * the include of your alternate allocator if needed (not needed in order
  * to use the default libc allocator). */
 
-#define s_malloc malloc
-#define s_realloc realloc
-#define s_free free
+#include "safe.h"
+
+#if !defined(s_malloc)
+#define s_malloc safe_malloc
+#endif
+#if !defined(s_realloc)
+#define s_realloc safe_realloc
+#endif
+#if !defined(s_free)
+#define s_free safe_free
+#endif

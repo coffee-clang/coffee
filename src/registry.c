@@ -1,5 +1,7 @@
 #include "registry.h"
 
+#include "build.h"
+#include "safe.h"
 #include "strings.h"
 
 #include <stdio.h>
@@ -29,12 +31,12 @@ sds coffee_home_dir(void)
 	return home_dir;
 }
 
-static const char *get_cache_dir(void)
+static char *get_cache_dir(void)
 {
 	return coffee_home_dir();
 }
 
-static const char *get_index_path(void)
+static char *get_index_path(void)
 {
 	static char index_path[4096];
 	snprintf_safe(index_path, sizeof(index_path), "%s/packages.json", get_cache_dir());
@@ -43,7 +45,7 @@ static const char *get_index_path(void)
 
 static i64 ensure_index_cached(void)
 {
-	const char *index_path = get_index_path();
+	char       *index_path = get_index_path();
 	struct stat st;
 
 	if (stat(index_path, &st) == 0) {
@@ -53,14 +55,25 @@ static i64 ensure_index_cached(void)
 		}
 	}
 
-	const char *cache_dir = get_cache_dir();
-	char        cmd[4096];
-	snprintf_safe(cmd, sizeof(cmd), "mkdir -p %s", cache_dir);
-	(void)system(cmd);
+	char *cache_dir = get_cache_dir();
 
-	snprintf_safe(cmd, sizeof(cmd), "curl -sL \"" REGISTRY_INDEX_URL "\" | zstd -df -o %s 2>/dev/null", index_path);
+	{
+		char *argv[] = { "mkdir", "-p", cache_dir, nullptr };
+		run_command(argv, 0);
+	}
 
-	return system(cmd);
+	/* Download index, then decompress (two-step to avoid shell pipe) */
+	{
+		sds   tmp_path    = sdscatprintf(sdsempty(), "%s.zst", index_path);
+		char *curl_argv[] = { "curl", "-sL", REGISTRY_INDEX_URL, "-o", tmp_path, nullptr };
+		i64   r           = run_command(curl_argv, 0);
+		if (r == 0) {
+			char *zstd_argv[] = { "zstd", "-df", tmp_path, "-o", index_path, nullptr };
+			r                 = run_command(zstd_argv, RUN_CMD_QUIET);
+		}
+		sdsfree(tmp_path);
+		return r;
+	}
 }
 
 static char *fetch_url(const char *url)
@@ -73,16 +86,16 @@ static char *fetch_url(const char *url)
 		return nullptr;
 	}
 
-	char *buffer = malloc(1);
+	char *buffer = safe_malloc(1);
 	buffer[0]    = '\0';
 	size_t total = 0;
 	char   buf[4096];
 
 	while (fgets(buf, sizeof(buf), fp)) {
 		size_t len    = strlen(buf);
-		char  *newbuf = realloc(buffer, total + len + 1);
+		char  *newbuf = safe_realloc(buffer, total + len + 1);
 		if (newbuf == nullptr) {
-			free(buffer);
+			safe_free(buffer);
 			pclose(fp);
 			return nullptr;
 		}
@@ -132,7 +145,7 @@ static char *extract_string_val(const char *text, const char *key)
 						after_key++;
 					}
 					if (*after_key == '\"' && after_key > start) {
-						char *result = malloc((size_t)(after_key - start + 1));
+						char *result = safe_malloc((size_t)(after_key - start + 1));
 						memccpy(result, start, '\0', (size_t)(after_key - start));
 						result[after_key - start] = '\0';
 						return result;
@@ -154,7 +167,7 @@ static char *extract_string_val(const char *text, const char *key)
 
 static recipe_list_t *parse_package_list(const char *json)
 {
-	recipe_list_t *list = calloc(1, sizeof(recipe_list_t));
+	recipe_list_t *list = safe_calloc(1, sizeof(recipe_list_t));
 	if (list == nullptr) {
 		return nullptr;
 	}
@@ -185,7 +198,7 @@ static recipe_list_t *parse_package_list(const char *json)
 
 			if (brace_count == 0 && obj_start) {
 				size_t obj_len = (size_t)(p - obj_start + 1);
-				char  *obj     = malloc(obj_len + 1);
+				char  *obj     = safe_malloc(obj_len + 1);
 				memccpy(obj, obj_start, '\0', obj_len);
 				obj[obj_len] = '\0';
 
@@ -195,12 +208,12 @@ static recipe_list_t *parse_package_list(const char *json)
 				new_r.version     = extract_string_val(obj, "version");
 				new_r.description = extract_string_val(obj, "description");
 
-				recipe_t *new_recipes = realloc(list->recipes, (list->count + 1) * sizeof(recipe_t));
+				recipe_t *new_recipes = safe_realloc(list->recipes, (list->count + 1) * sizeof(recipe_t));
 				if (new_recipes) {
 					list->recipes                = new_recipes;
 					list->recipes[list->count++] = new_r;
 				}
-				free(obj);
+				safe_free(obj);
 				obj_start = nullptr;
 			}
 		}
@@ -213,14 +226,14 @@ static recipe_list_t *parse_package_list(const char *json)
 recipe_list_t *registry_search(sds query)
 {
 	if (ensure_index_cached() != 0) {
-		recipe_list_t *empty = calloc(1, sizeof(recipe_list_t));
+		recipe_list_t *empty = safe_calloc(1, sizeof(recipe_list_t));
 		return empty;
 	}
 
 	const char *index_path = get_index_path();
 	FILE       *fp         = fopen(index_path, "r");
 	if (fp == nullptr) {
-		recipe_list_t *empty = calloc(1, sizeof(recipe_list_t));
+		recipe_list_t *empty = safe_calloc(1, sizeof(recipe_list_t));
 		return empty;
 	}
 
@@ -228,19 +241,19 @@ recipe_list_t *registry_search(sds query)
 	long len = ftell(fp);
 	fseek(fp, 0, SEEK_SET);
 
-	char *json = malloc((size_t)(len + 1));
+	char *json = safe_malloc((size_t)(len + 1));
 	fread(json, 1, (size_t)len, fp);
 	json[len] = '\0';
 	fclose(fp);
 
 	recipe_list_t *all = parse_package_list(json);
-	free(json);
+	safe_free(json);
 
 	if (query == nullptr || strlen(query) == 0) {
 		return all;
 	}
 
-	recipe_list_t *filtered = calloc(1, sizeof(recipe_list_t));
+	recipe_list_t *filtered = safe_calloc(1, sizeof(recipe_list_t));
 	if (filtered == nullptr) {
 		return all;
 	}
@@ -261,7 +274,7 @@ recipe_list_t *registry_search(sds query)
 			memset(&new_r, 0, sizeof(recipe_t));
 			if (r->name) {
 				size_t nlen = strlen(r->name);
-				new_r.name  = malloc(nlen + 1);
+				new_r.name  = safe_malloc(nlen + 1);
 				if (new_r.name) {
 					memccpy(new_r.name, r->name, '\0', nlen);
 					new_r.name[nlen] = '\0';
@@ -269,7 +282,7 @@ recipe_list_t *registry_search(sds query)
 			}
 			if (r->version) {
 				size_t vlen   = strlen(r->version);
-				new_r.version = malloc(vlen + 1);
+				new_r.version = safe_malloc(vlen + 1);
 				if (new_r.version) {
 					memccpy(new_r.version, r->version, '\0', vlen);
 					new_r.version[vlen] = '\0';
@@ -277,14 +290,14 @@ recipe_list_t *registry_search(sds query)
 			}
 			if (r->description) {
 				size_t dlen       = strlen(r->description);
-				new_r.description = malloc(dlen + 1);
+				new_r.description = safe_malloc(dlen + 1);
 				if (new_r.description) {
 					memccpy(new_r.description, r->description, '\0', dlen);
 					new_r.description[dlen] = '\0';
 				}
 			}
 
-			recipe_t *new_recipes = realloc(filtered->recipes, (filtered->count + 1) * sizeof(recipe_t));
+			recipe_t *new_recipes = safe_realloc(filtered->recipes, (filtered->count + 1) * sizeof(recipe_t));
 			if (new_recipes) {
 				filtered->recipes                    = new_recipes;
 				filtered->recipes[filtered->count++] = new_r;
@@ -310,14 +323,14 @@ recipe_t *registry_get(sds name)
 		return nullptr;
 	}
 
-	recipe_t *r = calloc(1, sizeof(recipe_t));
+	recipe_t *r = safe_calloc(1, sizeof(recipe_t));
 	if (r == nullptr) {
-		free(meta);
+		safe_free(meta);
 		return nullptr;
 	}
 
 	size_t nlen = strlen(name);
-	r->name     = malloc(nlen + 1);
+	r->name     = safe_malloc(nlen + 1);
 	if (r->name) {
 		memccpy(r->name, name, '\0', nlen);
 		r->name[nlen] = '\0';
@@ -352,7 +365,7 @@ recipe_t *registry_get(sds name)
 		toml_free(tbl);
 	}
 
-	free(meta);
+	safe_free(meta);
 	return r;
 }
 
@@ -364,23 +377,34 @@ i64 registry_fetch(sds name, const char *version, sds dest_dir)
 	}
 
 	char first = (char)tolower((unsigned char)name[0]);
-	char cmd[4096];
 
-	snprintf_safe(cmd, sizeof(cmd), "mkdir -p %s", dest_dir);
-	if (system(cmd) != 0) {
-		return -1;
+	{
+		char *argv[] = { "mkdir", "-p", dest_dir, nullptr };
+		if (run_command(argv, 0) != 0) {
+			return -1;
+		}
 	}
 
-	snprintf_safe(cmd, sizeof(cmd), "curl -sL \"" REGISTRY_RAW_URL "/recipes/%c/%s/library.toml\" -o %s/library.toml",
-	              first, name, dest_dir);
-	if (system(cmd) != 0) {
-		return -1;
+	{
+		sds   url    = sdscatprintf(sdsempty(), REGISTRY_RAW_URL "/recipes/%c/%s/library.toml", first, name);
+		sds   out    = sdscatprintf(sdsempty(), "%s/library.toml", dest_dir);
+		char *argv[] = { "curl", "-sL", url, "-o", out, nullptr };
+		i64   r      = run_command(argv, 0);
+		sdsfree(url);
+		sdsfree(out);
+		if (r != 0) {
+			return -1;
+		}
 	}
 
-	snprintf_safe(cmd, sizeof(cmd),
-	              "curl -sL \"" REGISTRY_RAW_URL "/recipes/%c/%s/install.sh\" -o %s/install.sh 2>/dev/null", first,
-	              name, dest_dir);
-	system(cmd);
+	{
+		sds   url    = sdscatprintf(sdsempty(), REGISTRY_RAW_URL "/recipes/%c/%s/install.sh", first, name);
+		sds   out    = sdscatprintf(sdsempty(), "%s/install.sh", dest_dir);
+		char *argv[] = { "curl", "-sL", url, "-o", out, nullptr };
+		run_command(argv, RUN_CMD_QUIET);
+		sdsfree(url);
+		sdsfree(out);
+	}
 
 	return 0;
 }
@@ -400,9 +424,9 @@ version_list_t *registry_get_versions(sds name)
 		return nullptr;
 	}
 
-	version_list_t *list = calloc(1, sizeof(version_list_t));
+	version_list_t *list = safe_calloc(1, sizeof(version_list_t));
 	if (list == nullptr) {
-		free(meta);
+		safe_free(meta);
 		return nullptr;
 	}
 
@@ -412,18 +436,18 @@ version_list_t *registry_get_versions(sds name)
 	if (tbl) {
 		toml_datum_t v = toml_string_in(tbl, "version");
 		if (v.ok) {
-			list->versions = malloc(sizeof(char *));
+			list->versions = safe_malloc(sizeof(char *));
 			if (list->versions) {
 				list->versions[0] = v.u.s; /* steal pointer */
 				list->count       = 1;
 			} else {
-				free(v.u.s);
+				safe_free(v.u.s);
 			}
 		}
 		toml_free(tbl);
 	}
 
-	free(meta);
+	safe_free(meta);
 	return list;
 }
 
@@ -435,11 +459,11 @@ void registry_free_versions(version_list_t *list)
 
 	for (size_t i = 0; i < list->count; i++) {
 		if (list->versions[i]) {
-			free(list->versions[i]);
+			safe_free(list->versions[i]);
 		}
 	}
-	free(list->versions);
-	free(list);
+	safe_free(list->versions);
+	safe_free(list);
 }
 
 void registry_free_recipes(recipe_list_t *list)
@@ -451,29 +475,29 @@ void registry_free_recipes(recipe_list_t *list)
 	for (size_t i = 0; i < list->count; i++) {
 		recipe_t *r = &list->recipes[i];
 		if (r->name) {
-			free(r->name);
+			safe_free(r->name);
 		}
 		if (r->version) {
-			free(r->version);
+			safe_free(r->version);
 		}
 		if (r->license) {
-			free(r->license);
+			safe_free(r->license);
 		}
 		if (r->repo) {
-			free(r->repo);
+			safe_free(r->repo);
 		}
 		if (r->description) {
-			free(r->description);
+			safe_free(r->description);
 		}
 		if (r->download_url) {
-			free(r->download_url);
+			safe_free(r->download_url);
 		}
 		if (r->dependencies) {
-			free(r->dependencies);
+			safe_free(r->dependencies);
 		}
 	}
-	free(list->recipes);
-	free(list);
+	safe_free(list->recipes);
+	safe_free(list);
 }
 
 void registry_free_recipe(recipe_t *r)
@@ -482,25 +506,25 @@ void registry_free_recipe(recipe_t *r)
 		return;
 	}
 	if (r->name) {
-		free(r->name);
+		safe_free(r->name);
 	}
 	if (r->version) {
-		free(r->version);
+		safe_free(r->version);
 	}
 	if (r->license) {
-		free(r->license);
+		safe_free(r->license);
 	}
 	if (r->repo) {
-		free(r->repo);
+		safe_free(r->repo);
 	}
 	if (r->description) {
-		free(r->description);
+		safe_free(r->description);
 	}
 	if (r->download_url) {
-		free(r->download_url);
+		safe_free(r->download_url);
 	}
 	if (r->dependencies) {
-		free(r->dependencies);
+		safe_free(r->dependencies);
 	}
-	free(r);
+	safe_free(r);
 }

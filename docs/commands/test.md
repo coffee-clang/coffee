@@ -14,5 +14,11 @@ coffee test
 
 ## Implementation Notes
 
-- Currently a stub command
-- Should compile test files and run test framework
+- Finds `Coffee.toml` in current or parent directories
+- Test sources: from `[test]` section sources if defined, else globs `tests/*.c`
+- Compiles project sources (`src/*.c`) + test sources into a test runner binary
+- Injects `-DCOFFEE_TEST_RUNNER` to activate the test framework entry point
+- Resolves dependency include paths/flags via lockfile; falls back to `deps/` filesystem
+- Compiler: `$CC` or `clang`; pass `--verbose` / `-v` for compiler output
+- Filter: `coffee test <filter>` or `TEST_FILTER=<filter>` env var
+- Output: `target/debug/<name>-tests` (respects `--target-dir`)

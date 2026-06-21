@@ -1,9 +1,9 @@
+#include "../build.h"
 #include "../coffee.h"
 #include "../manifest.h"
 #include "../project.h"
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include <unistd.h>
@@ -42,26 +42,35 @@ int64_t handle_bench(options *opts)
 		inc_flags = build_include_flags(m);
 	}
 
-	sds cmd;
-	if (strcmp(project_dir, ".") == 0) {
-		cmd = sdscatfmt(sdsempty(), "make bench INC_FLAGS='%s'", inc_flags);
-	} else {
-		cmd = sdscatfmt(sdsempty(), "make -C '%s' bench INC_FLAGS='%s'", project_dir, inc_flags);
+	char  *make_argv[16];
+	size_t make_argc = 0;
+
+	make_argv[make_argc++] = "make";
+	make_argv[make_argc++] = "bench";
+	if (strcmp(project_dir, ".") != 0) {
+		make_argv[make_argc++] = "-C";
+		make_argv[make_argc++] = project_dir;
 	}
+	sds inc_arg            = sdscatfmt(sdsempty(), "INC_FLAGS=%s", inc_flags);
+	make_argv[make_argc++] = inc_arg;
+	if (opts->verbose) {
+		make_argv[make_argc++] = "VERBOSE=1";
+	}
+	make_argv[make_argc] = nullptr;
 
 	if (opts->verbose) {
-		cmd = sdscatfmt(cmd, " VERBOSE=1");
+		printf_safe("Running: make");
+		for (size_t i = 1; i < make_argc; i++) {
+			printf_safe(" %s", make_argv[i]);
+		}
+		printf_safe("\n");
 	}
 
-	sdsfree(project_dir);
+	i64 ret = run_command(make_argv, 0);
 
-	if (opts->verbose) {
-		printf_safe("Running: %s\n", cmd);
-	}
-
-	i64 ret = system(cmd);
-	sdsfree(cmd);
+	sdsfree(inc_arg);
 	sdsfree(inc_flags);
+	sdsfree(project_dir);
 
 	if (m) {
 		manifest_free(m);
