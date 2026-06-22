@@ -31,7 +31,7 @@ them on every exploration.
 │   ├── strings.h        # Safe printf/snprintf wrappers
 │   ├── compat_limits.h  # Polyfill for C23 stdckdint on older toolchains
 │   ├── cargo_clone.c    # Standalone helper: Cargo-compatible CLI wrapper
-│   └── commands/        # 42 subcommand implementations, one .c per command
+34|d6343a69 │   └── commands/        # 43 command entries (40 handlers + 3 aliases), one .c per command
 │       ├── add.c, build.c, check.c, clean.c, config.c, ...
 │       ├── run.c, test.c, doc.c, search.c, info.c, ...
 │       ├── fetch.c, update.c, tree.c, vendor.c, ...
@@ -62,7 +62,7 @@ them on every exploration.
 │   ├── test_coverage_*.c     # Coverage tests for commands, build, cmdline, core, install, manifest
 │   └── test_commands_*.c     # Command integration tests (basic, deps, manifest)
 │
-├── docs/                # mdBook documentation (42 command reference pages)
+65|68b369c4 ├── docs/                # mdBook documentation (43 command reference pages)
 │   ├── index.md         # Introduction / quick start
 │   ├── features.md      # Feature system guide (~400 lines)
 │   ├── SUMMARY.md       # Table of contents
@@ -79,7 +79,7 @@ them on every exploration.
 All defined in `src/coffee.h` and module headers.
 
 | Type                    | File                    | Purpose                                                                                                                         |
-| ----------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| ----------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | `options_s` (`options`) | `src/coffee.h`          | Flattened CLI state — threaded through every command handler. Holds all flags, paths, feature strings, build mode.              |
 | `command_s`             | `src/coffee.h`          | Dispatch entry: `.name`, `.description`, `.action(options*) → i64`.                                                             |
 | `manifest_t`            | `src/manifest.h`        | Parsed `Coffee.toml`. Contains `package_t`, `dependencies_t`, `feature_def_t[]`, `test_section_t`.                              |
@@ -88,7 +88,7 @@ All defined in `src/coffee.h` and module headers.
 | `dependencies_t`        | `src/manifest.h`        | Array of `dependency_t`.                                                                                                        |
 | `test_section_t`        | `src/manifest.h`        | Test configuration: sources, harness, framework.                                                                                |
 | `feature_def_t`         | `src/manifest.h`        | Named feature: name + array of dependency feature strings.                                                                      |
-| `build_opts_t`          | `src/build.h`           | Build parameters: verbose, release/debug, target, features, jobs.                                                               |
+| 91                      | c3f83182                | `build_opts_t`                                                                                                                  | `src/build.h` | Build parameters: verbose, release, debug, locked, target, target_dir, jobs, features, all_features, no_default_features. |
 | `resolved_features_t`   | `src/coffee_features.h` | Resolved feature sets per package, with per-package `feature_set_t`.                                                            |
 | `feature_set_t`         | `src/coffee_features.h` | A set of feature names (sds array).                                                                                             |
 | `lockfile_t`            | `src/lockfile.h`        | Parsed `Coffee.lock`. Contains `lockfile_dep_t[]` entries (name, path, version, commit).                                        |
@@ -101,7 +101,9 @@ All defined in `src/coffee.h` and module headers.
 
 **Relationships:**
 
-- `command_s` → `options_s` → command handler → `manifest_t` (via `project_find_manifest` + `manifest_parse`)
+104|d83b8057 - `command_s` → `options_s` → command handler → `manifest_t` (via `project_find_manifest` + `manifest_parse`).
+105|90e3e389 For `build`/`run`/`compile`: handler checks for Makefile, then runs `make`.
+
 - Handler may also use `lockfile_t` (via `lockfile_parse`), `recipe_t`/`recipe_list_t` (via registry), `build_opts_t` → `build_project()` / `compile_sources()`, or `dep_graph_t` (via `dep_graph_create()`)
 - `dep_graph_create(manifest, lockfile, offline)` resolves all transitive dependencies, producing a flat graph with the root package at index 0. It handles git, path, and registry deps recursively
 - `manifest_t` stores deps in two parallel forms: `package.dependencies[]` (raw flat strings) and `dependencies.deps[]` (structured `dependency_t` from inline tables)
@@ -133,18 +135,15 @@ handle_xxx(options *opt):
     return 0
 ```
 
-**Build flow** (`src/commands/build.c` → `src/build.c`):
+136|9f44e403 **Build flow** (`src/commands/build.c`):
 
-```
-handle_build(&opt) → build_project(manifest, &opts)
-    → features_resolve() → resolved_features_t
-    → features_to_compiler_flags() → -DFEATURE_* flags
-    → glob("src/*.c") for source files
-    → dep_graph_create(manifest, lockfile, offline=true) → dep_graph_t
-    → iterate graph nodes: collect flags (dep_graph_flags) and sources (dep_graph_sources)
-    → fork+exec $CC (default: clang) with flags + sources + dep sources
-    → output to target/debug/<name> or --target-dir
-```
+139|ddcbe9c3 handle*build(&opt)
+140|30b3ac21 → Find Coffee.toml and resolve features (features_resolve → -DFEATURE*_ flags)
+141|eff7f8cd → Check for Makefile; if missing, error out with "Coffee requires a Makefile"
+142|5eb0eb46 → If Makefile found: fork+exec make -C <project*dir> [RELEASE=1] [DEBUG=1] [-j<N>]
+143|fe4fdff8 with CFLAGS_EXTRA="-DFEATURE*_ ..."
+144|20153950 → build_project() (direct fork+exec $CC) exists but is dead code in this command;
+145|fa16e113 it is only reachable from `coffee test` via compile_sources()
 
 **Test flow** (`src/commands/test.c`):
 
@@ -244,13 +243,18 @@ Coffee.toml (TOML)
     → features_resolve() → resolved_features_t
     → features_to_compiler_flags() → sds *flags[]
     ↓
-build_project() / compile_sources():
-    manifest_t + build_opts_t + compiled flags
-    → dep_graph_create(manifest, lockfile, offline) → dep_graph_t
-    → dep_graph_flags() + dep_graph_sources() for each transitive dep
-    → fork+exec $CC -DFEATURE_* src/*.c deps/*/src/*.c -o target/debug/<name>
-    ↓
-Binary output
+247|85daea0f build (Makefile path, primary):
+248|cb5cdf69     make -C <project_dir> with CFLAGS_EXTRA="-DFEATURE_* ..." and RELEASE/DEBUG flags
+249|9a379a13     ↓
+250|ecae33b3 Binary output
+251|00000000
+252|85daea0f test (direct path): compile_sources():
+253|7ba28ecc     manifest_t + build_opts_t + compiled flags
+254|215fe9d1     → dep_graph_create(manifest, lockfile, offline) → dep_graph_t
+255|33e42bea     → dep_graph_flags() + dep_graph_sources() for each transitive dep
+256|c3a842ad     → fork+exec $CC -DCOFFEE_TEST_RUNNER -DFEATURE_* src/*.c deps/*/src/*.c -o test binary
+257|9a379a13     ↓
+258|d06b6f45 Test binary output
 
 Coffee.lock (TOML)
     → lockfile_parse() → lockfile_t
@@ -259,9 +263,107 @@ Coffee.lock (TOML)
 Reproducible builds with pinned git SHAs
 ```
 
+## Data Structures
+
+### `manifest_t` — Parsed Coffee.toml (`src/manifest.h`)
+
+The central configuration type, representing a fully parsed `Coffee.toml` file.
+
+```
+manifest_t
+├── package (package_t)
+│   ├── name, version, edition, description, license, repository, authors
+│   ├── dependencies[] — raw strings like "toml = \"1.0\""
+│   ├── sources[] — source file globs from [lib]
+│   └── headers[] — header file globs from [lib]
+├── dependencies (dependencies_t)
+│   └── deps[] — resolved dependency_t entries (name, version, path, git,
+│       branch, tag, rev, optional)
+├── features[] — feature_def_t entries
+│   └── name, deps[] — feature name and its dependent package list
+├── bin[] — binary_target_t entries (name + src[] per binary)
+├── test (test_section_t) — sources[], harness
+└── features_count, bin_count, dependencies_count
+```
+
+**Lifecycle:** Created by `manifest_parse(path)` which reads TOML via `toml.c`, freed by `manifest_free()`. Written back by `manifest_write(path, m)`.
+
+### `dep_graph_t` — Transitive Dependency Graph (`src/dep_graph.h`)
+
+Resolves the full transitive dependency DAG from `Coffee.toml` dependencies.
+
+```
+dep_graph_t
+├── nodes[] — dep_graph_node_t entries
+│   ├── name, version, path, commit (git SHA)
+│   └── deps[] — indices into nodes[], out_count
+└── count
+```
+
+**Lifecycle:** Built by `dep_graph_resolve(manifest, lockfile)` via DFS over each dep's `Coffee.toml`. Freed by `dep_graph_free()`. Used by `fetch`, `build`, `update`, `outdated`, `metadata`, `generate-lockfile`.
+
+### `options_s` — CLI State (`src/coffee.h`)
+
+Global struct populated by CLI parser, threaded through all command handlers.
+
+```
+options_s
+├── flags: verbose, verbose2, quiet, color, locked, offline
+├── error_code, inputs[], inputs_num
+├── dependency flags: pkg_version, path, git, branch, tag, rev, registry,
+│   dev, build_dep, optional
+└── build flags: release, debug, jobs, bin, example, features,
+    all_features, no_default_features, profile, target, target_dir,
+    manifest_path
+```
+
+### `command_s` — Dispatch Table (`src/coffee.c`)
+
+```
+command_s { name, description, action(options*) -> i64 }
+```
+
+Static array indexed by command name from `argv[1]`. Returns exit code. Aliases (`b`→`build`, `c`→`check`, `t`→`test`) are separate entries pointing to the same handler. Currently 42 subcommands.
+
+### `lockfile_t` — Pinned Dependency Versions (`src/lockfile.h`)
+
+```
+lockfile_t
+├── package_name, package_version
+└── deps[] — lockfile_dep_t entries
+    └── name, version, path, commit (git SHA)
+```
+
+Parsed from `Coffee.lock` (TOML). Used for reproducible builds. Written by `generate-lockfile` and `fetch`.
+
+### `resolved_features_t` — Feature Resolution (`src/coffee_features.h`)
+
+```
+resolved_features_t
+├── packages[] — feature_set_t per package
+│   └── names[], count — enabled features for that package
+└── package_names[], package_count
+```
+
+Resolved by `features_resolve()`, consumed by `features_to_compiler_flags()` for `-D` flag generation.
+
+### `build_opts_t` — Build Parameters (`src/build.h`)
+
+```
+build_opts_t { verbose, release, debug, target, target_dir, jobs,
+               features[], features_count, all_features,
+               no_default_features }
+```
+
+Passed to `build_project()` and `compile_sources()`.
+
 ## Design decisions and rationale
 
-- **No build system generation.** Coffee compiles directly via `fork`/`exec` of `clang`/`$CC`; it does not generate Makefiles or CMake files. This keeps the build path simple and avoids intermediate files. See `src/build.c`.
+264|54330a73 - **Makefile-based build.** `coffee build`, `run`, and `compile` require a Makefile and invoke `make`.
+265|76fde475 `coffee init` and `coffee new` generate a Makefile template. `coffee test` bypasses this
+266|b6ff7338 and compiles directly via `compile_sources()` (fork+exec `$CC`). The direct-build path
+267|4cad99ec (`build_project()` in `src/build.c`) exists but is dead code in the `build` command — it is
+268|5e6d84c4 only reachable from `test`. See `src/build.c` and `src/commands/build.c`.
 
 - **External registry.** The list of available packages can be downloaded at
   https://coffee-clang.github.io/recipes/.well-known/packages.json.zstd. This registry is read-only, therefore there
@@ -298,19 +400,19 @@ Reproducible builds with pinned git SHAs
 
 ## External dependencies
 
-| Dependency       | Source                       | Used in                                       | Purpose                                   |
-| ---------------- | ---------------------------- | --------------------------------------------- | ----------------------------------------- |
-| **sds**          | `include/sds/` (antirez/sds) | Everywhere                                    | Dynamic string type (replaces `char *`)   |
-| **toml**         | `include/` (cktan/tomlc99)   | `src/manifest.c`                              | Parse `Coffee.toml` into `manifest_t`     |
-| **safe**         | `include/`                   | Various                                       | Arena allocator / safe memory wrappers    |
-| **curl**         | system (`pkg-config --libs`) | `src/registry.c`                              | HTTP downloads (called via `system()`)    |
-| **zlib**         | system (`-lz`)               | `src/registry.c`                              | Decompress registry index                 |
+| Dependency       | Source                       | Used in                                                      | Purpose                                   |
+| ---------------- | ---------------------------- | ------------------------------------------------------------ | ----------------------------------------- |
+| **sds**          | `include/sds/` (antirez/sds) | Everywhere                                                   | Dynamic string type (replaces `char *`)   |
+| **toml**         | `include/` (cktan/tomlc99)   | `src/manifest.c`                                             | Parse `Coffee.toml` into `manifest_t`     |
+| **safe**         | `include/`                   | Various                                                      | Arena allocator / safe memory wrappers    |
+| **curl**         | system (`pkg-config --libs`) | `src/registry.c`                                             | HTTP downloads (called via `system()`)    |
+| **zlib**         | system (`-lz`)               | `src/registry.c`                                             | Decompress registry index                 |
 | **git**          | system                       | `src/commands/fetch.c`, `dep_graph.c`, `generate_lockfile.c` | Clone/fetch git deps, resolve commit SHAs |
-| **getopt_long**  | libc (POSIX)                 | `src/cmdline.c`                               | CLI argument parsing via getopt_long      |
-| **clang**        | system                       | `src/build.c`, `src/commands/test.c`          | Default compiler (fork+exec `$CC`)        |
-| **clang-format** | build-time tool              | `fmt` command                                 | Code formatting                           |
-| **clang-tidy**   | build-time tool              | `lint`/`fix` commands                         | Static analysis / auto-fix                |
-| **doxygen**      | build-time tool              | `src/commands/doc.c`                          | API documentation generation              |
+| **getopt_long**  | libc (POSIX)                 | `src/cmdline.c`                                              | CLI argument parsing via getopt_long      |
+| **clang**        | system                       | `src/build.c`, `src/commands/test.c`                         | Default compiler (fork+exec `$CC`)        |
+| **clang-format** | build-time tool              | `fmt` command                                                | Code formatting                           |
+| **clang-tidy**   | build-time tool              | `lint`/`fix` commands                                        | Static analysis / auto-fix                |
+| **doxygen**      | build-time tool              | `src/commands/doc.c`                                         | API documentation generation              |
 
 ## Entry points
 

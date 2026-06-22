@@ -11,9 +11,8 @@
 Coffee is a **package manager and build system for C**, inspired by Cargo but built for the C ecosystem.
 Its design follows these principles:
 
-**Simplicity first.** Coffee compiles directly by fork+exec of `clang` (or `$CC`). It does not generate
-Makefiles, CMake files, or any intermediate build system — it is the build system. This keeps the build
-path simple, avoids intermediate files, and makes debugging straightforward.
+**Simplicity first.** Coffee compiles by building a Makefile tailored for `clang` (or `$CC`). Some coffee commands
+(e.g. `build`) are directly translated to a `make` call.
 
 **Manifest-driven.** Every project is described by a single `Coffee.toml` file. This manifest defines the
 package metadata, source files, headers, dependencies, features, binary targets, and test configuration.
@@ -28,177 +27,30 @@ published to. The primary dependency model is git-based and path-based; the regi
 path for discovering and adding simple dependencies.
 
 **No code generation.** Coffee does not use code generators or scaffolding tools. CLI parsing is
-hand-written with `getopt_long`. The test framework is bespoke (macro-based). All headers are internal
+hand-written with `getopt_long`. The test framework is bespoke (macro-based), but this will change at a later stage. All headers are internal
 to `src/` and `include/`. There is no public API — Coffee is a CLI tool, not a library.
 
 **Reproducible builds.** `Coffee.lock` pins exact versions and git commit SHAs. Transitive dependency
 graphs are cached in `.coffee/build-cache/` for speed. Feature resolution is deterministic.
-
-**C23 with aggressive linting.** The codebase uses modern C (`nullptr`, `[[nodiscard]]`, `<stdckdint.h>`)
-and enforces strict lint rules via `clang-tidy` (bugprone, cert, clang-analyzer checks as errors).
-`NOLINT` is banned.
-
-**SDS strings everywhere.** All mutable strings use `sds` (Simple Dynamic Strings) instead of raw `char *`.
-This prevents buffer overflows, simplifies concatenation, and provides a consistent string API across
-the entire codebase. Banned libc functions (`sprintf`, `strcpy`, `strcat`, etc.) are replaced with safe
-wrappers from `strings.h` and `include/safe.h`.
 
 **Small, focused commands.** Each subcommand is a single `.c` file in `src/commands/` with a handler
 function `handle_<name>(options *)`. Commands share core modules (`manifest.c`, `build.c`, `dep_graph.c`,
 `lockfile.c`) but do not depend on each other. This keeps each command self-contained and easy to
 understand, test, and modify.
 
-## Data Structures
+**Coffee** itself is a coffee project. This means that we keep a `Coffee.toml` file to manage its dependencies.
 
-### `manifest_t` — Parsed Coffee.toml (`src/manifest.h`)
-
-The central configuration type, representing a fully parsed `Coffee.toml` file.
-
-```
-manifest_t
-├── package (package_t)
-│   ├── name, version, edition, description, license, repository, authors
-│   ├── dependencies[] — raw strings like "toml = \"1.0\""
-│   ├── sources[] — source file globs from [lib]
-│   └── headers[] — header file globs from [lib]
-├── dependencies (dependencies_t)
-│   └── deps[] — resolved dependency_t entries (name, version, path, git,
-│       branch, tag, rev, optional)
-├── features[] — feature_def_t entries
-│   └── name, deps[] — feature name and its dependent package list
-├── bin[] — binary_target_t entries (name + src[] per binary)
-├── test (test_section_t) — sources[], harness
-└── features_count, bin_count, dependencies_count
-```
-
-**Lifecycle:** Created by `manifest_parse(path)` which reads TOML via `toml.c`, freed by `manifest_free()`. Written back by `manifest_write(path, m)`.
-
-### `dep_graph_t` — Transitive Dependency Graph (`src/dep_graph.h`)
-
-Resolves the full transitive dependency DAG from `Coffee.toml` dependencies.
-
-```
-dep_graph_t
-├── nodes[] — dep_graph_node_t entries
-│   ├── name, version, path, commit (git SHA)
-│   └── deps[] — indices into nodes[], out_count
-└── count
-```
-
-**Lifecycle:** Built by `dep_graph_resolve(manifest, lockfile)` via DFS over each dep's `Coffee.toml`. Freed by `dep_graph_free()`. Used by `fetch`, `build`, `update`, `outdated`, `metadata`, `generate-lockfile`.
-
-### `options_s` — CLI State (`src/coffee.h`)
-
-Global struct populated by CLI parser, threaded through all command handlers.
-
-```
-options_s
-├── flags: verbose, verbose2, quiet, color, locked, offline
-├── error_code, inputs[], inputs_num
-├── dependency flags: pkg_version, path, git, branch, tag, rev, registry,
-│   dev, build_dep, optional
-└── build flags: release, debug, jobs, bin, example, features,
-    all_features, no_default_features, profile, target, target_dir,
-    manifest_path
-```
-
-### `command_s` — Dispatch Table (`src/coffee.c`)
-
-```
-command_s { name, description, action(options*) -> i64 }
-```
-
-Static array indexed by command name from `argv[1]`. Returns exit code. Aliases (`b`→`build`, `c`→`check`, `t`→`test`) are separate entries pointing to the same handler. Currently 42 subcommands.
-
-### `lockfile_t` — Pinned Dependency Versions (`src/lockfile.h`)
-
-```
-lockfile_t
-├── package_name, package_version
-└── deps[] — lockfile_dep_t entries
-    └── name, version, path, commit (git SHA)
-```
-
-Parsed from `Coffee.lock` (TOML). Used for reproducible builds. Written by `generate-lockfile` and `fetch`.
-
-### `resolved_features_t` — Feature Resolution (`src/coffee_features.h`)
-
-```
-resolved_features_t
-├── packages[] — feature_set_t per package
-│   └── names[], count — enabled features for that package
-└── package_names[], package_count
-```
-
-Resolved by `features_resolve()`, consumed by `features_to_compiler_flags()` for `-D` flag generation.
-
-### `build_opts_t` — Build Parameters (`src/build.h`)
-
-```
-build_opts_t { verbose, release, debug, target, target_dir, jobs,
-               features[], features_count, all_features,
-               no_default_features }
-```
-
-Passed to `build_project()` and `compile_sources()`.
+**Program name**. `coffee` is the program name. It must be a single statically-linked file.
 
 ## Architecture Overview
 
-```
-main() in coffee.c
-├── cmdline_parser() parses argv → cli_args
-├── options_s populated from args_info
-├── command lookup by name → handler
-└── handler runs (each in src/commands/<name>.c)
-    ├── project_find_manifest() locates Coffee.toml
-    ├── manifest_parse() reads it
-    ├── dep_graph_resolve() computes transitive deps (build, fetch, update...)
-    ├── lockfile_parse() / lockfile_write() for pinning
-    ├── build_project() / compile_sources() → fork+exec $CC (clang)
-    ├── registry_*() for remote lookups (search, metadata)
-    └── returns exit code
-```
-
 Commands follow one of these patterns:
+
 - **Build:** `build`, `test`, `check`, `run` — collect sources, resolve deps, fork+exec clang
 - **Dependency management:** `add`, `remove`, `update`, `fetch`, `tree`, `outdated` — read/write Coffee.toml, resolve dep graph, manage lockfile
 - **Project scaffolding:** `new`, `init` — generate project skeleton
 - **Tooling:** `fix`, `lint`, `doc`, `fmt`, `clean` — wrap clang-tidy, clang-format, doxygen
 - **Registry queries:** `search`, `metadata`, `info` — query the remote package index
-
-## Coding Style
-
-Formatted by `.clang-format` and linted by `.clang-tidy` via `make tidy`.
-
-Key enforced rules:
-- Tabs for indentation (width 4, continuation indent 4), 120 column limit
-- Linux brace style (`BreakBeforeBraces: Linux`)
-- Pointer alignment right (`int *p`)
-- `snake_case` for functions, `lower_case` for variables
-- No typedef structs
-- Space before parens on control statements
-- No omitted braces
-- C23: `nullptr` not `NULL`, `[[nodiscard]]`, `<stdckdint.h>`
-- Banned functions: `malloc`/`calloc`/`free` allowed (clang-tidy checks suppressed); `sprintf`/`strcpy`/`strcat` families must use safe wrappers from `include/safe.h` or SDS alternatives from `strings.h`
-
-## Current Status (~94% complete, targeting v1.0)
-
-All P0, P1, P2, and P3 items from the original plan are implemented:
-
-- **P0 — Must-Have:** `check` uses project flags, `build` with incremental awareness, transitive dependency resolution via `dep_graph`, git ref checkout
-- **P1 — Major Usability:** `test` and `bench` compilation, `add` with version/features/optional, `remove` cleanups, `update` git-aware, `outdated` git comparison, `tree` transitive display, `new --lib/--bin`, lockfile records transitive deps
-- **P2 — Tooling & Config:** `doc` with manifest-driven Doxyfile generation, `config` with subcommand support (`list`, `get`, `set`, `unset`), `install-update-config` bootstraps `~/.coffee/config.toml` with defaults
-- **P3 — Performance:** Transitive dependency caching in `.coffee/build-cache/` to avoid re-resolving when `Coffee.toml`/`Coffee.lock` unchanged
-
-### Known Issues
-
-- `cov_new_lib_mode` was a test isolation failure (use-after-free in `handle_new` lib-mode Makefile path) — fixed
-
-## Command Reference
-
-All 42 subcommands are registered in the `commands[]` dispatch table in `src/coffee.c`. Each handler
-receives an `options *` struct (the flattened CLI state) and returns an `i64` exit code.
-Commands are organized below by functional category.
 
 ### Project Management
 
@@ -209,9 +61,9 @@ coffee init [name]
 ```
 
 Creates the canonical project structure (`src/`, `include/<name>/`, `deps/`, `tests/`, `docs/`,
-`scripts/`, `build/`) and generates boilerplate: `Coffee.toml`, `.gitignore`, `LICENSE` (MIT),
+`scripts/`, `build/`) and generates boilerplate: `Coffee.toml`, `.gitignore`, `LICENSE` (MIT), `Makefile`,
 `README.md`, `src/main.c` (hello world), `include/<name>/<name>.h` (include guard), and
-`docs/index.md`. Uses `create_dir()` / `create_file()` helpers and `sds` for all strings.
+`docs/index.md`. Uses `create_dir()` / `create_file()` helpers.
 The project name defaults to the current directory name (sanitizing `-` and `.` to `_`).
 
 #### `new` — Create a new project in a new directory
@@ -235,13 +87,8 @@ coffee build [--release] [--debug] [--target TRIPLE] [-j N] [--target-dir DIR]
              [--features F1,F2] [--all-features] [--no-default-features]
 ```
 
-Two modes:
-1. **Makefile path:** if a `Makefile` exists, runs `make -C <dir>` with `RELEASE=1`/`DEBUG=1`/`-jN`.
-   Resolved feature flags are passed as `CFLAGS_EXTRA`.
-2. **Direct build:** parses `Coffee.toml`, resolves features via `features_resolve()`, collects
-   source files with `glob("src/*.c")`, builds a transitive dep graph via `dep_graph_get()`,
-   and fork+execs `$CC` (default: `clang`) with all flags, sources, and dependency objects.
-Output goes to `target/<profile>/<name>`.
+It runs `make -C <dir>` with `RELEASE=1`/`DEBUG=1`/`-jN`.
+Resolved feature flags are passed as `CFLAGS_EXTRA`.
 
 #### `run` — Build and execute
 
@@ -249,7 +96,7 @@ Output goes to `target/<profile>/<name>`.
 coffee run [--release] [-- <args>...]
 ```
 
-Calls `build_project()` then executes the resulting binary, forwarding extra positional
+Runs `make -C <dir>` with `RELEASE=1`/`DEBUG=1`/`-jN`, then executes the resulting binary, forwarding extra positional
 arguments as argv to the compiled program.
 
 #### `check` (alias: `c`) — Static analysis without code generation

@@ -87,25 +87,7 @@ When planning or implementing any subcommand, read the corresponding markdown fi
 
 ## Coding style
 
-Coding style is strictly enforced by calling clang-format and clang-tidy after each change.
-The entire codebase MUST be lint clean.
-
-You can use the most recent C standard (C23). This means:
-
-- use nullptr and avoid NULL
-- use Checked Integer Arithmetic (<stdckdint.h>)
-- use [[nodiscard]] when possible
-
-Follow the options in .clang-tidy. You cannot modify that file.
-You cannot have `NOLINT` in the `.c` and `.h` files.
-
-We follow the [curl conventions](https://curl.se/dev/code-style.html), except:
-
-- We use tabs for indentation (tab width 4, continuation indent 4), not spaces
-- We use a 120-column limit, not 79
-- We use the most recent C standard (C23)
-
-You cannot change the files `.clang-tidy` and `.clang-format` that are configuration files for `clang-tidy` and `clang-format`.
+The coding style is defined in the file CONTRIBUTING.md
 
 ## Compilation
 
