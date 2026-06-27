@@ -112,12 +112,12 @@ All defined in `src/coffee.h` and module headers.
 | `dependencies_t`        | `src/manifest.h`        | Array of `dependency_t`.                                                                                                        |
 | `test_section_t`        | `src/manifest.h`        | Test configuration: sources, harness, framework.                                                                                |
 | `feature_def_t`         | `src/manifest.h`        | Named feature: name + array of dependency feature strings.                                                                      |
-| `build_opts_t`          | `src/build.h`           | Build parameters: verbose, release, debug, locked, target, target_dir, jobs, features, features_count, all_features, no_default_features. |
+| `build_opts_t`          | `src/build.h`           | Build parameters: verbose, release, debug, locked, target_dir, jobs, features, features_count, all_features, no_default_features. |
 | `resolved_features_t`   | `src/coffee_features.h` | Resolved feature sets per package, with per-package `feature_set_t`.                                                            |
 | `feature_set_t`         | `src/coffee_features.h` | A set of feature names (sds array).                                                                                             |
 | `lockfile_t`            | `src/lockfile.h`        | Parsed `Coffee.lock`. Contains `lockfile_dep_t[]` entries (name, path, version, commit).                                        |
 | `lockfile_dep_t`        | `src/lockfile.h`        | A single locked dependency: name, path, version, commit SHA.                                                                    |
-| `dep_node_t`            | `src/dep_graph.h`       | A node in the dependency graph: name, path, version, commit, flags, sources, git metadata.                                      |
+| `dep_node_t`            | `src/dep_graph.h`       | A node in the dependency graph: name, version_constraint, is_git, git_ref, path, version, commit, flags, sources, visited.      |
 | `dep_graph_t`           | `src/dep_graph.h`       | Transitive dependency graph: array of `dep_node_t`, root at index 0. Built via `dep_graph_create()`.                            |
 | `recipe_t`              | `src/registry.h`        | Registry recipe: name, version, license, download_url, dependencies.                                                            |
 | `recipe_list_t`         | `src/registry.h`        | Array of `recipe_t` (search results).                                                                                           |
@@ -125,8 +125,8 @@ All defined in `src/coffee.h` and module headers.
 
 **Relationships:**
 
-104|d83b8057 - `command_s` → `options_s` → command handler → `manifest_t` (via `project_find_manifest` + `manifest_parse`).
-105|90e3e389 For `build`/`run`/`compile`: handler checks for Makefile, then runs `make`.
+- `command_s` → `options_s` → command handler → `manifest_t` (via `project_find_manifest` + `manifest_parse`).
+For `build`/`run`/`compile`: handler checks for Makefile, then runs `make`.
 
 - Handler may also use `lockfile_t` (via `lockfile_parse`), `recipe_t`/`recipe_list_t` (via registry), `build_opts_t` → `build_project()` / `compile_sources()`, or `dep_graph_t` (via `dep_graph_create()`)
 - `dep_graph_create(manifest, lockfile, offline)` resolves all transitive dependencies, producing a flat graph with the root package at index 0. It handles git, path, and registry deps recursively
@@ -159,15 +159,14 @@ handle_xxx(options *opt):
     return 0
 ```
 
-136|9f44e403 **Build flow** (`src/commands/build.c`):
+**Build flow** (`src/commands/build.c`):
 
-139|ddcbe9c3 handle*build(&opt)
-140|30b3ac21 → Find Coffee.toml and resolve features (features_resolve → -DFEATURE*_ flags)
-141|eff7f8cd → Check for Makefile; if missing, error out with "Coffee requires a Makefile"
-142|5eb0eb46 → If Makefile found: fork+exec make -C <project*dir> [RELEASE=1] [DEBUG=1] [-j<N>]
-143|fe4fdff8 with CFLAGS_EXTRA="-DFEATURE*_ ..."
-144|20153950 → build_project() (direct fork+exec $CC) exists but is dead code in this command;
-145|fa16e113 it is only reachable from `coffee test` via compile_sources()
+handle_build(&opt)
+    → Find Coffee.toml and resolve features (features_resolve → -DFEATURE_* flags)
+    → Check for Makefile; if missing, error out with "Coffee requires a Makefile"
+    → If Makefile found: fork+exec make -C <project_dir> [RELEASE=1] [DEBUG=1] [-j<N>]
+      with CFLAGS_EXTRA="-DFEATURE_* ..."
+    → build_project() (direct fork+exec $CC) is dead code, not reachable from any command
 
 **Test flow** (`src/commands/test.c`):
 
@@ -176,7 +175,7 @@ handle_test(&opt)
     → Find and parse Coffee.toml
     → Determine test sources: from [test] section or glob tests/*.c
     → Determine project sources: glob src/*.c
-    → Resolve dependency flags (lockfile + dep_resolve_dir + dep_add_flags)
+    → Resolve dependency flags (lockfile_find_dep + dep_resolve_dir + dep_add_flags)
     → compile_sources() → fork+exec $CC -DCOFFEE_TEST_RUNNER → test binary
     → Run test binary with optional filter (inputs[1] or TEST_FILTER env)
     → Return exit code
@@ -254,8 +253,8 @@ handle_config(&opt)
 ```
 handle_generate_lockfile(&opt)
     → Parse manifest dependencies
-    → For each dep, resolve directory via dep_resolve_dir()
-    → For git deps, record resolved commit SHA via git rev-parse HEAD
+    → Call dep_graph_get() to resolve full transitive graph
+    → For each dep node, record pinned version and commit SHA from resolved graph
     → Write Coffee.lock with pinned version and commit per dep
 ```
 
@@ -267,18 +266,18 @@ Coffee.toml (TOML)
     → features_resolve() → resolved_features_t
     → features_to_compiler_flags() → sds *flags[]
     ↓
-247|85daea0f build (Makefile path, primary):
-248|cb5cdf69     make -C <project_dir> with CFLAGS_EXTRA="-DFEATURE_* ..." and RELEASE/DEBUG flags
-249|9a379a13     ↓
-250|ecae33b3 Binary output
-251|00000000
-252|85daea0f test (direct path): compile_sources():
-253|7ba28ecc     manifest_t + build_opts_t + compiled flags
-254|215fe9d1     → dep_graph_create(manifest, lockfile, offline) → dep_graph_t
-255|33e42bea     → dep_graph_flags() + dep_graph_sources() for each transitive dep
-256|c3a842ad     → fork+exec $CC -DCOFFEE_TEST_RUNNER -DFEATURE_* src/*.c deps/*/src/*.c -o test binary
-257|9a379a13     ↓
-258|d06b6f45 Test binary output
+build (Makefile path, primary):
+    make -C <project_dir> with CFLAGS_EXTRA="-DFEATURE_* ..." and RELEASE/DEBUG flags
+    ↓
+Binary output
+
+test (direct path): compile_sources():
+    manifest_t + build_opts_t + compiled flags
+    → lockfile_find_dep() → lockfile lookup; fallback: dep_resolve_dir()
+    → dep_add_flags() for each transitive dep
+    → fork+exec $CC -DCOFFEE_TEST_RUNNER -DFEATURE_* src/*.c deps/*/src/*.c -o test binary
+    ↓
+Test binary output
 
 Coffee.lock (TOML)
     → lockfile_parse() → lockfile_t
@@ -324,7 +323,7 @@ dep_graph_t
 └── count, capacity, offline
 ```
 
-**Lifecycle:** Built by `dep_graph_resolve(manifest, lockfile)` via DFS over each dep's `Coffee.toml`. Freed by `dep_graph_free()`. Used by `fetch`, `build`, `update`, `outdated`, `metadata`, `generate-lockfile`.
+**Lifecycle:** Built by `dep_graph_create(manifest, lockfile, offline)` via DFS over each dep's `Coffee.toml`. Freed by `dep_graph_free()`. Used by `fetch`, `build`, `update`, `outdated`, `metadata`, `generate-lockfile`.
 
 ### `options_s` — CLI State (`src/coffee.h`)
 
@@ -332,12 +331,13 @@ Global struct populated by CLI parser, threaded through all command handlers.
 
 ```
 options_s
-├── flags: verbose, verbose2, quiet, color, locked, offline
+├── flags: verbose, verbose2, quiet, color (i64), locked, offline
 ├── error_code, inputs[], inputs_num
+├── toolchain (sds), lib (bool), fix (bool)
 ├── dependency flags: pkg_version, path, git, branch, tag, rev, registry,
 │   dev, build_dep, optional
 └── build flags: release, debug, jobs, bin, example, features,
-    all_features, no_default_features, profile, target, target_dir,
+    all_features, no_default_features, profile, target_dir,
     manifest_path
 ```
 
@@ -353,9 +353,11 @@ Static array indexed by command name from `argv[1]`. Returns exit code. Aliases 
 
 ```
 lockfile_t
+├── version (i64) — lockfile format version
 ├── package_name, package_version
-└── deps[] — lockfile_dep_t entries
-    └── name, version, path, commit (git SHA)
+├── deps[] — lockfile_dep_t entries
+│   └── name, version, path, commit (git SHA)
+└── deps_count
 ```
 
 Parsed from `Coffee.lock` (TOML). Used for reproducible builds. Written by `generate-lockfile` and `fetch`.
@@ -374,7 +376,7 @@ Resolved by `features_resolve()`, consumed by `features_to_compiler_flags()` for
 ### `build_opts_t` — Build Parameters (`src/build.h`)
 
 ```
-build_opts_t { verbose, release, debug, target, target_dir, jobs,
+build_opts_t { verbose, release, debug, locked, target_dir, jobs,
                features[], features_count, all_features,
                no_default_features }
 ```
@@ -383,11 +385,11 @@ Passed to `build_project()` and `compile_sources()`.
 
 ## Design decisions and rationale
 
-264|54330a73 - **Makefile-based build.** `coffee build`, `run`, and `compile` require a Makefile and invoke `make`.
-265|76fde475 `coffee init` and `coffee new` generate a Makefile template. `coffee test` bypasses this
-266|b6ff7338 and compiles directly via `compile_sources()` (fork+exec `$CC`). The direct-build path
-267|4cad99ec (`build_project()` in `src/build.c`) exists but is dead code in the `build` command — it is
-268|5e6d84c4 only reachable from `test`. See `src/build.c` and `src/commands/build.c`.
+- **Makefile-based build.** `coffee build`, `run`, and `compile` require a Makefile and invoke `make`.
+  `coffee init` and `coffee new` generate a Makefile template. `coffee test` bypasses this
+  and compiles directly via `compile_sources()` (fork+exec `$CC`). The direct-build path
+  (`build_project()` in `src/build.c`) is dead code, not reachable from any command.
+  See `src/build.c` and `src/commands/build.c`.
 
 - **External registry.** The list of available packages can be downloaded at
   https://coffee-clang.github.io/recipes/.well-known/packages.json.zstd. This registry is read-only, therefore there
