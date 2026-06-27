@@ -5,5 +5,7 @@ Display version information.
 ## Usage
 
 ```
-coffee --version
+coffee version
+
+Both `coffee version` and `coffee --version` work.
 ```

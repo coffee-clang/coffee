@@ -61,7 +61,7 @@ command_s commands[] = {
 	  .action      = &handle_pkgid },
 	{ .name = "remove", .description = "Remove dependencies from a manifest file", .action = &handle_remove },
 	{ .name = "report", .description = "Generate and display various kinds of reports", .action = &handle_report },
-	{ .name = "rm", .description = "Remove a binary from the system", .action = &handle_rm },
+	{ .name = "rm", .description = "Alias for remove — remove a dependency from the manifest", .action = &handle_rm },
 	{ .name = "run", .description = "Run a binary or example of the local package", .action = &handle_run },
 	{ .name = "search", .description = "Search packages in the registry", .action = &handle_search },
 	{ .name        = "test",

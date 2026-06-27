@@ -35,7 +35,7 @@ root
 ├── Coffee.toml         # Project manifest
 ├── include/            # Public API headers
 ├── src/                # Source files
-├── include/            # Dependencies (vendored in-tree)
+
 ├── tests/              # Unit & integration tests
 ├── docs/               # Documentation
 ├── scripts/            # Utility scripts
@@ -77,7 +77,7 @@ coffee build
 
 - **[Feature System Guide](features.md)** — Learn about Coffee's conditional compilation
   and optional dependency features
-- **[Command Reference](commands/README.md)** — Detailed documentation for every command
+- **Command Reference** — See `docs/commands/` for detailed documentation of every command
 - **[Design Document](../DESIGN.md)** — Architecture, design philosophy, and complete command reference
 
 ## Project Status

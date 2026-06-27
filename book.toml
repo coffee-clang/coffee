@@ -12,7 +12,7 @@ create-missing = false
 [output.html]
 no-section-label = true
 default-theme = "light"
-preferred-dark-theme = "light"
+preferred-dark-theme = "navy"
 # Search is enabled — see the search toggle in the menu-bar
 theme = "docs/theme"
 additional-css = ["docs/theme/coffee.css"]

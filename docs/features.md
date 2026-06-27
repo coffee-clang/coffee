@@ -33,7 +33,7 @@ In C, conditional compilation is traditionally done with:
 
 But managing these flags manually is error-prone. Coffee's feature system automates:
 - Defining which features exist
-- Which code files correspond to which features
+- Which `-D` compiler flags to pass for each feature
 - Which optional dependencies are needed
 - Passing `-D` flags to the compiler automatically
 
@@ -238,7 +238,7 @@ coffee build --features "a/y"
 
 ## Conditional Compilation Patterns
 
-### Feature-Specific Source Files
+### Feature-Guarded Source Code
 
 You can structure your project:
 
@@ -400,7 +400,7 @@ coffee build --features "json,xml,libmysqlclient"
 - `coffee build` - Build with features
 - `coffee test` - Run tests with features
 - `coffee run` - Run binary with features
-- `coffee metadata` - View package features (coming soon)
+- `coffee metadata` - View package features
 - `coffee generate-lockfile` - Generate lockfile with resolved features
 
 ## Example

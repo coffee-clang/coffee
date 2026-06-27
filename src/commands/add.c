@@ -1,7 +1,6 @@
 #include "../coffee.h"
 #include "../manifest.h"
 #include "../project.h"
-#include "../registry.h"
 #include "safe.h"
 
 #include <stdio.h>
@@ -66,19 +65,10 @@ int64_t handle_add(options *opts)
 	/* Add new dependency */
 	sds dep_str;
 	if (!opts->git && !opts->path) {
-		recipe_t *recipe = registry_get(sdsnew(package_name));
-		if (recipe == nullptr || recipe->version == nullptr) {
-			fprintf_safe(stderr, "Error: Package '%s' not found in registry\n", package_name);
-			fprintf_safe(stderr, "Use --git <url> or --path <path> to specify the source\n");
-			if (recipe != nullptr) {
-				registry_free_recipe(recipe);
-			}
-			manifest_free(m);
-			sdsfree(manifest_path);
-			return 1;
-		}
-		dep_str = sdscatprintf(sdsempty(), "%s = \"%s\"", package_name, recipe->version);
-		registry_free_recipe(recipe);
+		fprintf_safe(stderr, "Error: use --git <url> or --path <path> to specify the dependency source\n");
+		manifest_free(m);
+		sdsfree(manifest_path);
+		return 1;
 	} else if (opts->path) {
 		if (opts->pkg_version) {
 			dep_str = sdscatprintf(sdsempty(), "%s = { path = \"%s\", version = \"%s\" }", package_name, opts->path,
