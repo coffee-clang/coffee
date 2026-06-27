@@ -16,6 +16,10 @@ them on every exploration.
 ├── DESIGN.md            # Design philosophy and rationale
 ├── TODO.md              # ~94% complete, targeting v1.0
 ├── ARCHITECTURE.md      # This file
+├── PLAN_P0.md           # Plan P0 implementation notes
+├── CONTRIBUTING.md      # Contribution guidelines
+├── book.toml            # mdBook configuration
+├── build-coverage.sh    # Coverage build script
 │
 ├── src/
 │   ├── coffee.c         # Entry point: CLI dispatch via commands[] table
@@ -23,15 +27,21 @@ them on every exploration.
 │   ├── cmdline.c/.h     # Hand-written CLI parser (getopt_long)
 │   ├── manifest.c/.h    # Coffee.toml parser/writer (TOML → manifest_t)
 │   ├── project.c/.h     # Manifest discovery (walk up dirs for Coffee.toml)
-│   ├── build.c/.h       # Build orchestration: fork+exec $CC, feature flags, dep resolution
+│   ├── build.c/.h       # Build orchestration via Makefile + make (compile_sources fork+exec $CC used by test)
 │   ├── registry.c/.h    # Remote registry client (curl-based, secondary path)
 │   ├── coffee_features.c/.h  # Feature resolution: features → -DFLAGS
 │   ├── lockfile.c/.h    # Coffee.lock parser/writer (dependency pinning)
 │   ├── dep_graph.c/.h   # Transitive dependency graph resolver (DFS + cycle detection)
 │   ├── strings.h        # Safe printf/snprintf wrappers
 │   ├── compat_limits.h  # Polyfill for C23 stdckdint on older toolchains
+│   ├── toolcheck.c/.h   # Tool checking utilities
+│   ├── version.c/.h     # Version string parsing/comparison
+│   ├── skeleton.h       # Skeleton embedding header
+│   ├── skeletons.h      # Embedded project skeletons
+│   ├── sds.c            # antirez/sds implementation (vendored)
+│   ├── toml.c           # cktan/tomlc99 implementation (vendored)
 │   ├── cargo_clone.c    # Standalone helper: Cargo-compatible CLI wrapper
-34|d6343a69 │   └── commands/        # 43 command entries (40 handlers + 3 aliases), one .c per command
+│   └── commands/        # 43 command entries (41 handlers + 2 aliases, 41 .c files)
 │       ├── add.c, build.c, check.c, clean.c, config.c, ...
 │       ├── run.c, test.c, doc.c, search.c, info.c, ...
 │       ├── fetch.c, update.c, tree.c, vendor.c, ...
@@ -59,10 +69,11 @@ them on every exploration.
 │   ├── test_manifest_version.c  # Version extraction tests
 │   ├── test_manifest_bin.c   # Binary target tests
 │   ├── test_framework_test.c # Meta-tests for the framework itself
+│   ├── test_new_init.c        # Init/new command tests
 │   ├── test_coverage_*.c     # Coverage tests for commands, build, cmdline, core, install, manifest
 │   └── test_commands_*.c     # Command integration tests (basic, deps, manifest)
 │
-65|68b369c4 ├── docs/                # mdBook documentation (43 command reference pages)
+├── docs/                # mdBook documentation (41 command reference pages)
 │   ├── index.md         # Introduction / quick start
 │   ├── features.md      # Feature system guide (~400 lines)
 │   ├── SUMMARY.md       # Table of contents
@@ -70,6 +81,19 @@ them on every exploration.
 │   └── commands/        # One .md per command
 │
 ├── bin/                 # Output directory (static binary, test runner)
+├── fuzz/                # Fuzz testing targets (7 files)
+│   ├── fuzz_cmdline.c
+│   ├── fuzz_dep_graph.c
+│   ├── fuzz_features.c
+│   ├── fuzz_lockfile.c
+│   ├── fuzz_manifest.c
+│   ├── fuzz_registry.c
+│   └── fuzz_version.c
+├── skeletons/           # Project skeleton templates (12 files)
+│   ├── Coffee.toml, Coffee.toml.bin, Coffee.toml.lib
+│   ├── LICENSE, Makefile, Makefile.lib
+│   ├── README.md, gitignore, header.h
+│   ├── index.md, lib.c, main.c
 ├── scripts/             # CI/utility scripts
 └── .github/             # CI workflows
 ```
@@ -88,7 +112,7 @@ All defined in `src/coffee.h` and module headers.
 | `dependencies_t`        | `src/manifest.h`        | Array of `dependency_t`.                                                                                                        |
 | `test_section_t`        | `src/manifest.h`        | Test configuration: sources, harness, framework.                                                                                |
 | `feature_def_t`         | `src/manifest.h`        | Named feature: name + array of dependency feature strings.                                                                      |
-| 91                      | c3f83182                | `build_opts_t`                                                                                                                  | `src/build.h` | Build parameters: verbose, release, debug, locked, target, target_dir, jobs, features, all_features, no_default_features. |
+| `build_opts_t`          | `src/build.h`           | Build parameters: verbose, release, debug, locked, target, target_dir, jobs, features, features_count, all_features, no_default_features. |
 | `resolved_features_t`   | `src/coffee_features.h` | Resolved feature sets per package, with per-package `feature_set_t`.                                                            |
 | `feature_set_t`         | `src/coffee_features.h` | A set of feature names (sds array).                                                                                             |
 | `lockfile_t`            | `src/lockfile.h`        | Parsed `Coffee.lock`. Contains `lockfile_dep_t[]` entries (name, path, version, commit).                                        |
@@ -294,10 +318,10 @@ Resolves the full transitive dependency DAG from `Coffee.toml` dependencies.
 
 ```
 dep_graph_t
-├── nodes[] — dep_graph_node_t entries
-│   ├── name, version, path, commit (git SHA)
-│   └── deps[] — indices into nodes[], out_count
-└── count
+├── nodes[] — dep_node_t entries
+│   ├── name, version, path, commit (git SHA), flags, sources[], src_count
+│   ├── version_constraint, is_git, git_ref, visited
+└── count, capacity, offline
 ```
 
 **Lifecycle:** Built by `dep_graph_resolve(manifest, lockfile)` via DFS over each dep's `Coffee.toml`. Freed by `dep_graph_free()`. Used by `fetch`, `build`, `update`, `outdated`, `metadata`, `generate-lockfile`.
@@ -323,7 +347,7 @@ options_s
 command_s { name, description, action(options*) -> i64 }
 ```
 
-Static array indexed by command name from `argv[1]`. Returns exit code. Aliases (`b`→`build`, `c`→`check`, `t`→`test`) are separate entries pointing to the same handler. Currently 42 subcommands.
+Static array indexed by command name from `argv[1]`. Returns exit code. Aliases (`b`→`build`, `c`→`check`) are separate entries pointing to the same handler. Currently 43 command entries (41 handlers + 2 aliases).
 
 ### `lockfile_t` — Pinned Dependency Versions (`src/lockfile.h`)
 

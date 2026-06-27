@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include <sys/stat.h>
 #include <unistd.h>
@@ -569,11 +570,14 @@ TEST(cov_new_lib_mode)
 {
 	char old_cwd[4096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd");
-	sds tmpdir = sdscatprintf(sdsempty(), "/tmp/coverage-cmd-new-lib-%d", getpid());
+	struct timespec ts;
+	clock_gettime(CLOCK_REALTIME, &ts);
+	sds tmpdir = sdscatprintf(sdsempty(), "/tmp/coverage-cmd-new-lib-%jd-%ld", (intmax_t)getpid(), ts.tv_nsec);
 	sds rmcmd  = sdscatprintf(sdsempty(), "rm -rf %s", tmpdir);
 	system(rmcmd);
 	sdsfree(rmcmd);
-	mkdir(tmpdir, 0755);
+	int mdret = mkdir(tmpdir, 0755);
+	ASSERT(mdret == 0, "mkdir tmpdir should succeed");
 	ASSERT(chdir(tmpdir) == 0, "chdir");
 
 	options opt = {

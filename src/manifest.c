@@ -98,6 +98,7 @@ manifest_t *manifest_parse(sds path)
 	fclose(fp);
 
 	if (conf == nullptr) {
+		fprintf_safe(stderr, "Error: TOML parse failed: %s\n", errbuf[0] ? errbuf : "unknown error");
 		return nullptr;
 	}
 

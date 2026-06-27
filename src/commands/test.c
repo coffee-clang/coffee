@@ -18,13 +18,14 @@ int64_t handle_test(options *opts)
 	/* Find and parse manifest */
 	char *manifest_path = project_find_manifest(nullptr);
 	if (manifest_path == nullptr) {
-		fprintf_safe(stderr, "Error: No Coffee.toml found\n");
+		fprintf_safe(stderr, "Error: Could not find Coffee.toml in current directory\n");
 		return 1;
 	}
 
 	manifest_t *m = manifest_parse(manifest_path);
 	if (m == nullptr) {
 		fprintf_safe(stderr, "Error: Could not parse Coffee.toml\n");
+		fprintf_safe(stderr, "  Check the file for syntax errors and run 'coffee check' for validation.\n");
 		sdsfree(manifest_path);
 		return 1;
 	}

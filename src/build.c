@@ -55,9 +55,7 @@ i64 run_command(char **argv, int flags)
 		if (WIFEXITED(wstatus)) {
 			return WEXITSTATUS(wstatus);
 		}
-		if (flags & RUN_CMD_VERBOSE) {
-			fprintf_safe(stderr, "Command terminated abnormally (signal %d)\n", WTERMSIG(wstatus));
-		}
+		fprintf_safe(stderr, "Command terminated abnormally (signal %d)\n", WTERMSIG(wstatus));
 		return 1;
 	}
 

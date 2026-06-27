@@ -132,7 +132,7 @@ int64_t handle_build(options *opts)
 		if (ret == 0) {
 			printf_safe("Build successful\n");
 		} else {
-			fprintf_safe(stderr, "Build failed\n");
+			fprintf_safe(stderr, "Build failed (make exited with code %d)\n", (int)ret);
 		}
 		return ret;
 	}
@@ -143,48 +143,4 @@ int64_t handle_build(options *opts)
 	fprintf_safe(stderr, "Error: No Makefile found. Coffee requires a Makefile for building.\n");
 	fprintf_safe(stderr, "Use 'coffee new <name>' to create a new project with a Makefile template.\n");
 	return 1;
-	sdsfree(makefile_path);
-
-	manifest_t *manifest = manifest_parse(manifest_path);
-	sdsfree(manifest_path);
-
-	if (manifest == nullptr) {
-		fprintf_safe(stderr, "Error: Could not parse Coffee.toml\n");
-		return 1;
-	}
-
-	sds   *features       = nullptr;
-	size_t features_count = 0;
-	if (opts->features) {
-		features_parse_cli(opts->features, &features, &features_count);
-	}
-
-	build_opts_t build_opts = {
-		.verbose             = opts->verbose,
-		.release             = opts->release,
-		.debug               = opts->debug,
-		.locked              = opts->locked,
-		.target              = opts->target,
-		.target_dir          = opts->target_dir,
-		.jobs                = opts->jobs > 0 ? opts->jobs : 1,
-		.features            = features,
-		.features_count      = features_count,
-		.all_features        = opts->all_features,
-		.no_default_features = opts->no_default_features,
-	};
-
-	i64 ret = build_project(manifest, &build_opts);
-
-	for (size_t i = 0; i < features_count; i++) {
-		sdsfree(features[i]);
-	}
-	safe_free(features);
-
-	manifest_free(manifest);
-
-	if (ret == 0) {
-		printf_safe("Build successful\n");
-	}
-
-	return ret;
 }

@@ -130,7 +130,7 @@ int64_t handle_run(options *opts)
 	if (ret != 0) {
 		sdsfree(manifest_path);
 		manifest_free(manifest);
-		fprintf_safe(stderr, "Build failed\n");
+		fprintf_safe(stderr, "Build failed (make exited with code %d)\n", (int)ret);
 		return ret;
 	}
 

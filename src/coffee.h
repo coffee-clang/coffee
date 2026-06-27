@@ -55,7 +55,7 @@ typedef struct options_s {
 	sds  example;
 	sds  features;
 	sds  profile;
-	sds  target;
+	sds  target;         // accepted but not yet implemented (cross-compilation planned)
 	sds  target_dir;
 	sds  manifest_path;
 

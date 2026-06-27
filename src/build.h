@@ -17,11 +17,11 @@
 i64 run_command(char **argv, int flags);
 
 typedef struct {
-	bool   verbose;
-	bool   release;
-	bool   debug;
-	bool   locked;
-	sds    target;
+	bool verbose;
+	bool release;
+	bool debug;
+	bool locked;
+
 	sds    target_dir;
 	i64    jobs;
 	sds   *features;
