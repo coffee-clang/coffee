@@ -24,6 +24,7 @@ Checks: '
   -readability-magic-numbers,
   -readability-function-cognitive-complexity,
   -readability-isolate-declaration,
+  -readability-implicit-bool-conversion,
   
   # 6. EXPLICITLY DISABLE C++ SPECIFIC RULESETS (Prevents C23 compiler friction)
   -modernize-*,
