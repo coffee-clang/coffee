@@ -39,46 +39,11 @@ But managing these flags manually is error-prone. Coffee's feature system automa
 
 ## Defining Features in Coffee.toml
 
-### Basic Feature with No Dependencies
-
-```toml
-[package]
-name = "mylib"
-version = "1.0.0"
-
-[features]
-json = []           # Enable JSON support
-xml = []            # Enable XML support
-logging = []        # Enable debug logging
-```
-
-### Features with Dependencies
-
-```toml
-[features]
-json = ["serde_json"]           # When json feature enabled, also enable serde_json's json feature
-advanced-logging = ["log/max-level-debug", "regex"]  # Enable multiple dependency features
-
-[package]
-# This library depends on serde_json itself, but only when the json feature is enabled:
-[dependencies]
-serde_json = { version = "1.0", optional = true, features = ["json"] }
-regex = { version = "1.0", optional = true }
-log = { version = "0.4", optional = true, features = ["max-level-debug"] }
-```
+Features are defined in the `[features]` section of `Coffee.toml`. For the complete syntax and examples, see the [Features section in the Coffee.toml specification](coffee-toml.md#the-features-section).
 
 ### Default Features
 
-```toml
-[features]
-default = ["json", "logging"]   # These are enabled automatically unless --no-default-features
-
-json = []
-xml = []
-logging = []
-```
-
-When a user does `coffee build`, they automatically get `json` and `logging`. To build without them:
+The `default` feature is enabled automatically unless `--no-default-features` is passed:
 
 ```bash
 coffee build --no-default-features
@@ -86,17 +51,9 @@ coffee build --no-default-features
 
 ### Optional Dependencies
 
-The `optional = true` flag on a dependency means: "Only link this library if one of my features requires it."
+Mark a dependency as `optional = true` in `[dependencies]`, then reference it in a feature. If the feature is not enabled, the dependency is not linked.
 
-```toml
-[dependencies]
-openssl = { version = "3.0", optional = true }   # Only used if 'tls' feature is enabled
-
-[features]
-tls = ["openssl"]   # Enable 'tls' feature pulls in openssl
-```
-
-If a user builds without `--features tls`, OpenSSL won't be linked.
+See the [Optional Dependencies example](coffee-toml.md#optional-dependencies) in the Coffee.toml specification.
 
 ## Using Features in Your Code
 
@@ -151,31 +108,23 @@ mylib_json_parse(data);
 
 ### Enabling Features
 
-When you depend on a library that has features, you can choose which to enable:
-
-```toml
-[dependencies]
-mylib = { version = "1.0", features = ["json", "logging"] }
-```
-
-Or from the command line:
+When you depend on a library that has features, you can choose which to enable via the `features` field in the dependency's inline table, or from the command line:
 
 ```bash
 coffee build --features "mylib/json,mylib/logging"
 ```
 
+See the [Dependency with features enabled example](coffee-toml.md#examples) in the Coffee.toml specification.
+
 ### Disabling Default Features
 
-```toml
-[dependencies]
-mylib = { version = "1.0", default-features = false, features = ["xml"] }
-```
-
-Or:
+Use `default-features = false` in the dependency's inline table, or pass `--no-default-features`:
 
 ```bash
 coffee build --no-default-features --features "mylib/xml"
 ```
+
+See the [Dependency with default features disabled example](coffee-toml.md#examples) in the Coffee.toml specification.
 
 ### Enabling All Features
 
@@ -200,27 +149,7 @@ When you build with features, Coffee:
 
 ### Example
 
-Your `Coffee.toml`:
-
-```toml
-[dependencies]
-a = "1.0"
-b = "1.0"
-```
-
-Package `a` has `[features]`:
-```toml
-[features]
-x = []
-y = []
-default = ["x"]
-```
-
-Package `b` has `[features]`:
-```toml
-[features]
-z = []
-```
+Suppose your `Coffee.toml` declares dependencies `a` and `b`, where `a` defines features `x`, `y` (with `x` as default), and `b` defines feature `z`.
 
 You run:
 
@@ -274,53 +203,13 @@ void mylib_init(void) {
 
 ## Common Use Cases
 
-### 1. Network vs CLI Tool
+For complete TOML examples of common feature patterns, see the [Common Patterns section](coffee-toml.md#common-patterns) in the Coffee.toml specification, including:
 
-```toml
-[features]
-network = ["curl"]   # When building a networking tool
-default = []        # By default, just CLI
+- Network vs CLI tool (optional curl dependency)
+- Database backend selection (postgres/mysql/sqlite)
+- Logging levels (multiple feature flags)
 
-[dependencies]
-curl = { version = "7.0", optional = true }
-```
-
-Users who need networking can enable it. Others get smaller binary without linking curl.
-
-### 2. Database Backend Selection
-
-```toml
-[features]
-postgres = ["pq"]
-mysql = ["mysqlclient"]
-sqlite = []   # Built-in, no external dep
-
-[dependencies]
-pq = { version = "9.0", optional = true }
-mysqlclient = { version = "8.0", optional = true }
-```
-
-User builds with PostgreSQL support:
-
-```bash
-coffee build --features "postgres"
-```
-
-### 3. Logging Levels
-
-```toml
-[features]
-log-error = []
-log-warn = []
-log-info = []
-log-debug = []
-log-trace = []
-
-# Can enable multiple:
-# --features "log-info,log-debug" gives up to debug level
-```
-
-In code:
+### Using Logging Levels in Code
 
 ```c
 #ifdef FEATURE_LOG_TRACE

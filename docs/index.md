@@ -50,8 +50,8 @@ root
   resolution via `Coffee.lock`
 - **Feature system** — Conditional compilation and optional dependencies via
   `[features]` in your manifest
-- **Registry** — Search and install packages from the [Coffee registry](https://github.com/coffee-clang)
-- **Static analysis** — `coffee check` runs clang-tidy and validates your manifest
+- **Registry** — Search packages in the [Coffee registry](https://coffee-clang.github.io/recipes/.well-known/packages.json.zstd); install specific packages via `coffee install --git <url>`.
+- **Static analysis** — `coffee check` runs `clang -fsyntax-only` and validates your manifest
 - **Cross-compilation** — Target different platforms via `--target`
 
 ## Getting Started
@@ -70,7 +70,7 @@ make
 coffee new hello
 cd hello
 coffee build
-./target/debug/hello
+73|cf19582f 	./build/debug/hello
 ```
 
 ## Documentation

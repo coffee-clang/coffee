@@ -4,7 +4,7 @@ Remove build artifacts.
 
 ## Description
 
-Deletes the target directory and all compiled files.
+Deletes the build directory and all compiled files.
 
 ## Usage
 
@@ -14,5 +14,5 @@ coffee clean
 
 ## Implementation Notes
 
-- Removes target/ directory
+- Removes build/ directory
 - Removes all .o files and executables

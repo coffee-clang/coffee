@@ -6,7 +6,7 @@ Analyze code without building.
 
 Performs static analysis on the code without compiling.
 Also checks if `Coffee.toml` is valid and complete, that is it contains all possible configuration options. If a
-configuration value is not set, set it to the default value.
+configuration value is not set, it warns and suggests a default (it does not modify the file).
 
 ## Usage
 

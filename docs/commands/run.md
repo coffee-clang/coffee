@@ -4,7 +4,7 @@ Build and execute the project.
 
 ## Description
 
-Compiles and runs the binary. Shortcut for `coffee build && ./target/debug/<name>`.
+Compiles and runs the binary. Shortcut for \`coffee build && ./build/debug/<name>\`.
 
 ## Usage
 

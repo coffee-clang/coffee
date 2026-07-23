@@ -4,6 +4,7 @@
 
 # Reference
 
+- [Coffee.toml Specification](coffee-toml.md)
 - [Feature System](features.md)
 - [Design Document](../DESIGN.md)
 

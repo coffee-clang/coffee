@@ -21,4 +21,4 @@ coffee test
 - Resolves dependency include paths/flags via lockfile; falls back to `deps/` filesystem
 - Compiler: `$CC` or `clang`; pass `--verbose` / `-v` for compiler output
 - Filter: `coffee test <filter>` or `TEST_FILTER=<filter>` env var
-- Output: `target/debug/<name>-tests` (respects `--target-dir`)
+- Output: `build/debug/<name>-tests` (respects `--target-dir`)
