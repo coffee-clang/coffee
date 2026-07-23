@@ -24,6 +24,27 @@
 
 void coffee_register_coverage_build_tests(void);
 
+static char saved_cwd[4096];
+
+static void setup_build_test(const char *name)
+{
+	sds tmpdir = sdscatprintf(sdsempty(), "/tmp/coverage-build-%s", name);
+	mkdir(tmpdir, 0755);
+	assert(getcwd(saved_cwd, sizeof(saved_cwd)) != nullptr);
+	assert(chdir(tmpdir) == 0);
+	sdsfree(tmpdir);
+}
+
+static void teardown_build_test(const char *name)
+{
+	chdir(saved_cwd);
+	sds cmd = sdscatprintf(sdsempty(), "rm -rf /tmp/coverage-build-%s", name);
+	system(cmd);
+	sdsfree(cmd);
+}
+
+#include <assert.h>
+
 TEST(cov_dep_resolve_dir_deps_local)
 {
 	mkdir("deps", 0755);
@@ -156,6 +177,8 @@ TEST(cov_dep_parse_name_path)
 /* build_project with --locked flag (lockfile exists and is fresh) */
 TEST(cov_build_project_locked)
 {
+	setup_build_test("locked");
+
 	mkdir("src", 0755);
 	FILE *fp = fopen("src/main.c", "w");
 	ASSERT(fp != nullptr, "create main.c");
@@ -188,16 +211,16 @@ TEST(cov_build_project_locked)
 	i64 ret = build_project(m, &opts);
 	ASSERT(ret == 0 || ret == 1, "build_project locked");
 	manifest_free(m);
-	remove("Coffee.lock");
-	remove("Coffee.toml");
-	remove("src/main.c");
-	rmdir("src");
+
+	teardown_build_test("locked");
 	PASS();
 }
 
 /* build_project with release mode */
 TEST(cov_build_project_release)
 {
+	setup_build_test("release");
+
 	mkdir("src", 0755);
 	FILE *fp = fopen("src/main.c", "w");
 	ASSERT(fp != nullptr, "create main.c");
@@ -222,15 +245,16 @@ TEST(cov_build_project_release)
 	i64 ret = build_project(m, &opts);
 	ASSERT(ret == 0 || ret == 1, "build_project release");
 	manifest_free(m);
-	remove("Coffee.toml");
-	remove("src/main.c");
-	rmdir("src");
+
+	teardown_build_test("release");
 	PASS();
 }
 
 /* build_project with features */
 TEST(cov_build_project_features)
 {
+	setup_build_test("features");
+
 	mkdir("src", 0755);
 	FILE *fp = fopen("src/main.c", "w");
 	ASSERT(fp != nullptr, "create main.c");
@@ -260,15 +284,16 @@ TEST(cov_build_project_features)
 	ASSERT(ret == 0 || ret == 1, "build_project features");
 	manifest_free(m);
 	sdsfree(feats[0]);
-	remove("Coffee.toml");
-	remove("src/main.c");
-	rmdir("src");
+
+	teardown_build_test("features");
 	PASS();
 }
 
 /* build_run */
 TEST(cov_build_run_basic)
 {
+	setup_build_test("run");
+
 	mkdir("src", 0755);
 	FILE *fp = fopen("src/main.c", "w");
 	ASSERT(fp != nullptr, "create main.c");
@@ -290,9 +315,8 @@ TEST(cov_build_run_basic)
 	i64          ret  = build_run(m, &opts, nullptr, 0);
 	ASSERT(ret == 0 || ret == 1, "build_run");
 	manifest_free(m);
-	remove("Coffee.toml");
-	remove("src/main.c");
-	rmdir("src");
+
+	teardown_build_test("run");
 	PASS();
 }
 

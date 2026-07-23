@@ -191,6 +191,14 @@ test: $(TEST_RUNNER)
 	else \
 		$(TEST_RUNNER); \
 	fi
+	@if git rev-parse --show-toplevel >/dev/null 2>&1; then \
+		if ! git diff --quiet -- Coffee.toml; then \
+			echo "=== ERROR: Tests modified or deleted Coffee.toml ==="; \
+			git checkout -- Coffee.toml; \
+			echo "Coffee.toml restored. Failing build."; \
+			exit 1; \
+		fi; \
+	fi
 
 tidy:
 	find src tests -name "*.c" -print0 | xargs -0 -I{} clang-tidy --quiet --warnings-as-errors='*' {} -- -Isrc -Iinclude -Iinclude/sds -I. -Ideps -std=c23 -D_GNU_SOURCE

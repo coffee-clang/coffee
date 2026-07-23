@@ -171,10 +171,10 @@ TEST(fetch_rejects_dotdot_dep)
 	ASSERT(ret == 0, "fetch should succeed (invalid dep skipped)");
 	ASSERT(access("evil", F_OK) != 0, "no traversal symlink should exist inside tmpdir");
 
-	chdir(old_cwd);
 	remove("Coffee.toml");
 	remove("Coffee.lock");
 	rmdir("deps");
+	chdir(old_cwd);
 	rmdir(tmpdir);
 	sdsfree(tmpdir);
 	PASS();
@@ -204,10 +204,10 @@ TEST(fetch_rejects_slash_dep)
 	ASSERT(access("deps/foo", F_OK) != 0, "no deps/foo should exist");
 	ASSERT(access("deps/foo/bar", F_OK) != 0, "no deps/foo/bar should exist");
 
-	chdir(old_cwd);
 	remove("Coffee.toml");
 	remove("Coffee.lock");
 	rmdir("deps");
+	chdir(old_cwd);
 	rmdir(tmpdir);
 	sdsfree(tmpdir);
 	PASS();
@@ -237,8 +237,8 @@ TEST(manifest_rejects_traversal_name)
 	ASSERT(strcmp(m->dependencies.deps[0].name, "normal") == 0, "remaining dep should be 'normal'");
 	manifest_free(m);
 
-	chdir(old_cwd);
 	remove("Coffee.toml");
+	chdir(old_cwd);
 	rmdir(tmpdir);
 	sdsfree(tmpdir);
 
