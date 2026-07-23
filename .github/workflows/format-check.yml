@@ -9,7 +9,7 @@ jobs:
   check:
     runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install clang-tools
         run: |
