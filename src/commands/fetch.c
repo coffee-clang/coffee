@@ -33,10 +33,10 @@ static i64 fetch_git_dep(const char *name, const char *url, const char *global_d
 		}
 		i64 ret;
 		if (ref != nullptr) {
-			char *argv1[] = { "git", "-C", target_dir, "fetch", "--depth", "1", "origin", (char *)ref, nullptr };
+			char *argv1[] = { "git", "-C", target_dir, "fetch", "--depth", "1", "origin", unconst(ref), nullptr };
 			ret           = run_command(argv1, RUN_CMD_QUIET);
 			if (ret == 0) {
-				char *argv2[] = { "git", "-C", target_dir, "checkout", (char *)ref, nullptr };
+				char *argv2[] = { "git", "-C", target_dir, "checkout", unconst(ref), nullptr };
 				ret           = run_command(argv2, RUN_CMD_QUIET);
 			}
 		} else {
@@ -56,10 +56,10 @@ static i64 fetch_git_dep(const char *name, const char *url, const char *global_d
 
 	i64 ret;
 	if (ref != nullptr) {
-		char *argv[] = { "git", "clone", "--depth", "1", "--branch", (char *)ref, (char *)url, target_dir, nullptr };
+		char *argv[] = { "git", "clone", "--depth", "1", "--branch", unconst(ref), unconst(url), target_dir, nullptr };
 		ret          = run_command(argv, RUN_CMD_QUIET);
 	} else {
-		char *argv[] = { "git", "clone", "--depth", "1", (char *)url, target_dir, nullptr };
+		char *argv[] = { "git", "clone", "--depth", "1", unconst(url), target_dir, nullptr };
 		ret          = run_command(argv, RUN_CMD_QUIET);
 	}
 	if (verbose) {

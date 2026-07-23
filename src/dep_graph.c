@@ -660,7 +660,7 @@ i64 dep_graph_compare_remote(const dep_graph_t *g, const char *dep_name, sds *be
 	}
 
 	/* git fetch origin */
-	char *fetch_argv[] = { "git", "-C", (char *)dep_path, "fetch", "origin", "--depth", "1", nullptr };
+	char *fetch_argv[] = { "git", "-C", unconst(dep_path), "fetch", "origin", "--depth", "1", nullptr };
 	i64   ret          = run_command(fetch_argv, RUN_CMD_QUIET);
 
 	if (ret != 0) {
@@ -672,7 +672,7 @@ i64 dep_graph_compare_remote(const dep_graph_t *g, const char *dep_name, sds *be
 
 	/* git rev-list --count HEAD..<ref>  */
 	sds   rev_arg    = sdscatprintf(sdsempty(), "HEAD..%s", ref);
-	char *rev_argv[] = { "git", "-C", (char *)dep_path, "rev-list", "--count", rev_arg, nullptr };
+	char *rev_argv[] = { "git", "-C", unconst(dep_path), "rev-list", "--count", rev_arg, nullptr };
 	sds   output     = run_command_capture(rev_argv, RUN_CMD_QUIET);
 	sdsfree(rev_arg);
 	if (output == nullptr) {
@@ -724,27 +724,29 @@ i64 dep_graph_fetch_git(dep_graph_t *g, const char *dep_name, bool verbose)
 		if (verbose) {
 			printf_safe("    Fetching %s (%s)...\n", dep_name, ref);
 		}
-		char *fetch_argv[] = { "git", "-C", (char *)dep_path, "fetch", "origin", "--depth", "1", (char *)ref, nullptr };
-		ret                = run_command(fetch_argv, RUN_CMD_QUIET);
+		char *fetch_argv[] = {
+			"git", "-C", unconst(dep_path), "fetch", "origin", "--depth", "1", unconst(ref), nullptr
+		};
+		ret = run_command(fetch_argv, RUN_CMD_QUIET);
 		if (ret == 0) {
-			char *co_argv[] = { "git", "-C", (char *)dep_path, "checkout", (char *)ref, nullptr };
+			char *co_argv[] = { "git", "-C", unconst(dep_path), "checkout", unconst(ref), nullptr };
 			ret             = run_command(co_argv, RUN_CMD_QUIET);
 		}
 	} else {
 		if (verbose) {
 			printf_safe("    Fetching %s...\n", dep_name);
 		}
-		char *fetch_argv[] = { "git", "-C", (char *)dep_path, "fetch", "--depth", "1", "origin", nullptr };
+		char *fetch_argv[] = { "git", "-C", unconst(dep_path), "fetch", "--depth", "1", "origin", nullptr };
 		ret                = run_command(fetch_argv, RUN_CMD_QUIET);
 		if (ret == 0) {
-			char *reset_argv[] = { "git", "-C", (char *)dep_path, "reset", "--hard", "origin/HEAD", nullptr };
+			char *reset_argv[] = { "git", "-C", unconst(dep_path), "reset", "--hard", "origin/HEAD", nullptr };
 			ret                = run_command(reset_argv, RUN_CMD_QUIET);
 		}
 	}
 
 	if (ret == 0) {
 		/* Update commit SHA in the node */
-		char *rev_argv[] = { "git", "-C", (char *)dep_path, "rev-parse", "HEAD", nullptr };
+		char *rev_argv[] = { "git", "-C", unconst(dep_path), "rev-parse", "HEAD", nullptr };
 		sds   output     = run_command_capture(rev_argv, RUN_CMD_QUIET);
 		if (output != nullptr) {
 			size_t olen = sdslen(output);

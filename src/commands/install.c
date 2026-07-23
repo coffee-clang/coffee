@@ -59,7 +59,7 @@ static i64 create_symlink(const char *target, const char *link_path)
 	struct stat st;
 	if (lstat(link_path, &st) == 0) {
 		if (S_ISLNK(st.st_mode) || S_ISDIR(st.st_mode)) {
-			char *rm_argv[] = { "rm", "-rf", (char *)link_path, nullptr };
+			char *rm_argv[] = { "rm", "-rf", unconst(link_path), nullptr };
 			if (run_command(rm_argv, 0) != 0) {
 				return -1;
 			}

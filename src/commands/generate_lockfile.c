@@ -98,7 +98,7 @@ int64_t handle_generate_lockfile(options *opts)
 			if (dep_graph_is_git(g, dep_name)) {
 				const char *dep_path = dep_graph_path(g, dep_name);
 				if (dep_path != nullptr) {
-					char *rev_argv[] = { "git", "-C", (char *)dep_path, "rev-parse", "HEAD", nullptr };
+					char *rev_argv[] = { "git", "-C", unconst(dep_path), "rev-parse", "HEAD", nullptr };
 					sds   output     = run_command_capture(rev_argv, RUN_CMD_QUIET);
 					if (output != nullptr) {
 						size_t olen = sdslen(output);

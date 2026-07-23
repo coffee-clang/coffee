@@ -11,6 +11,20 @@
 #define RUN_CMD_QUIET   (1 << 1)
 
 /*
+ * Cast a const char * to char * for passing to exec-family argv arrays.
+ * POSIX execvp takes char *const * even though it never modifies arguments,
+ * so we must suppress -Wcast-qual at the single transition point.  The
+ * inline function isolates the pragma so callers stay clean.
+ */
+static inline char *unconst(const char *p)
+{
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-qual"
+	return (char *)p;
+#pragma GCC diagnostic pop
+}
+
+/*
  * Run an external command with fork+execvp. Returns exit code.
  * Supports flags: RUN_CMD_VERBOSE (print command), RUN_CMD_QUIET (stderr to /dev/null).
  */

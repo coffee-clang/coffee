@@ -78,7 +78,7 @@ static i64 ensure_index_cached(void)
 
 static char *fetch_url(const char *url)
 {
-	char *argv[] = { "curl", "-sL", (char *)url, nullptr };
+	char *argv[] = { "curl", "-sL", unconst(url), nullptr };
 	sds   result = run_command_capture(argv, RUN_CMD_QUIET);
 	if (result == nullptr) {
 		return nullptr;

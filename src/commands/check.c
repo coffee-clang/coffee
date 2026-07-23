@@ -59,8 +59,8 @@ int64_t handle_check(options *opts)
 
 	printf_safe("Checking source code for syntax errors...\n");
 
-	const char *cc        = getenv("CC") != nullptr ? getenv("CC") : "clang";
-	sds         inc_flags = sdsnew("-Ideps -Isrc -Iinclude -I.");
+	char *cc        = getenv("CC") != nullptr ? getenv("CC") : "clang";
+	sds   inc_flags = sdsnew("-Ideps -Isrc -Iinclude -I.");
 
 	for (size_t i = 0; i < m->package.dependencies_count; i++) {
 		sds   name;
@@ -129,7 +129,7 @@ int64_t handle_check(options *opts)
 	char **argv = (char **)safe_malloc(sizeof(char *) * argc);
 	size_t idx  = 0;
 
-	argv[idx++] = (char *)cc;
+	argv[idx++] = cc;
 	argv[idx++] = "-fsyntax-only";
 
 	size_t end_idx;
