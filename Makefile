@@ -53,6 +53,8 @@ ifdef DEBUG
 endif
 # External CFLAGS overlay (feature flags from coffee build)
 CFLAGS_COMMON += $(CFLAGS_EXTRA)
+# Sanitizer flags (set via CFLAGS_SAN=... on the command line, e.g. by `make sanitize`)
+CFLAGS_COMMON += $(CFLAGS_SAN)
 CFLAGS_COMMON += -D_GNU_SOURCE -include $(SRC_DIR)/compat_limits.h -iquote$(SRC_DIR) -isysteminclude -iquoteinclude/sds
 LDFLAGS := -static
 
@@ -277,4 +279,31 @@ $(FUZZ_DIR)/fuzz_%: fuzz/fuzz_%.c $(FUZZ_SUPPORT_OBJ)
 
 fuzz: $(FUZZ_BINS)
 
-.PHONY: all bootstrap clean format test tidy install docs docs-assets serve release fuzz
+# --------------------------------------------------------------------
+# Sanitizer builds — replicate .github/workflows/sanitizers.yml locally
+# --------------------------------------------------------------------
+NPROC := $(shell nproc)
+
+SANITIZE_ADDRESS_CFLAGS  := -fsanitize=address -fno-omit-frame-pointer
+SANITIZE_UNDEFINED_CFLAGS := -fsanitize=undefined -fno-sanitize-recover=all
+
+# Run one sanitizer: clean, build, test. $1 = sanitizer name, $2 = flags
+define sanitize_run
+	@echo "=== Sanitizer: $(1) ==="
+	$(MAKE) clean
+	$(MAKE) -j$(NPROC) CC=clang CFLAGS_SAN="$(2)" LDFLAGS="$(2) -lz"
+	$(MAKE) test CC=clang CFLAGS_SAN="$(2)" LDFLAGS="$(2) -lz"
+	@echo "=== Sanitizer: $(1) — passed ==="
+endef
+
+sanitize-address:
+	$(call sanitize_run,address,$(SANITIZE_ADDRESS_CFLAGS))
+
+sanitize-undefined:
+	$(call sanitize_run,undefined,$(SANITIZE_UNDEFINED_CFLAGS))
+
+sanitize: sanitize-address sanitize-undefined
+	@echo "=== All sanitizer builds passed ==="
+
+.PHONY: all bootstrap clean format test tidy install docs docs-assets serve release fuzz \
+	sanitize sanitize-address sanitize-undefined
