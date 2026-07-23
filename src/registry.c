@@ -287,6 +287,7 @@ recipe_list_t *registry_search(sds query)
 		}
 	}
 
+	registry_free_recipes(all);
 	return filtered;
 }
 

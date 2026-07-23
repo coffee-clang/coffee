@@ -57,6 +57,7 @@ TEST(feature_resolve)
 
 	features_free(resolved);
 	manifest_free(m);
+	sdsfree(requested[0]);
 	PASS();
 }
 
@@ -197,6 +198,8 @@ TEST(compiler_flags)
 
 	features_free(resolved);
 	manifest_free(m);
+	sdsfree(requested[0]);
+	sdsfree(requested[1]);
 	PASS();
 }
 
@@ -222,6 +225,7 @@ TEST(transitive_features)
 
 	features_free(resolved);
 	manifest_free(m);
+	sdsfree(requested[0]);
 	PASS();
 }
 

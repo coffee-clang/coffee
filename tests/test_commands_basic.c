@@ -256,7 +256,9 @@ TEST(new_creates_project)
 	i64 ret = handle_new(&opt);
 
 	/* Check files were created */
-	i64 has_toml = (access(sdscatprintf(sdsempty(), "%s/Coffee.toml", tmpdir), F_OK) == 0);
+	sds toml_check = sdscatprintf(sdsempty(), "%s/Coffee.toml", tmpdir);
+	i64 has_toml   = (access(toml_check, F_OK) == 0);
+	sdsfree(toml_check);
 
 	/* Cleanup */
 	sds cmd = sdscatprintf(sdsempty(), "rm -rf %s", tmpdir);

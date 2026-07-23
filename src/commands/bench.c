@@ -39,6 +39,7 @@ int64_t handle_bench(options *opts)
 
 	sds inc_flags = sdsempty();
 	if (m) {
+		sdsfree(inc_flags);
 		inc_flags = build_include_flags(m);
 	}
 

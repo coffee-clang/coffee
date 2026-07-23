@@ -21,6 +21,7 @@ int64_t handle_fix(options *opts)
 
 	sds inc_flags = sdsnew("-Isrc");
 	if (m) {
+		sdsfree(inc_flags);
 		inc_flags = sdsnew("-Isrc -Iinclude -I. -Ideps");
 		if (m->package.name) {
 			inc_flags = sdscatprintf(inc_flags, " -Iinclude/%s", m->package.name);

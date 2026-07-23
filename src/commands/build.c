@@ -48,7 +48,8 @@ int64_t handle_build(options *opts)
 		}
 
 		char  *make_argv[16];
-		size_t make_argc = 0;
+		size_t make_argc   = 0;
+		sds    cflags_save = nullptr;
 
 		make_argv[make_argc++] = "make";
 		make_argv[make_argc++] = "-C";
@@ -85,11 +86,12 @@ int64_t handle_build(options *opts)
 					size_t dflags_count = 0;
 					sds   *dflags       = features_to_compiler_flags(resolved, manifest->package.name, &dflags_count);
 					if (dflags_count > 0) {
-						sds cflags = sdsnew("CFLAGS_EXTRA=");
+						cflags_save = sdsnew("CFLAGS_EXTRA=");
 						for (size_t i = 0; i < dflags_count; i++) {
-							cflags = sdscatprintf(cflags, "%s%s", dflags[i], (i + 1 < dflags_count) ? " " : "");
+							cflags_save =
+							    sdscatprintf(cflags_save, "%s%s", dflags[i], (i + 1 < dflags_count) ? " " : "");
 						}
-						make_argv[make_argc++] = cflags;
+						make_argv[make_argc++] = cflags_save;
 					}
 					for (size_t i = 0; i < dflags_count; i++) {
 						sdsfree(dflags[i]);
@@ -122,8 +124,7 @@ int64_t handle_build(options *opts)
 		if (opts->jobs > 0) {
 			sdsfree(make_argv[5]); /* -j flag */
 		}
-		/* CFLAGS_EXTRA is harder to track; we allocated it but index varies. Skip for now
-		   since this is a short-lived process and the sds leak is minor. */
+		sdsfree(cflags_save);
 
 		sdsfree(project_dir);
 		sdsfree(makefile_path);

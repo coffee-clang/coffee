@@ -364,8 +364,12 @@ TEST(cov_features_resolve_null)
 /* features_is_enabled with null args */
 TEST(cov_features_is_enabled_null)
 {
-	ASSERT(!features_is_enabled(nullptr, sdsnew("pkg"), sdsnew("feat")), "null rf");
+	sds pkg  = sdsnew("pkg");
+	sds feat = sdsnew("feat");
+	ASSERT(!features_is_enabled(nullptr, pkg, feat), "null rf");
 	ASSERT(!features_is_enabled(nullptr, nullptr, nullptr), "all null");
+	sdsfree(pkg);
+	sdsfree(feat);
 	PASS();
 }
 
@@ -376,7 +380,9 @@ TEST(cov_features_to_flags_null_args)
 	sds   *flags = features_to_compiler_flags(nullptr, nullptr, nullptr);
 	ASSERT(flags == nullptr, "null rf -> null");
 
-	flags = features_to_compiler_flags(nullptr, sdsnew("pkg"), &cnt);
+	sds pkg2 = sdsnew("pkg");
+	flags    = features_to_compiler_flags(nullptr, pkg2, &cnt);
+	sdsfree(pkg2);
 	ASSERT(flags == nullptr, "null rf with package -> null");
 
 	flags = features_to_compiler_flags(nullptr, nullptr, &cnt);

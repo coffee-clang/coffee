@@ -264,6 +264,14 @@ int64_t handle_new(options *opts)
 		printf_safe("  - build/\n");
 
 		sdsfree(name);
+		sdsfree(manifest_path);
+		sdsfree(include_dir);
+		sdsfree(src_dir);
+		sdsfree(deps_dir);
+		sdsfree(tests_dir);
+		sdsfree(docs_dir);
+		sdsfree(scripts_dir);
+		sdsfree(build_dir);
 		return 0;
 	}
 
@@ -292,5 +300,13 @@ int64_t handle_new(options *opts)
 	printf_safe("  - build/\n");
 
 	sdsfree(name);
+	sdsfree(manifest_path);
+	sdsfree(include_dir);
+	sdsfree(src_dir);
+	sdsfree(deps_dir);
+	sdsfree(tests_dir);
+	sdsfree(docs_dir);
+	sdsfree(scripts_dir);
+	sdsfree(build_dir);
 	return 0;
 }
