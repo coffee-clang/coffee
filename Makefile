@@ -204,6 +204,9 @@ install: $(TARGET)
 docs:
 	@$(MDBOOK) build
 
+docs-assets:
+	@./scripts/fetch-docs-assets.sh
+
 serve:
 	$(MDBOOK) serve
 
@@ -266,4 +269,4 @@ $(FUZZ_DIR)/fuzz_%: fuzz/fuzz_%.c $(FUZZ_SUPPORT_OBJ)
 
 fuzz: $(FUZZ_BINS)
 
-.PHONY: all bootstrap clean format test tidy install docs serve release fuzz
+.PHONY: all bootstrap clean format test tidy install docs docs-assets serve release fuzz
