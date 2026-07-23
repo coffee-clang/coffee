@@ -11,10 +11,9 @@
 #define RUN_CMD_QUIET   (1 << 1)
 
 /*
- * Cast a const char * to char * for passing to exec-family argv arrays.
- * POSIX execvp takes char *const * even though it never modifies arguments,
- * so we must suppress -Wcast-qual at the single transition point.  The
- * inline function isolates the pragma so callers stay clean.
+ * Cast away const for execvp argv arrays. POSIX execvp takes char *const *
+ * even though it never modifies arguments, so we suppress -Wcast-qual here.
+ * The inline function isolates the pragma so callers stay clean.
  */
 static inline char *unconst(const char *p)
 {
