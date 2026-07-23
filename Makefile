@@ -157,7 +157,7 @@ $(TEST_RUNNER): $(TEST_OBJS) $(TEST_SUPPORT_OBJ) $(TEST_COFFEE_OBJ)
 	@mkdir -p $(BIN_DIR)/tests
 	$(CC) $(LDFLAGS) -o $@ $^
 
-all: $(TARGET) docs
+all: $(TARGET)
 
 bootstrap:
 	@mkdir -p include/sds
