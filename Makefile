@@ -284,15 +284,15 @@ fuzz: $(FUZZ_BINS)
 # --------------------------------------------------------------------
 NPROC := $(shell nproc)
 
-SANITIZE_ADDRESS_CFLAGS  := -fsanitize=address -fno-omit-frame-pointer
-SANITIZE_UNDEFINED_CFLAGS := -fsanitize=undefined -fno-sanitize-recover=all
+SANITIZE_ADDRESS_CFLAGS  := -g -O1 -fsanitize=address -fno-omit-frame-pointer
+SANITIZE_UNDEFINED_CFLAGS := -g -O1 -fsanitize=undefined -fno-sanitize-recover=all
 
 # Run one sanitizer: clean, build, test. $1 = sanitizer name, $2 = flags
 define sanitize_run
 	@echo "=== Sanitizer: $(1) ==="
 	$(MAKE) clean
-	$(MAKE) -j$(NPROC) CC=clang CFLAGS_SAN="$(2)" LDFLAGS="$(2) -lz"
-	$(MAKE) test CC=clang CFLAGS_SAN="$(2)" LDFLAGS="$(2) -lz"
+	$(MAKE) -j$(NPROC) CC=clang CFLAGS_SAN="$(2)" LDFLAGS="-g $(2) -lz"
+	$(MAKE) test CC=clang CFLAGS_SAN="$(2)" LDFLAGS="-g $(2) -lz"
 	@echo "=== Sanitizer: $(1) — passed ==="
 endef
 
