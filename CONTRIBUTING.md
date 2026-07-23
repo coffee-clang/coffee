@@ -12,7 +12,7 @@ Key enforced rules:
 - No typedef structs
 - Space before parens on control statements
 - No omitted braces
-- Banned functions: `malloc`/`calloc`/`free` allowed (clang-tidy checks suppressed); `sprintf`/`strcpy`/`strcat` families must use safe wrappers from `include/safe.h` or SDS alternatives from `strings.h`
+15|d6999bf5 - Banned functions: raw \`malloc\`/\`calloc\`/\`free\`/\`realloc\` are banned in \`src/\` — use the \`safe_*\` wrappers from \`include/safe.h\` instead (raw allocation is permitted only inside \`include/safe.h\` itself). \`sprintf\`/\`strcpy\`/\`strcat\` families must use safe wrappers from \`include/safe.h\` or SDS alternatives from \`strings.h\`
 
 You can use the most recent C standard (C23). This means:
 

@@ -16,6 +16,12 @@
  */
 i64 run_command(char **argv, int flags);
 
+/*
+ * Run an external command and capture its stdout. Returns an sds string
+ * (caller frees with sdsfree) or nullptr on failure.
+ */
+sds run_command_capture(char **argv, int flags);
+
 typedef struct {
 	bool verbose;
 	bool release;
@@ -74,6 +80,13 @@ size_t dep_add_flags(const char *dep_dir, const char *dep_name, sds *flags, sds 
  * Returns a new sds with the bare name (caller frees).
  */
 sds dep_parse_name(const char *entry);
+
+/*
+ * Validate a dependency name for filesystem safety.
+ * Rejects nullptr, empty, ".", "..", and any name containing '/'.
+ * Returns true if the name is safe to use in paths.
+ */
+bool dep_name_is_valid(const char *name);
 
 size_t count_flag_tokens(const char *flags);
 

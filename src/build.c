@@ -10,6 +10,7 @@
 
 #include <stdbool.h>
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -61,6 +62,78 @@ i64 run_command(char **argv, int flags)
 
 	perror("fork");
 	return 1;
+}
+
+sds run_command_capture(char **argv, int flags)
+{
+	if (flags & RUN_CMD_VERBOSE) {
+		printf_safe("Running:");
+		for (char *const *a = argv; *a; a++) {
+			printf_safe(" %s", *a);
+		}
+		printf_safe("\n");
+	}
+
+	int pipefd[2];
+	if (pipe(pipefd) != 0) {
+		return nullptr;
+	}
+
+	pid_t pid = fork();
+
+	if (pid == 0) {
+		close(pipefd[0]);
+		if (dup2(pipefd[1], STDOUT_FILENO) < 0) {
+			_exit(1);
+		}
+		close(pipefd[1]);
+
+		if (flags & RUN_CMD_QUIET) {
+			int devnull = open("/dev/null", O_WRONLY);
+			if (devnull < 0) {
+				_exit(1);
+			}
+			if (dup2(devnull, STDERR_FILENO) < 0) {
+				_exit(1);
+			}
+			close(devnull);
+		}
+
+		execvp(argv[0], argv);
+		_exit(1);
+	} else if (pid > 0) {
+		close(pipefd[1]);
+
+		sds     result = sdsempty();
+		char    buf[4096];
+		ssize_t n;
+
+		while ((n = read(pipefd[0], buf, sizeof(buf))) != 0) {
+			if (n < 0) {
+				if (errno == EINTR) {
+					continue;
+				}
+				break;
+			}
+			result = sdscatlen(result, buf, (size_t)n);
+		}
+		close(pipefd[0]);
+
+		int wstatus;
+		waitpid(pid, &wstatus, 0);
+
+		if (!WIFEXITED(wstatus) || WEXITSTATUS(wstatus) != 0) {
+			sdsfree(result);
+			return nullptr;
+		}
+
+		return result;
+	}
+
+	close(pipefd[0]);
+	close(pipefd[1]);
+	perror("fork");
+	return nullptr;
 }
 
 /*
@@ -341,6 +414,20 @@ sds dep_parse_name(const char *entry)
 	return name;
 }
 
+bool dep_name_is_valid(const char *name)
+{
+	if (name == nullptr || name[0] == '\0') {
+		return false;
+	}
+	if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) {
+		return false;
+	}
+	if (strchr(name, '/') != nullptr) {
+		return false;
+	}
+	return true;
+}
+
 size_t count_flag_tokens(const char *flags)
 {
 	if (flags == nullptr || flags[0] == '\0') {
@@ -433,7 +520,7 @@ i64 build_project(manifest_t *manifest, build_opts_t *opts)
 	}
 
 	char *cc         = getenv("CC") != nullptr ? getenv("CC") : "clang";
-	char *output_dir = opts != nullptr && opts->target_dir != nullptr ? opts->target_dir : "target/debug";
+	char *output_dir = opts != nullptr && opts->target_dir != nullptr ? opts->target_dir : "build/debug";
 
 	bool verbose = false;
 	if (opts != nullptr) {
@@ -636,7 +723,7 @@ i64 build_run(manifest_t *manifest, build_opts_t *opts, sds *args, i64 argc)
 		return ret;
 	}
 
-	const char *output_dir = opts != nullptr && opts->target_dir != nullptr ? opts->target_dir : "target/debug";
+	const char *output_dir = opts != nullptr && opts->target_dir != nullptr ? opts->target_dir : "build/debug";
 	const char *name       = manifest->package.name;
 
 	sds exe_path = sdscatprintf(sdsempty(), "%s/%s", output_dir, name);

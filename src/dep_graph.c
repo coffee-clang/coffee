@@ -323,7 +323,14 @@ dep_graph_t *dep_graph_create(manifest_t *m, lockfile_t *lf, bool offline)
 	g->offline = offline;
 
 	/* Add root node */
-	i64 root_idx = add_node(g, m->package.name != nullptr ? m->package.name : "root");
+	const char *root_name = m->package.name != nullptr ? m->package.name : "root";
+	if (!dep_name_is_valid(root_name)) {
+		fprintf_safe(stderr, "Error: invalid root package name '%s' (must not contain '/' or be '.'/'..')\n",
+		             root_name);
+		dep_graph_free(g);
+		return nullptr;
+	}
+	i64 root_idx = add_node(g, root_name);
 	if (root_idx < 0) {
 		dep_graph_free(g);
 		return nullptr;
@@ -416,6 +423,11 @@ dep_graph_t *dep_graph_create(manifest_t *m, lockfile_t *lf, bool offline)
 						sdsfree(constraint);
 						continue;
 					}
+					if (!dep_name_is_valid(dep_key)) {
+						fprintf_safe(stderr, "Warning: skipping invalid dependency name '%s'\n", dep_key);
+						sdsfree(constraint);
+						continue;
+					}
 					/* Add as a new node */
 					i64 child_idx = add_node(g, dep_key);
 					if (child_idx < 0) {
@@ -468,6 +480,13 @@ dep_graph_t *dep_graph_create(manifest_t *m, lockfile_t *lf, bool offline)
 							             g->nodes[existing].version);
 						}
 					}
+					sdsfree(constraint);
+					sdsfree(dep_name);
+					continue;
+				}
+
+				if (!dep_name_is_valid(dep_name)) {
+					fprintf_safe(stderr, "Warning: skipping invalid dependency name '%s'\n", dep_name);
 					sdsfree(constraint);
 					sdsfree(dep_name);
 					continue;
@@ -652,27 +671,25 @@ i64 dep_graph_compare_remote(const dep_graph_t *g, const char *dep_name, sds *be
 	}
 
 	/* git rev-list --count HEAD..<ref>  */
-	sds   rev_cmd = sdscatprintf(sdsempty(), "cd '%s' && git rev-list --count HEAD..%s 2>/dev/null", dep_path, ref);
-	FILE *pipe    = popen(rev_cmd, "r");
-	sdsfree(rev_cmd);
-	if (pipe == nullptr) {
+	sds   rev_arg    = sdscatprintf(sdsempty(), "HEAD..%s", ref);
+	char *rev_argv[] = { "git", "-C", (char *)dep_path, "rev-list", "--count", rev_arg, nullptr };
+	sds   output     = run_command_capture(rev_argv, RUN_CMD_QUIET);
+	sdsfree(rev_arg);
+	if (output == nullptr) {
 		if (behind_by) {
 			*behind_by = sdsnew("(rev-list failed)");
 		}
 		return -1;
 	}
 
-	char buf[64] = { 0 };
-	if (fgets(buf, sizeof(buf), pipe) == nullptr) {
-		pclose(pipe);
-		if (behind_by) {
-			*behind_by = sdsnew("(parse failed)");
-		}
-		return -1;
+	/* Strip trailing newline */
+	size_t olen = sdslen(output);
+	if (olen > 0 && output[olen - 1] == '\n') {
+		output[olen - 1] = '\0';
 	}
-	pclose(pipe);
 
-	i64 behind = atol(buf);
+	i64 behind = atol(output);
+	sdsfree(output);
 	if (behind_by) {
 		if (behind == 0) {
 			*behind_by = sdsnew("up-to-date");
@@ -727,22 +744,18 @@ i64 dep_graph_fetch_git(dep_graph_t *g, const char *dep_name, bool verbose)
 
 	if (ret == 0) {
 		/* Update commit SHA in the node */
-		sds   rev_cmd = sdscatprintf(sdsempty(), "cd '%s' && git rev-parse HEAD 2>/dev/null", dep_path);
-		FILE *pipe    = popen(rev_cmd, "r");
-		sdsfree(rev_cmd);
-		if (pipe != nullptr) {
-			char rev_buf[128] = { 0 };
-			if (fgets(rev_buf, sizeof(rev_buf), pipe) != nullptr) {
-				size_t len = strlen(rev_buf);
-				if (len > 0 && rev_buf[len - 1] == '\n') {
-					rev_buf[len - 1] = '\0';
-				}
-				if (rev_buf[0] != '\0') {
-					sdsfree(g->nodes[idx].commit);
-					g->nodes[idx].commit = sdsnew(rev_buf);
-				}
+		char *rev_argv[] = { "git", "-C", (char *)dep_path, "rev-parse", "HEAD", nullptr };
+		sds   output     = run_command_capture(rev_argv, RUN_CMD_QUIET);
+		if (output != nullptr) {
+			size_t olen = sdslen(output);
+			if (olen > 0 && output[olen - 1] == '\n') {
+				output[olen - 1] = '\0';
 			}
-			pclose(pipe);
+			if (output[0] != '\0') {
+				sdsfree(g->nodes[idx].commit);
+				g->nodes[idx].commit = sdsnew(output);
+			}
+			sdsfree(output);
 		}
 	}
 	return ret;

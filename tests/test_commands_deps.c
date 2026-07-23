@@ -358,10 +358,10 @@ TEST(run_with_manifest)
 	ASSERT(fp != nullptr, "could not create Makefile");
 	fprintf_safe(fp, "CC := clang\n");
 	fprintf_safe(fp, "CFLAGS := -std=c23 -O0 -g\n");
-	fprintf_safe(fp, "TARGET := target/debug/run\n");
+	fprintf_safe(fp, "TARGET := build/debug/run\n");
 	fprintf_safe(fp, "all: $(TARGET)\n");
 	fprintf_safe(fp, "$(TARGET): src/main.c\n");
-	fprintf_safe(fp, "\t@mkdir -p target/debug\n");
+	fprintf_safe(fp, "\t@mkdir -p build/debug\n");
 	fprintf_safe(fp, "\t$(CC) $(CFLAGS) -o $(TARGET) src/main.c\n");
 	fclose(fp);
 

@@ -32,8 +32,8 @@ int64_t handle_package(options *opts)
 	const char *name    = m->package.name != nullptr ? m->package.name : "project";
 	const char *version = m->package.version != nullptr ? m->package.version : "0.1.0";
 
-	char package_dir[] = "target/package";
-	mkdir("target", 0755);
+	char package_dir[] = "build/package";
+	mkdir("build", 0755);
 	mkdir(package_dir, 0755);
 
 	sds tarball = sdscatprintf(sdsempty(), "%s/%s-%s.tar.gz", package_dir, name, version);

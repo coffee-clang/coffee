@@ -1,5 +1,6 @@
 #include "manifest.h"
 
+#include "build.h"
 #include "safe.h"
 #include "strings.h"
 
@@ -360,8 +361,7 @@ manifest_t *manifest_parse(sds path)
 				}
 			}
 			if (count > 0) {
-				m->dependencies.deps_count = count;
-				m->dependencies.deps       = safe_calloc(count, sizeof(dependency_t));
+				m->dependencies.deps = safe_calloc(count, sizeof(dependency_t));
 				if (m->dependencies.deps == nullptr) {
 					manifest_free(m);
 					toml_free(conf);
@@ -375,6 +375,10 @@ manifest_t *manifest_parse(sds path)
 					}
 					toml_table_t *inline_tbl = toml_table_in(dt, key);
 					if (inline_tbl == nullptr) {
+						continue;
+					}
+					if (!dep_name_is_valid(key)) {
+						fprintf_safe(stderr, "Warning: skipping invalid dependency name '%s'\n", key);
 						continue;
 					}
 					m->dependencies.deps[idx].name = sdsnew(key);
@@ -408,6 +412,7 @@ manifest_t *manifest_parse(sds path)
 					}
 					idx++;
 				}
+				m->dependencies.deps_count = idx;
 			}
 		}
 	}

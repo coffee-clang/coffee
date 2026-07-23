@@ -40,7 +40,7 @@ them on every exploration.
 │   ├── skeletons.h      # Embedded project skeletons
 │   ├── sds.c            # antirez/sds implementation (vendored)
 │   ├── toml.c           # cktan/tomlc99 implementation (vendored)
-│   ├── cargo_clone.c    # Standalone helper: Cargo-compatible CLI wrapper
+
 │   └── commands/        # 43 command entries (41 handlers + 2 aliases, 41 .c files)
 │       ├── add.c, build.c, check.c, clean.c, config.c, ...
 │       ├── run.c, test.c, doc.c, search.c, info.c, ...
@@ -290,7 +290,7 @@ Reproducible builds with pinned git SHAs
 
 ### `manifest_t` — Parsed Coffee.toml (`src/manifest.h`)
 
-The central configuration type, representing a fully parsed `Coffee.toml` file.
+The central configuration type, representing a fully parsed `Coffee.toml` file. For the complete Coffee.toml format specification, see [docs/coffee-toml.md](docs/coffee-toml.md).
 
 ```
 manifest_t
@@ -418,7 +418,7 @@ Passed to `build_project()` and `compile_sources()`.
 
 - **Manifest stores deps twice.** The flat `package.dependencies[]` array preserves the raw TOML strings (backwards compatibility with existing commands like `tree`, `update`, `metadata`). The structured `dependencies.deps[]` array is populated from inline tables (`name = { git = "...", ... }`) and used by `fetch`, `generate_lockfile`, and `build`.
 
-- **Transitive dependency graph.** `dep_graph.c` resolves the full transitive dependency tree via DFS, producing a flat array with the root at index 0. Each node carries resolved paths, compiler flags, source files, and git metadata. This replaces the older ad-hoc `dep_resolve_dir()` / `dep_add_flags()` approach with a single, cacheable data structure shared across `build`, `test`, `tree`, and `outdated` commands.
+- **Transitive dependency graph.** `dep_graph.c` resolves the full transitive dependency tree via DFS, producing a flat array with the root at index 0. Each node carries resolved paths, compiler flags, source files, and git metadata. This complements (rather than replaces) the older `dep_resolve_dir()` / `dep_add_flags()` helpers, which are still used by `tree` and `coffee_features`. The dep graph is used by `test`, `install`, `fetch`, `update`, `outdated`, `report`, `metadata`, `generate-lockfile`, and `build`.
 
 - **Arena allocator in safe.h.** `include/safe.h` provides a bump-pointer arena (`struct arena`) with block chaining. Allocations from an arena are freed together via `arena_reset()` or `arena_destroy()`. Individual `arena_alloc()` pointers cannot be freed separately. Default block size is 64 KiB. This is used internally by `dep_graph` and other modules that need bulk temporary allocations.
 

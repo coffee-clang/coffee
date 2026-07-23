@@ -21,7 +21,7 @@
 
 ### `coffee build` incremental awareness
 
-✅ **DONE** — Runs `make` without arguments when a Makefile is present. Falls back to `build_project()` for projects without Makefile. Supports `--release`, `--debug`, `-j`, and feature flags.
+✅ **DONE** — Runs `make` without arguments when a Makefile is present. Errors out if no Makefile is present (a Makefile is required). Supports `--release`, `--debug`, `-j`, and feature flags.
 
 ### Transitive dependency resolution
 
@@ -37,11 +37,11 @@
 
 ### `coffee test` — proper compilation, not shell loop
 
-✅ **DONE** — Uses `make bin/tests/runner` infrastructure instead of a raw shell loop. Supports `TEST_FILTER` env var / input arg to run a single test. Test runner prints pass/fail per test and exits nonzero on failure.
+✅ **DONE** — Compiles project + test sources directly via `compile_sources()` (fork+exec `$CC -DCOFFEE_TEST_RUNNER`) into a standalone test binary, without needing a Makefile. Supports `TEST_FILTER` env var / input arg to run a single test. Test runner prints pass/fail per test and exits nonzero on failure.
 
 ### `coffee bench` — same treatment as test
 
-✅ **DONE** — Now compiles `bench/*.c` files into `bin/bench/` via Makefile and runs each with `time`. Passes include paths and compiler flags from Coffee.toml via `INC_FLAGS`.
+✅ **DONE** — Delegates to `make bench` with `INC_FLAGS` derived from Coffee.toml include paths. Requires a Makefile with a `bench` target; compilation and timing are handled by that target.
 
 ### `coffee add` — support version, features, optional
 
@@ -73,7 +73,7 @@
 
 ### Remove registry dependency
 
-✅ **DONE** — `search`, `logout`, `info` commands stubbed with "No registry configured" message. `vendor` uses git clone. `add` requires `--git`/`--path`. `install` uses `--git`. `metadata` and `report audit` use `dep_graph` instead of registry lookups.
+✅ **DONE** — `search` queries the remote registry index; `info` reads project metadata from `Coffee.toml`. `vendor` uses git clone. `add` requires `--git`/`--path`. `install` uses `--git`. `metadata` and `report audit` use `dep_graph` instead of registry lookups.
 
 ---
 
@@ -152,7 +152,7 @@
 2. Read the command's `docs/commands/<name>.md`
 3. Implement the handler in `src/commands/<name>.c`
 4. Add tests in `tests/test_<name>.c`
-5. Run `make check` to ensure lint-clean
+5. Run `make tidy` to ensure lint-clean
 6. Open a PR
 
 See `README.md` for build instructions and coding standards.

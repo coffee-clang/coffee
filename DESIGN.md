@@ -38,7 +38,7 @@ function `handle_<name>(options *)`. Commands share core modules (`manifest.c`, 
 `lockfile.c`) but do not depend on each other. This keeps each command self-contained and easy to
 understand, test, and modify.
 
-**Coffee** itself is a coffee project. This means that we keep a `Coffee.toml` file to manage its dependencies.
+41|773d050e **Coffee** itself is a coffee project. This means that we keep a \`Coffee.toml\` file to manage its own build configuration (dependencies are vendored in \`include/\`, not declared in the manifest).
 
 **Program name**. `coffee` is the program name. It must be a single statically-linked file.
 
@@ -136,7 +136,7 @@ Requires a Makefile with a `bench` target.
 coffee compile
 ```
 
-Pure alias — delegates directly to `handle_build()`.
+139|63a1a060 Delegates to \`handle_build()\` via a thin \`handle_compile()\` wrapper (not a table alias — \`compile\` has its own \`commands[]\` entry).
 
 #### `cflags` — Print compiler include flags for dependencies
 
@@ -176,7 +176,7 @@ coffee add <package> [--version VER] [--path PATH] [--git URL] [--dev] [--build-
 ```
 
 Resolves the dependency source in priority order: `--path` → inline table with path, `--git` →
-inline table with git URL, neither → registry lookup via `registry_get()`. Appends the entry
+inline table with git URL, neither → error: `--git` or `--path` is required (no registry fallback). Appends the entry
 to `Coffee.toml`'s `[dependencies]`, updates the Makefile's `CFLAGS`/`LDFLAGS` if present,
 and reminds the user to run `coffee fetch`. Validates the package name as alphanumeric + `_`/`-`.
 

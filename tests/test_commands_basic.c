@@ -21,8 +21,8 @@ void coffee_register_commands_basic_tests(void);
 TEST(clean_basic)
 {
 	/* Create a dummy target directory to clean */
-	mkdir("target", 0755);
-	FILE *fp = fopen("target/dummy.txt", "w");
+	mkdir("build", 0755);
+	FILE *fp = fopen("build/dummy.txt", "w");
 	if (fp) {
 		fprintf_safe(fp, "test\n");
 		fclose(fp);
@@ -34,7 +34,7 @@ TEST(clean_basic)
 	};
 	i64 ret = handle_clean(&opt);
 	ASSERT(ret == 0, "clean should return 0");
-	ASSERT(access("target", F_OK) != 0, "target dir should be removed after clean");
+	ASSERT(access("build", F_OK) != 0, "build dir should be removed after clean");
 	PASS();
 }
 

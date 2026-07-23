@@ -1,5 +1,6 @@
 #include "../build.h"
 #include "../coffee.h"
+#include "../dep_graph.h"
 #include "../manifest.h"
 #include "../project.h"
 #include "../registry.h"
@@ -188,14 +189,28 @@ int64_t handle_install(options *opts)
 		/* Resolve dep flags for the package */
 		sds dep_flags = sdsnew("-O0 -g");
 
-		for (size_t i = 0; i < pkg_manifest->package.dependencies_count; i++) {
-			sds dep_name = dep_parse_name(pkg_manifest->package.dependencies[i]);
-			sds dep_dir  = dep_resolve_dir(dep_name);
-			if (dep_dir != nullptr) {
-				dep_add_flags(dep_dir, dep_name, &dep_flags, nullptr, 0);
-				sdsfree(dep_dir);
+		dep_graph_t *dg = dep_graph_create(pkg_manifest, nullptr, true);
+		if (dg != nullptr) {
+			for (size_t i = 1; i < dep_graph_count(dg); i++) {
+				const char *dep_name = dep_graph_node_name(dg, i);
+				if (dep_name != nullptr) {
+					sds df    = dep_graph_flags(dg, dep_name);
+					dep_flags = sdscatprintf(dep_flags, "%s", df);
+					sdsfree(df);
+				}
 			}
-			sdsfree(dep_name);
+			dep_graph_free(dg);
+		} else {
+			/* Fallback — resolve direct deps via filesystem */
+			for (size_t i = 0; i < pkg_manifest->package.dependencies_count; i++) {
+				sds dep_name = dep_parse_name(pkg_manifest->package.dependencies[i]);
+				sds dep_dir  = dep_resolve_dir(dep_name);
+				if (dep_dir != nullptr) {
+					dep_add_flags(dep_dir, dep_name, &dep_flags, nullptr, 0);
+					sdsfree(dep_dir);
+				}
+				sdsfree(dep_name);
+			}
 		}
 
 		for (size_t i = 0; i < pkg_manifest->bin_count; i++) {

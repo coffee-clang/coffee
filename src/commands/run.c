@@ -136,7 +136,7 @@ int64_t handle_run(options *opts)
 
 	/* Run the built binary */
 	const char *name       = manifest->package.name;
-	const char *output_dir = opts->target_dir ? opts->target_dir : "target/debug";
+	const char *output_dir = opts->target_dir ? opts->target_dir : "build/debug";
 	sds         exe_path   = sdscatprintf(sdsempty(), "%s/%s", output_dir, name);
 
 	if (access(exe_path, X_OK) != 0) {

@@ -19,6 +19,10 @@
  */
 static i64 fetch_git_dep(const char *name, const char *url, const char *global_dir, const char *ref, bool verbose)
 {
+	if (!dep_name_is_valid(name)) {
+		fprintf_safe(stderr, "  Error: invalid dependency name '%s'\n", name);
+		return 1;
+	}
 	sds target_dir = sdscatprintf(sdsempty(), "%s/%s", global_dir, name);
 
 	sds git_dir = sdscatprintf(sdsempty(), "%s/.git", target_dir);
@@ -70,6 +74,10 @@ static i64 fetch_git_dep(const char *name, const char *url, const char *global_d
  */
 static i64 fetch_path_dep(const char *name, const char *path, const char *local_deps_dir)
 {
+	if (!dep_name_is_valid(name)) {
+		fprintf_safe(stderr, "  Error: invalid dependency name '%s'\n", name);
+		return 1;
+	}
 	sds target = sdsnew(path);
 	if (path[0] != '/') {
 		char *resolved = realpath(path, nullptr);
@@ -206,21 +214,17 @@ int64_t handle_fetch(options *opts)
 					lf.deps[dep_idx].name = sdsnew(dep_name);
 					lf.deps[dep_idx].path = sdsnew(cache_path);
 
-					sds   rev_cmd = sdscatprintf(sdsempty(), "cd '%s' && git rev-parse HEAD 2>/dev/null", dep_dir);
-					FILE *pipe    = popen(rev_cmd, "r");
-					sdsfree(rev_cmd);
-					if (pipe != nullptr) {
-						char buf[128] = { 0 };
-						if (fgets(buf, sizeof(buf), pipe) != nullptr) {
-							size_t len = strlen(buf);
-							if (len > 0 && buf[len - 1] == '\n') {
-								buf[len - 1] = '\0';
-							}
-							if (buf[0] != '\0') {
-								lf.deps[dep_idx].commit = sdsnew(buf);
-							}
+					char *rev_argv[] = { "git", "-C", dep_dir, "rev-parse", "HEAD", nullptr };
+					sds   output     = run_command_capture(rev_argv, RUN_CMD_QUIET);
+					if (output != nullptr) {
+						size_t olen = sdslen(output);
+						if (olen > 0 && output[olen - 1] == '\n') {
+							output[olen - 1] = '\0';
 						}
-						pclose(pipe);
+						if (output[0] != '\0') {
+							lf.deps[dep_idx].commit = sdsnew(output);
+						}
+						sdsfree(output);
 					}
 
 					lf.deps[dep_idx].version = sdsnew("*");
@@ -250,9 +254,9 @@ int64_t handle_fetch(options *opts)
 				overall = 1;
 			}
 
-			lf.deps_count = dep_idx + 1;
 			dep_idx++;
 		}
+		lf.deps_count = dep_idx;
 	}
 
 	lockfile_write("Coffee.lock", &lf);

@@ -69,7 +69,8 @@ int64_t handle_add(options *opts)
 		manifest_free(m);
 		sdsfree(manifest_path);
 		return 1;
-	} else if (opts->path) {
+	}
+	if (opts->path) {
 		if (opts->pkg_version) {
 			dep_str = sdscatprintf(sdsempty(), "%s = { path = \"%s\", version = \"%s\" }", package_name, opts->path,
 			                       opts->pkg_version);

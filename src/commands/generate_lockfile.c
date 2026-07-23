@@ -98,21 +98,17 @@ int64_t handle_generate_lockfile(options *opts)
 			if (dep_graph_is_git(g, dep_name)) {
 				const char *dep_path = dep_graph_path(g, dep_name);
 				if (dep_path != nullptr) {
-					sds   cmd  = sdscatprintf(sdsempty(), "cd '%s' && git rev-parse HEAD 2>/dev/null", dep_path);
-					FILE *pipe = popen(cmd, "r");
-					sdsfree(cmd);
-					if (pipe != nullptr) {
-						char buf[128] = { 0 };
-						if (fgets(buf, sizeof(buf), pipe) != nullptr) {
-							size_t len = strlen(buf);
-							if (len > 0 && buf[len - 1] == '\n') {
-								buf[len - 1] = '\0';
-							}
-							if (buf[0] != '\0') {
-								lf.deps[dep_idx].commit = sdsnew(buf);
-							}
+					char *rev_argv[] = { "git", "-C", (char *)dep_path, "rev-parse", "HEAD", nullptr };
+					sds   output     = run_command_capture(rev_argv, RUN_CMD_QUIET);
+					if (output != nullptr) {
+						size_t olen = sdslen(output);
+						if (olen > 0 && output[olen - 1] == '\n') {
+							output[olen - 1] = '\0';
 						}
-						pclose(pipe);
+						if (output[0] != '\0') {
+							lf.deps[dep_idx].commit = sdsnew(output);
+						}
+						sdsfree(output);
 					}
 				}
 			}

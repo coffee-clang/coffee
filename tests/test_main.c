@@ -32,6 +32,7 @@ void coffee_register_coverage_build_deps_tests(void);
 void coffee_register_version_tests(void);
 void coffee_register_dep_graph_tests(void);
 void coffee_register_new_init_tests(void);
+void coffee_register_security_tests(void);
 
 int main(int argc, char **argv)
 {
@@ -75,6 +76,7 @@ int main(int argc, char **argv)
 	coffee_register_version_tests();
 	coffee_register_dep_graph_tests();
 	coffee_register_new_init_tests();
+	coffee_register_security_tests();
 
 	if (verbose) {
 		printf("Registered %lu tests\n", (unsigned long)test_framework_count);

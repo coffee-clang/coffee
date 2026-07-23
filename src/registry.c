@@ -78,34 +78,16 @@ static i64 ensure_index_cached(void)
 
 static char *fetch_url(const char *url)
 {
-	char cmd[4096];
-	snprintf_safe(cmd, sizeof(cmd), "curl -sL \"%s\" 2>/dev/null", url);
-
-	FILE *fp = popen(cmd, "r");
-	if (fp == nullptr) {
+	char *argv[] = { "curl", "-sL", (char *)url, nullptr };
+	sds   result = run_command_capture(argv, RUN_CMD_QUIET);
+	if (result == nullptr) {
 		return nullptr;
 	}
 
-	char *buffer = safe_malloc(1);
-	buffer[0]    = '\0';
-	size_t total = 0;
-	char   buf[4096];
-
-	while (fgets(buf, sizeof(buf), fp)) {
-		size_t len    = strlen(buf);
-		char  *newbuf = safe_realloc(buffer, total + len + 1);
-		if (newbuf == nullptr) {
-			safe_free(buffer);
-			pclose(fp);
-			return nullptr;
-		}
-		buffer = newbuf;
-		memccpy(buffer + total, buf, '\0', len);
-		total += len;
-		buffer[total] = '\0';
-	}
-
-	pclose(fp);
+	size_t len    = sdslen(result);
+	char  *buffer = safe_malloc(len + 1);
+	memccpy(buffer, result, '\0', len + 1);
+	sdsfree(result);
 	return buffer;
 }
 

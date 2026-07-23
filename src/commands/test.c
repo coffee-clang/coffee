@@ -1,6 +1,6 @@
 #include "../build.h"
 #include "../coffee.h"
-#include "../lockfile.h"
+#include "../dep_graph.h"
 #include "../manifest.h"
 #include "../project.h"
 #include "safe.h"
@@ -94,7 +94,7 @@ int64_t handle_test(options *opts)
 	}
 
 	/* Build output path */
-	char *out_dir = opts->target_dir ? opts->target_dir : (char *)"target/debug";
+	char *out_dir = opts->target_dir ? opts->target_dir : (char *)"build/debug";
 	sds   output  = sdscatprintf(sdsempty(), "%s/%s-tests", out_dir, m->package.name);
 
 	/* Ensure output directory exists */
@@ -123,28 +123,26 @@ int64_t handle_test(options *opts)
 	flags     = sdscatprintf(flags, " -I%s/tests", project_dir);
 	flags     = sdscatprintf(flags, " -I%s/src", project_dir);
 
-	/* Resolve dependency flags using lockfile or filesystem */
-	sds         lockfile_path = sdsnew("Coffee.lock");
-	lockfile_t *lock          = lockfile_parse(lockfile_path);
+	/* Build dependency graph from manifest + lockfile */
+	sds          lockfile_path = sdsnew("Coffee.lock");
+	lockfile_t  *lock          = lockfile_parse(lockfile_path);
+	dep_graph_t *dg            = dep_graph_create(m, lock, opts->offline);
 
-	for (size_t i = 0; i < m->package.dependencies_count; i++) {
-		sds dep_name = dep_parse_name(m->package.dependencies[i]);
-		sds dep_dir  = nullptr;
-
-		if (lock != nullptr) {
-			lockfile_dep_t *ldep = lockfile_find_dep(lock, dep_name);
-			if (ldep != nullptr && ldep->path != nullptr) {
-				dep_dir = sdsnew(ldep->path);
+	if (dg == nullptr) {
+		fprintf_safe(stderr, "Warning: Could not resolve dependency graph\n");
+		fprintf_safe(stderr, "  Continuing without dependency flags\n");
+	} else {
+		/* Collect flags from all transitive deps (skip root at index 0) */
+		for (size_t i = 1; i < dep_graph_count(dg); i++) {
+			const char *dep_name = dep_graph_node_name(dg, i);
+			if (dep_name != nullptr) {
+				sds dep_flags = dep_graph_flags(dg, dep_name);
+				flags         = sdscatprintf(flags, "%s", dep_flags);
+				sdsfree(dep_flags);
 			}
 		}
-		if (dep_dir == nullptr) {
-			dep_dir = dep_resolve_dir(dep_name);
-		}
-		if (dep_dir) {
-			dep_add_flags(dep_dir, dep_name, &flags, nullptr, nullptr);
-			sdsfree(dep_dir);
-		}
-		sdsfree(dep_name);
+		dep_graph_free(dg);
+		dg = nullptr;
 	}
 
 	/* Build the compiler argument array: project sources + test sources */
