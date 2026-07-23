@@ -24,6 +24,13 @@ TEST(pkg_dir_exists)
 	const char *home = getenv("HOME");
 	ASSERT(home, "HOME not set");
 
+	sds coffee = sdscatprintf(sdsempty(), "%s/.coffee", home);
+	mkdir(coffee, 0755);
+	sdsfree(coffee);
+	sds depsdir = sdscatprintf(sdsempty(), "%s/.coffee/deps", home);
+	mkdir(depsdir, 0755);
+	sdsfree(depsdir);
+
 	sds pkgdir = sdscatprintf(sdsempty(), "%s/.coffee/deps/test-pkg", home);
 
 	mkdir(pkgdir, 0755);
@@ -38,6 +45,13 @@ TEST(library_toml_with_include)
 {
 	const char *home = getenv("HOME");
 	ASSERT(home, "HOME not set");
+
+	sds coffee = sdscatprintf(sdsempty(), "%s/.coffee", home);
+	mkdir(coffee, 0755);
+	sdsfree(coffee);
+	sds depsdir = sdscatprintf(sdsempty(), "%s/.coffee/deps", home);
+	mkdir(depsdir, 0755);
+	sdsfree(depsdir);
 
 	sds pkgdir = sdscatprintf(sdsempty(), "%s/.coffee/deps/test-pkg", home);
 	mkdir(pkgdir, 0755);
@@ -73,6 +87,13 @@ TEST(library_toml_with_libname)
 	const char *home = getenv("HOME");
 	ASSERT(home, "HOME not set");
 
+	sds coffee = sdscatprintf(sdsempty(), "%s/.coffee", home);
+	mkdir(coffee, 0755);
+	sdsfree(coffee);
+	sds depsdir = sdscatprintf(sdsempty(), "%s/.coffee/deps", home);
+	mkdir(depsdir, 0755);
+	sdsfree(depsdir);
+
 	sds pkgdir = sdscatprintf(sdsempty(), "%s/.coffee/deps/test-pkg", home);
 	mkdir(pkgdir, 0755);
 
@@ -107,6 +128,13 @@ TEST(fallback_no_keys)
 {
 	const char *home = getenv("HOME");
 	ASSERT(home, "HOME not set");
+
+	sds coffee = sdscatprintf(sdsempty(), "%s/.coffee", home);
+	mkdir(coffee, 0755);
+	sdsfree(coffee);
+	sds depsdir = sdscatprintf(sdsempty(), "%s/.coffee/deps", home);
+	mkdir(depsdir, 0755);
+	sdsfree(depsdir);
 
 	sds pkgdir = sdscatprintf(sdsempty(), "%s/.coffee/deps/test-nokeys", home);
 	mkdir(pkgdir, 0755);

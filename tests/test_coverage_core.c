@@ -237,6 +237,13 @@ TEST(cov_dep_resolve_global)
 	if (home == nullptr) {
 		home = "/tmp";
 	}
+	sds coffee = sdscatprintf(sdsempty(), "%s/.coffee", home);
+	mkdir(coffee, 0755);
+	sdsfree(coffee);
+	sds depsdir = sdscatprintf(sdsempty(), "%s/.coffee/deps", home);
+	mkdir(depsdir, 0755);
+	sdsfree(depsdir);
+
 	sds global_deps = sdscatprintf(sdsempty(), "%s/.coffee/deps/globalpkg", home);
 	mkdir(global_deps, 0755);
 
