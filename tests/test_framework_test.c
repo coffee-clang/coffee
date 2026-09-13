@@ -1,6 +1,8 @@
 /* Test for the test framework itself */
 #include "test_framework.h"
 
+#include <signal.h>
+
 void coffee_register_framework_tests(void);
 
 TEST(framework_registers_test)
@@ -48,10 +50,32 @@ TEST(framework_no_duplicate_names)
 	PASS();
 }
 
+/* A test that crashes the process (used to verify fork isolation). */
+static i64 test_fn_crash_probe(void)
+{
+	raise(SIGSEGV);
+	return 1;
+}
+
+TEST(framework_crash_is_isolated)
+{
+	/* Register a crashing test and run only it via a unique filter.
+	 * The runner forks per test, so the crash must be contained: the
+	 * run reports failure but the process survives.  This test itself
+	 * runs in a forked child, so the extra registration never leaks
+	 * into the rest of the suite. */
+	test_framework_register("zzz_crash_probe", test_fn_crash_probe);
+
+	i64 rc = test_framework_run("zzz_crash_probe");
+	ASSERT(rc != 0, "run with crashing test should report failure");
+	PASS();
+}
+
 void coffee_register_framework_tests(void)
 {
 	TEST_REGISTER(framework_registers_test);
 	TEST_REGISTER(framework_test_count_is_reasonable);
 	TEST_REGISTER(framework_test_function_returns_expected);
 	TEST_REGISTER(framework_no_duplicate_names);
+	TEST_REGISTER(framework_crash_is_isolated);
 }

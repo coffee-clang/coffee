@@ -2,6 +2,9 @@
 
 #include "../src/strings.h"
 
+#include <sys/wait.h>
+#include <unistd.h>
+
 /* Global test registry */
 test_entry_t test_framework_tests[TEST_FRAMEWORK_MAX_TESTS];
 u64          test_framework_count = 0;
@@ -45,11 +48,30 @@ i64 test_framework_run(const char *filter)
 		printf("  %-55s ... ", name);
 		fflush(stdout);
 
-		i64 result = test_framework_tests[i].func();
+		/* Run each test in a forked child so a segfault or abort in one
+		 * test cannot kill the remaining tests or corrupt the counters.
+		 * The child reports its result via the exit code; PASS()/FAIL()
+		 * print the verdict before returning, and _exit() skips the
+		 * parent's atexit handlers and buffered output. */
+		pid_t pid = fork();
+		if (pid == 0) {
+			i64 result = test_framework_tests[i].func();
+			_exit(result ? 0 : 1);
+		}
 
-		if (result) {
-			local_passed++;
+		if (pid > 0) {
+			int wstatus;
+			waitpid(pid, &wstatus, 0);
+			if (WIFEXITED(wstatus) && WEXITSTATUS(wstatus) == 0) {
+				local_passed++;
+			} else {
+				if (WIFSIGNALED(wstatus)) {
+					printf("  CRASHED (signal %d)\n", WTERMSIG(wstatus));
+				}
+				local_failed++;
+			}
 		} else {
+			perror("fork");
 			local_failed++;
 		}
 

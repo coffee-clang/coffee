@@ -41,7 +41,7 @@ static sds config_path(void)
 static sds config_read_raw(const char *section, const char *key)
 {
 	sds   path = config_path();
-	FILE *fp   = fopen(path, "r");
+	FILE *fp   = safe_fopen(path, "r");
 	sds   ret  = nullptr;
 	sdsfree(path);
 
@@ -51,7 +51,7 @@ static sds config_read_raw(const char *section, const char *key)
 
 	char          errbuf[256];
 	toml_table_t *conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
-	fclose(fp);
+	safe_fclose(fp);
 
 	if (conf == nullptr) {
 		return nullptr;
@@ -89,7 +89,7 @@ static sds config_read_raw(const char *section, const char *key)
 static i64 config_list(void)
 {
 	sds   path = config_path();
-	FILE *fp   = fopen(path, "r");
+	FILE *fp   = safe_fopen(path, "r");
 	sdsfree(path);
 
 	if (fp == nullptr) {
@@ -99,7 +99,7 @@ static i64 config_list(void)
 
 	char          errbuf[256];
 	toml_table_t *conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
-	fclose(fp);
+	safe_fclose(fp);
 
 	if (conf == nullptr) {
 		printf_safe("(empty config)\n");
@@ -153,7 +153,7 @@ static i64 config_list(void)
 static i64 config_set_raw(const char *section, const char *key, const char *value)
 {
 	sds   path  = config_path();
-	FILE *fp    = fopen(path, "r");
+	FILE *fp    = safe_fopen(path, "r");
 	bool  found = false;
 
 	/* Read all lines */
@@ -171,7 +171,7 @@ static i64 config_set_raw(const char *section, const char *key, const char *valu
 			lines[nlines] = sdsnew(buf);
 			nlines++;
 		}
-		fclose(fp);
+		safe_fclose(fp);
 	}
 
 	/* Ensure parent directory exists */
@@ -188,7 +188,7 @@ static i64 config_set_raw(const char *section, const char *key, const char *valu
 	sds new_line = sdscatprintf(sdsempty(), "%s = \"%s\"\n", key, value);
 
 	/* Write back */
-	fp = fopen(path, "w");
+	fp = safe_fopen(path, "w");
 	if (fp == nullptr) {
 		fprintf_safe(stderr, "Error: Could not write %s\n", path);
 		sdsfree(path);
@@ -267,7 +267,7 @@ static i64 config_set_raw(const char *section, const char *key, const char *valu
 
 	sdsfree(sect_header);
 
-	fclose(fp);
+	safe_fclose(fp);
 
 	sdsfree(path);
 	sdsfree(new_line);
@@ -285,7 +285,7 @@ static i64 config_unset_raw(const char *section, const char *key)
 {
 	(void)section;
 	sds   path = config_path();
-	FILE *fp   = fopen(path, "r");
+	FILE *fp   = safe_fopen(path, "r");
 
 	if (fp == nullptr) {
 		return 0;
@@ -305,10 +305,10 @@ static i64 config_unset_raw(const char *section, const char *key)
 		lines[nlines] = sdsnew(buf);
 		nlines++;
 	}
-	fclose(fp);
+	safe_fclose(fp);
 
 	/* Write back, skipping the matching line */
-	fp = fopen(path, "w");
+	fp = safe_fopen(path, "w");
 	if (fp == nullptr) {
 		sdsfree(path);
 		for (size_t i = 0; i < nlines; i++) {
@@ -334,7 +334,7 @@ static i64 config_unset_raw(const char *section, const char *key)
 		}
 	}
 
-	fclose(fp);
+	safe_fclose(fp);
 
 	sdsfree(path);
 	for (size_t i = 0; i < nlines; i++) {

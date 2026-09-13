@@ -24,7 +24,7 @@ int64_t handle_lint(options *opts)
 		sdsfree(inc_flags);
 		inc_flags = sdsnew("-Isrc -Iinclude -I. -Ideps");
 		if (m->package.name) {
-			inc_flags = sdscatprintf(inc_flags, " -Iinclude/%s", m->package.name);
+			inc_flags = sdscatprintf(inc_flags, " -I\"include/%s\"", m->package.name);
 		}
 	}
 

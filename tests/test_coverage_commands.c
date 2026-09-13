@@ -7,6 +7,7 @@
 #include "../src/coffee.h"
 #include "../src/manifest.h"
 #include "../src/project.h"
+#include "../src/registry.h"
 #include "../src/strings.h"
 #include "test_framework.h"
 
@@ -1360,11 +1361,7 @@ TEST(cov_list_installed_with_files)
 {
 	setup_proj("list-bin", nullptr, true);
 	/* Create a fake COFFEE_HOME bin dir with an installed binary */
-	const char *home = getenv("HOME");
-	if (home == nullptr) {
-		home = "/tmp";
-	}
-	sds coffee_dir = sdscatprintf(sdsempty(), "%s/.coffee", home);
+	sds coffee_dir = sdsnew(coffee_home_dir());
 	sds bin_dir    = sdscatprintf(sdsempty(), "%s/bin", coffee_dir);
 	mkdir(bin_dir, 0755);
 	sds   bin_path = sdscatprintf(sdsempty(), "%s/coffee-test-bin", bin_dir);
@@ -1516,11 +1513,7 @@ TEST(cov_build_with_features)
 TEST(cov_install_update_update_pkg)
 {
 	/* Create a fake global deps dir with a package */
-	const char *home = getenv("HOME");
-	if (home == nullptr) {
-		home = "/tmp";
-	}
-	sds coffee_dir = sdscatprintf(sdsempty(), "%s/.coffee", home);
+	sds coffee_dir = sdsnew(coffee_home_dir());
 	sds deps_dir   = sdscatprintf(sdsempty(), "%s/deps", coffee_dir);
 	sds pkg_dir    = sdscatprintf(sdsempty(), "%s/update-pkg", deps_dir);
 	mkdir(deps_dir, 0755);
@@ -1569,11 +1562,7 @@ TEST(cov_init_with_path)
 /* ===== uninstall: with actual installed package ===== */
 TEST(cov_uninstall_installed)
 {
-	const char *home = getenv("HOME");
-	if (home == nullptr) {
-		home = "/tmp";
-	}
-	sds coffee_dir = sdscatprintf(sdsempty(), "%s/.coffee", home);
+	sds coffee_dir = sdsnew(coffee_home_dir());
 	sds deps_dir   = sdscatprintf(sdsempty(), "%s/deps", coffee_dir);
 	sds pkg_dir    = sdscatprintf(sdsempty(), "%s/to-uninstall", deps_dir);
 	mkdir(deps_dir, 0755);

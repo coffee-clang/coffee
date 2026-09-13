@@ -1,6 +1,7 @@
 #include "../build.h"
 #include "../coffee.h"
 #include "../registry.h"
+#include "safe.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -14,7 +15,7 @@ int64_t handle_install_update(options *opts)
 	sds deps_dir = sdscatprintf(sdsempty(), "%s/deps", coffee_home_dir());
 
 	struct stat st;
-	if (stat(deps_dir, &st) != 0) {
+	if (safe_stat(deps_dir, &st) != 0) {
 		sdsfree(deps_dir);
 		printf_safe("No packages to update.\n");
 		return 0;
@@ -28,7 +29,7 @@ int64_t handle_install_update(options *opts)
 	if (target) {
 		sds pkg_dir = sdscatprintf(sdsempty(), "%s/%s", deps_dir, target);
 
-		if (stat(pkg_dir, &st) != 0) {
+		if (safe_stat(pkg_dir, &st) != 0) {
 			sdsfree(pkg_dir);
 			sdsfree(deps_dir);
 			fprintf_safe(stderr, "Error: Package '%s' is not installed\n", target);

@@ -1,4 +1,6 @@
 #include "safe.h"
+
+#include "../src/registry.h"
 /*
  * Coverage tests for build.c dependency resolution loop and
  * coffee_features.c transitive dependency resolution.
@@ -216,20 +218,16 @@ TEST(cov_build_release)
 /* dep_resolve_dir: global fallback when deps/ and vendor/ don't exist */
 TEST(cov_build_dep_resolve_global)
 {
-	/* Ensure ~/.coffee/deps/global-test/ exists */
-	const char *home = getenv("HOME");
-	if (home == nullptr) {
-		home = "/tmp";
-	}
-	sds global_dir = sdscatprintf(sdsempty(), "%s/.coffee/deps/global-test", home);
+	/* Ensure the sandboxed global deps dir exists */
+	sds global_dir = sdscatprintf(sdsempty(), "%s/deps/global-test", coffee_home_dir());
 	mkdir(global_dir, 0755);
 
 	sds path = dep_resolve_dir("global-test");
 	ASSERT(path != nullptr, "resolved global dep");
-	ASSERT(strstr(path, ".coffee/deps/") != nullptr, "global path");
+	ASSERT(strstr(path, "/deps/global-test") != nullptr, "global path");
 
 	sdsfree(path);
-	sds cmd = sdscatprintf(sdsempty(), "rm -rf %s/.coffee/deps/global-test", home);
+	sds cmd = sdscatprintf(sdsempty(), "rm -rf %s/deps/global-test", coffee_home_dir());
 	system(cmd);
 	sdsfree(cmd);
 	sdsfree(global_dir);

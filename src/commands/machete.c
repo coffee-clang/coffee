@@ -1,6 +1,7 @@
 #include "../coffee.h"
 #include "../manifest.h"
 #include "../project.h"
+#include "safe.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,7 +34,7 @@ static i64 file_is_source(const char *name)
 
 static i64 scan_file_for_include(const char *filepath, const char *dep_name)
 {
-	FILE *fp = fopen(filepath, "r");
+	FILE *fp = safe_fopen(filepath, "r");
 	if (fp == nullptr) {
 		return 0;
 	}
@@ -49,12 +50,12 @@ static i64 scan_file_for_include(const char *filepath, const char *dep_name)
 		}
 
 		if (strstr(p, dep_name)) {
-			fclose(fp);
+			safe_fclose(fp);
 			return 1;
 		}
 	}
 
-	fclose(fp);
+	safe_fclose(fp);
 	return 0;
 }
 
@@ -75,7 +76,7 @@ static i64 scan_dir_for_dep(const char *dirpath, const char *dep_name)
 		sds path = sdscatprintf(sdsempty(), "%s/%s", dirpath, entry->d_name);
 
 		struct stat st;
-		if (stat(path, &st) != 0) {
+		if (safe_stat(path, &st) != 0) {
 			sdsfree(path);
 			continue;
 		}

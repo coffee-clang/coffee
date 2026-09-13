@@ -145,4 +145,48 @@ static inline i64 snprintf_safe(char *buf, size_t size, const char *fmt, ...)
 	return len;
 }
 
+/**
+ * @brief Escape a string for inclusion in a TOML basic string literal.
+ *
+ * Escapes backslash, double quote, newline, carriage return, and tab.
+ * Returns a new sds (caller frees).  A nullptr input yields an empty sds.
+ */
+static inline sds toml_escape(const char *s)
+{
+	if (s == nullptr) {
+		return sdsempty();
+	}
+	sds out = sdsempty();
+	for (const char *p = s; *p != '\0'; p++) {
+		if (*p == '\\') {
+			out = sdscatlen(out, "\\\\", 2);
+		} else if (*p == '"') {
+			out = sdscatlen(out, "\\\"", 2);
+		} else if (*p == '\n') {
+			out = sdscatlen(out, "\\n", 2);
+		} else if (*p == '\r') {
+			out = sdscatlen(out, "\\r", 2);
+		} else if (*p == '\t') {
+			out = sdscatlen(out, "\\t", 2);
+		} else {
+			out = sdscatlen(out, p, 1);
+		}
+	}
+	return out;
+}
+
+/**
+ * @brief Write a TOML string value with proper escaping.
+ *
+ * The format string must contain exactly one %s, which is replaced by the
+ * escaped value.  Used by the manifest/lockfile writers so that quotes and
+ * backslashes in user data cannot corrupt the emitted TOML.
+ */
+static inline void fprintf_toml_value(FILE *stream, const char *fmt, const char *s)
+{
+	sds esc = toml_escape(s);
+	fprintf_safe(stream, fmt, esc);
+	sdsfree(esc);
+}
+
 #endif // STRINGS_H_

@@ -38,7 +38,7 @@ int64_t handle_build(options *opts)
 	}
 
 	/* Check for Makefile */
-	if (access(makefile_path, F_OK) == 0) {
+	if (safe_access(makefile_path, F_OK) == 0) {
 		/* Build with make */
 		sds project_dir = nullptr;
 		if (dir_end) {

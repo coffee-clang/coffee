@@ -8,17 +8,18 @@
 #include <string.h>
 
 #include <toml.h>
+#include <unistd.h>
 
 lockfile_t *lockfile_parse(sds path)
 {
-	FILE *fp = fopen(path, "r");
+	FILE *fp = safe_fopen(path, "r");
 	if (fp == nullptr) {
 		return nullptr;
 	}
 
 	char          errbuf[256];
 	toml_table_t *conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
-	fclose(fp);
+	safe_fclose(fp);
 
 	if (conf == nullptr) {
 		return nullptr;
@@ -56,40 +57,45 @@ lockfile_t *lockfile_parse(sds path)
 	/* Read [[dependencies]] */
 	toml_array_t *deps_arr = toml_array_in(conf, "dependencies");
 	if (deps_arr) {
-		lf->deps_count = (size_t)toml_array_nelem(deps_arr);
-		if (lf->deps_count > 0) {
-			lf->deps = safe_calloc(lf->deps_count, sizeof(lockfile_dep_t));
+		i64 n = toml_array_nelem(deps_arr);
+		if (n > 0) {
+			lf->deps = safe_calloc((size_t)n, sizeof(lockfile_dep_t));
 			if (lf->deps == nullptr) {
 				lockfile_free(lf);
 				toml_free(conf);
 				return nullptr;
 			}
-			for (size_t i = 0; i < lf->deps_count; i++) {
-				toml_table_t *dep_tbl = toml_table_at(deps_arr, (i64)i);
+			/* Use a separate write index so skipped (non-table) slots do
+			 * not leave NULL holes that inflate deps_count. */
+			size_t idx = 0;
+			for (i64 i = 0; i < n; i++) {
+				toml_table_t *dep_tbl = toml_table_at(deps_arr, i);
 				if (dep_tbl == nullptr) {
 					continue;
 				}
 				toml_datum_t dep_name = toml_string_in(dep_tbl, "name");
 				if (dep_name.ok) {
-					lf->deps[i].name = sdsnew(dep_name.u.s);
+					lf->deps[idx].name = sdsnew(dep_name.u.s);
 					safe_free(dep_name.u.s);
 				}
 				toml_datum_t dep_ver = toml_string_in(dep_tbl, "version");
 				if (dep_ver.ok) {
-					lf->deps[i].version = sdsnew(dep_ver.u.s);
+					lf->deps[idx].version = sdsnew(dep_ver.u.s);
 					safe_free(dep_ver.u.s);
 				}
 				toml_datum_t dep_path = toml_string_in(dep_tbl, "path");
 				if (dep_path.ok) {
-					lf->deps[i].path = sdsnew(dep_path.u.s);
+					lf->deps[idx].path = sdsnew(dep_path.u.s);
 					safe_free(dep_path.u.s);
 				}
 				toml_datum_t dep_commit = toml_string_in(dep_tbl, "commit");
 				if (dep_commit.ok) {
-					lf->deps[i].commit = sdsnew(dep_commit.u.s);
+					lf->deps[idx].commit = sdsnew(dep_commit.u.s);
 					safe_free(dep_commit.u.s);
 				}
+				idx++;
 			}
+			lf->deps_count = idx;
 		}
 	}
 
@@ -120,8 +126,12 @@ i64 lockfile_write(sds path, lockfile_t *lf)
 		return -1;
 	}
 
-	FILE *fp = fopen(path, "w");
+	/* Write to a temp file, fsync, then rename over the target so a crash
+	 * or ENOSPC mid-write cannot truncate the user's Coffee.lock. */
+	sds   tmp_path = sdscatprintf(sdsempty(), "%s.tmp", path);
+	FILE *fp       = safe_fopen(tmp_path, "w");
 	if (fp == nullptr) {
+		sdsfree(tmp_path);
 		return -1;
 	}
 
@@ -131,29 +141,51 @@ i64 lockfile_write(sds path, lockfile_t *lf)
 
 	fprintf_safe(fp, "[package]\n");
 	if (lf->package_name) {
-		fprintf_safe(fp, "name = \"%s\"\n", lf->package_name);
+		fprintf_toml_value(fp, "name = \"%s\"\n", lf->package_name);
 	}
 	if (lf->package_version) {
-		fprintf_safe(fp, "version = \"%s\"\n", lf->package_version);
+		fprintf_toml_value(fp, "version = \"%s\"\n", lf->package_version);
 	}
 
 	for (size_t i = 0; i < lf->deps_count; i++) {
 		fprintf_safe(fp, "\n[[dependencies]]\n");
 		if (lf->deps[i].name) {
-			fprintf_safe(fp, "name = \"%s\"\n", lf->deps[i].name);
+			fprintf_toml_value(fp, "name = \"%s\"\n", lf->deps[i].name);
 		}
 		if (lf->deps[i].version) {
-			fprintf_safe(fp, "version = \"%s\"\n", lf->deps[i].version);
+			fprintf_toml_value(fp, "version = \"%s\"\n", lf->deps[i].version);
 		}
 		if (lf->deps[i].path) {
-			fprintf_safe(fp, "path = \"%s\"\n", lf->deps[i].path);
+			fprintf_toml_value(fp, "path = \"%s\"\n", lf->deps[i].path);
 		}
 		if (lf->deps[i].commit) {
-			fprintf_safe(fp, "commit = \"%s\"\n", lf->deps[i].commit);
+			fprintf_toml_value(fp, "commit = \"%s\"\n", lf->deps[i].commit);
 		}
 	}
 
-	fclose(fp);
+	if (fflush(fp) != 0) {
+		safe_fclose(fp);
+		remove(tmp_path);
+		sdsfree(tmp_path);
+		return -1;
+	}
+	if (fsync(fileno(fp)) != 0) {
+		safe_fclose(fp);
+		remove(tmp_path);
+		sdsfree(tmp_path);
+		return -1;
+	}
+	if (safe_fclose(fp) != 0) {
+		remove(tmp_path);
+		sdsfree(tmp_path);
+		return -1;
+	}
+	if (safe_rename(tmp_path, path) != 0) {
+		remove(tmp_path);
+		sdsfree(tmp_path);
+		return -1;
+	}
+	sdsfree(tmp_path);
 	return 0;
 }
 

@@ -39,10 +39,10 @@ i64 run_command(char **argv, int flags)
 
 	if (pid == 0) {
 		if (flags & RUN_CMD_QUIET) {
-			int devnull = open("/dev/null", O_WRONLY);
+			int devnull = safe_open("/dev/null", O_WRONLY);
 			if (devnull >= 0) {
 				dup2(devnull, STDERR_FILENO);
-				close(devnull);
+				safe_close(devnull);
 			}
 		}
 
@@ -75,34 +75,34 @@ sds run_command_capture(char **argv, int flags)
 	}
 
 	int pipefd[2];
-	if (pipe(pipefd) != 0) {
+	if (safe_pipe(pipefd) != 0) {
 		return nullptr;
 	}
 
 	pid_t pid = fork();
 
 	if (pid == 0) {
-		close(pipefd[0]);
+		safe_close(pipefd[0]);
 		if (dup2(pipefd[1], STDOUT_FILENO) < 0) {
 			_exit(1);
 		}
-		close(pipefd[1]);
+		safe_close(pipefd[1]);
 
 		if (flags & RUN_CMD_QUIET) {
-			int devnull = open("/dev/null", O_WRONLY);
+			int devnull = safe_open("/dev/null", O_WRONLY);
 			if (devnull < 0) {
 				_exit(1);
 			}
 			if (dup2(devnull, STDERR_FILENO) < 0) {
 				_exit(1);
 			}
-			close(devnull);
+			safe_close(devnull);
 		}
 
 		execvp(argv[0], argv);
 		_exit(1);
 	} else if (pid > 0) {
-		close(pipefd[1]);
+		safe_close(pipefd[1]);
 
 		sds     result = sdsempty();
 		char    buf[4096];
@@ -117,7 +117,7 @@ sds run_command_capture(char **argv, int flags)
 			}
 			result = sdscatlen(result, buf, (size_t)n);
 		}
-		close(pipefd[0]);
+		safe_close(pipefd[0]);
 
 		int wstatus;
 		waitpid(pid, &wstatus, 0);
@@ -130,8 +130,8 @@ sds run_command_capture(char **argv, int flags)
 		return result;
 	}
 
-	close(pipefd[0]);
-	close(pipefd[1]);
+	safe_close(pipefd[0]);
+	safe_close(pipefd[1]);
 	perror("fork");
 	return nullptr;
 }
@@ -144,19 +144,19 @@ sds run_command_capture(char **argv, int flags)
 sds dep_resolve_dir(const char *name)
 {
 	sds local = sdscatprintf(sdsempty(), "deps/%s", name);
-	if (access(local, F_OK) == 0) {
+	if (safe_access(local, F_OK) == 0) {
 		return local;
 	}
 	sdsfree(local);
 
 	sds vendor_dir = sdscatprintf(sdsempty(), "vendor/%s", name);
-	if (access(vendor_dir, F_OK) == 0) {
+	if (safe_access(vendor_dir, F_OK) == 0) {
 		return vendor_dir;
 	}
 	sdsfree(vendor_dir);
 
 	sds global = sdscatfmt(sdsempty(), "%s/deps/%s", coffee_home_dir(), name);
-	if (access(global, F_OK) == 0) {
+	if (safe_access(global, F_OK) == 0) {
 		return global;
 	}
 	sdsfree(global);
@@ -181,13 +181,13 @@ sds dep_resolve_dir_constraint(const char *name, const char *constraint)
 
 	/* First check local and vendor paths (flat) */
 	sds local = sdscatprintf(sdsempty(), "deps/%s", name);
-	if (access(local, F_OK) == 0) {
+	if (safe_access(local, F_OK) == 0) {
 		return local;
 	}
 	sdsfree(local);
 
 	sds vendor_dir = sdscatprintf(sdsempty(), "vendor/%s", name);
-	if (access(vendor_dir, F_OK) == 0) {
+	if (safe_access(vendor_dir, F_OK) == 0) {
 		return vendor_dir;
 	}
 	sdsfree(vendor_dir);
@@ -199,7 +199,7 @@ sds dep_resolve_dir_constraint(const char *name, const char *constraint)
 		/* No versioned directory — try flat global path */
 		sdsfree(global_base);
 		sds global_flat = sdscatfmt(sdsempty(), "%s/deps/%s", coffee_home_dir(), name);
-		if (access(global_flat, F_OK) == 0) {
+		if (safe_access(global_flat, F_OK) == 0) {
 			return global_flat;
 		}
 		sdsfree(global_flat);
@@ -221,7 +221,7 @@ sds dep_resolve_dir_constraint(const char *name, const char *constraint)
 
 		/* Read version from library.toml */
 		sds   lt_path = sdscatprintf(sdsempty(), "%s/library.toml", sub_path);
-		FILE *fp      = fopen(lt_path, "r");
+		FILE *fp      = safe_fopen(lt_path, "r");
 		sdsfree(lt_path);
 
 		if (fp == nullptr) {
@@ -231,7 +231,7 @@ sds dep_resolve_dir_constraint(const char *name, const char *constraint)
 
 		char          errbuf[256];
 		toml_table_t *conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
-		fclose(fp);
+		safe_fclose(fp);
 
 		if (conf == nullptr) {
 			sdsfree(sub_path);
@@ -290,7 +290,7 @@ sds dep_resolve_dir_constraint(const char *name, const char *constraint)
 
 	/* Fall back to flat global path */
 	sds global_flat = sdscatfmt(sdsempty(), "%s/deps/%s", coffee_home_dir(), name);
-	if (access(global_flat, F_OK) == 0) {
+	if (safe_access(global_flat, F_OK) == 0) {
 		return global_flat;
 	}
 	sdsfree(global_flat);
@@ -312,7 +312,7 @@ size_t dep_add_flags(const char *dep_dir, const char *dep_name, sds *flags, sds 
 
 	/* Read library.toml if present */
 	sds   toml_path = sdscatprintf(sdsempty(), "%s/library.toml", dep_dir);
-	FILE *fp        = fopen(toml_path, "r");
+	FILE *fp        = safe_fopen(toml_path, "r");
 	if (fp) {
 		char          errbuf[256];
 		toml_table_t *conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
@@ -326,7 +326,7 @@ size_t dep_add_flags(const char *dep_dir, const char *dep_name, sds *flags, sds 
 					if (raw) {
 						char *s;
 						if (toml_rtos(raw, &s) == 0 && s) {
-							*flags = sdscatprintf(*flags, " -I%s/%s", dep_dir, s);
+							*flags = sdscatprintf(*flags, " -I\"%s/%s\"", dep_dir, s);
 							safe_free(s);
 							found = 1;
 						}
@@ -343,7 +343,7 @@ size_t dep_add_flags(const char *dep_dir, const char *dep_name, sds *flags, sds 
 					if (raw) {
 						char *s;
 						if (toml_rtos(raw, &s) == 0 && s) {
-							*flags = sdscatprintf(*flags, " -L%s/%s", dep_dir, s);
+							*flags = sdscatprintf(*flags, " -L\"%s/%s\"", dep_dir, s);
 							safe_free(s);
 							found = 1;
 						}
@@ -353,28 +353,28 @@ size_t dep_add_flags(const char *dep_dir, const char *dep_name, sds *flags, sds 
 
 			toml_free(conf);
 		}
-		fclose(fp);
+		safe_fclose(fp);
 	}
 	sdsfree(toml_path);
 
 	/* Fallback: include/ directory */
 	if (!found) {
 		sds inc_path = sdscatprintf(sdsempty(), "%s/include", dep_dir);
-		if (access(inc_path, F_OK) == 0) {
-			*flags = sdscatprintf(*flags, " -I%s", inc_path);
+		if (safe_access(inc_path, F_OK) == 0) {
+			*flags = sdscatprintf(*flags, " -I\"%s\"", inc_path);
 		}
 		sdsfree(inc_path);
 	}
 
 	/* Fallback: lib/ directory */
 	sds lib_path = sdscatprintf(sdsempty(), "%s/lib", dep_dir);
-	if (access(lib_path, F_OK) == 0) {
-		*flags = sdscatprintf(*flags, " -L%s", lib_path);
+	if (safe_access(lib_path, F_OK) == 0) {
+		*flags = sdscatprintf(*flags, " -L\"%s\"", lib_path);
 	}
 	sdsfree(lib_path);
 
 	/* Always add -l<name> */
-	*flags = sdscatprintf(*flags, " -l%s", dep_name);
+	*flags = sdscatprintf(*flags, " -l\"%s\"", dep_name);
 
 	/* Also compile dep source files if they exist (only if src_list provided) */
 	if (src_list != nullptr && src_count != nullptr) {
@@ -425,7 +425,59 @@ bool dep_name_is_valid(const char *name)
 	if (strchr(name, '/') != nullptr) {
 		return false;
 	}
+	/* Reject double quotes: they would break the quoted-argv splitting
+	 * used when building compiler command lines. */
+	if (strchr(name, '"') != nullptr) {
+		return false;
+	}
 	return true;
+}
+
+/*
+ * Validate a git ref (branch/tag/rev) before passing it to git.
+ * Rejects anything that could be parsed as a git option (leading '-')
+ * or that contains shell/option metacharacters.  Allows refs/heads/...,
+ * origin/..., tags, and short SHAs.
+ */
+bool ref_is_valid(const char *ref)
+{
+	if (ref == nullptr || ref[0] == '\0') {
+		return false;
+	}
+	/* A leading '-' would be parsed by git as an option. */
+	if (ref[0] == '-') {
+		return false;
+	}
+	for (size_t i = 0; ref[i] != '\0'; i++) {
+		char c = ref[i];
+		if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '.' || c == '_' ||
+		      c == '/' || c == '-')) {
+			return false;
+		}
+	}
+	return true;
+}
+
+/*
+ * Validate a git clone URL.  Only explicit schemes are allowed; anything
+ * that could be interpreted as a git option (leading '-') is rejected.
+ */
+bool url_is_valid(const char *url)
+{
+	if (url == nullptr) {
+		return false;
+	}
+	if (strncmp(url, "https://", 8) == 0 || strncmp(url, "http://", 7) == 0 || strncmp(url, "git://", 6) == 0 ||
+	    strncmp(url, "ssh://", 6) == 0 || strncmp(url, "git+ssh://", 10) == 0 || strncmp(url, "git+https://", 12) == 0) {
+		return true;
+	}
+	/* Local filesystem paths (git clone supports them).  These cannot be
+	 * parsed as git options because they start with '/' or '.', and the
+	 * '--' separator in the argv provides the real protection. */
+	if (url[0] == '/' || strncmp(url, "./", 2) == 0 || strncmp(url, "../", 3) == 0) {
+		return true;
+	}
+	return false;
 }
 
 size_t count_flag_tokens(const char *flags)
@@ -443,7 +495,13 @@ size_t count_flag_tokens(const char *flags)
 			break;
 		}
 		count++;
-		while (*p != ' ' && *p != '\0') {
+		bool in_quotes = false;
+		while (*p != '\0') {
+			if (*p == '"') {
+				in_quotes = !in_quotes;
+			} else if (*p == ' ' && !in_quotes) {
+				break;
+			}
 			p++;
 		}
 	}
@@ -466,7 +524,19 @@ sds split_flags_to_argv(const char *flags, char **argv, size_t start_idx, size_t
 			break;
 		}
 		argv[start_idx++] = p;
-		while (*p != ' ' && *p != '\0') {
+		/* A token is delimited by spaces outside quotes; double quotes
+		 * are stripped and mark regions where spaces are literal, so
+		 * -l"foo bar" yields the single argv element "-lfoo bar". */
+		bool in_quotes = false;
+		while (*p != '\0') {
+			if (*p == '"') {
+				memmove(p, p + 1, strlen(p));
+				in_quotes = !in_quotes;
+				continue;
+			}
+			if (*p == ' ' && !in_quotes) {
+				break;
+			}
 			p++;
 		}
 		if (*p == ' ') {
@@ -548,7 +618,7 @@ i64 build_project(manifest_t *manifest, build_opts_t *opts)
 		/* Check staleness: Coffee.toml should not be newer than Coffee.lock */
 		struct stat toml_st;
 		struct stat lock_st;
-		if (stat("Coffee.toml", &toml_st) == 0 && stat("Coffee.lock", &lock_st) == 0) {
+		if (safe_stat("Coffee.toml", &toml_st) == 0 && safe_stat("Coffee.lock", &lock_st) == 0) {
 			if (toml_st.st_mtime > lock_st.st_mtime) {
 				fprintf_safe(stderr,
 				             "Error: Coffee.toml is newer than Coffee.lock (--locked requires up-to-date lockfile)\n");
@@ -731,7 +801,7 @@ i64 build_run(manifest_t *manifest, build_opts_t *opts, sds *args, i64 argc)
 		return 1;
 	}
 
-	if (access(exe_path, X_OK) != 0) {
+	if (safe_access(exe_path, X_OK) != 0) {
 		fprintf_safe(stderr, "Error: Executable not found: %s\n", exe_path);
 		sdsfree(exe_path);
 		return 1;
@@ -760,3 +830,4 @@ i64 build_run(manifest_t *manifest, build_opts_t *opts, sds *args, i64 argc)
 	safe_free((void *)run_argv);
 	return ret;
 }
+

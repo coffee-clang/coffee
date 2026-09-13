@@ -101,6 +101,19 @@ sds dep_parse_name(const char *entry);
  */
 bool dep_name_is_valid(const char *name);
 
+/*
+ * Validate a git ref (branch/tag/rev) before passing it to git.
+ * Rejects anything that could be parsed as a git option or that
+ * contains option/shell metacharacters.
+ */
+bool ref_is_valid(const char *ref);
+
+/*
+ * Validate a git clone URL.  Only explicit schemes (https, http, git,
+ * ssh, git+ssh, git+https) are accepted.
+ */
+bool url_is_valid(const char *url);
+
 size_t count_flag_tokens(const char *flags);
 
 sds split_flags_to_argv(const char *flags, char **argv, size_t start_idx, size_t *end_idx);

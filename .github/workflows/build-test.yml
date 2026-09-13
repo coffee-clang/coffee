@@ -25,6 +25,14 @@ jobs:
       - name: Run tests
         run: make test
 
+      - name: Fuzz smoke tests
+        run: |
+          make fuzz
+          for f in bin/fuzz/fuzz_*; do
+            echo "=== $f ==="
+            "$f" -runs=10000
+          done
+
       - name: Check tidy
         run: make tidy
 

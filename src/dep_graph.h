@@ -38,6 +38,12 @@ typedef struct dep_graph_s {
 } dep_graph_t;
 
 /*
+ * Internal: find a dep index by name, or -1. Shared between the dep_graph
+ * module files (dep_graph.c, dep_graph_git.c). Not part of the public API.
+ */
+i64 dep_graph_find_node(const dep_graph_t *g, const char *name);
+
+/*
  * Get the name of the node at a given index.
  * Index 0 is always the root package.
  * Returns nullptr for invalid index.

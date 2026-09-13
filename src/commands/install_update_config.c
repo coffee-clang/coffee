@@ -39,7 +39,7 @@ static sds cfg_path(void)
  */
 static size_t read_config_lines(const char *path, sds **lines_out)
 {
-	FILE *fp = fopen(path, "r");
+	FILE *fp = safe_fopen(path, "r");
 	if (fp == nullptr) {
 		*lines_out = nullptr;
 		return 0;
@@ -58,7 +58,7 @@ static size_t read_config_lines(const char *path, sds **lines_out)
 		lines[nlines] = sdsnew(buf);
 		nlines++;
 	}
-	fclose(fp);
+	safe_fclose(fp);
 
 	*lines_out = lines;
 	return nlines;
@@ -201,11 +201,11 @@ int64_t handle_install_update_config(options *opts)
 	/* Parse existing config to check which keys are missing */
 	toml_table_t *conf = nullptr;
 	if (nlines > 0) {
-		FILE *fp = fopen(path, "r");
+		FILE *fp = safe_fopen(path, "r");
 		if (fp) {
 			char errbuf[256];
 			conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
-			fclose(fp);
+			safe_fclose(fp);
 		}
 	}
 
@@ -248,7 +248,7 @@ int64_t handle_install_update_config(options *opts)
 	}
 
 	/* Write back */
-	FILE *fp = fopen(path, "w");
+	FILE *fp = safe_fopen(path, "w");
 	if (fp == nullptr) {
 		fprintf_safe(stderr, "Error: Could not write %s\n", path);
 		sdsfree(path);
@@ -262,7 +262,7 @@ int64_t handle_install_update_config(options *opts)
 	for (size_t i = 0; i < nlines; i++) {
 		fprintf_safe(fp, "%s", lines[i]);
 	}
-	fclose(fp);
+	safe_fclose(fp);
 
 	printf_safe("Configuration installed/updated: %zu key(s) added.\n", added);
 

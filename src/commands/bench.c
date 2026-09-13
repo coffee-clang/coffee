@@ -12,7 +12,7 @@ static sds build_include_flags(manifest_t *m)
 {
 	sds flags = sdsnew("-Isrc -Iinclude -I. -Ideps");
 	if (m->package.name) {
-		flags = sdscatfmt(flags, " -Iinclude/%s", m->package.name);
+		flags = sdscatfmt(flags, " -I\"include/%s\"", m->package.name);
 	}
 	return flags;
 }

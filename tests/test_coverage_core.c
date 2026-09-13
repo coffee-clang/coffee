@@ -233,27 +233,23 @@ TEST(cov_build_run_no_project)
 /* dep_resolve_dir — global ~/.coffee/deps/ */
 TEST(cov_dep_resolve_global)
 {
-	const char *home = getenv("HOME");
-	if (home == nullptr) {
-		home = "/tmp";
-	}
-	sds coffee = sdscatprintf(sdsempty(), "%s/.coffee", home);
+	sds coffee = sdsnew(coffee_home_dir());
 	mkdir(coffee, 0755);
 	sdsfree(coffee);
-	sds depsdir = sdscatprintf(sdsempty(), "%s/.coffee/deps", home);
+	sds depsdir = sdscatprintf(sdsempty(), "%s/deps", coffee_home_dir());
 	mkdir(depsdir, 0755);
 	sdsfree(depsdir);
 
-	sds global_deps = sdscatprintf(sdsempty(), "%s/.coffee/deps/globalpkg", home);
+	sds global_deps = sdscatprintf(sdsempty(), "%s/deps/globalpkg", coffee_home_dir());
 	mkdir(global_deps, 0755);
 
 	sds path = dep_resolve_dir("globalpkg");
 	ASSERT(path != nullptr, "found globalpkg");
-	ASSERT(strstr(path, ".coffee/deps/") != nullptr, "global path");
+	ASSERT(strstr(path, "/deps/globalpkg") != nullptr, "global path");
 	sdsfree(path);
 
-	/* Cleanup — remove parent dirs up to .coffee */
-	sds cmd = sdscatprintf(sdsempty(), "rm -rf %s/.coffee", home);
+	/* Cleanup — remove the sandboxed global deps dir */
+	sds cmd = sdscatprintf(sdsempty(), "rm -rf %s/deps/globalpkg", coffee_home_dir());
 	system(cmd);
 	sdsfree(cmd);
 	sdsfree(global_deps);
@@ -356,12 +352,8 @@ TEST(cov_registry_free_versions_nonnull)
 TEST(cov_install_update_missing_target)
 {
 	/* Ensure the global deps dir exists so the handler reaches the target check */
-	const char *home = getenv("HOME");
-	if (home == nullptr) {
-		home = "/tmp";
-	}
-	sds coffee_dir = sdscatprintf(sdsempty(), "%s/.coffee", home);
-	sds deps_dir   = sdscatprintf(sdsempty(), "%s/.coffee/deps", home);
+	sds coffee_dir = sdsnew(coffee_home_dir());
+	sds deps_dir   = sdscatprintf(sdsempty(), "%s/deps", coffee_home_dir());
 	mkdir(coffee_dir, 0755);
 	mkdir(deps_dir, 0755);
 

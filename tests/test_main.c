@@ -7,6 +7,11 @@
 
 #include "test_framework.h"
 
+#include "../src/strings.h"
+
+#include <ftw.h>
+#include <unistd.h>
+
 /* Forward declarations for all test file registration functions */
 void coffee_register_features_tests(void);
 void coffee_register_makefile_tests(void);
@@ -34,8 +39,35 @@ void coffee_register_dep_graph_tests(void);
 void coffee_register_new_init_tests(void);
 void coffee_register_security_tests(void);
 
+/* Remove a file/dir tree (used to clean up the per-run COFFEE_HOME). */
+static int remove_tree_entry(const char *path, const struct stat *st, int type, struct FTW *ftw)
+{
+	(void)st;
+	(void)type;
+	(void)ftw;
+	return remove(path);
+}
+
+static void cleanup_test_home(void)
+{
+	const char *home = getenv("COFFEE_HOME");
+	/* Only ever delete the sandbox we created ourselves. */
+	if (home != nullptr && strncmp(home, "/tmp/coffee-test-home-", 22) == 0) {
+		nftw(home, remove_tree_entry, 64, FTW_DEPTH | FTW_PHYS);
+	}
+}
+
 int main(int argc, char **argv)
 {
+	/* Redirect COFFEE_HOME to a private sandbox so no test can ever
+	 * create or delete files in the developer's real ~/.coffee. */
+	sds test_home = sdsnew("/tmp/coffee-test-home-XXXXXX");
+	if (mkdtemp(test_home) != nullptr) {
+		setenv("COFFEE_HOME", test_home, 1);
+		atexit(cleanup_test_home);
+	}
+	sdsfree(test_home);
+
 	const char *filter = nullptr;
 
 	/* Parse --test and --verbose from argv */

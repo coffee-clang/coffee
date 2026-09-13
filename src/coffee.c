@@ -150,13 +150,13 @@ int main(int argc, char **argv)
 				if (toolcheck_run(cmd) != 0) {
 					exit(EXIT_FAILURE);
 				}
-				commands[i].action(&opt);
-				exit(EXIT_SUCCESS);
+				i64 rc = commands[i].action(&opt);
+				exit(rc == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 			}
 		}
 
 		/* Check if we have received a command, but it's not in the list */
-		printf_safe("Command '%s' is not recognized.\n", cmd);
+		fprintf_safe(stderr, "Command '%s' is not recognized.\n", cmd);
 		cmdline_parser_print_help();
 		exit(EXIT_FAILURE);
 	}

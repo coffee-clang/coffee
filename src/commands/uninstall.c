@@ -1,6 +1,7 @@
 #include "../build.h"
 #include "../coffee.h"
 #include "../registry.h"
+#include "safe.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -20,7 +21,7 @@ int64_t handle_uninstall(options *opts)
 	sds pkg_dir = sdscatprintf(sdsempty(), "%s/deps/%s", coffee_home_dir(), package);
 
 	struct stat st;
-	if (stat(pkg_dir, &st) != 0) {
+	if (safe_stat(pkg_dir, &st) != 0) {
 		sdsfree(pkg_dir);
 		fprintf_safe(stderr, "Error: Package '%s' is not installed\n", package);
 		return 1;

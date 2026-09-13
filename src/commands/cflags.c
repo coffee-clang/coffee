@@ -17,7 +17,7 @@ static void append_cflags_for_pkg(const char *name, sds *buf)
 		return;
 	}
 
-	if (access(dir, F_OK) != 0) {
+	if (safe_access(dir, F_OK) != 0) {
 		sdsfree(dir);
 		return;
 	}
@@ -25,7 +25,7 @@ static void append_cflags_for_pkg(const char *name, sds *buf)
 	sds toml_path = sdscatprintf(sdsempty(), "%s/library.toml", dir);
 
 	i64   found = 0;
-	FILE *fp    = fopen(toml_path, "r");
+	FILE *fp    = safe_fopen(toml_path, "r");
 	if (fp) {
 		char          errbuf[256];
 		toml_table_t *conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
@@ -47,12 +47,12 @@ static void append_cflags_for_pkg(const char *name, sds *buf)
 			}
 			toml_free(conf);
 		}
-		fclose(fp);
+		safe_fclose(fp);
 	}
 
 	if (!found) {
 		sds inc_path = sdscatprintf(sdsempty(), "%s/include", dir);
-		if (access(inc_path, F_OK) == 0) {
+		if (safe_access(inc_path, F_OK) == 0) {
 			*buf = sdscatprintf(*buf, "-I%s ", inc_path);
 		}
 		sdsfree(inc_path);

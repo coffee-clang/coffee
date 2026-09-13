@@ -120,8 +120,8 @@ int64_t handle_test(options *opts)
 
 	/* Build compiler flags */
 	sds flags = sdsnew("-O0 -g -DCOFFEE_TEST_RUNNER");
-	flags     = sdscatprintf(flags, " -I%s/tests", project_dir);
-	flags     = sdscatprintf(flags, " -I%s/src", project_dir);
+	flags     = sdscatprintf(flags, " -I\"%s/tests\"", project_dir);
+	flags     = sdscatprintf(flags, " -I\"%s/src\"", project_dir);
 
 	/* Build dependency graph from manifest + lockfile */
 	sds          lockfile_path = sdsnew("Coffee.lock");

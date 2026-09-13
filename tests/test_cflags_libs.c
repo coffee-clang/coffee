@@ -1,3 +1,4 @@
+#include "../src/registry.h"
 #include "../src/strings.h"
 #include "test_framework.h"
 
@@ -21,17 +22,14 @@ static void create_file(const char *path, const char *content)
 
 TEST(pkg_dir_exists)
 {
-	const char *home = getenv("HOME");
-	ASSERT(home, "HOME not set");
-
-	sds coffee = sdscatprintf(sdsempty(), "%s/.coffee", home);
+	sds coffee = sdsnew(coffee_home_dir());
 	mkdir(coffee, 0755);
 	sdsfree(coffee);
-	sds depsdir = sdscatprintf(sdsempty(), "%s/.coffee/deps", home);
+	sds depsdir = sdscatprintf(sdsempty(), "%s/deps", coffee_home_dir());
 	mkdir(depsdir, 0755);
 	sdsfree(depsdir);
 
-	sds pkgdir = sdscatprintf(sdsempty(), "%s/.coffee/deps/test-pkg", home);
+	sds pkgdir = sdscatprintf(sdsempty(), "%s/deps/test-pkg", coffee_home_dir());
 
 	mkdir(pkgdir, 0755);
 
@@ -43,17 +41,14 @@ TEST(pkg_dir_exists)
 
 TEST(library_toml_with_include)
 {
-	const char *home = getenv("HOME");
-	ASSERT(home, "HOME not set");
-
-	sds coffee = sdscatprintf(sdsempty(), "%s/.coffee", home);
+	sds coffee = sdsnew(coffee_home_dir());
 	mkdir(coffee, 0755);
 	sdsfree(coffee);
-	sds depsdir = sdscatprintf(sdsempty(), "%s/.coffee/deps", home);
+	sds depsdir = sdscatprintf(sdsempty(), "%s/deps", coffee_home_dir());
 	mkdir(depsdir, 0755);
 	sdsfree(depsdir);
 
-	sds pkgdir = sdscatprintf(sdsempty(), "%s/.coffee/deps/test-pkg", home);
+	sds pkgdir = sdscatprintf(sdsempty(), "%s/deps/test-pkg", coffee_home_dir());
 	mkdir(pkgdir, 0755);
 
 	sds toml_path = sdscatprintf(sdsempty(), "%s/library.toml", pkgdir);
@@ -84,17 +79,14 @@ TEST(library_toml_with_include)
 
 TEST(library_toml_with_libname)
 {
-	const char *home = getenv("HOME");
-	ASSERT(home, "HOME not set");
-
-	sds coffee = sdscatprintf(sdsempty(), "%s/.coffee", home);
+	sds coffee = sdsnew(coffee_home_dir());
 	mkdir(coffee, 0755);
 	sdsfree(coffee);
-	sds depsdir = sdscatprintf(sdsempty(), "%s/.coffee/deps", home);
+	sds depsdir = sdscatprintf(sdsempty(), "%s/deps", coffee_home_dir());
 	mkdir(depsdir, 0755);
 	sdsfree(depsdir);
 
-	sds pkgdir = sdscatprintf(sdsempty(), "%s/.coffee/deps/test-pkg", home);
+	sds pkgdir = sdscatprintf(sdsempty(), "%s/deps/test-pkg", coffee_home_dir());
 	mkdir(pkgdir, 0755);
 
 	sds toml_path = sdscatprintf(sdsempty(), "%s/library.toml", pkgdir);
@@ -126,17 +118,14 @@ TEST(library_toml_with_libname)
 
 TEST(fallback_no_keys)
 {
-	const char *home = getenv("HOME");
-	ASSERT(home, "HOME not set");
-
-	sds coffee = sdscatprintf(sdsempty(), "%s/.coffee", home);
+	sds coffee = sdsnew(coffee_home_dir());
 	mkdir(coffee, 0755);
 	sdsfree(coffee);
-	sds depsdir = sdscatprintf(sdsempty(), "%s/.coffee/deps", home);
+	sds depsdir = sdscatprintf(sdsempty(), "%s/deps", coffee_home_dir());
 	mkdir(depsdir, 0755);
 	sdsfree(depsdir);
 
-	sds pkgdir = sdscatprintf(sdsempty(), "%s/.coffee/deps/test-nokeys", home);
+	sds pkgdir = sdscatprintf(sdsempty(), "%s/deps/test-nokeys", coffee_home_dir());
 	mkdir(pkgdir, 0755);
 
 	sds incdir = sdscatprintf(sdsempty(), "%s/include", pkgdir);
@@ -162,10 +151,7 @@ TEST(fallback_no_keys)
 
 TEST(pkg_not_installed)
 {
-	const char *home = getenv("HOME");
-	ASSERT(home, "HOME not set");
-
-	sds pkgdir = sdscatprintf(sdsempty(), "%s/.coffee/deps/nonexistent-pkg", home);
+	sds pkgdir = sdscatprintf(sdsempty(), "%s/deps/nonexistent-pkg", coffee_home_dir());
 
 	ASSERT(access(pkgdir, F_OK) != 0, "nonexistent package dir should not exist");
 	sdsfree(pkgdir);

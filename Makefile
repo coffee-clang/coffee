@@ -26,6 +26,8 @@ UNITY_CORE_SRCS := \
 	$(SRC_DIR)/lockfile.c \
 	$(SRC_DIR)/version.c \
 	$(SRC_DIR)/dep_graph.c \
+	$(SRC_DIR)/dep_graph_git.c \
+	$(SRC_DIR)/dep_graph_cache.c \
 	$(SRC_DIR)/coffee.c
 
 UNITY_ALL_SRCS := $(UNITY_CORE_SRCS) $(sort $(COMMANDS_SRCS))
@@ -291,8 +293,8 @@ SANITIZE_UNDEFINED_CFLAGS := -g -O1 -fsanitize=undefined -fno-sanitize-recover=a
 define sanitize_run
 	@echo "=== Sanitizer: $(1) ==="
 	$(MAKE) clean
-	$(MAKE) -j$(NPROC) CC=clang CFLAGS_SAN="$(2)" LDFLAGS="-g $(2) -lz"
-	$(MAKE) test CC=clang CFLAGS_SAN="$(2)" LDFLAGS="-g $(2) -lz"
+	$(MAKE) -j$(NPROC) CC=clang CFLAGS_SAN="$(2)" LDFLAGS="-g $(2)"
+	$(MAKE) test CC=clang CFLAGS_SAN="$(2)" LDFLAGS="-g $(2)"
 	@echo "=== Sanitizer: $(1) — passed ==="
 endef
 

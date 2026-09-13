@@ -52,6 +52,12 @@ int64_t handle_vendor(options *opts)
 			}
 		}
 
+		if (!dep_name_is_valid(name)) {
+			fprintf_safe(stderr, "  Warning: skipping invalid dependency name '%s'\n", name);
+			sdsfree(name);
+			continue;
+		}
+
 		sds dest_dir = sdscatprintf(sdsempty(), "vendor/%s", name);
 
 		printf_safe("  Vendoring: %s\n", name);
@@ -61,8 +67,13 @@ int64_t handle_vendor(options *opts)
 		for (size_t j = 0; j < m->dependencies.deps_count; j++) {
 			if (m->dependencies.deps[j].name != nullptr && strcmp(m->dependencies.deps[j].name, name) == 0) {
 				if (m->dependencies.deps[j].git != nullptr) {
+					if (!url_is_valid(m->dependencies.deps[j].git)) {
+						fprintf_safe(stderr, "  Error: invalid git URL for %s\n", name);
+						found = true;
+						break;
+					}
 					char *git_argv[] = {
-						"git", "clone", "--depth", "1", m->dependencies.deps[j].git, dest_dir, nullptr
+						"git", "clone", "--depth", "1", "--", m->dependencies.deps[j].git, dest_dir, nullptr
 					};
 					i64 ret = run_command(git_argv, RUN_CMD_QUIET);
 

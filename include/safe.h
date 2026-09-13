@@ -1,12 +1,17 @@
 #ifndef SAFE_SAFE_H_
 #define SAFE_SAFE_H_
 
+#include <errno.h>
+#include <fcntl.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 /*
  * Wrappers for functions that clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
@@ -245,6 +250,69 @@ static inline int64_t safe_system(const char *command) {
 
 static inline FILE *safe_popen(const char *command, const char *type) {
     return popen(command, type);
+}
+
+/* ---------------------------------------------------------------------------
+ * File I/O and syscall wrappers — pass-throughs with safe_* naming so the
+ * banned-function policy (AGENTS.md) has a single sanctioned home.
+ * --------------------------------------------------------------------------- */
+
+static inline FILE *safe_fopen(const char *path, const char *mode) {
+    return fopen(path, mode);
+}
+
+static inline int safe_fclose(FILE *stream) {
+    return fclose(stream);
+}
+
+static inline int safe_open(const char *path, int flags, ...) {
+    va_list ap;
+    va_start(ap, flags);
+    mode_t mode = (flags & O_CREAT) != 0 ? (mode_t)va_arg(ap, int) : (mode_t)0;
+    va_end(ap);
+    return open(path, flags, mode);
+}
+
+static inline int safe_close(int fd) {
+    return close(fd);
+}
+
+static inline int safe_pipe(int fds[2]) {
+    return pipe(fds);
+}
+
+static inline int safe_stat(const char *path, struct stat *buf) {
+    return stat(path, buf);
+}
+
+static inline int safe_access(const char *path, int mode) {
+    return access(path, mode);
+}
+
+static inline int safe_rename(const char *oldpath, const char *newpath) {
+    return rename(oldpath, newpath);
+}
+
+/* Validated number parsing: rejects empty, garbage, and overflow input.
+ * Returns false and leaves *out untouched on failure. */
+static inline bool safe_strtol(const char *nptr, int base, int64_t *out) {
+    char *end;
+    long  val;
+
+    if (nptr == nullptr || nptr[0] == '\0' || out == nullptr) {
+        return false;
+    }
+    errno = 0;
+    val   = strtol(nptr, &end, base);
+    if (errno == ERANGE || end == nptr || *end != '\0') {
+        return false;
+    }
+    *out = (int64_t)val;
+    return true;
+}
+
+static inline bool safe_atol(const char *s, int64_t *out) {
+    return safe_strtol(s, 10, out);
 }
 
 #endif /* SAFE_SAFE_H_ */

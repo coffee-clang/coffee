@@ -100,13 +100,13 @@ static i64 doc_generate_doxyfile(manifest_t *m, const sds project_dir)
 	doc_settings_t cfg;
 	{
 		sds   manifest_path = sdscatprintf(sdsempty(), "%s/Coffee.toml", project_dir);
-		FILE *fp            = fopen(manifest_path, "r");
+		FILE *fp            = safe_fopen(manifest_path, "r");
 		sdsfree(manifest_path);
 
 		if (fp) {
 			char          errbuf[256];
 			toml_table_t *conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
-			fclose(fp);
+			safe_fclose(fp);
 
 			if (conf) {
 				toml_table_t *doc_tab = toml_table_in(conf, "doc");
@@ -121,7 +121,7 @@ static i64 doc_generate_doxyfile(manifest_t *m, const sds project_dir)
 	}
 
 	sds   doxyfile_path = sdscatprintf(sdsempty(), "%s/Doxyfile", project_dir);
-	FILE *df            = fopen(doxyfile_path, "w");
+	FILE *df            = safe_fopen(doxyfile_path, "w");
 	if (df == nullptr) {
 		fprintf_safe(stderr, "Error: Could not create Doxyfile at %s\n", doxyfile_path);
 		sdsfree(doxyfile_path);
@@ -162,7 +162,7 @@ static i64 doc_generate_doxyfile(manifest_t *m, const sds project_dir)
 		fprintf_safe(df, "EXCLUDE_PATTERNS       = %s\n", cfg.exclude_patterns);
 	}
 
-	fclose(df);
+	safe_fclose(df);
 	doc_settings_free(&cfg);
 	printf_safe("Generated Doxyfile\n");
 	sdsfree(doxyfile_path);
@@ -180,17 +180,17 @@ static i64 doc_generate(const sds project_dir, manifest_t *m)
 	/* Check for existing Doxyfile */
 	sds doxyfile_path = sdscatprintf(sdsempty(), "%s/Doxyfile", project_dir);
 
-	if (access(doxyfile_path, F_OK) != 0) {
+	if (safe_access(doxyfile_path, F_OK) != 0) {
 		/* No Doxyfile — check if [doc] section exists */
 		sds   mp = sdscatprintf(sdsempty(), "%s/Coffee.toml", project_dir);
-		FILE *fp = fopen(mp, "r");
+		FILE *fp = safe_fopen(mp, "r");
 		sdsfree(mp);
 
 		bool has_doc_section = false;
 		if (fp) {
 			char          errbuf[256];
 			toml_table_t *conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
-			fclose(fp);
+			safe_fclose(fp);
 			if (conf) {
 				has_doc_section = (toml_table_in(conf, "doc") != nullptr);
 				toml_free(conf);

@@ -15,7 +15,7 @@
 
 static i64 file_exists(const char *path)
 {
-	return access(path, F_OK) == 0;
+	return safe_access(path, F_OK) == 0;
 }
 
 sds project_find_manifest(sds start_dir)
@@ -72,14 +72,14 @@ sds pkg_dir(const char *name)
 {
 	/* Check local deps/ first */
 	sds local = sdscatprintf(sdsempty(), "deps/%s", name);
-	if (access(local, F_OK) == 0) {
+	if (safe_access(local, F_OK) == 0) {
 		return local;
 	}
 	sdsfree(local);
 
 	/* Check vendor/ next */
 	sds vendor_dir = sdscatprintf(sdsempty(), "vendor/%s", name);
-	if (access(vendor_dir, F_OK) == 0) {
+	if (safe_access(vendor_dir, F_OK) == 0) {
 		return vendor_dir;
 	}
 	sdsfree(vendor_dir);
@@ -91,7 +91,7 @@ sds pkg_dir(const char *name)
 i64 create_dir(const char *path)
 {
 	struct stat st;
-	if (stat(path, &st) == 0) {
+	if (safe_stat(path, &st) == 0) {
 		return 0;
 	}
 	return mkdir(path, 0755);
@@ -99,19 +99,19 @@ i64 create_dir(const char *path)
 
 i64 create_file(const char *path, const char *content)
 {
-	FILE *fp = fopen(path, "w");
+	FILE *fp = safe_fopen(path, "w");
 	if (fp == nullptr) {
 		return -1;
 	}
 	fprintf_safe(fp, "%s", content);
-	fclose(fp);
+	safe_fclose(fp);
 	return 0;
 }
 
 sds resolve_dep_version(const char *dep_dir)
 {
 	sds   toml_path = sdscatprintf(sdsempty(), "%s/library.toml", dep_dir);
-	FILE *fp        = fopen(toml_path, "r");
+	FILE *fp        = safe_fopen(toml_path, "r");
 	if (fp == nullptr) {
 		sdsfree(toml_path);
 		return sdsnew("*");
@@ -119,7 +119,7 @@ sds resolve_dep_version(const char *dep_dir)
 
 	char          errbuf[256];
 	toml_table_t *conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
-	fclose(fp);
+	safe_fclose(fp);
 
 	sds version = nullptr;
 	if (conf) {

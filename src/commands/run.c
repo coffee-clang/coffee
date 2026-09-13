@@ -35,7 +35,7 @@ int64_t handle_run(options *opts)
 		makefile_path = sdsnew("Makefile");
 	}
 
-	if (access(makefile_path, F_OK) != 0) {
+	if (safe_access(makefile_path, F_OK) != 0) {
 		sdsfree(makefile_path);
 		sdsfree(manifest_path);
 		fprintf_safe(stderr, "Error: No Makefile found. Coffee requires a Makefile for building.\n");
@@ -139,7 +139,7 @@ int64_t handle_run(options *opts)
 	const char *output_dir = opts->target_dir ? opts->target_dir : "build/debug";
 	sds         exe_path   = sdscatprintf(sdsempty(), "%s/%s", output_dir, name);
 
-	if (access(exe_path, X_OK) != 0) {
+	if (safe_access(exe_path, X_OK) != 0) {
 		fprintf_safe(stderr, "Error: Executable not found: %s\n", exe_path);
 		sdsfree(exe_path);
 		sdsfree(manifest_path);

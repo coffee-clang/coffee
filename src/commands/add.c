@@ -118,15 +118,15 @@ int64_t handle_add(options *opts)
 		sdsfree(makefile_path);
 		fprintf_safe(stderr, "Warning: package name contains unsafe characters, skipping Makefile update\n");
 	} else {
-		FILE *exist_check = fopen(makefile_path, "r");
+		FILE *exist_check = safe_fopen(makefile_path, "r");
 		if (exist_check) {
-			fclose(exist_check);
-			FILE *mf = fopen(makefile_path, "a");
+			safe_fclose(exist_check);
+			FILE *mf = safe_fopen(makefile_path, "a");
 			if (mf) {
 				fprintf_safe(mf, "\n# Dep: %s\n", package_name);
 				fprintf_safe(mf, "CFLAGS += -Ideps/%s/include\n", package_name);
 				fprintf_safe(mf, "LDFLAGS += -Ldeps/%s/lib -l%s\n", package_name, package_name);
-				if (fclose(mf) != 0) {
+				if (safe_fclose(mf) != 0) {
 					fprintf_safe(stderr, "Warning: failed to write to Makefile\n");
 				}
 			}

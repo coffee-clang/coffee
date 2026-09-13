@@ -31,8 +31,8 @@ jobs:
       - name: Build with ${{ matrix.sanitizer }}
         run: |
           make clean
-          make -j$(nproc) CC=clang CFLAGS_SAN="${{ matrix.cflags }}" LDFLAGS="-lz -L/usr/lib/x86_64-linux-gnu ${{ matrix.cflags }}"
+          make -j$(nproc) CC=clang CFLAGS_SAN="${{ matrix.cflags }}" LDFLAGS="${{ matrix.cflags }}"
 
       - name: Run tests with ${{ matrix.sanitizer }}
         run: |
-          make test CC=clang CFLAGS_SAN="${{ matrix.cflags }}" LDFLAGS="-lz -L/usr/lib/x86_64-linux-gnu ${{ matrix.cflags }}"
+          make test CC=clang CFLAGS_SAN="${{ matrix.cflags }}" LDFLAGS="${{ matrix.cflags }}"

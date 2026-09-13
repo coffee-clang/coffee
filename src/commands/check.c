@@ -2,6 +2,7 @@
 #include "../coffee.h"
 #include "../manifest.h"
 #include "../project.h"
+#include "safe.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -76,12 +77,12 @@ int64_t handle_check(options *opts)
 		}
 
 		sds dep_dir = sdscatprintf(sdsempty(), "deps/%s", name);
-		if (access(dep_dir, F_OK) == 0) {
+		if (safe_access(dep_dir, F_OK) == 0) {
 			sds inc = sdscatprintf(sdsempty(), "%s/include", dep_dir);
-			if (access(inc, F_OK) == 0) {
-				inc_flags = sdscatprintf(inc_flags, " -I%s", inc);
+			if (safe_access(inc, F_OK) == 0) {
+				inc_flags = sdscatprintf(inc_flags, " -I\"%s\"", inc);
 			}
-			inc_flags = sdscatprintf(inc_flags, " -I%s", dep_dir);
+			inc_flags = sdscatprintf(inc_flags, " -I\"%s\"", dep_dir);
 			sdsfree(inc);
 		}
 		sdsfree(dep_dir);
@@ -89,7 +90,7 @@ int64_t handle_check(options *opts)
 	}
 
 	if (m->package.name) {
-		inc_flags = sdscatprintf(inc_flags, " -Iinclude/%s", m->package.name);
+		inc_flags = sdscatprintf(inc_flags, " -I\"include/%s\"", m->package.name);
 	}
 
 	/* Collect source and header files */

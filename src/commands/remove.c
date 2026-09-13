@@ -71,7 +71,7 @@ int64_t handle_remove(options *opts)
 		makefile_path = sdsnew("Makefile");
 	}
 
-	FILE *mf = fopen(makefile_path, "r");
+	FILE *mf = safe_fopen(makefile_path, "r");
 	if (mf) {
 		sds dep_header = sdscatprintf(sdsempty(), "# Dep: %s", package_name);
 
@@ -101,12 +101,12 @@ int64_t handle_remove(options *opts)
 				size_t before_len = (size_t)(dep_start - content);
 				size_t after_len  = sdslen(content) - (size_t)(dep_end - content);
 
-				fclose(mf);
-				mf = fopen(makefile_path, "w");
+				safe_fclose(mf);
+				mf = safe_fopen(makefile_path, "w");
 				if (mf) {
 					fwrite(content, 1, before_len, mf);
 					fwrite(dep_end, 1, after_len, mf);
-					fclose(mf);
+					safe_fclose(mf);
 					printf_safe("  Cleaned up Makefile section for %s\n", package_name);
 					mf = nullptr; /* Prevent double-close */
 				}
@@ -115,7 +115,7 @@ int64_t handle_remove(options *opts)
 		}
 		sdsfree(dep_header);
 		if (mf) {
-			fclose(mf);
+			safe_fclose(mf);
 		}
 	}
 

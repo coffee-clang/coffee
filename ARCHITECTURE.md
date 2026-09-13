@@ -32,6 +32,8 @@ them on every exploration.
 │   ├── coffee_features.c/.h  # Feature resolution: features → -DFLAGS
 │   ├── lockfile.c/.h    # Coffee.lock parser/writer (dependency pinning)
 │   ├── dep_graph.c/.h   # Transitive dependency graph resolver (DFS + cycle detection)
+│   ├── dep_graph_git.c  # Git operations on dep graph nodes (fetch, compare remote)
+│   ├── dep_graph_cache.c # Dep graph caching (.coffee/build-cache)
 │   ├── strings.h        # Safe printf/snprintf wrappers
 │   ├── compat_limits.h  # Polyfill for C23 stdckdint on older toolchains
 │   ├── toolcheck.c/.h   # Tool checking utilities
@@ -197,14 +199,14 @@ handle_fetch(&opt)
 
 ```
 registry_search() / registry_get()
-    → curl (via system()) → ~/.coffee/packages.json (cached index)
+    → curl (fork+exec) → ~/.coffee/packages.json.zst → zstd (fork+exec) → packages.json (cached index)
     → parse JSON lines → recipe_t / recipe_list_t
 ```
 
 This is a secondary, deprecated path. The project is designed for git/path-based
 dependency management without a central registry.
 
-**Dep graph flow** (`src/dep_graph.c`):
+**Dep graph flow** (`src/dep_graph.c`, `src/dep_graph_git.c`, `src/dep_graph_cache.c`):
 
 ```
 dep_graph_create(manifest, lockfile, offline)
@@ -418,7 +420,7 @@ Passed to `build_project()` and `compile_sources()`.
 
 - **Manifest stores deps twice.** The flat `package.dependencies[]` array preserves the raw TOML strings (backwards compatibility with existing commands like `tree`, `update`, `metadata`). The structured `dependencies.deps[]` array is populated from inline tables (`name = { git = "...", ... }`) and used by `fetch`, `generate_lockfile`, and `build`.
 
-- **Transitive dependency graph.** `dep_graph.c` resolves the full transitive dependency tree via DFS, producing a flat array with the root at index 0. Each node carries resolved paths, compiler flags, source files, and git metadata. This complements (rather than replaces) the older `dep_resolve_dir()` / `dep_add_flags()` helpers, which are still used by `tree` and `coffee_features`. The dep graph is used by `test`, `install`, `fetch`, `update`, `outdated`, `report`, `metadata`, `generate-lockfile`, and `build`.
+- **Transitive dependency graph.** `dep_graph.c` resolves the full transitive dependency tree via DFS, producing a flat array with the root at index 0. Each node carries resolved paths, compiler flags, source files, and git metadata. The module is split by concern: `dep_graph_git.c` holds the git fetch/compare operations, `dep_graph_cache.c` holds the `.coffee/build-cache` read/write path. `dep_graph_find_node()` (in `dep_graph.h`) is shared internally. This complements (rather than replaces) the older `dep_resolve_dir()` / `dep_add_flags()` helpers, which are still used by `tree` and `coffee_features`. The dep graph is used by `test`, `install`, `fetch`, `update`, `outdated`, `report`, `metadata`, `generate-lockfile`, and `build`.
 
 - **Arena allocator in safe.h.** `include/safe.h` provides a bump-pointer arena (`struct arena`) with block chaining. Allocations from an arena are freed together via `arena_reset()` or `arena_destroy()`. Individual `arena_alloc()` pointers cannot be freed separately. Default block size is 64 KiB. This is used internally by `dep_graph` and other modules that need bulk temporary allocations.
 
@@ -431,9 +433,9 @@ Passed to `build_project()` and `compile_sources()`.
 | **sds**          | `include/sds/` (antirez/sds) | Everywhere                                                   | Dynamic string type (replaces `char *`)   |
 | **toml**         | `include/` (cktan/tomlc99)   | `src/manifest.c`                                             | Parse `Coffee.toml` into `manifest_t`     |
 | **safe**         | `include/`                   | Various                                                      | Arena allocator / safe memory wrappers    |
-| **curl**         | system (`pkg-config --libs`) | `src/registry.c`                                             | HTTP downloads (called via `system()`)    |
-| **zlib**         | system (`-lz`)               | `src/registry.c`                                             | Decompress registry index                 |
-| **git**          | system                       | `src/commands/fetch.c`, `dep_graph.c`, `generate_lockfile.c` | Clone/fetch git deps, resolve commit SHAs |
+| **curl**         | system CLI (`curl`)         | `src/registry.c`                                             | HTTP downloads (fork+exec, no shell)      |
+| **zstd**         | system CLI (`zstd`)         | `src/registry.c`                                             | Decompress the registry index             |
+| **git**          | system                       | `src/commands/fetch.c`, `dep_graph_git.c`, `generate_lockfile.c` | Clone/fetch git deps, resolve commit SHAs |
 | **getopt_long**  | libc (POSIX)                 | `src/cmdline.c`                                              | CLI argument parsing via getopt_long      |
 | **clang**        | system                       | `src/build.c`, `src/commands/test.c`                         | Default compiler (fork+exec `$CC`)        |
 | **clang-format** | build-time tool              | `fmt` command                                                | Code formatting                           |

@@ -18,7 +18,7 @@
 static toml_table_t *read_dep_table(const char *dep_dir)
 {
 	sds   toml_path = sdscatprintf(sdsempty(), "%s/library.toml", dep_dir);
-	FILE *fp        = fopen(toml_path, "r");
+	FILE *fp        = safe_fopen(toml_path, "r");
 	sdsfree(toml_path);
 	if (fp == nullptr) {
 		return nullptr;
@@ -26,7 +26,7 @@ static toml_table_t *read_dep_table(const char *dep_dir)
 
 	char          errbuf[256];
 	toml_table_t *conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
-	fclose(fp);
+	safe_fclose(fp);
 
 	if (conf == nullptr) {
 		return nullptr;

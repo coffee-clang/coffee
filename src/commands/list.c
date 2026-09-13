@@ -2,6 +2,7 @@
 #include "../manifest.h"
 #include "../project.h"
 #include "../registry.h"
+#include "safe.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,7 +21,7 @@ int64_t handle_list(options *opts)
 		sdsfree(home_dir);
 
 		struct stat st;
-		if (stat(bin_dir, &st) != 0) {
+		if (safe_stat(bin_dir, &st) != 0) {
 			printf_safe("No installed binaries.\n");
 			sdsfree(bin_dir);
 			return 0;
@@ -41,7 +42,7 @@ int64_t handle_list(options *opts)
 				continue;
 			}
 			sds full_path = sdscatprintf(sdsempty(), "%s/%s", bin_dir, entry->d_name);
-			if (access(full_path, X_OK) == 0) {
+			if (safe_access(full_path, X_OK) == 0) {
 				printf_safe("  %s\n", entry->d_name);
 				count++;
 			}

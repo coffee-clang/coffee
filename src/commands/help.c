@@ -12,5 +12,6 @@ int64_t handle_help(options *opt)
 			printf_safe("  %-24s %s\n", commands[i].name, commands[i].description);
 		}
 	}
+	printf_safe("\nAliases: b = build, c = check\n");
 	return 0;
 }

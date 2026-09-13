@@ -364,14 +364,13 @@ i64 cmdline_parser(i64 argc, char **argv, struct cli_args *args_info)
 		case 'j':
 			args_info->jobs_given = true;
 			{
-				char *end;
-				long  val = strtol(optarg, &end, 10);
-				if (end == optarg || *end != '\0' || val < 0 || val > 2147483647) {
+				i64 val;
+				if (!safe_strtol(optarg, 10, &val) || val < 0 || val > 2147483647) {
 					fprintf_safe(stderr, "coffee: invalid numeric value: %s\n", optarg);
 					cmdline_parser_free(args_info);
 					return 1;
 				}
-				args_info->jobs_arg = (i64)val;
+				args_info->jobs_arg = val;
 			}
 			break;
 

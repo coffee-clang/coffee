@@ -20,10 +20,20 @@ static bool tool_exists(const char *name)
 
 i64 toolcheck_run(const char *command_name)
 {
-	if (command_name != nullptr) {
-		if (strcmp(command_name, "help") == 0 || strcmp(command_name, "version") == 0) {
-			return 0;
-		}
+	if (command_name == nullptr) {
+		return 0;
+	}
+
+	/* Only commands that actually build, compile, or fetch need tool
+	 * probing.  Everything else (help, version, config, search, ...)
+	 * must work even when clang/git are absent from PATH. */
+	if (strcmp(command_name, "build") != 0 && strcmp(command_name, "b") != 0 &&
+	    strcmp(command_name, "compile") != 0 && strcmp(command_name, "check") != 0 &&
+	    strcmp(command_name, "c") != 0 && strcmp(command_name, "test") != 0 &&
+	    strcmp(command_name, "bench") != 0 && strcmp(command_name, "install") != 0 &&
+	    strcmp(command_name, "lint") != 0 && strcmp(command_name, "fix") != 0 &&
+	    strcmp(command_name, "run") != 0) {
+		return 0;
 	}
 
 	struct {

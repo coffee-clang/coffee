@@ -102,7 +102,7 @@ TEST(cov_dep_add_flags_with_library_toml)
 	ASSERT(found > 0, "dep_add_flags should find entries");
 	ASSERT(strstr(flags, "-I") != nullptr, "flags contain -I");
 	ASSERT(strstr(flags, "-L") != nullptr, "flags contain -L");
-	ASSERT(strstr(flags, "-ltestlib") != nullptr, "flags contain -ltestlib");
+	ASSERT(strstr(flags, "-l\"testlib\"") != nullptr, "flags contain -l\"testlib\"");
 
 	sdsfree(flags);
 	rmdir("deps/testlib/lib");
@@ -126,7 +126,7 @@ TEST(cov_dep_add_flags_fallback)
 	ASSERT(found == 0, "fallback should return 0 (no library.toml)");
 	ASSERT(strstr(flags, "-I") != nullptr, "flags contain -I fallback");
 	ASSERT(strstr(flags, "-L") != nullptr, "flags contain -L fallback");
-	ASSERT(strstr(flags, "-lfallback") != nullptr, "flags contain -lfallback");
+	ASSERT(strstr(flags, "-l\"fallback\"") != nullptr, "flags contain -l\"fallback\"");
 
 	sdsfree(flags);
 	rmdir("deps/fallback/lib");

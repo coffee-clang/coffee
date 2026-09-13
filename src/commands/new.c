@@ -2,6 +2,7 @@
 #include "../manifest.h"
 #include "../project.h"
 #include "../skeleton.h"
+#include "safe.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -50,7 +51,7 @@ int64_t handle_new(options *opts)
 
 	sds manifest_path = sdscatprintf(sdsempty(), "%s/Coffee.toml", path);
 
-	if (access(manifest_path, F_OK) == 0) {
+	if (safe_access(manifest_path, F_OK) == 0) {
 		sdsfree(manifest_path);
 		fprintf_safe(stderr, "Error: Project already exists at %s\n", path);
 		return 1;

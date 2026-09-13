@@ -23,17 +23,27 @@ static i64 fetch_git_dep(const char *name, const char *url, const char *global_d
 		fprintf_safe(stderr, "  Error: invalid dependency name '%s'\n", name);
 		return 1;
 	}
+	if (!url_is_valid(url)) {
+		fprintf_safe(stderr, "  Error: invalid git URL for '%s'\n", name);
+		return 1;
+	}
+	if (ref != nullptr && !ref_is_valid(ref)) {
+		fprintf_safe(stderr, "  Error: invalid git ref '%s' for '%s'\n", ref, name);
+		return 1;
+	}
 	sds target_dir = sdscatprintf(sdsempty(), "%s/%s", global_dir, name);
 
 	sds git_dir = sdscatprintf(sdsempty(), "%s/.git", target_dir);
-	if (access(git_dir, F_OK) == 0) {
+	if (safe_access(git_dir, F_OK) == 0) {
 		sdsfree(git_dir);
 		if (verbose) {
 			printf_safe("    Updating %s...\n", name);
 		}
 		i64 ret;
 		if (ref != nullptr) {
-			char *argv1[] = { "git", "-C", target_dir, "fetch", "--depth", "1", "origin", unconst(ref), nullptr };
+			/* '--' before the refspec prevents git from parsing a
+			 * ref that starts with '-' as an option (option injection). */
+			char *argv1[] = { "git", "-C", target_dir, "fetch", "--depth", "1", "origin", "--", unconst(ref), nullptr };
 			ret           = run_command(argv1, RUN_CMD_QUIET);
 			if (ret == 0) {
 				char *argv2[] = { "git", "-C", target_dir, "checkout", unconst(ref), nullptr };
@@ -56,10 +66,10 @@ static i64 fetch_git_dep(const char *name, const char *url, const char *global_d
 
 	i64 ret;
 	if (ref != nullptr) {
-		char *argv[] = { "git", "clone", "--depth", "1", "--branch", unconst(ref), unconst(url), target_dir, nullptr };
+		char *argv[] = { "git", "clone", "--depth", "1", "--branch", unconst(ref), "--", unconst(url), target_dir, nullptr };
 		ret          = run_command(argv, RUN_CMD_QUIET);
 	} else {
-		char *argv[] = { "git", "clone", "--depth", "1", unconst(url), target_dir, nullptr };
+		char *argv[] = { "git", "clone", "--depth", "1", "--", unconst(url), target_dir, nullptr };
 		ret          = run_command(argv, RUN_CMD_QUIET);
 	}
 	if (verbose) {
@@ -91,7 +101,7 @@ static i64 fetch_path_dep(const char *name, const char *path, const char *local_
 		safe_free(resolved);
 	}
 
-	if (access(target, F_OK) != 0) {
+	if (safe_access(target, F_OK) != 0) {
 		fprintf_safe(stderr, "  Error: path '%s' for '%s' does not exist\n", target, name);
 		sdsfree(target);
 		return 1;

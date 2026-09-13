@@ -103,6 +103,15 @@ int64_t handle_install(options *opts)
 	char       *package     = opts->inputs[1];
 	const char *req_version = opts->inputs_num >= 3 ? opts->inputs[2] : nullptr;
 
+	if (!dep_name_is_valid(package)) {
+		fprintf_safe(stderr, "Error: invalid package name '%s'\n", package);
+		return 1;
+	}
+	if (!url_is_valid(opts->git)) {
+		fprintf_safe(stderr, "Error: invalid --git URL '%s'\n", opts->git);
+		return 1;
+	}
+
 	if (req_version != nullptr) {
 		printf_safe("Installing package: %s (version %s)\n", package, req_version);
 	} else {
@@ -127,7 +136,7 @@ int64_t handle_install(options *opts)
 	}
 
 	{
-		char *clone_argv[] = { "git", "clone", "--depth", "1", opts->git, clone_path, nullptr };
+		char *clone_argv[] = { "git", "clone", "--depth", "1", "--", opts->git, clone_path, nullptr };
 		i64   ret          = run_command(clone_argv, RUN_CMD_QUIET);
 		if (ret != 0) {
 			sdsfree(clone_path);
@@ -172,7 +181,7 @@ int64_t handle_install(options *opts)
 		}
 
 		/* Move cloned files into versioned directory */
-		if (rename(clone_path, cache_path) != 0) {
+		if (safe_rename(clone_path, cache_path) != 0) {
 			char *mv_argv[] = { "mv", clone_path, cache_path, nullptr };
 			i64   mv_ret    = run_command(mv_argv, RUN_CMD_QUIET);
 			if (mv_ret == 0) {

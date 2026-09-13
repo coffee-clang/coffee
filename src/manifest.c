@@ -8,6 +8,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <unistd.h>
+
 static bool is_valid_feature_name(const char *name)
 {
 	if (name == nullptr || name[0] == '\0') {
@@ -77,6 +79,9 @@ static void free_binary(binary_target_t *bin)
 	safe_free(bin->src);
 }
 
+/* tomlc99's toml_rtos() (via toml_string_in/at) returns a freshly
+ * allocated string owned by the caller (see norm_basic_str in toml.c),
+ * so safe_free(datum.u.s) below is correct — never double-freed. */
 static sds toml_datum_to_string(toml_datum_t datum)
 {
 	if (!datum.ok) {
@@ -87,16 +92,24 @@ static sds toml_datum_to_string(toml_datum_t datum)
 	return result;
 }
 
+/* toml_array_nelem returns i64; guard against a negative count wrapping
+ * to SIZE_MAX on the subsequent allocation. */
+static size_t array_nelem_safe(toml_array_t *arr)
+{
+	i64 n = toml_array_nelem(arr);
+	return n > 0 ? (size_t)n : 0;
+}
+
 manifest_t *manifest_parse(sds path)
 {
-	FILE *fp = fopen(path, "r");
+	FILE *fp = safe_fopen(path, "r");
 	if (fp == nullptr) {
 		return nullptr;
 	}
 
 	char          errbuf[256];
 	toml_table_t *conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
-	fclose(fp);
+	safe_fclose(fp);
 
 	if (conf == nullptr) {
 		fprintf_safe(stderr, "Error: TOML parse failed: %s\n", errbuf[0] ? errbuf : "unknown error");
@@ -135,7 +148,7 @@ manifest_t *manifest_parse(sds path)
 
 	toml_array_t *deps_arr = toml_array_in(conf, "dependencies");
 	if (deps_arr) {
-		m->package.dependencies_count = (size_t)toml_array_nelem(deps_arr);
+		m->package.dependencies_count = array_nelem_safe(deps_arr);
 		m->package.dependencies       = safe_calloc(m->package.dependencies_count, sizeof(sds));
 		if (m->package.dependencies == nullptr && m->package.dependencies_count > 0) {
 			manifest_free(m);
@@ -195,7 +208,7 @@ manifest_t *manifest_parse(sds path)
 		sources_arr = toml_array_in(pkg, "sources");
 	}
 	if (sources_arr) {
-		m->package.sources_count = (size_t)toml_array_nelem(sources_arr);
+		m->package.sources_count = array_nelem_safe(sources_arr);
 		m->package.sources       = safe_calloc(m->package.sources_count, sizeof(sds));
 		if (m->package.sources == nullptr && m->package.sources_count > 0) {
 			manifest_free(m);
@@ -213,7 +226,7 @@ manifest_t *manifest_parse(sds path)
 		headers_arr = toml_array_in(pkg, "headers");
 	}
 	if (headers_arr) {
-		m->package.headers_count = (size_t)toml_array_nelem(headers_arr);
+		m->package.headers_count = array_nelem_safe(headers_arr);
 		m->package.headers       = safe_calloc(m->package.headers_count, sizeof(sds));
 		if (m->package.headers == nullptr && m->package.headers_count > 0) {
 			manifest_free(m);
@@ -262,7 +275,7 @@ manifest_t *manifest_parse(sds path)
 				if (!is_valid_feature_name(m->features[idx].name)) {
 					fprintf_safe(stderr, "Warning: Invalid feature name: %s\n", key);
 				}
-				m->features[idx].deps_count = (size_t)toml_array_nelem(arr);
+				m->features[idx].deps_count = array_nelem_safe(arr);
 				if (m->features[idx].deps_count > 0) {
 					m->features[idx].deps = safe_calloc(m->features[idx].deps_count, sizeof(sds));
 					if (m->features[idx].deps == nullptr) {
@@ -308,7 +321,7 @@ manifest_t *manifest_parse(sds path)
 	/* Parse [[bin]] array of tables */
 	toml_array_t *bin_arr = toml_array_in(conf, "bin");
 	if (bin_arr) {
-		m->bin_count = (size_t)toml_array_nelem(bin_arr);
+		m->bin_count = array_nelem_safe(bin_arr);
 		if (m->bin_count > 0) {
 			m->bin = safe_calloc(m->bin_count, sizeof(binary_target_t));
 			if (m->bin == nullptr) {
@@ -325,7 +338,7 @@ manifest_t *manifest_parse(sds path)
 				m->bin[i].name        = toml_datum_to_string(bname);
 				toml_array_t *src_arr = toml_array_in(bt, "src");
 				if (src_arr) {
-					m->bin[i].src_count = (size_t)toml_array_nelem(src_arr);
+					m->bin[i].src_count = array_nelem_safe(src_arr);
 					if (m->bin[i].src_count > 0) {
 						m->bin[i].src = safe_calloc(m->bin[i].src_count, sizeof(sds));
 						if (m->bin[i].src == nullptr) {
@@ -422,7 +435,7 @@ manifest_t *manifest_parse(sds path)
 	if (test_tab) {
 		toml_array_t *src_arr = toml_array_in(test_tab, "sources");
 		if (src_arr) {
-			m->test.sources_count = (size_t)toml_array_nelem(src_arr);
+			m->test.sources_count = array_nelem_safe(src_arr);
 			m->test.sources       = safe_calloc(m->test.sources_count, sizeof(sds));
 			if (m->test.sources == nullptr && m->test.sources_count > 0) {
 				manifest_free(m);
@@ -529,39 +542,47 @@ void manifest_free(manifest_t *m)
 
 i64 manifest_write(sds path, manifest_t *m)
 {
-	FILE *fp = fopen(path, "w");
+	if (m == nullptr || path == nullptr) {
+		return -1;
+	}
+
+	/* Write to a temp file, fsync, then rename over the target so a crash
+	 * or ENOSPC mid-write cannot truncate the user's Coffee.toml. */
+	sds   tmp_path = sdscatprintf(sdsempty(), "%s.tmp", path);
+	FILE *fp       = safe_fopen(tmp_path, "w");
 	if (fp == nullptr) {
+		sdsfree(tmp_path);
 		return -1;
 	}
 
 	fprintf_safe(fp, "[package]\n");
 	if (m->package.name) {
-		fprintf_safe(fp, "name = \"%s\"\n", m->package.name);
+		fprintf_toml_value(fp, "name = \"%s\"\n", m->package.name);
 	}
 	if (m->package.version) {
-		fprintf_safe(fp, "version = \"%s\"\n", m->package.version);
+		fprintf_toml_value(fp, "version = \"%s\"\n", m->package.version);
 	}
 	if (m->package.edition) {
-		fprintf_safe(fp, "edition = \"%s\"\n", m->package.edition);
+		fprintf_toml_value(fp, "edition = \"%s\"\n", m->package.edition);
 	}
 	if (m->package.description) {
-		fprintf_safe(fp, "description = \"%s\"\n", m->package.description);
+		fprintf_toml_value(fp, "description = \"%s\"\n", m->package.description);
 	}
 	if (m->package.license) {
-		fprintf_safe(fp, "license = \"%s\"\n", m->package.license);
+		fprintf_toml_value(fp, "license = \"%s\"\n", m->package.license);
 	}
 	if (m->package.repository) {
-		fprintf_safe(fp, "repository = \"%s\"\n", m->package.repository);
+		fprintf_toml_value(fp, "repository = \"%s\"\n", m->package.repository);
 	}
 	if (m->package.authors) {
-		fprintf_safe(fp, "authors = \"%s\"\n", m->package.authors);
+		fprintf_toml_value(fp, "authors = \"%s\"\n", m->package.authors);
 	}
 
 	if (m->package.sources_count > 0) {
 		fprintf_safe(fp, "\nsources = [\n");
 		for (size_t i = 0; i < m->package.sources_count; i++) {
 			if (m->package.sources[i]) {
-				fprintf_safe(fp, "  \"%s\",\n", m->package.sources[i]);
+				fprintf_toml_value(fp, "  \"%s\",\n", m->package.sources[i]);
 			}
 		}
 		fprintf_safe(fp, "]\n");
@@ -571,18 +592,74 @@ i64 manifest_write(sds path, manifest_t *m)
 		fprintf_safe(fp, "headers = [\n");
 		for (size_t i = 0; i < m->package.headers_count; i++) {
 			if (m->package.headers[i]) {
-				fprintf_safe(fp, "  \"%s\",\n", m->package.headers[i]);
+				fprintf_toml_value(fp, "  \"%s\",\n", m->package.headers[i]);
 			}
 		}
 		fprintf_safe(fp, "]\n");
 	}
 
-	if (m->package.dependencies_count > 0) {
+	/* Dependencies: emit structured (inline-table) deps first, then flat
+	 * string entries.  Bare keys in the flat array are inline-table
+	 * remnants from parsing and must be skipped to avoid emitting a key
+	 * with no value (invalid TOML) and duplicating the dep. */
+	if (m->package.dependencies_count > 0 || m->dependencies.deps_count > 0) {
 		fprintf_safe(fp, "\n[dependencies]\n");
-		for (size_t i = 0; i < m->package.dependencies_count; i++) {
-			if (m->package.dependencies[i]) {
-				fprintf_safe(fp, "%s\n", m->package.dependencies[i]);
+		for (size_t i = 0; i < m->dependencies.deps_count; i++) {
+			dependency_t *d = &m->dependencies.deps[i];
+			if (d->name == nullptr) {
+				continue;
 			}
+			fprintf_safe(fp, "%s = {", d->name);
+			bool first = true;
+			if (d->git) {
+				fprintf_toml_value(fp, first ? " git = \"%s\"" : ", git = \"%s\"", d->git);
+				first = false;
+			}
+			if (d->path) {
+				fprintf_toml_value(fp, first ? " path = \"%s\"" : ", path = \"%s\"", d->path);
+				first = false;
+			}
+			if (d->version) {
+				fprintf_toml_value(fp, first ? " version = \"%s\"" : ", version = \"%s\"", d->version);
+				first = false;
+			}
+			if (d->branch) {
+				fprintf_toml_value(fp, first ? " branch = \"%s\"" : ", branch = \"%s\"", d->branch);
+				first = false;
+			}
+			if (d->tag) {
+				fprintf_toml_value(fp, first ? " tag = \"%s\"" : ", tag = \"%s\"", d->tag);
+				first = false;
+			}
+			if (d->rev) {
+				fprintf_toml_value(fp, first ? " rev = \"%s\"" : ", rev = \"%s\"", d->rev);
+				first = false;
+			}
+			if (d->optional) {
+				fprintf_safe(fp, "%s optional = true", first ? "" : ",");
+				first = false;
+			}
+			fprintf_safe(fp, " }\n");
+		}
+		for (size_t i = 0; i < m->package.dependencies_count; i++) {
+			if (m->package.dependencies[i] == nullptr) {
+				continue;
+			}
+			if (strchr(m->package.dependencies[i], '=') == nullptr) {
+				sds  name        = dep_parse_name(m->package.dependencies[i]);
+				bool structured  = false;
+				for (size_t j = 0; j < m->dependencies.deps_count; j++) {
+					if (m->dependencies.deps[j].name != nullptr && strcmp(m->dependencies.deps[j].name, name) == 0) {
+						structured = true;
+						break;
+					}
+				}
+				sdsfree(name);
+				if (structured) {
+					continue;
+				}
+			}
+			fprintf_safe(fp, "%s\n", m->package.dependencies[i]);
 		}
 	}
 
@@ -596,7 +673,7 @@ i64 manifest_write(sds path, manifest_t *m)
 						fprintf_safe(fp, ", ");
 					}
 					if (m->features[i].deps[j]) {
-						fprintf_safe(fp, "\"%s\"", m->features[i].deps[j]);
+						fprintf_toml_value(fp, "\"%s\"", m->features[i].deps[j]);
 					}
 				}
 				fprintf_safe(fp, "]\n");
@@ -609,12 +686,12 @@ i64 manifest_write(sds path, manifest_t *m)
 		for (size_t i = 0; i < m->bin_count; i++) {
 			if (m->bin[i].name) {
 				fprintf_safe(fp, "[[bin]]\n");
-				fprintf_safe(fp, "name = \"%s\"\n", m->bin[i].name);
+				fprintf_toml_value(fp, "name = \"%s\"\n", m->bin[i].name);
 				if (m->bin[i].src_count > 0) {
 					fprintf_safe(fp, "src = [\n");
 					for (size_t j = 0; j < m->bin[i].src_count; j++) {
 						if (m->bin[i].src[j]) {
-							fprintf_safe(fp, "  \"%s\",\n", m->bin[i].src[j]);
+							fprintf_toml_value(fp, "  \"%s\",\n", m->bin[i].src[j]);
 						}
 					}
 					fprintf_safe(fp, "]\n");
@@ -630,19 +707,41 @@ i64 manifest_write(sds path, manifest_t *m)
 			fprintf_safe(fp, "sources = [\n");
 			for (size_t i = 0; i < m->test.sources_count; i++) {
 				if (m->test.sources[i]) {
-					fprintf_safe(fp, "  \"%s\",\n", m->test.sources[i]);
+					fprintf_toml_value(fp, "  \"%s\",\n", m->test.sources[i]);
 				}
 			}
 			fprintf_safe(fp, "]\n");
 		}
 		if (m->test.harness) {
-			fprintf_safe(fp, "harness = \"%s\"\n", m->test.harness);
+			fprintf_toml_value(fp, "harness = \"%s\"\n", m->test.harness);
 		}
 		if (m->test.framework) {
-			fprintf_safe(fp, "framework = \"%s\"\n", m->test.framework);
+			fprintf_toml_value(fp, "framework = \"%s\"\n", m->test.framework);
 		}
 	}
 
-	fclose(fp);
+	if (fflush(fp) != 0) {
+		safe_fclose(fp);
+		remove(tmp_path);
+		sdsfree(tmp_path);
+		return -1;
+	}
+	if (fsync(fileno(fp)) != 0) {
+		safe_fclose(fp);
+		remove(tmp_path);
+		sdsfree(tmp_path);
+		return -1;
+	}
+	if (safe_fclose(fp) != 0) {
+		remove(tmp_path);
+		sdsfree(tmp_path);
+		return -1;
+	}
+	if (safe_rename(tmp_path, path) != 0) {
+		remove(tmp_path);
+		sdsfree(tmp_path);
+		return -1;
+	}
+	sdsfree(tmp_path);
 	return 0;
 }

@@ -11,9 +11,7 @@
 
 #include <glob.h>
 #include <sds/sds.h>
-#include <sys/stat.h>
 #include <toml.h>
-#include <unistd.h>
 
 /* ------------------------------------------------------------------ */
 /* Internal helpers                                                    */
@@ -112,7 +110,7 @@ static sds dep_extract_constraint(const char *entry)
 /*
  * Find a dep in the graph by name. Returns -1 if not found.
  */
-static i64 find_node(const dep_graph_t *g, const char *name)
+i64 dep_graph_find_node(const dep_graph_t *g, const char *name)
 {
 	if (g == nullptr || name == nullptr) {
 		return -1;
@@ -155,11 +153,11 @@ static toml_table_t *dep_graph_read_table(const char *dep_dir, toml_table_t **ou
 	*out_conf = nullptr;
 
 	sds   toml_path = sdscatprintf(sdsempty(), "%s/Coffee.toml", dep_dir);
-	FILE *fp        = fopen(toml_path, "r");
+	FILE *fp        = safe_fopen(toml_path, "r");
 	if (fp == nullptr) {
 		sdsfree(toml_path);
 		toml_path = sdscatprintf(sdsempty(), "%s/library.toml", dep_dir);
-		fp        = fopen(toml_path, "r");
+		fp        = safe_fopen(toml_path, "r");
 		if (fp == nullptr) {
 			sdsfree(toml_path);
 			return nullptr;
@@ -169,7 +167,7 @@ static toml_table_t *dep_graph_read_table(const char *dep_dir, toml_table_t **ou
 
 	char          errbuf[256];
 	toml_table_t *conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
-	fclose(fp);
+	safe_fclose(fp);
 
 	if (conf == nullptr) {
 		return nullptr;
@@ -191,7 +189,7 @@ static toml_table_t *dep_graph_read_table(const char *dep_dir, toml_table_t **ou
 static sds read_version(const char *dep_dir)
 {
 	sds   toml_path = sdscatprintf(sdsempty(), "%s/library.toml", dep_dir);
-	FILE *fp        = fopen(toml_path, "r");
+	FILE *fp        = safe_fopen(toml_path, "r");
 	sdsfree(toml_path);
 	if (fp == nullptr) {
 		return sdsnew("*");
@@ -199,7 +197,7 @@ static sds read_version(const char *dep_dir)
 
 	char          errbuf[256];
 	toml_table_t *conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
-	fclose(fp);
+	safe_fclose(fp);
 
 	if (conf == nullptr) {
 		return sdsnew("*");
@@ -224,11 +222,11 @@ static sds read_version(const char *dep_dir)
 static sds get_git_ref_from_manifest(const char *dep_dir)
 {
 	sds   toml_path = sdscatprintf(sdsempty(), "%s/Coffee.toml", dep_dir);
-	FILE *fp        = fopen(toml_path, "r");
+	FILE *fp        = safe_fopen(toml_path, "r");
 	if (fp == nullptr) {
 		sdsfree(toml_path);
 		toml_path = sdscatprintf(sdsempty(), "%s/library.toml", dep_dir);
-		fp        = fopen(toml_path, "r");
+		fp        = safe_fopen(toml_path, "r");
 		if (fp == nullptr) {
 			sdsfree(toml_path);
 			return nullptr;
@@ -238,7 +236,7 @@ static sds get_git_ref_from_manifest(const char *dep_dir)
 
 	char          errbuf[256];
 	toml_table_t *conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
-	fclose(fp);
+	safe_fclose(fp);
 
 	if (conf == nullptr) {
 		return nullptr;
@@ -374,7 +372,7 @@ dep_graph_t *dep_graph_create(manifest_t *m, lockfile_t *lf, bool offline)
 
 			/* Check if git repo */
 			sds git_dir = sdscatprintf(sdsempty(), "%s/.git", dep_dir);
-			if (access(git_dir, F_OK) == 0) {
+			if (safe_access(git_dir, F_OK) == 0) {
 				cur->is_git = true;
 				/* Get the git ref from the manifest (branch/tag/rev) */
 				sds ref = get_git_ref_from_manifest(dep_dir);
@@ -411,7 +409,7 @@ dep_graph_t *dep_graph_create(manifest_t *m, lockfile_t *lf, bool offline)
 					sds constraint = get_toml_constraint(transitive_deps, dep_key);
 
 					/* Check if already in graph — validate version constraint */
-					i64 existing = find_node(g, dep_key);
+					i64 existing = dep_graph_find_node(g, dep_key);
 					if (existing >= 0) {
 						if (constraint != nullptr && g->nodes[existing].version != nullptr) {
 							if (!version_satisfies(g->nodes[existing].version, constraint)) {
@@ -471,7 +469,7 @@ dep_graph_t *dep_graph_create(manifest_t *m, lockfile_t *lf, bool offline)
 				}
 
 				/* Check if already in graph — validate version constraint */
-				i64 existing = find_node(g, dep_name);
+				i64 existing = dep_graph_find_node(g, dep_name);
 				if (existing >= 0) {
 					if (constraint != nullptr && g->nodes[existing].version != nullptr) {
 						if (!version_satisfies(g->nodes[existing].version, constraint)) {
@@ -570,7 +568,7 @@ sds dep_graph_flags(const dep_graph_t *g, const char *dep_name)
 	if (g == nullptr || dep_name == nullptr) {
 		return sdsempty();
 	}
-	i64 idx = find_node(g, dep_name);
+	i64 idx = dep_graph_find_node(g, dep_name);
 	if (idx < 0 || g->nodes[idx].flags == nullptr) {
 		return sdsempty();
 	}
@@ -582,7 +580,7 @@ const sds *dep_graph_sources(const dep_graph_t *g, const char *dep_name, size_t 
 	if (g == nullptr || dep_name == nullptr || count == nullptr) {
 		return nullptr;
 	}
-	i64 idx = find_node(g, dep_name);
+	i64 idx = dep_graph_find_node(g, dep_name);
 	if (idx < 0) {
 		*count = 0;
 		return nullptr;
@@ -596,7 +594,7 @@ const char *dep_graph_path(const dep_graph_t *g, const char *dep_name)
 	if (g == nullptr || dep_name == nullptr) {
 		return nullptr;
 	}
-	i64 idx = find_node(g, dep_name);
+	i64 idx = dep_graph_find_node(g, dep_name);
 	if (idx < 0) {
 		return nullptr;
 	}
@@ -608,7 +606,7 @@ const char *dep_graph_commit(const dep_graph_t *g, const char *dep_name)
 	if (g == nullptr || dep_name == nullptr) {
 		return nullptr;
 	}
-	i64 idx = find_node(g, dep_name);
+	i64 idx = dep_graph_find_node(g, dep_name);
 	if (idx < 0) {
 		return nullptr;
 	}
@@ -620,7 +618,7 @@ bool dep_graph_is_git(const dep_graph_t *g, const char *dep_name)
 	if (g == nullptr || dep_name == nullptr) {
 		return false;
 	}
-	i64 idx = find_node(g, dep_name);
+	i64 idx = dep_graph_find_node(g, dep_name);
 	if (idx < 0) {
 		return false;
 	}
@@ -632,439 +630,10 @@ const char *dep_graph_git_ref(const dep_graph_t *g, const char *dep_name)
 	if (g == nullptr || dep_name == nullptr) {
 		return nullptr;
 	}
-	i64 idx = find_node(g, dep_name);
+	i64 idx = dep_graph_find_node(g, dep_name);
 	if (idx < 0) {
 		return nullptr;
 	}
 	return g->nodes[idx].git_ref;
 }
 
-i64 dep_graph_compare_remote(const dep_graph_t *g, const char *dep_name, sds *behind_by)
-{
-	if (g == nullptr || dep_name == nullptr) {
-		return -1;
-	}
-	i64 idx = find_node(g, dep_name);
-	if (idx < 0 || !g->nodes[idx].is_git || g->nodes[idx].path == nullptr) {
-		return -1;
-	}
-
-	const char *dep_path = g->nodes[idx].path;
-	const char *ref      = g->nodes[idx].git_ref != nullptr ? g->nodes[idx].git_ref : "origin/HEAD";
-
-	if (g->offline) {
-		if (behind_by) {
-			*behind_by = sdsnew("(offline)");
-		}
-		return -1;
-	}
-
-	/* git fetch origin */
-	char *fetch_argv[] = { "git", "-C", unconst(dep_path), "fetch", "origin", "--depth", "1", nullptr };
-	i64   ret          = run_command(fetch_argv, RUN_CMD_QUIET);
-
-	if (ret != 0) {
-		if (behind_by) {
-			*behind_by = sdsnew("(fetch failed)");
-		}
-		return -1;
-	}
-
-	/* git rev-list --count HEAD..<ref>  */
-	sds   rev_arg    = sdscatprintf(sdsempty(), "HEAD..%s", ref);
-	char *rev_argv[] = { "git", "-C", unconst(dep_path), "rev-list", "--count", rev_arg, nullptr };
-	sds   output     = run_command_capture(rev_argv, RUN_CMD_QUIET);
-	sdsfree(rev_arg);
-	if (output == nullptr) {
-		if (behind_by) {
-			*behind_by = sdsnew("(rev-list failed)");
-		}
-		return -1;
-	}
-
-	/* Strip trailing newline */
-	size_t olen = sdslen(output);
-	if (olen > 0 && output[olen - 1] == '\n') {
-		output[olen - 1] = '\0';
-	}
-
-	i64 behind = atol(output);
-	sdsfree(output);
-	if (behind_by) {
-		if (behind == 0) {
-			*behind_by = sdsnew("up-to-date");
-		} else if (behind == 1) {
-			*behind_by = sdsnew("1 commit behind");
-		} else {
-			*behind_by = sdscatprintf(sdsempty(), "%lld commits behind", (long long)behind);
-		}
-	}
-	return behind;
-}
-
-i64 dep_graph_fetch_git(dep_graph_t *g, const char *dep_name, bool verbose)
-{
-	if (g == nullptr || dep_name == nullptr) {
-		return -1;
-	}
-	i64 idx = find_node(g, dep_name);
-	if (idx < 0 || !g->nodes[idx].is_git) {
-		return -1;
-	}
-
-	const char *dep_path = g->nodes[idx].path;
-	const char *ref      = g->nodes[idx].git_ref;
-
-	if (dep_path == nullptr) {
-		return -1;
-	}
-
-	i64 ret;
-	if (ref != nullptr) {
-		if (verbose) {
-			printf_safe("    Fetching %s (%s)...\n", dep_name, ref);
-		}
-		char *fetch_argv[] = {
-			"git", "-C", unconst(dep_path), "fetch", "origin", "--depth", "1", unconst(ref), nullptr
-		};
-		ret = run_command(fetch_argv, RUN_CMD_QUIET);
-		if (ret == 0) {
-			char *co_argv[] = { "git", "-C", unconst(dep_path), "checkout", unconst(ref), nullptr };
-			ret             = run_command(co_argv, RUN_CMD_QUIET);
-		}
-	} else {
-		if (verbose) {
-			printf_safe("    Fetching %s...\n", dep_name);
-		}
-		char *fetch_argv[] = { "git", "-C", unconst(dep_path), "fetch", "--depth", "1", "origin", nullptr };
-		ret                = run_command(fetch_argv, RUN_CMD_QUIET);
-		if (ret == 0) {
-			char *reset_argv[] = { "git", "-C", unconst(dep_path), "reset", "--hard", "origin/HEAD", nullptr };
-			ret                = run_command(reset_argv, RUN_CMD_QUIET);
-		}
-	}
-
-	if (ret == 0) {
-		/* Update commit SHA in the node */
-		char *rev_argv[] = { "git", "-C", unconst(dep_path), "rev-parse", "HEAD", nullptr };
-		sds   output     = run_command_capture(rev_argv, RUN_CMD_QUIET);
-		if (output != nullptr) {
-			size_t olen = sdslen(output);
-			if (olen > 0 && output[olen - 1] == '\n') {
-				output[olen - 1] = '\0';
-			}
-			if (output[0] != '\0') {
-				sdsfree(g->nodes[idx].commit);
-				g->nodes[idx].commit = sdsnew(output);
-			}
-			sdsfree(output);
-		}
-	}
-	return ret;
-}
-
-/* ------------------------------------------------------------------ */
-/* Graph cache — read / write to .coffee/build-cache/                   */
-/* ------------------------------------------------------------------ */
-
-static sds toml_escape(const char *s)
-{
-	if (s == nullptr) {
-		return sdsempty();
-	}
-	sds out = sdsempty();
-	for (const char *p = s; *p != '\0'; p++) {
-		if (*p == '\\') {
-			out = sdscatlen(out, "\\\\", 2);
-		} else if (*p == '"') {
-			out = sdscatlen(out, "\\\"", 2);
-		} else if (*p == '\n') {
-			out = sdscatlen(out, "\\n", 2);
-		} else if (*p == '\r') {
-			out = sdscatlen(out, "\\r", 2);
-		} else if (*p == '\t') {
-			out = sdscatlen(out, "\\t", 2);
-		} else {
-			out = sdscatlen(out, p, 1);
-		}
-	}
-	return out;
-}
-
-static i64 dep_graph_cache_write(const dep_graph_t *g, const char *cache_path, i64 toml_mtime, i64 lock_mtime)
-{
-	FILE *fp = fopen(cache_path, "w");
-	if (fp == nullptr) {
-		return -1;
-	}
-
-	fprintf_safe(fp, "# This file is automatically generated by coffee.\n");
-	fprintf_safe(fp, "# It caches the resolved dependency graph for faster builds.\n");
-	fprintf_safe(fp, "[metadata]\n");
-	fprintf_safe(fp, "coffee_toml_mtime = %lld\n", (long long)toml_mtime);
-	fprintf_safe(fp, "coffee_lock_mtime = %lld\n", (long long)lock_mtime);
-	fprintf_safe(fp, "cache_version = 1\n");
-	fprintf_safe(fp, "offline = %s\n", (int)g->offline ? "true" : "false");
-
-	for (size_t i = 0; i < g->count; i++) {
-		dep_node_t *n = &g->nodes[i];
-		fprintf_safe(fp, "\n[[nodes]]\n");
-		fprintf_safe(fp, "name = \"%s\"\n", n->name != nullptr ? n->name : "");
-
-		if (n->path != nullptr) {
-			sds esc = toml_escape(n->path);
-			fprintf_safe(fp, "path = \"%s\"\n", esc);
-			sdsfree(esc);
-		}
-		if (n->version != nullptr) {
-			sds esc = toml_escape(n->version);
-			fprintf_safe(fp, "version = \"%s\"\n", esc);
-			sdsfree(esc);
-		}
-		if (n->version_constraint != nullptr) {
-			sds esc = toml_escape(n->version_constraint);
-			fprintf_safe(fp, "version_constraint = \"%s\"\n", esc);
-			sdsfree(esc);
-		}
-		if (n->commit != nullptr) {
-			sds esc = toml_escape(n->commit);
-			fprintf_safe(fp, "commit = \"%s\"\n", esc);
-			sdsfree(esc);
-		}
-		fprintf_safe(fp, "is_git = %s\n", (int)n->is_git ? "true" : "false");
-		if (n->git_ref != nullptr) {
-			sds esc = toml_escape(n->git_ref);
-			fprintf_safe(fp, "git_ref = \"%s\"\n", esc);
-			sdsfree(esc);
-		}
-		if (n->flags != nullptr) {
-			sds esc = toml_escape(n->flags);
-			fprintf_safe(fp, "flags = \"%s\"\n", esc);
-			sdsfree(esc);
-		}
-		if (n->src_count > 0 && n->sources != nullptr) {
-			fprintf_safe(fp, "sources = [");
-			for (size_t j = 0; j < n->src_count; j++) {
-				sds esc = toml_escape(n->sources[j]);
-				fprintf_safe(fp, "\"%s\"%s", esc, (j + 1 < n->src_count) ? ", " : "");
-				sdsfree(esc);
-			}
-			fprintf_safe(fp, "]\n");
-		}
-	}
-
-	fclose(fp);
-	return 0;
-}
-
-static dep_graph_t *dep_graph_load_cached(const char *cache_path, i64 toml_mtime, i64 lock_mtime)
-{
-	FILE *fp = fopen(cache_path, "r");
-	if (fp == nullptr) {
-		return nullptr;
-	}
-
-	char          errbuf[256];
-	toml_table_t *conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
-	fclose(fp);
-
-	if (conf == nullptr) {
-		return nullptr;
-	}
-
-	/* Validate metadata */
-	toml_table_t *meta = toml_table_in(conf, "metadata");
-	if (meta == nullptr) {
-		toml_free(conf);
-		return nullptr;
-	}
-
-	toml_datum_t cached_ver = toml_int_in(meta, "cache_version");
-	if (!cached_ver.ok || cached_ver.u.i != 1) {
-		toml_free(conf);
-		return nullptr;
-	}
-
-	toml_datum_t cached_toml_mtime = toml_int_in(meta, "coffee_toml_mtime");
-	if (!cached_toml_mtime.ok || cached_toml_mtime.u.i != toml_mtime) {
-		toml_free(conf);
-		return nullptr;
-	}
-
-	toml_datum_t cached_lock_mtime = toml_int_in(meta, "coffee_lock_mtime");
-	if (!cached_lock_mtime.ok || cached_lock_mtime.u.i != lock_mtime) {
-		toml_free(conf);
-		return nullptr;
-	}
-
-	/* Read nodes */
-	toml_array_t *nodes_arr = toml_array_in(conf, "nodes");
-	if (nodes_arr == nullptr) {
-		toml_free(conf);
-		return nullptr;
-	}
-
-	i64 ncount = toml_array_nelem(nodes_arr);
-	if (ncount <= 0) {
-		toml_free(conf);
-		return nullptr;
-	}
-
-	dep_graph_t *g = safe_calloc(1, sizeof(dep_graph_t));
-	if (g == nullptr) {
-		toml_free(conf);
-		return nullptr;
-	}
-
-	g->capacity = (size_t)ncount;
-	g->nodes    = safe_calloc(g->capacity, sizeof(dep_node_t));
-	if (g->nodes == nullptr) {
-		safe_free(g);
-		toml_free(conf);
-		return nullptr;
-	}
-
-	/* Read offline flag from metadata */
-	toml_datum_t cached_offline = toml_bool_in(meta, "offline");
-	if (cached_offline.ok != 0) {
-		g->offline = (cached_offline.u.b != 0);
-	} else {
-		g->offline = false;
-	}
-
-	for (i64 i = 0; i < ncount; i++) {
-		toml_table_t *ntbl = toml_table_at(nodes_arr, i);
-		if (ntbl == nullptr) {
-			continue;
-		}
-
-		toml_datum_t name_d = toml_string_in(ntbl, "name");
-		if (name_d.ok) {
-			g->nodes[i].name = sdsnew(name_d.u.s);
-			safe_free(name_d.u.s);
-		}
-
-		toml_datum_t path_d = toml_string_in(ntbl, "path");
-		if (path_d.ok) {
-			g->nodes[i].path = sdsnew(path_d.u.s);
-			safe_free(path_d.u.s);
-		}
-
-		toml_datum_t ver_d = toml_string_in(ntbl, "version");
-		if (ver_d.ok) {
-			g->nodes[i].version = sdsnew(ver_d.u.s);
-			safe_free(ver_d.u.s);
-		}
-
-		toml_datum_t vc_d = toml_string_in(ntbl, "version_constraint");
-		if (vc_d.ok) {
-			g->nodes[i].version_constraint = sdsnew(vc_d.u.s);
-			safe_free(vc_d.u.s);
-		}
-
-		toml_datum_t commit_d = toml_string_in(ntbl, "commit");
-		if (commit_d.ok) {
-			g->nodes[i].commit = sdsnew(commit_d.u.s);
-			safe_free(commit_d.u.s);
-		}
-
-		toml_datum_t git_d = toml_bool_in(ntbl, "is_git");
-		if (git_d.ok != 0) {
-			g->nodes[i].is_git = (git_d.u.b != 0);
-		} else {
-			g->nodes[i].is_git = false;
-		}
-
-		toml_datum_t ref_d = toml_string_in(ntbl, "git_ref");
-		if (ref_d.ok) {
-			g->nodes[i].git_ref = sdsnew(ref_d.u.s);
-			safe_free(ref_d.u.s);
-		}
-
-		toml_datum_t flags_d = toml_string_in(ntbl, "flags");
-		if (flags_d.ok) {
-			g->nodes[i].flags = sdsnew(flags_d.u.s);
-			safe_free(flags_d.u.s);
-		}
-
-		toml_array_t *src_arr = toml_array_in(ntbl, "sources");
-		if (src_arr != nullptr) {
-			i64 src_count = toml_array_nelem(src_arr);
-			if (src_count > 0) {
-				g->nodes[i].sources   = safe_calloc((size_t)src_count, sizeof(sds));
-				g->nodes[i].src_count = 0;
-				if (g->nodes[i].sources != nullptr) {
-					for (i64 j = 0; j < src_count; j++) {
-						toml_datum_t s = toml_string_at(src_arr, j);
-						if (s.ok) {
-							g->nodes[i].sources[g->nodes[i].src_count] = sdsnew(s.u.s);
-							g->nodes[i].src_count++;
-							safe_free(s.u.s);
-						}
-					}
-				}
-			}
-		}
-	}
-
-	g->count = (size_t)ncount;
-	toml_free(conf);
-	return g;
-}
-
-dep_graph_t *dep_graph_get(manifest_t *m, lockfile_t *lf, bool offline, const char *project_dir)
-{
-	if (m == nullptr) {
-		return nullptr;
-	}
-	if (project_dir == nullptr) {
-		return dep_graph_create(m, lf, offline);
-	}
-
-	/* Stat Coffee.toml and Coffee.lock for cache validation */
-	i64 toml_mtime = 0;
-	i64 lock_mtime = 0;
-
-	struct stat st;
-	sds         toml_path = sdscatprintf(sdsempty(), "%s/Coffee.toml", project_dir);
-	if (stat(toml_path, &st) == 0) {
-		toml_mtime = (i64)st.st_mtime;
-	}
-	sdsfree(toml_path);
-
-	sds lock_path = sdscatprintf(sdsempty(), "%s/Coffee.lock", project_dir);
-	if (stat(lock_path, &st) == 0) {
-		lock_mtime = (i64)st.st_mtime;
-	}
-	sdsfree(lock_path);
-
-	/* Build cache path — create directory tree if needed */
-	sds coffee_dir = sdscatprintf(sdsempty(), "%s/.coffee", project_dir);
-	mkdir(coffee_dir, 0755);
-
-	sds cache_dir = sdscatprintf(sdsempty(), "%s/build-cache", coffee_dir);
-	mkdir(cache_dir, 0755);
-
-	sdsfree(coffee_dir);
-
-	const char *pkg_name   = m->package.name != nullptr ? m->package.name : "unnamed";
-	sds         cache_path = sdscatprintf(sdsempty(), "%s/%s.graph", cache_dir, pkg_name);
-
-	/* Try cache */
-	dep_graph_t *g = dep_graph_load_cached(cache_path, toml_mtime, lock_mtime);
-	if (g != nullptr) {
-		sdsfree(cache_path);
-		sdsfree(cache_dir);
-		return g;
-	}
-
-	/* Cache miss — build from scratch */
-	g = dep_graph_create(m, lf, offline);
-	if (g != nullptr) {
-		dep_graph_cache_write(g, cache_path, toml_mtime, lock_mtime);
-	}
-
-	sdsfree(cache_path);
-	sdsfree(cache_dir);
-	return g;
-}

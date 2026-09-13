@@ -2,6 +2,7 @@
 #include "../manifest.h"
 #include "../project.h"
 #include "../skeleton.h"
+#include "safe.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,7 +15,7 @@
 
 static bool has_main_function(const char *path)
 {
-	FILE *fp = fopen(path, "r");
+	FILE *fp = safe_fopen(path, "r");
 	if (fp == nullptr) {
 		return false;
 	}
@@ -26,7 +27,7 @@ static bool has_main_function(const char *path)
 			break;
 		}
 	}
-	fclose(fp);
+	safe_fclose(fp);
 	return found;
 }
 
@@ -60,7 +61,7 @@ int64_t handle_init(options *opts)
 
 	char manifest_path[] = "Coffee.toml";
 
-	if (access(manifest_path, F_OK) == 0) {
+	if (safe_access(manifest_path, F_OK) == 0) {
 		fprintf_safe(stderr, "Error: Coffee.toml already exists in the current directory\n");
 		sdsfree(name);
 		return 1;
