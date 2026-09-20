@@ -26,13 +26,21 @@ i64 toolcheck_run(const char *command_name)
 
 	/* Only commands that actually build, compile, or fetch need tool
 	 * probing.  Everything else (help, version, config, search, ...)
-	 * must work even when clang/git are absent from PATH. */
-	if (strcmp(command_name, "build") != 0 && strcmp(command_name, "b") != 0 &&
-	    strcmp(command_name, "compile") != 0 && strcmp(command_name, "check") != 0 &&
-	    strcmp(command_name, "c") != 0 && strcmp(command_name, "test") != 0 &&
-	    strcmp(command_name, "bench") != 0 && strcmp(command_name, "install") != 0 &&
-	    strcmp(command_name, "lint") != 0 && strcmp(command_name, "fix") != 0 &&
-	    strcmp(command_name, "run") != 0) {
+	 * must work even when clang/git are absent from PATH.  doc and
+	 * package self-check their own tools (doxygen, tar) with clear
+	 * messages, so they are not probed here. */
+	static const char *build_commands[] = {
+		"build", "b", "compile", "check", "c", "test", "bench", "install", "lint", "fix", "run",
+		"fetch", "update", "vendor", "outdated", "generate-lockfile", "install-update",
+	};
+	bool needs_tools = false;
+	for (size_t i = 0; i < sizeof(build_commands) / sizeof(build_commands[0]); i++) {
+		if (strcmp(command_name, build_commands[i]) == 0) {
+			needs_tools = true;
+			break;
+		}
+	}
+	if (!needs_tools) {
 		return 0;
 	}
 

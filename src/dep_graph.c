@@ -342,6 +342,9 @@ dep_graph_t *dep_graph_create(manifest_t *m, lockfile_t *lf, bool offline)
 	while (dep_cursor < g->count) {
 		dep_node_t *cur = &g->nodes[dep_cursor];
 		dep_cursor++;
+		/* add_node() below can realloc g->nodes, invalidating cur; the
+		 * sds buffer cur->name points to does not move, so capture it. */
+		const char *cur_name = cur->name;
 
 		/* Resolve the directory for this dep */
 		sds dep_dir = nullptr;
@@ -402,7 +405,7 @@ dep_graph_t *dep_graph_create(manifest_t *m, lockfile_t *lf, bool offline)
 						break;
 					}
 					/* Skip self-references */
-					if (cur->name != nullptr && strcmp(dep_key, cur->name) == 0) {
+					if (cur_name != nullptr && strcmp(dep_key, cur_name) == 0) {
 						continue;
 					}
 					/* Extract version constraint for this dep */
@@ -414,7 +417,7 @@ dep_graph_t *dep_graph_create(manifest_t *m, lockfile_t *lf, bool offline)
 						if (constraint != nullptr && g->nodes[existing].version != nullptr) {
 							if (!version_satisfies(g->nodes[existing].version, constraint)) {
 								fprintf_safe(stderr, "Warning: %s requires %s %s but %s is resolved\n",
-								             cur->name != nullptr ? cur->name : "(root)", dep_key, constraint,
+								             cur_name != nullptr ? cur_name : "(root)", dep_key, constraint,
 								             g->nodes[existing].version);
 							}
 						}

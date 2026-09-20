@@ -130,6 +130,24 @@ static dependency_t *find_dep(manifest_t *m, const char *name)
 	return nullptr;
 }
 
+/*
+ * True when name is declared directly in the root manifest's flat
+ * dependency list (either "name = \"ver\"" or a bare inline-table key).
+ * Transitive graph nodes are absent from that list.
+ */
+static bool is_root_dep(manifest_t *m, const char *name)
+{
+	for (size_t i = 0; i < m->package.dependencies_count; i++) {
+		sds parsed = dep_parse_name(m->package.dependencies[i]);
+		bool match = parsed != nullptr && strcmp(parsed, name) == 0;
+		sdsfree(parsed);
+		if (match) {
+			return true;
+		}
+	}
+	return false;
+}
+
 int64_t handle_fetch(options *opts)
 {
 	char *manifest_path = project_find_manifest(nullptr);
@@ -195,10 +213,15 @@ int64_t handle_fetch(options *opts)
 				continue;
 			}
 
+			dependency_t *structured = find_dep(m, dep_name);
+			if (structured == nullptr && !is_root_dep(m, dep_name)) {
+				/* Transitive dep: already materialized through its parent. */
+				continue;
+			}
+
 			printf_safe("  %s\n", dep_name);
 
-			dependency_t *structured = find_dep(m, dep_name);
-			i64           ret        = -1;
+			i64 ret = -1;
 
 			if (structured != nullptr && structured->git != nullptr) {
 				const char *ref = nullptr;
@@ -257,11 +280,11 @@ int64_t handle_fetch(options *opts)
 				}
 			} else {
 				fprintf_safe(stderr, "  Warning: '%s' has no git or path source — skipping\n", dep_name);
-				ret = -1;
 			}
 
 			if (ret != 0) {
 				overall = 1;
+				continue;
 			}
 
 			dep_idx++;

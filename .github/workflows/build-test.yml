@@ -14,7 +14,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update && \
-          sudo apt-get install -y clang clang-format clang-tidy lz4 liblz4-dev zlib1g-dev
+          sudo apt-get install -y clang clang-format clang-tidy lz4 liblz4-dev
 
       - name: Bootstrap dependencies
         run: make bootstrap
@@ -30,7 +30,11 @@ jobs:
           make fuzz
           for f in bin/fuzz/fuzz_*; do
             echo "=== $f ==="
-            "$f" -runs=10000
+            runs=10000
+            case "$f" in
+              *fuzz_registry) runs=2000 ;; # network-isolated, slower per input
+            esac
+            "$f" -runs=$runs
           done
 
       - name: Check tidy

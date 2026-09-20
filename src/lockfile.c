@@ -185,6 +185,7 @@ i64 lockfile_write(sds path, lockfile_t *lf)
 		sdsfree(tmp_path);
 		return -1;
 	}
+	safe_fsync_dir(path);
 	sdsfree(tmp_path);
 	return 0;
 }

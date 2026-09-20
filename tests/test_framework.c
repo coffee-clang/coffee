@@ -48,6 +48,30 @@ i64 test_framework_run(const char *filter)
 		printf("  %-55s ... ", name);
 		fflush(stdout);
 
+		/* COFFEE_TEST_NO_FORK=1 runs tests in-process.  The forked child
+		 * _exit()s, which skips LeakSanitizer's atexit leak check; the
+		 * no-fork pass restores leak detection (a crashing test kills
+		 * the suite, which is the point of that dedicated pass). */
+		const char *no_fork = getenv("COFFEE_TEST_NO_FORK");
+		if (no_fork != nullptr && strcmp(no_fork, "1") == 0) {
+			/* Tests that chdir() and then fail return early without
+			 * restoring the cwd; restore it here so the in-process
+			 * pass stays deterministic. */
+			char old_cwd[4096];
+			bool have_cwd = getcwd(old_cwd, sizeof(old_cwd)) != nullptr;
+			i64   result  = test_framework_tests[i].func();
+			if (have_cwd) {
+				chdir(old_cwd);
+			}
+			if (result) {
+				local_passed++;
+			} else {
+				local_failed++;
+			}
+			tests_run++;
+			continue;
+		}
+
 		/* Run each test in a forked child so a segfault or abort in one
 		 * test cannot kill the remaining tests or corrupt the counters.
 		 * The child reports its result via the exit code; PASS()/FAIL()

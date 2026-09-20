@@ -59,14 +59,23 @@ static i64 test_fn_crash_probe(void)
 
 TEST(framework_crash_is_isolated)
 {
+	/* Fork isolation is meaningless in the no-fork leak-check pass;
+	 * running the crash probe there would kill the whole suite. */
+	const char *no_fork = getenv("COFFEE_TEST_NO_FORK");
+	if (no_fork != nullptr && strcmp(no_fork, "1") == 0) {
+		PASS();
+	}
+
 	/* Register a crashing test and run only it via a unique filter.
 	 * The runner forks per test, so the crash must be contained: the
 	 * run reports failure but the process survives.  This test itself
 	 * runs in a forked child, so the extra registration never leaks
-	 * into the rest of the suite. */
-	test_framework_register("zzz_crash_probe", test_fn_crash_probe);
+	 * into the rest of the suite.  Note: tests run in registration
+	 * order, not name order, so the "crash_probe" prefix is purely
+	 * descriptive. */
+	test_framework_register("crash_probe_isolated", test_fn_crash_probe);
 
-	i64 rc = test_framework_run("zzz_crash_probe");
+	i64 rc = test_framework_run("crash_probe_isolated");
 	ASSERT(rc != 0, "run with crashing test should report failure");
 	PASS();
 }

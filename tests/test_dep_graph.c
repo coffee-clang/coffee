@@ -667,6 +667,70 @@ TEST(dep_graph_deep_transitive)
 	PASS();
 }
 
+/* ===================== GRAPH GROWTH (add_node realloc) ===================== */
+
+TEST(dep_graph_growth_realloc)
+{
+	setup_tmpdir("growth");
+	mkdir("src", 0755);
+	mkdir("deps", 0755);
+
+	/* 31 direct deps fill the initial 32-node capacity (root + 31).
+	 * a1 then adds two transitive deps: the first add_node() must
+	 * realloc the node array, which used to invalidate the cached
+	 * cur pointer — the second transitive dep then read cur->name
+	 * from freed memory (use-after-free).
+	 *
+	 * Detecting a regression requires the ASan pass (sanitizers.yml):
+	 * in a plain build the dangling read usually returns intact heap
+	 * contents, so this test passes even with the bug present. */
+	for (int i = 1; i <= 31; i++) {
+		sds name = sdscatprintf(sdsempty(), "a%d", i);
+		create_dep(name, i == 1 ? "[dependencies]\nb1 = \"1.0.0\"\nb2 = \"1.0.0\"\n" : nullptr);
+		sdsfree(name);
+	}
+	create_dep("b1", nullptr);
+	create_dep("b2", nullptr);
+
+	sds deps = sdsnew("dependencies = [");
+	for (int i = 1; i <= 31; i++) {
+		deps = sdscatprintf(deps, "%s\"a%d\"", i > 1 ? ", " : "", i);
+	}
+	deps = sdscat(deps, "]\n");
+	write_manifest("growth", deps);
+	sdsfree(deps);
+
+	manifest_t *m = manifest_parse("Coffee.toml");
+	ASSERT(m != nullptr, "parse manifest");
+
+	dep_graph_t *g = dep_graph_create(m, nullptr, false);
+	ASSERT(g != nullptr, "graph created");
+
+	/* root + 31 a-deps + b1 + b2 = 34 nodes */
+	ASSERT(dep_graph_count(g) == 34, "all nodes present after growth");
+
+	/* BFS order is deterministic: root, then root's deps a1..a31,
+	 * then a1's transitive deps b1 and b2. */
+	ASSERT(strcmp(dep_graph_node_name(g, 0), "growth") == 0, "node 0 is root");
+	for (int i = 1; i <= 31; i++) {
+		sds  expected = sdscatprintf(sdsempty(), "a%d", i);
+		bool ordered  = strcmp(dep_graph_node_name(g, (size_t)i), expected) == 0;
+		sdsfree(expected);
+		ASSERT(ordered, "a-dep in BFS order");
+	}
+	ASSERT(strcmp(dep_graph_node_name(g, 32), "b1") == 0, "node 32 is b1");
+	ASSERT(strcmp(dep_graph_node_name(g, 33), "b2") == 0, "node 33 is b2");
+
+	ASSERT(dep_graph_path(g, "b1") != nullptr, "b1 resolved");
+	ASSERT(dep_graph_path(g, "b2") != nullptr, "b2 resolved");
+	ASSERT(dep_graph_path(g, "a31") != nullptr, "a31 resolved");
+
+	dep_graph_free(g);
+	manifest_free(m);
+	teardown_tmpdir("growth");
+	PASS();
+}
+
 /* ===================== ROOT NODE PROPERTIES ===================== */
 
 TEST(dep_graph_root_properties)
@@ -1175,4 +1239,5 @@ void coffee_register_dep_graph_tests(void)
 	TEST_REGISTER(dep_graph_cache_corrupt_recovery);
 	TEST_REGISTER(dep_graph_cache_with_lockfile);
 	TEST_REGISTER(dep_graph_cache_lockfile_mtime_change);
+	TEST_REGISTER(dep_graph_growth_realloc);
 }

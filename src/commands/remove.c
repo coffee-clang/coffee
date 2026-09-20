@@ -29,21 +29,7 @@ int64_t handle_remove(options *opts)
 		return 1;
 	}
 
-	bool found = false;
-	for (size_t i = 0; i < m->package.dependencies_count; i++) {
-		if (m->package.dependencies[i] &&
-		    strncmp(m->package.dependencies[i], package_name, strlen(package_name)) == 0) {
-			found = true;
-			sdsfree(m->package.dependencies[i]);
-			for (size_t j = i; j < m->package.dependencies_count - 1; j++) {
-				m->package.dependencies[j] = m->package.dependencies[j + 1];
-			}
-			m->package.dependencies_count--;
-			m->package.dependencies =
-			    safe_realloc(m->package.dependencies, m->package.dependencies_count * sizeof(sds));
-			break;
-		}
-	}
+	bool found = manifest_remove_dependency(m, package_name);
 
 	if (!found) {
 		fprintf_safe(stderr, "Error: Dependency %s not found in manifest\n", package_name);

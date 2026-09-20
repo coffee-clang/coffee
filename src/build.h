@@ -102,6 +102,14 @@ sds dep_parse_name(const char *entry);
 bool dep_name_is_valid(const char *name);
 
 /*
+ * Validate a version string for filesystem safety before it is used in
+ * a path.  Rejects nullptr, empty, leading '.' or '-', and any
+ * character outside [A-Za-z0-9._+~*-] (no '/', '\', '"', whitespace, or
+ * shell metacharacters).  Deliberately stricter than version_parse().
+ */
+bool version_is_valid(const char *version);
+
+/*
  * Validate a git ref (branch/tag/rev) before passing it to git.
  * Rejects anything that could be parsed as a git option or that
  * contains option/shell metacharacters.
@@ -109,8 +117,11 @@ bool dep_name_is_valid(const char *name);
 bool ref_is_valid(const char *ref);
 
 /*
- * Validate a git clone URL.  Only explicit schemes (https, http, git,
- * ssh, git+ssh, git+https) are accepted.
+ * Validate a git clone URL.  Explicit schemes (https, http, git, ssh,
+ * git+ssh, git+https), local filesystem paths, and scp-style
+ * user@host:path URLs are accepted; anything that could be parsed as a
+ * git option (leading '-') or that contains shell metacharacters is
+ * rejected.
  */
 bool url_is_valid(const char *url);
 

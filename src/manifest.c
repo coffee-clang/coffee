@@ -70,6 +70,54 @@ static void free_dependency(dependency_t *dep)
 	sdsfree(dep->rev);
 }
 
+bool manifest_remove_dependency(manifest_t *m, const char *name)
+{
+	if (m == nullptr || name == nullptr) {
+		return false;
+	}
+
+	bool found = false;
+
+	/* Structured (inline-table) deps */
+	for (size_t i = 0; i < m->dependencies.deps_count; i++) {
+		if (m->dependencies.deps[i].name != nullptr && strcmp(m->dependencies.deps[i].name, name) == 0) {
+			free_dependency(&m->dependencies.deps[i]);
+			for (size_t j = i; j < m->dependencies.deps_count - 1; j++) {
+				m->dependencies.deps[j] = m->dependencies.deps[j + 1];
+			}
+			m->dependencies.deps_count--;
+			m->dependencies.deps =
+			    safe_realloc(m->dependencies.deps, m->dependencies.deps_count * sizeof(dependency_t));
+			found = true;
+			break;
+		}
+	}
+
+	/* Flat string deps (also covers the bare-key remnant left by a
+	 * structured dep during parsing) */
+	for (size_t i = 0; i < m->package.dependencies_count; i++) {
+		if (m->package.dependencies[i] == nullptr) {
+			continue;
+		}
+		sds  dep_name = dep_parse_name(m->package.dependencies[i]);
+		bool match    = strcmp(dep_name, name) == 0;
+		sdsfree(dep_name);
+		if (match) {
+			sdsfree(m->package.dependencies[i]);
+			for (size_t j = i; j < m->package.dependencies_count - 1; j++) {
+				m->package.dependencies[j] = m->package.dependencies[j + 1];
+			}
+			m->package.dependencies_count--;
+			m->package.dependencies =
+			    safe_realloc(m->package.dependencies, m->package.dependencies_count * sizeof(sds));
+			found = true;
+			break;
+		}
+	}
+
+	return found;
+}
+
 static void free_binary(binary_target_t *bin)
 {
 	sdsfree(bin->name);
@@ -742,6 +790,7 @@ i64 manifest_write(sds path, manifest_t *m)
 		sdsfree(tmp_path);
 		return -1;
 	}
+	safe_fsync_dir(path);
 	sdsfree(tmp_path);
 	return 0;
 }

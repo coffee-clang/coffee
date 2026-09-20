@@ -434,6 +434,32 @@ bool dep_name_is_valid(const char *name)
 }
 
 /*
+ * Validate a version string before it is used in a filesystem path.
+ * Version strings can come from third-party content (a cloned
+ * library.toml), so they must not be able to escape the directory they
+ * are interpolated into.  Deliberately stricter than version_parse():
+ * rejects '/', '\', '"', whitespace and shell metacharacters, plus a
+ * leading '.' (covers ".", "..", ".hidden") or '-'.
+ */
+bool version_is_valid(const char *version)
+{
+	if (version == nullptr || version[0] == '\0') {
+		return false;
+	}
+	if (version[0] == '.' || version[0] == '-') {
+		return false;
+	}
+	for (size_t i = 0; version[i] != '\0'; i++) {
+		char c = version[i];
+		if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '.' || c == '_' ||
+		      c == '+' || c == '~' || c == '*' || c == '-')) {
+			return false;
+		}
+	}
+	return true;
+}
+
+/*
  * Validate a git ref (branch/tag/rev) before passing it to git.
  * Rejects anything that could be parsed as a git option (leading '-')
  * or that contains shell/option metacharacters.  Allows refs/heads/...,
@@ -476,6 +502,43 @@ bool url_is_valid(const char *url)
 	 * '--' separator in the argv provides the real protection. */
 	if (url[0] == '/' || strncmp(url, "./", 2) == 0 || strncmp(url, "../", 3) == 0) {
 		return true;
+	}
+	/* scp-style syntax: user@host:path (e.g. git@github.com:org/repo.git).
+	 * user/host are [A-Za-z0-9._-]+ with exactly one '@' separator, path
+	 * is [A-Za-z0-9._/~+-]+ and must not start with '-' (git would parse
+	 * it as an option).  IPv6 scp form (git@[addr]:path) is rejected. */
+	const char *at = strchr(url, '@');
+	if (at != nullptr && at > url && at[1] != '\0') {
+		const char *colon = strchr(at, ':');
+		if (colon != nullptr && colon[1] != '\0' && colon[1] != '-') {
+			/* user and host are validated separately so the single '@'
+			 * separator is the only one allowed. */
+			bool ok = true;
+			for (const char *p = url; p < at && ok; p++) {
+				char c = *p;
+				if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '.' ||
+				      c == '_' || c == '-')) {
+					ok = false;
+				}
+			}
+			for (const char *p = at + 1; p < colon && ok; p++) {
+				char c = *p;
+				if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '.' ||
+				      c == '_' || c == '-')) {
+					ok = false;
+				}
+			}
+			for (const char *p = colon + 1; *p != '\0' && ok; p++) {
+				char c = *p;
+				if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '.' ||
+				      c == '/' || c == '_' || c == '-' || c == '~' || c == '+')) {
+					ok = false;
+				}
+			}
+			if (ok) {
+				return true;
+			}
+		}
 	}
 	return false;
 }

@@ -161,6 +161,23 @@ int64_t handle_install(options *opts)
 		final_ver = sdsnew("*");
 	}
 
+	/* The version comes from the cloned repo's library.toml (third-party
+	 * content) and is interpolated into ~/.coffee/deps/<pkg>/<version>,
+	 * then passed to rm -rf / mkdir -p / rename.  Reject anything that
+	 * could escape that directory before any of those run. */
+	if (!version_is_valid(final_ver)) {
+		fprintf_safe(stderr, "Error: invalid version '%s' in %s/library.toml\n", final_ver, clone_path);
+		{
+			char *rm_argv[] = { "rm", "-rf", clone_path, nullptr };
+			run_command(rm_argv, RUN_CMD_QUIET);
+		}
+		manifest_free(pkg_manifest);
+		sdsfree(final_ver);
+		sdsfree(clone_path);
+		sdsfree(bin_dir);
+		return 1;
+	}
+
 	/* If requested version is specified and doesn't match, warn */
 	if (req_version != nullptr && !version_satisfies(final_ver, req_version)) {
 		fprintf_safe(stderr, "Warning: requested version %s but cloned version is %s\n", req_version, final_ver);
@@ -225,6 +242,10 @@ int64_t handle_install(options *opts)
 		for (size_t i = 0; i < pkg_manifest->bin_count; i++) {
 			binary_target_t *bt = &pkg_manifest->bin[i];
 			if (bt->name == nullptr) {
+				continue;
+			}
+			if (!dep_name_is_valid(bt->name)) {
+				fprintf_safe(stderr, "Error: invalid binary target name '%s'\n", bt->name);
 				continue;
 			}
 			i64 ret = compile_binary(cc, bt->name, bt->src, bt->src_count, dep_flags, bin_dir,

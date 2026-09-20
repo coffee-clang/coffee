@@ -3,10 +3,12 @@
  */
 #include "../src/build.h"
 #include "../src/coffee.h"
+#include "../src/lockfile.h"
 #include "../src/manifest.h"
 #include "../src/project.h"
 #include "../src/registry.h"
 #include "../src/strings.h"
+#include "../src/toolcheck.h"
 #include "test_framework.h"
 
 #include <stdio.h>
@@ -244,6 +246,8 @@ TEST(url_is_valid_unit)
 	ASSERT(url_is_valid("git+https://example.com/x"), "git+https should be valid");
 	ASSERT(url_is_valid("/tmp/local-repo"), "absolute local path should be valid");
 	ASSERT(url_is_valid("./local-repo"), "relative local path should be valid");
+	ASSERT(url_is_valid("git@github.com:org/repo.git"), "scp form should be valid");
+	ASSERT(url_is_valid("git@host:~/path"), "scp form with tilde should be valid");
 	ASSERT(!url_is_valid(nullptr), "nullptr should be invalid");
 	ASSERT(!url_is_valid(""), "empty should be invalid");
 	ASSERT(!url_is_valid("-o/tmp/pwned"), "option injection should be invalid");
@@ -251,6 +255,37 @@ TEST(url_is_valid_unit)
 	ASSERT(!url_is_valid("ftp://example.com"), "ftp scheme should be invalid");
 	ASSERT(!url_is_valid("javascript:alert(1)"), "javascript scheme should be invalid");
 	ASSERT(!url_is_valid("github.com/x/y"), "no scheme should be invalid");
+	ASSERT(!url_is_valid("git@host:;rm -rf /"), "scp path with metacharacters should be invalid");
+	ASSERT(!url_is_valid("git@host:-o/tmp/x"), "scp path with leading dash should be invalid");
+	ASSERT(!url_is_valid("git@host:"), "scp form with empty path should be invalid");
+	ASSERT(!url_is_valid("@host:path"), "scp form with empty user should be invalid");
+	ASSERT(!url_is_valid("a@b@c:path"), "scp form with multiple @ should be invalid");
+	PASS();
+}
+
+/* ---------------------------------------------------------------
+ * version_is_valid unit tests
+ * --------------------------------------------------------------- */
+TEST(version_is_valid_unit)
+{
+	ASSERT(version_is_valid("1.0.0"), "1.0.0 should be valid");
+	ASSERT(version_is_valid("v1.2"), "v1.2 should be valid");
+	ASSERT(version_is_valid("2.0"), "2.0 should be valid");
+	ASSERT(version_is_valid("1.0.0-alpha.1+build.5"), "semver pre-release should be valid");
+	ASSERT(version_is_valid("*"), "wildcard sentinel should be valid");
+	ASSERT(!version_is_valid(nullptr), "nullptr should be invalid");
+	ASSERT(!version_is_valid(""), "empty should be invalid");
+	/* version_parse() accepts this (it stops after the patch component);
+	 * the path validator must not. */
+	ASSERT(!version_is_valid("1.0.0/../../x"), "traversal should be invalid");
+	ASSERT(!version_is_valid(".."), ".. should be invalid");
+	ASSERT(!version_is_valid("."), ". should be invalid");
+	ASSERT(!version_is_valid(".hidden"), "leading dot should be invalid");
+	ASSERT(!version_is_valid("-x"), "leading dash should be invalid");
+	ASSERT(!version_is_valid("1.0.0 x"), "whitespace should be invalid");
+	ASSERT(!version_is_valid("1.0.0;rm -rf /"), "shell metacharacters should be invalid");
+	ASSERT(!version_is_valid("1.0.0\\..\\x"), "backslash should be invalid");
+	ASSERT(!version_is_valid("1.0.0\"x"), "double quote should be invalid");
 	PASS();
 }
 
@@ -308,7 +343,42 @@ TEST(manifest_roundtrip_preserves_inline_deps)
 	ASSERT(found_git, "git dep should survive round-trip");
 	ASSERT(found_path, "path dep should survive round-trip");
 	ASSERT(found_plain, "plain dep should survive round-trip");
+
+	/* Remove a structured dep: both arrays must be purged */
+	ASSERT(manifest_remove_dependency(m2, "mylib"), "remove should find mylib");
+	ASSERT(!manifest_remove_dependency(m2, "mylib"), "second remove should fail");
+	ASSERT(manifest_write("Coffee.toml", m2) == 0, "manifest_write should succeed after remove");
 	manifest_free(m2);
+
+	manifest_t *m3 = manifest_parse("Coffee.toml");
+	ASSERT(m3 != nullptr, "re-parse after remove should succeed");
+	ASSERT(m3->dependencies.deps_count == 1, "one structured dep should remain");
+	bool path_survives = false;
+	for (size_t i = 0; i < m3->dependencies.deps_count; i++) {
+		if (m3->dependencies.deps[i].name != nullptr && strcmp(m3->dependencies.deps[i].name, "mypath") == 0) {
+			path_survives = true;
+		}
+	}
+	ASSERT(path_survives, "mypath should survive the remove");
+	/* Flat array: no mylib remnant, plain still present */
+	bool mylib_gone = true;
+	bool plain_here = false;
+	for (size_t i = 0; i < m3->package.dependencies_count; i++) {
+		if (m3->package.dependencies[i] == nullptr) {
+			continue;
+		}
+		sds  dep_name = dep_parse_name(m3->package.dependencies[i]);
+		if (strcmp(dep_name, "mylib") == 0) {
+			mylib_gone = false;
+		}
+		if (strcmp(dep_name, "plain") == 0) {
+			plain_here = true;
+		}
+		sdsfree(dep_name);
+	}
+	ASSERT(mylib_gone, "no mylib remnant in flat array after remove");
+	ASSERT(plain_here, "plain dep should survive the remove");
+	manifest_free(m3);
 
 	remove("Coffee.toml");
 	chdir(old_cwd);
@@ -327,6 +397,7 @@ TEST(registry_search_parses_mock_index)
 	system(rmcmd);
 	sdsfree(rmcmd);
 	mkdir(tmpdir, 0755);
+	char *old_home = getenv("COFFEE_HOME");
 	setenv("COFFEE_HOME", tmpdir, 1);
 
 	FILE *fp = fopen("/tmp/coffee-test-registry/packages.json", "w");
@@ -347,6 +418,11 @@ TEST(registry_search_parses_mock_index)
 	remove("/tmp/coffee-test-registry/packages.json");
 	rmdir(tmpdir);
 	sdsfree(tmpdir);
+	if (old_home != nullptr) {
+		setenv("COFFEE_HOME", old_home, 1);
+	} else {
+		unsetenv("COFFEE_HOME");
+	}
 	PASS();
 }
 
@@ -427,6 +503,363 @@ TEST(manifest_rejects_traversal_name)
 
 	PASS();
 }
+
+/* ---------------------------------------------------------------
+ * add/remove — exact-name matching (no prefix match)
+ * --------------------------------------------------------------- */
+TEST(add_remove_exact_name_match)
+{
+	char old_cwd[4096];
+	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
+	sds tmpdir = sdsnew("/tmp/coffee-test-exact-name");
+	mkdir(tmpdir, 0755);
+	ASSERT(chdir(tmpdir) == 0, "chdir failed");
+
+	FILE *fp = fopen("Coffee.toml", "w");
+	ASSERT(fp != nullptr, "fopen Coffee.toml failed");
+	fprintf_safe(fp, "[package]\nname = \"test\"\nversion = \"1.0.0\"\nedition = \"c23\"\n");
+	fprintf_safe(fp, "[dependencies]\nfoo = \"1.0\"\nfoobar = \"2.0\"\n");
+	fclose(fp);
+
+	manifest_t *m = manifest_parse("Coffee.toml");
+	ASSERT(m != nullptr, "manifest_parse should succeed");
+	ASSERT(manifest_remove_dependency(m, "foo"), "remove foo should succeed");
+	ASSERT(m->package.dependencies_count == 1, "one flat dep should remain");
+	ASSERT(m->package.dependencies[0] != nullptr, "remaining dep present");
+	sds remaining = dep_parse_name(m->package.dependencies[0]);
+	ASSERT(strcmp(remaining, "foobar") == 0, "foobar should survive, foo removed");
+	sdsfree(remaining);
+	manifest_free(m);
+
+	remove("Coffee.toml");
+	chdir(old_cwd);
+	rmdir(tmpdir);
+	sdsfree(tmpdir);
+	PASS();
+}
+
+/* ---------------------------------------------------------------
+ * install — unsafe binary target names rejected
+ * --------------------------------------------------------------- */
+TEST(install_rejects_unsafe_bin_name)
+{
+	char old_cwd[4096];
+	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
+	sds tmpdir = sdsnew("/tmp/coffee-test-unsafe-bin");
+	mkdir(tmpdir, 0755);
+	ASSERT(chdir(tmpdir) == 0, "chdir failed");
+
+	FILE *fp = fopen("Coffee.toml", "w");
+	ASSERT(fp != nullptr, "fopen Coffee.toml failed");
+	fprintf_safe(fp, "[package]\nname = \"evil\"\nversion = \"1.0.0\"\nedition = \"c23\"\n");
+	fprintf_safe(fp, "[[bin]]\nname = \"../evil\"\nsrc = [\"main.c\"]\n");
+	fclose(fp);
+
+	manifest_t *m = manifest_parse("Coffee.toml");
+	ASSERT(m != nullptr, "manifest_parse should succeed");
+	ASSERT(m->bin_count == 1, "one binary target should parse");
+	if (m->bin_count > 0) {
+		ASSERT(!dep_name_is_valid(m->bin[0].name), "traversal bin name should be invalid");
+	}
+	manifest_free(m);
+
+	remove("Coffee.toml");
+	chdir(old_cwd);
+	rmdir(tmpdir);
+	sdsfree(tmpdir);
+	PASS();
+}
+
+/* ---------------------------------------------------------------
+ * install — traversal version from cloned library.toml rejected
+ * --------------------------------------------------------------- */
+TEST(install_rejects_traversal_version)
+{
+	/* Requires git; skip (pass) when unavailable. */
+	{
+		char *git_argv[] = { "git", "--version", nullptr };
+		if (run_command(git_argv, RUN_CMD_QUIET) != 0) {
+			printf("  (git not available, skipping)\n");
+			PASS();
+		}
+	}
+
+	char old_cwd[4096];
+	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
+
+	/* Build a malicious repo whose version escapes the deps dir */
+	sds repo_dir = sdsnew("/tmp/coffee-test-install-evil-repo");
+	mkdir(repo_dir, 0755);
+	ASSERT(chdir(repo_dir) == 0, "chdir to repo failed");
+
+	FILE *fp = fopen("library.toml", "w");
+	ASSERT(fp != nullptr, "fopen library.toml failed");
+	fprintf_safe(fp, "[package]\nname = \"evil\"\nversion = \"../../pwned\"\n");
+	fclose(fp);
+
+	mkdir("src", 0755);
+	fp = fopen("src/main.c", "w");
+	ASSERT(fp != nullptr, "fopen main.c failed");
+	fprintf_safe(fp, "int main(void) { return 0; }\n");
+	fclose(fp);
+
+	{
+		char *init_argv[] = { "git", "init", "-q", nullptr };
+		ASSERT(run_command(init_argv, RUN_CMD_QUIET) == 0, "git init failed");
+		char *add_argv[] = { "git", "add", "-A", nullptr };
+		ASSERT(run_command(add_argv, RUN_CMD_QUIET) == 0, "git add failed");
+		char *commit_argv[] = { "git", "-c", "user.email=test@test", "-c", "user.name=test", "commit", "-q", "-m",
+			                    "init", nullptr };
+		ASSERT(run_command(commit_argv, RUN_CMD_QUIET) == 0, "git commit failed");
+	}
+
+	/* Sandbox COFFEE_HOME and a project dir */
+	sds test_home = sdsnew("/tmp/coffee-test-install-evil-home");
+	mkdir(test_home, 0755);
+	const char *old_home = getenv("COFFEE_HOME");
+	setenv("COFFEE_HOME", test_home, 1);
+
+	sds proj_dir = sdsnew("/tmp/coffee-test-install-evil-proj");
+	mkdir(proj_dir, 0755);
+	ASSERT(chdir(proj_dir) == 0, "chdir to project failed");
+
+	fp = fopen("Coffee.toml", "w");
+	ASSERT(fp != nullptr, "fopen project Coffee.toml failed");
+	fprintf_safe(fp, "[package]\nname = \"proj\"\nversion = \"1.0.0\"\nedition = \"c23\"\n");
+	fclose(fp);
+
+	options opt = {
+		.inputs     = (char *[]){ "install", "evil" },
+		.inputs_num = 2,
+		.git        = repo_dir,
+	};
+	i64 ret = handle_install(&opt);
+
+	ASSERT(ret == 1, "install should reject traversal version");
+
+	sds pwned = sdscatprintf(sdsempty(), "%s/pwned", test_home);
+	ASSERT(access(pwned, F_OK) != 0, "no directory should be created outside deps");
+	sdsfree(pwned);
+
+	sds evil_dep = sdscatprintf(sdsempty(), "%s/deps/evil", test_home);
+	ASSERT(access(evil_dep, F_OK) != 0, "malicious clone should be cleaned up");
+	sdsfree(evil_dep);
+
+	/* Cleanup */
+	chdir(old_cwd);
+	if (old_home != nullptr) {
+		setenv("COFFEE_HOME", old_home, 1);
+	} else {
+		unsetenv("COFFEE_HOME");
+	}
+	{
+		char *rm_argv[] = { "rm", "-rf", repo_dir, proj_dir, test_home, nullptr };
+		run_command(rm_argv, RUN_CMD_QUIET);
+	}
+	sdsfree(repo_dir);
+	sdsfree(proj_dir);
+	sdsfree(test_home);
+	PASS();
+}
+
+/* ---------------------------------------------------------------
+ * toolcheck — probing limited to build/fetch commands
+ * --------------------------------------------------------------- */
+TEST(toolcheck_skips_non_build_commands)
+{
+	/* With an empty PATH no tool can be found: build commands must
+	 * report failure while metadata commands must still pass. */
+	char *old_path = getenv("PATH");
+	setenv("PATH", "/nonexistent", 1);
+
+	ASSERT(toolcheck_run("config") == 0, "config should not probe tools");
+	ASSERT(toolcheck_run("search") == 0, "search should not probe tools");
+	ASSERT(toolcheck_run("fetch") != 0, "fetch should probe tools and fail without them");
+	ASSERT(toolcheck_run("update") != 0, "update should probe tools and fail without them");
+	ASSERT(toolcheck_run("vendor") != 0, "vendor should probe tools and fail without them");
+	ASSERT(toolcheck_run("outdated") != 0, "outdated should probe tools and fail without them");
+	ASSERT(toolcheck_run("generate-lockfile") != 0, "generate-lockfile should probe tools");
+	ASSERT(toolcheck_run("install-update") != 0, "install-update should probe tools");
+	ASSERT(toolcheck_run("doc") == 0, "doc should not probe tools (self-checks doxygen)");
+	ASSERT(toolcheck_run("package") == 0, "package should not probe tools (self-checks tar)");
+
+	if (old_path != nullptr) {
+		setenv("PATH", old_path, 1);
+	} else {
+		unsetenv("PATH");
+	}
+	PASS();
+}
+
+/* ---------------------------------------------------------------
+ * fetch — transitive deps must not corrupt Coffee.lock
+ * --------------------------------------------------------------- */
+TEST(fetch_transitive_dep_no_lockfile_corruption)
+{
+	/* Requires git; skip (pass) when unavailable. */
+	{
+		char *git_argv[] = { "git", "--version", nullptr };
+		if (run_command(git_argv, RUN_CMD_QUIET) != 0) {
+			printf("  (git not available, skipping)\n");
+			PASS();
+		}
+	}
+
+	/* Drop leftovers from an aborted previous run so the fixture is
+	 * re-created from scratch. */
+	{
+		char *clean_argv[] = { "rm", "-rf", "/tmp/coffee-test-fetch-transitive-repo",
+			                   "/tmp/coffee-test-fetch-transitive-proj", "/tmp/coffee-test-fetch-transitive-home",
+			                   nullptr };
+		run_command(clean_argv, RUN_CMD_QUIET);
+	}
+
+	char old_cwd[4096];
+	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
+
+	/* Parent repo: a git dep that itself declares a nested dependency. */
+	sds repo_dir = sdsnew("/tmp/coffee-test-fetch-transitive-repo");
+	mkdir(repo_dir, 0755);
+	ASSERT(chdir(repo_dir) == 0, "chdir to repo failed");
+
+	FILE *fp = fopen("Coffee.toml", "w");
+	ASSERT(fp != nullptr, "fopen repo Coffee.toml failed");
+	fprintf_safe(fp, "[package]\nname = \"parent\"\nversion = \"1.0.0\"\nedition = \"c23\"\n");
+	fprintf_safe(fp, "\n[dependencies]\nnested = \"1.0\"\n");
+	fclose(fp);
+
+	mkdir("src", 0755);
+	fp = fopen("src/main.c", "w");
+	ASSERT(fp != nullptr, "fopen repo main.c failed");
+	fprintf_safe(fp, "int main(void) { return 0; }\n");
+	fclose(fp);
+
+	{
+		char *init_argv[] = { "git", "init", "-q", nullptr };
+		ASSERT(run_command(init_argv, RUN_CMD_QUIET) == 0, "git init failed");
+		char *add_argv[] = { "git", "add", "-A", nullptr };
+		ASSERT(run_command(add_argv, RUN_CMD_QUIET) == 0, "git add failed");
+		char *commit_argv[] = { "git", "-c", "user.email=test@test", "-c", "user.name=test", "commit", "-q", "-m",
+			                    "init", nullptr };
+		ASSERT(run_command(commit_argv, RUN_CMD_QUIET) == 0, "git commit failed");
+	}
+
+	/* Sandbox COFFEE_HOME and a project dir */
+	sds test_home = sdsnew("/tmp/coffee-test-fetch-transitive-home");
+	mkdir(test_home, 0755);
+	const char *old_home = getenv("COFFEE_HOME");
+	setenv("COFFEE_HOME", test_home, 1);
+
+	sds proj_dir = sdsnew("/tmp/coffee-test-fetch-transitive-proj");
+	mkdir(proj_dir, 0755);
+	ASSERT(chdir(proj_dir) == 0, "chdir to project failed");
+
+	fp = fopen("Coffee.toml", "w");
+	ASSERT(fp != nullptr, "fopen project Coffee.toml failed");
+	fprintf_safe(fp, "[package]\nname = \"proj\"\nversion = \"1.0.0\"\nedition = \"c23\"\n");
+	fprintf_safe(fp, "\n[dependencies]\nparent = { git = \"%s\" }\n", repo_dir);
+	fclose(fp);
+
+	options opt = {
+		.inputs     = (char *[]){ "fetch" },
+		.inputs_num = 1,
+	};
+
+	i64 ret1 = handle_fetch(&opt);
+	ASSERT(ret1 == 0, "first fetch should succeed");
+
+	lockfile_t *lf1 = lockfile_parse("Coffee.lock");
+	ASSERT(lf1 != nullptr, "first Coffee.lock should parse");
+	ASSERT(lf1->deps_count == 1, "first lockfile should have exactly one dep");
+	ASSERT(lf1->deps[0].name != nullptr && strcmp(lf1->deps[0].name, "parent") == 0,
+	       "first dep should be 'parent'");
+	lockfile_free(lf1);
+
+	i64 ret2 = handle_fetch(&opt);
+	ASSERT(ret2 == 0, "second fetch should succeed");
+
+	lockfile_t *lf2 = lockfile_parse("Coffee.lock");
+	ASSERT(lf2 != nullptr, "second Coffee.lock should parse");
+	ASSERT(lf2->deps_count == 1, "second lockfile should still have exactly one dep");
+	ASSERT(lf2->deps[0].name != nullptr && strcmp(lf2->deps[0].name, "parent") == 0,
+	       "second dep should be 'parent'");
+	lockfile_free(lf2);
+
+	/* Cleanup */
+	chdir(old_cwd);
+	if (old_home != nullptr) {
+		setenv("COFFEE_HOME", old_home, 1);
+	} else {
+		unsetenv("COFFEE_HOME");
+	}
+	{
+		char *rm_argv[] = { "rm", "-rf", repo_dir, proj_dir, test_home, nullptr };
+		run_command(rm_argv, RUN_CMD_QUIET);
+	}
+	sdsfree(repo_dir);
+	sdsfree(proj_dir);
+	sdsfree(test_home);
+	PASS();
+}
+
+/* ---------------------------------------------------------------
+ * fetch — a root flat dep with no git/path source warns and fails
+ * --------------------------------------------------------------- */
+TEST(fetch_root_flat_dep_warns)
+{
+	{
+		char *clean_argv[] = { "rm", "-rf", "/tmp/coffee-test-fetch-flat-proj", "/tmp/coffee-test-fetch-flat-home",
+			                   nullptr };
+		run_command(clean_argv, RUN_CMD_QUIET);
+	}
+
+	char old_cwd[4096];
+	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
+
+	sds test_home = sdsnew("/tmp/coffee-test-fetch-flat-home");
+	mkdir(test_home, 0755);
+	const char *old_home = getenv("COFFEE_HOME");
+	setenv("COFFEE_HOME", test_home, 1);
+
+	sds proj_dir = sdsnew("/tmp/coffee-test-fetch-flat-proj");
+	mkdir(proj_dir, 0755);
+	ASSERT(chdir(proj_dir) == 0, "chdir to project failed");
+
+	FILE *fp = fopen("Coffee.toml", "w");
+	ASSERT(fp != nullptr, "fopen project Coffee.toml failed");
+	fprintf_safe(fp, "[package]\nname = \"proj\"\nversion = \"1.0.0\"\nedition = \"c23\"\n");
+	fprintf_safe(fp, "\n[dependencies]\nfoo = \"1.0\"\n");
+	fclose(fp);
+
+	options opt = {
+		.inputs     = (char *[]){ "fetch" },
+		.inputs_num = 1,
+	};
+
+	i64 ret = handle_fetch(&opt);
+	ASSERT(ret == 1, "root flat dep with no source should fail");
+
+	lockfile_t *lf = lockfile_parse("Coffee.lock");
+	ASSERT(lf != nullptr, "Coffee.lock should parse");
+	ASSERT(lf->deps_count == 0, "no lockfile entry for an unfetchable dep");
+	lockfile_free(lf);
+
+	/* Cleanup */
+	chdir(old_cwd);
+	if (old_home != nullptr) {
+		setenv("COFFEE_HOME", old_home, 1);
+	} else {
+		unsetenv("COFFEE_HOME");
+	}
+	{
+		char *rm_argv[] = { "rm", "-rf", proj_dir, test_home, nullptr };
+		run_command(rm_argv, RUN_CMD_QUIET);
+	}
+	sdsfree(proj_dir);
+	sdsfree(test_home);
+	PASS();
+}
+
 void coffee_register_security_tests(void)
 {
 	TEST_REGISTER(run_command_capture_echo);
@@ -441,11 +874,18 @@ void coffee_register_security_tests(void)
 	TEST_REGISTER(dep_name_is_valid_unit);
 	TEST_REGISTER(ref_is_valid_unit);
 	TEST_REGISTER(url_is_valid_unit);
+	TEST_REGISTER(version_is_valid_unit);
 	TEST_REGISTER(manifest_roundtrip_preserves_inline_deps);
 	TEST_REGISTER(registry_search_parses_mock_index);
 	TEST_REGISTER(fetch_rejects_dotdot_dep);
 	TEST_REGISTER(fetch_rejects_slash_dep);
 	TEST_REGISTER(manifest_rejects_traversal_name);
+	TEST_REGISTER(add_remove_exact_name_match);
+	TEST_REGISTER(install_rejects_unsafe_bin_name);
+	TEST_REGISTER(install_rejects_traversal_version);
+	TEST_REGISTER(fetch_transitive_dep_no_lockfile_corruption);
+	TEST_REGISTER(fetch_root_flat_dep_warns);
+	TEST_REGISTER(toolcheck_skips_non_build_commands);
 	TEST_REGISTER(safe_strtol_valid);
 	TEST_REGISTER(safe_strtol_invalid);
 	TEST_REGISTER(safe_atol_valid);

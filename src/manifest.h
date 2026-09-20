@@ -72,6 +72,16 @@ void        manifest_free(manifest_t *m);
 i64         manifest_write(sds path, manifest_t *m);
 
 /**
+ * Remove a dependency by exact name from both the structured
+ * (inline-table) and flat string dependency arrays.
+ *
+ * @param m    Parsed manifest
+ * @param name Dependency name to remove
+ * @return true if a dependency was removed, false otherwise
+ */
+bool manifest_remove_dependency(manifest_t *m, const char *name);
+
+/**
  * Extract package name and version constraint from a dependency entry.
  *
  * @param entry Dependency string like "toml = \"1.0.0\"" or "sds = \"*\""

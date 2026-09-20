@@ -49,6 +49,15 @@ int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size)
 	/* Point COFFEE_HOME at the temporary tree */
 	setenv("COFFEE_HOME", tmpdir, 1);
 
+	/* registry_get() would curl the real registry per input; make curl
+	 * fail fast so the harness never touches the network.  A CI
+	 * no_proxy covering the registry host would bypass the bogus
+	 * proxy, so clear it too. */
+	setenv("https_proxy", "http://127.0.0.1:1", 1);
+	setenv("http_proxy", "http://127.0.0.1:1", 1);
+	unsetenv("no_proxy");
+	unsetenv("NO_PROXY");
+
 	/* Exercise the JSON parser via registry_search */
 	recipe_list_t *list = registry_search(sdsempty());
 	if (list != nullptr) {

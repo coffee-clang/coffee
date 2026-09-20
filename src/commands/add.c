@@ -51,10 +51,23 @@ int64_t handle_add(options *opts)
 		return 1;
 	}
 
-	/* Check if dependency already exists */
+	/* Check if dependency already exists (exact name match, both arrays) */
 	for (size_t i = 0; i < m->package.dependencies_count; i++) {
-		if (m->package.dependencies[i] != nullptr &&
-		    strncmp(m->package.dependencies[i], package_name, strlen(package_name)) == 0) {
+		if (m->package.dependencies[i] == nullptr) {
+			continue;
+		}
+		sds  dep_name = dep_parse_name(m->package.dependencies[i]);
+		bool match    = strcmp(dep_name, package_name) == 0;
+		sdsfree(dep_name);
+		if (match) {
+			printf_safe("Dependency %s already exists\n", package_name);
+			manifest_free(m);
+			sdsfree(manifest_path);
+			return 0;
+		}
+	}
+	for (size_t i = 0; i < m->dependencies.deps_count; i++) {
+		if (m->dependencies.deps[i].name != nullptr && strcmp(m->dependencies.deps[i].name, package_name) == 0) {
 			printf_safe("Dependency %s already exists\n", package_name);
 			manifest_free(m);
 			sdsfree(manifest_path);

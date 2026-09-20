@@ -293,6 +293,29 @@ static inline int safe_rename(const char *oldpath, const char *newpath) {
     return rename(oldpath, newpath);
 }
 
+/* Best-effort fsync of a directory so a rename into it is durable
+ * across power loss.  Errors are ignored: the rename itself already
+ * succeeded, and not all filesystems support directory fsync. */
+static inline void safe_fsync_dir(const char *path) {
+    char dir[4096];
+    if (memccpy(dir, path, '\0', sizeof(dir)) == nullptr) {
+        return; /* path too long for the buffer */
+    }
+    char *slash = strrchr(dir, '/');
+    if (slash != nullptr) {
+        if (slash == dir) {
+            slash[1] = '\0';
+        } else {
+            *slash = '\0';
+        }
+        int fd = safe_open(dir, O_RDONLY | O_DIRECTORY);
+        if (fd >= 0) {
+            (void)fsync(fd);
+            (void)safe_close(fd);
+        }
+    }
+}
+
 /* Validated number parsing: rejects empty, garbage, and overflow input.
  * Returns false and leaves *out untouched on failure. */
 static inline bool safe_strtol(const char *nptr, int base, int64_t *out) {
