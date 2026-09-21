@@ -18,51 +18,75 @@ static bool tool_exists(const char *name)
 	return result;
 }
 
+/* Hard tool requirements, per command.  clang covers the compiler and
+ * clang-tidy (which ships with clang). */
+struct tool_requirements {
+	const char *command;
+	bool        needs_clang;
+	bool        needs_git;
+};
+
+static const struct tool_requirements tool_requirements[] = {
+	{ "build", true, false },
+	{ "b", true, false },
+	{ "compile", true, false },
+	{ "check", true, false },
+	{ "c", true, false },
+	{ "test", true, false },
+	{ "bench", true, false },
+	{ "lint", true, false },
+	{ "fix", true, false },
+	{ "run", true, false },
+	{ "install", true, true },
+	{ "fetch", false, true },
+	{ "update", false, true },
+	{ "vendor", false, true },
+	{ "outdated", false, true },
+	{ "generate-lockfile", false, true },
+	{ "install-update", false, true },
+};
+
 i64 toolcheck_run(const char *command_name)
 {
 	if (command_name == nullptr) {
 		return 0;
 	}
 
-	/* Only commands that actually build, compile, or fetch need tool
-	 * probing.  Everything else (help, version, config, search, ...)
-	 * must work even when clang/git are absent from PATH.  doc and
-	 * package self-check their own tools (doxygen, tar) with clear
-	 * messages, so they are not probed here. */
-	static const char *build_commands[] = {
-		"build", "b", "compile", "check", "c", "test", "bench", "install", "lint", "fix", "run",
-		"fetch", "update", "vendor", "outdated", "generate-lockfile", "install-update",
-	};
-	bool needs_tools = false;
-	for (size_t i = 0; i < sizeof(build_commands) / sizeof(build_commands[0]); i++) {
-		if (strcmp(command_name, build_commands[i]) == 0) {
-			needs_tools = true;
+	/* Requirements are per command: clang is needed only by the commands
+	 * that compile C code (directly, through make, or through clang-tidy),
+	 * git only by the commands that clone or fetch dependencies.  A
+	 * machine without clang must still be able to fetch dependencies.
+	 *
+	 * Commands absent from the table (help, version, config, search, ...)
+	 * must work even when clang/git are absent from PATH.  doc and package
+	 * self-check their own tools (doxygen, tar) with clear messages, so
+	 * they are not probed here. */
+	const struct tool_requirements *req = nullptr;
+	for (size_t i = 0; i < sizeof(tool_requirements) / sizeof(tool_requirements[0]); i++) {
+		if (strcmp(command_name, tool_requirements[i].command) == 0) {
+			req = &tool_requirements[i];
 			break;
 		}
 	}
-	if (!needs_tools) {
+	if (req == nullptr) {
 		return 0;
 	}
 
-	struct {
-		const char *name;
-		const char *label;
-		bool        hard;
-	} tools[] = {
-		{ "clang", "clang", true }, { "git", "git", true },    { "make", "make", false },
-		{ "curl", "curl", false },  { "zstd", "zstd", false }, { "doxygen", "doxygen", false },
-	};
-
 	bool ok = true;
 
-	for (size_t i = 0; i < sizeof(tools) / sizeof(tools[0]); i++) {
-		if (!tool_exists(tools[i].name)) {
-			if (tools[i].hard) {
-				fprintf_safe(stderr, "Error: %s not found on PATH\n", tools[i].label);
-				ok = false;
-			} else {
-				fprintf_safe(stderr, "Warning: %s not found on PATH — some commands may not work\n", tools[i].label);
-			}
+	if (req->needs_clang && !tool_exists("clang")) {
+		fprintf_safe(stderr, "Error: clang not found on PATH\n");
+		ok = false;
+	}
+	if (req->needs_git && !tool_exists("git")) {
+		fprintf_safe(stderr, "Error: git not found on PATH\n");
+		ok = false;
+	}
+
+	static const char *optional[] = { "make", "curl", "zstd", "doxygen" };
+	for (size_t i = 0; i < sizeof(optional) / sizeof(optional[0]); i++) {
+		if (!tool_exists(optional[i])) {
+			fprintf_safe(stderr, "Warning: %s not found on PATH — some commands may not work\n", optional[i]);
 		}
 	}
 

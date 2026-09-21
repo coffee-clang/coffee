@@ -665,10 +665,56 @@ TEST(install_rejects_traversal_version)
 /* ---------------------------------------------------------------
  * toolcheck — probing limited to build/fetch commands
  * --------------------------------------------------------------- */
+
+/* Create /tmp/coffee-toolcheck-stub-<tool>-<pid>/<tool>, a fake tool that
+ * exits 0, so a test can put exactly one tool on PATH.  Returns the
+ * directory (free with toolcheck_stub_free) or nullptr. */
+static sds toolcheck_stub_dir(const char *tool)
+{
+	sds   dir          = sdscatprintf(sdsempty(), "/tmp/coffee-toolcheck-stub-%s-%d", tool, (int)getpid());
+	char *mkdir_argv[] = { "mkdir", "-p", dir, nullptr };
+	if (run_command(mkdir_argv, RUN_CMD_QUIET) != 0) {
+		sdsfree(dir);
+		return nullptr;
+	}
+
+	sds   path = sdscatprintf(sdsempty(), "%s/%s", dir, tool);
+	FILE *fp   = fopen(path, "w");
+	if (fp == nullptr) {
+		sdsfree(path);
+		sdsfree(dir);
+		return nullptr;
+	}
+	fprintf_safe(fp, "#!/bin/sh\nexit 0\n");
+	fclose(fp);
+	chmod(path, 0755);
+	sdsfree(path);
+	return dir;
+}
+
+static void toolcheck_stub_free(sds dir)
+{
+	if (dir == nullptr) {
+		return;
+	}
+	char *rm_argv[] = { "rm", "-rf", dir, nullptr };
+	run_command(rm_argv, RUN_CMD_QUIET);
+	sdsfree(dir);
+}
+
+static void toolcheck_restore_path(char *old_path)
+{
+	if (old_path != nullptr) {
+		setenv("PATH", old_path, 1);
+	} else {
+		unsetenv("PATH");
+	}
+}
+
 TEST(toolcheck_skips_non_build_commands)
 {
-	/* With an empty PATH no tool can be found: build commands must
-	 * report failure while metadata commands must still pass. */
+	/* With an empty PATH no tool can be found: commands that need clang or
+	 * git must report failure while metadata commands must still pass. */
 	char *old_path = getenv("PATH");
 	setenv("PATH", "/nonexistent", 1);
 
@@ -683,11 +729,73 @@ TEST(toolcheck_skips_non_build_commands)
 	ASSERT(toolcheck_run("doc") == 0, "doc should not probe tools (self-checks doxygen)");
 	ASSERT(toolcheck_run("package") == 0, "package should not probe tools (self-checks tar)");
 
-	if (old_path != nullptr) {
-		setenv("PATH", old_path, 1);
-	} else {
-		unsetenv("PATH");
-	}
+	toolcheck_restore_path(old_path);
+	PASS();
+}
+
+/* The fetch family must work on a machine without clang. */
+TEST(toolcheck_fetch_needs_only_git)
+{
+	sds stub = toolcheck_stub_dir("git");
+	ASSERT(stub != nullptr, "could not create stub git");
+
+	char *old_path = getenv("PATH");
+	setenv("PATH", stub, 1);
+
+	ASSERT(toolcheck_run("fetch") == 0, "fetch needs git only");
+	ASSERT(toolcheck_run("update") == 0, "update needs git only");
+	ASSERT(toolcheck_run("vendor") == 0, "vendor needs git only");
+	ASSERT(toolcheck_run("outdated") == 0, "outdated needs git only");
+	ASSERT(toolcheck_run("generate-lockfile") == 0, "generate-lockfile needs git only");
+	ASSERT(toolcheck_run("install-update") == 0, "install-update needs git only");
+
+	ASSERT(toolcheck_run("build") != 0, "build still needs clang");
+	ASSERT(toolcheck_run("b") != 0, "b still needs clang");
+	ASSERT(toolcheck_run("compile") != 0, "compile still needs clang");
+	ASSERT(toolcheck_run("check") != 0, "check still needs clang");
+	ASSERT(toolcheck_run("c") != 0, "c still needs clang");
+	ASSERT(toolcheck_run("test") != 0, "test still needs clang");
+	ASSERT(toolcheck_run("bench") != 0, "bench still needs clang");
+	ASSERT(toolcheck_run("lint") != 0, "lint still needs clang");
+	ASSERT(toolcheck_run("fix") != 0, "fix still needs clang");
+	ASSERT(toolcheck_run("run") != 0, "run still needs clang");
+	ASSERT(toolcheck_run("install") != 0, "install needs clang too");
+
+	toolcheck_restore_path(old_path);
+	toolcheck_stub_free(stub);
+	PASS();
+}
+
+/* Compiling commands must not start passing when only git is absent. */
+TEST(toolcheck_build_needs_clang)
+{
+	sds stub = toolcheck_stub_dir("clang");
+	ASSERT(stub != nullptr, "could not create stub clang");
+
+	char *old_path = getenv("PATH");
+	setenv("PATH", stub, 1);
+
+	ASSERT(toolcheck_run("build") == 0, "build needs clang only");
+	ASSERT(toolcheck_run("b") == 0, "b needs clang only");
+	ASSERT(toolcheck_run("compile") == 0, "compile needs clang only");
+	ASSERT(toolcheck_run("check") == 0, "check needs clang only");
+	ASSERT(toolcheck_run("c") == 0, "c needs clang only");
+	ASSERT(toolcheck_run("test") == 0, "test needs clang only");
+	ASSERT(toolcheck_run("bench") == 0, "bench needs clang only");
+	ASSERT(toolcheck_run("lint") == 0, "lint needs clang only");
+	ASSERT(toolcheck_run("fix") == 0, "fix needs clang only");
+	ASSERT(toolcheck_run("run") == 0, "run needs clang only");
+
+	ASSERT(toolcheck_run("fetch") != 0, "fetch needs git");
+	ASSERT(toolcheck_run("update") != 0, "update needs git");
+	ASSERT(toolcheck_run("vendor") != 0, "vendor needs git");
+	ASSERT(toolcheck_run("outdated") != 0, "outdated needs git");
+	ASSERT(toolcheck_run("generate-lockfile") != 0, "generate-lockfile needs git");
+	ASSERT(toolcheck_run("install-update") != 0, "install-update needs git");
+	ASSERT(toolcheck_run("install") != 0, "install needs git too");
+
+	toolcheck_restore_path(old_path);
+	toolcheck_stub_free(stub);
 	PASS();
 }
 
@@ -886,6 +994,8 @@ void coffee_register_security_tests(void)
 	TEST_REGISTER(fetch_transitive_dep_no_lockfile_corruption);
 	TEST_REGISTER(fetch_root_flat_dep_warns);
 	TEST_REGISTER(toolcheck_skips_non_build_commands);
+	TEST_REGISTER(toolcheck_fetch_needs_only_git);
+	TEST_REGISTER(toolcheck_build_needs_clang);
 	TEST_REGISTER(safe_strtol_valid);
 	TEST_REGISTER(safe_strtol_invalid);
 	TEST_REGISTER(safe_atol_valid);

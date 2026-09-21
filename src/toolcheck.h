@@ -8,7 +8,11 @@ typedef int64_t i64;
 /**
  * @brief Check that required system tools exist on PATH.
  *
- * Hard requirements (clang, git): prints an error and the function returns 1.
+ * Hard requirements are per command: clang is required by the commands that
+ * compile C code (build, b, compile, check, c, test, bench, lint, fix, run,
+ * install), git by the commands that clone or fetch dependencies (fetch,
+ * update, vendor, outdated, generate-lockfile, install-update, install).
+ * A missing hard requirement prints an error and the function returns 1.
  * Soft requirements (make, curl, zstd, doxygen): prints a warning.
  *
  * When @p command_name is "help" or "version" the check is skipped entirely.
