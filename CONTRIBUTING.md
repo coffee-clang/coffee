@@ -12,7 +12,7 @@ Key enforced rules:
 - No typedef structs
 - Space before parens on control statements
 - No omitted braces
-15|d6999bf5 - Banned functions: raw \`malloc\`/\`calloc\`/\`free\`/\`realloc\` are banned in \`src/\` — use the \`safe_*\` wrappers from \`include/safe.h\` instead (raw allocation is permitted only inside \`include/safe.h\` itself). \`sprintf\`/\`strcpy\`/\`strcat\` families must use safe wrappers from \`include/safe.h\` or SDS alternatives from \`strings.h\`
+15|d6999bf5 - Banned functions: raw \`malloc\`/\`calloc\`/\`free\`/\`realloc\` are banned in \`src/\` — use the \`safe_*\` wrappers from \`include/safe.h\` instead (raw allocation is permitted only inside \`include/safe.h\` itself). \`sprintf\`/\`strcpy\`/\`strcat\` families must be replaced with the SDS-based helpers in \`strings.h\` (\`fprintf_safe\`, \`printf_safe\`, \`snprintf_safe\`) — \`include/safe.h\` deliberately exports no formatting or string-copy wrapper
 
 You can use the most recent C standard (C23). This means:
 
@@ -32,5 +32,6 @@ and enforces strict lint rules via `clang-tidy` (bugprone, cert, clang-analyzer 
 
 **SDS strings everywhere.** All mutable strings use `sds` (Simple Dynamic Strings) instead of raw `char *`.
 This prevents buffer overflows, simplifies concatenation, and provides a consistent string API across
-the entire codebase. Banned libc functions (`sprintf`, `strcpy`, `strcat`, etc.) are replaced with safe
-wrappers from `strings.h` and `include/safe.h`.
+the entire codebase. Banned libc functions (`sprintf`, `strcpy`, `strcat`, etc.) are replaced with the SDS-based
+helpers in `strings.h`; `include/safe.h` provides only allocation, file I/O and validated
+number parsing.

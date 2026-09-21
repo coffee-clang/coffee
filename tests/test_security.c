@@ -473,6 +473,98 @@ TEST(safe_atol_invalid)
 }
 
 /* ---------------------------------------------------------------
+ * The safe-building-block headers must not re-export banned footguns
+ * --------------------------------------------------------------- */
+
+/* Read a whole file into an sds; an unreadable file yields an empty sds. */
+static sds read_file(const char *path)
+{
+	sds   body = sdsempty();
+	FILE *fp   = fopen(path, "r");
+	if (fp == nullptr) {
+		return body;
+	}
+
+	char   buf[4096];
+	size_t got;
+	do {
+		got  = fread(buf, 1, sizeof(buf), fp);
+		body = sdscatlen(body, buf, got);
+	} while (got > 0);
+	fclose(fp);
+	return body;
+}
+
+/* Resolve a path relative to this file's own compile-time directory, so the
+ * check does not depend on the current directory.  If __FILE__ carries no
+ * directory component, the bare relative path is used. */
+static sds header_path(const char *relative)
+{
+	sds   path  = sdsnew(__FILE__);
+	char *slash = strrchr(path, '/');
+	if (slash != nullptr) {
+		sdsrange(path, 0, (ssize_t)(slash - path));
+	} else {
+		sdsclear(path);
+	}
+	path = sdscat(path, relative);
+	return path;
+}
+
+TEST(safe_header_exports_no_banned_wrappers)
+{
+	static const char *const banned[] = {
+		"safe_snprintf", "safe_fprintf", "safe_printf",  "safe_memcpy", "safe_memset",
+		"safe_sprintf",  "safe_strcpy",   "safe_scanf",   "safe_system", "safe_popen",
+	};
+	static const char *const guarded[] = {
+		"../include/safe.h",
+		"../src/strings.h",
+	};
+
+	i64 leaks = 0;
+	i64 kept  = 0;
+
+	for (size_t h = 0; h < sizeof(guarded) / sizeof(guarded[0]); h++) {
+		sds path = header_path(guarded[h]);
+		sds body = read_file(path);
+		if (sdslen(body) == 0) {
+			printf("  could not read %s\n", path);
+			sdsfree(body);
+			sdsfree(path);
+			FAIL("a guarded header could not be read");
+		}
+
+		for (size_t i = 0; i < sizeof(banned) / sizeof(banned[0]); i++) {
+			if (strstr(body, banned[i]) != nullptr) {
+				printf("  %s re-exports banned wrapper: %s\n", guarded[h], banned[i]);
+				leaks++;
+			}
+		}
+
+		/* The wrappers that are actually used must stay. */
+		if (strstr(body, "safe_malloc") != nullptr) {
+			kept++;
+		}
+		if (strstr(body, "safe_fopen") != nullptr) {
+			kept++;
+		}
+		if (strstr(body, "safe_strtol") != nullptr) {
+			kept++;
+		}
+
+		sdsfree(body);
+		sdsfree(path);
+	}
+
+	if (leaks > 0) {
+		FAIL("a guarded header must not export banned wrappers");
+	}
+	ASSERT(kept == 3, "the live safe_* wrappers should stay");
+	PASS();
+}
+
+/* ---------------------------------------------------------------
  * manifest — traversal name rejection at parse time
  * --------------------------------------------------------------- */
 TEST(manifest_rejects_traversal_name)
@@ -1000,4 +1092,5 @@ void coffee_register_security_tests(void)
 	TEST_REGISTER(safe_strtol_invalid);
 	TEST_REGISTER(safe_atol_valid);
 	TEST_REGISTER(safe_atol_invalid);
+	TEST_REGISTER(safe_header_exports_no_banned_wrappers);
 }

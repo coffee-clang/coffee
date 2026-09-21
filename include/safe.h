@@ -14,8 +14,15 @@
 #include <unistd.h>
 
 /*
- * Wrappers for functions that clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
- * flags. These live in a header directory filtered from clang-tidy checks.
+ * This header deliberately provides only safe building blocks: the arena
+ * allocator, abort-on-OOM allocation wrappers, file I/O / syscall
+ * pass-throughs, and validated number parsing.
+ *
+ * The unsafe format, string, and process-execution wrappers (sprintf,
+ * strcpy, scanf, system, popen, ...) are intentionally absent: they
+ * would re-export the footguns banned by AGENTS.md under a trustworthy
+ * name.  Do not re-add them — format and build strings with the
+ * SDS-based helpers in `strings.h` instead.
  */
 
 /* ---------------------------------------------------------------------------
@@ -185,71 +192,6 @@ static inline void arena_destroy(struct arena *a)
 static inline void safe_free(void *ptr)
 {
 	free(ptr);
-}
-
-static inline int64_t safe_snprintf(char *buf, size_t size, const char *fmt, ...) {
-    int64_t ret;
-    va_list ap;
-    va_start(ap, fmt);
-    ret = vsnprintf(buf, size, fmt, ap);
-    va_end(ap);
-    return ret;
-}
-
-static inline int64_t safe_fprintf(FILE *stream, const char *fmt, ...) {
-    int64_t ret;
-    va_list ap;
-    va_start(ap, fmt);
-    ret = vfprintf(stream, fmt, ap);
-    va_end(ap);
-    return ret;
-}
-
-static inline int64_t safe_printf(const char *fmt, ...) {
-    int64_t ret;
-    va_list ap;
-    va_start(ap, fmt);
-    ret = vprintf(fmt, ap);
-    va_end(ap);
-    return ret;
-}
-
-static inline void *safe_memcpy(void *dest, const void *src, size_t n) {
-    return memcpy(dest, src, n);
-}
-
-static inline void *safe_memset(void *s, int c, size_t n) {
-    return memset(s, c, n);
-}
-
-static inline int64_t safe_sprintf(char *buf, const char *fmt, ...) {
-    int64_t ret;
-    va_list ap;
-    va_start(ap, fmt);
-    ret = vsprintf(buf, fmt, ap);
-    va_end(ap);
-    return ret;
-}
-
-static inline char *safe_strcpy(char *dest, const char *src) {
-    return strcpy(dest, src);
-}
-
-static inline int64_t safe_scanf(const char *fmt, ...) {
-    int64_t ret;
-    va_list ap;
-    va_start(ap, fmt);
-    ret = vscanf(fmt, ap);
-    va_end(ap);
-    return ret;
-}
-
-static inline int64_t safe_system(const char *command) {
-    return (int64_t)system(command);
-}
-
-static inline FILE *safe_popen(const char *command, const char *type) {
-    return popen(command, type);
 }
 
 /* ---------------------------------------------------------------------------

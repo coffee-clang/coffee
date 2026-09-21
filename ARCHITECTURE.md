@@ -52,7 +52,7 @@ them on every exploration.
 ├── include/             # Vendored third-party headers (maintained in-tree)
 │   ├── sds/             # antirez/sds — Simple Dynamic Strings headers
 │   ├── toml.h           # cktan/tomlc99 — TOML parser header
-│   └── safe.h           # Safe string wrappers + bump-pointer arena allocator
+│   └── safe.h           # Allocation / file I/O wrappers + bump-pointer arena allocator
 │
 │   (sds.c and toml.c are compiled as part of src/ for convenience)
 │
