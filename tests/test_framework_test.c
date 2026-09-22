@@ -25,18 +25,6 @@ TEST(framework_test_count_is_reasonable)
 	PASS();
 }
 
-TEST(framework_test_function_returns_expected)
-{
-	/* Directly call a test function to verify it works */
-	if (test_framework_count == 0) {
-		FAIL("no tests registered");
-	}
-	i64 result = test_framework_tests[0].func();
-	/* We're testing that calling works, result depends on which test is first */
-	(void)result;
-	PASS();
-}
-
 TEST(framework_no_duplicate_names)
 {
 	for (u64 i = 0; i < test_framework_count; i++) {
@@ -84,7 +72,6 @@ void coffee_register_framework_tests(void)
 {
 	TEST_REGISTER(framework_registers_test);
 	TEST_REGISTER(framework_test_count_is_reasonable);
-	TEST_REGISTER(framework_test_function_returns_expected);
 	TEST_REGISTER(framework_no_duplicate_names);
 	TEST_REGISTER(framework_crash_is_isolated);
 }

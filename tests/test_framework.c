@@ -60,8 +60,9 @@ i64 test_framework_run(const char *filter)
 			char old_cwd[4096];
 			bool have_cwd = getcwd(old_cwd, sizeof(old_cwd)) != nullptr;
 			i64   result  = test_framework_tests[i].func();
-			if (have_cwd) {
-				chdir(old_cwd);
+			if (have_cwd && chdir(old_cwd) != 0) {
+				fprintf_safe(stderr, "Error: cannot restore cwd to '%s' after test '%s'\n", old_cwd, name);
+				result = 0;
 			}
 			if (result) {
 				local_passed++;
