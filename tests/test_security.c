@@ -473,6 +473,43 @@ TEST(safe_atol_invalid)
 }
 
 /* ---------------------------------------------------------------
+ * safe_fsync_dir: best-effort and total for every path shape
+ * --------------------------------------------------------------- */
+TEST(safe_fsync_dir_handles_any_path_shape)
+{
+	/* A bare relative name (no slash) must fsync ".", not be skipped. */
+	char bare[]   = "Coffee.lock";
+	char rooted[] = "/coffee-nonexistent-dir";
+	char nested[] = "some/nested/dir/Coffee.lock";
+	char slashy[] = "some/nested/";
+	char empty[]  = "";
+
+	safe_fsync_dir(bare);
+	safe_fsync_dir(rooted);
+	safe_fsync_dir(nested);
+	safe_fsync_dir(slashy);
+	safe_fsync_dir(empty);
+
+	/* The path is borrowed: the helper must not write through it. */
+	ASSERT(strcmp(bare, "Coffee.lock") == 0, "borrowed path must be left alone");
+	ASSERT(strcmp(rooted, "/coffee-nonexistent-dir") == 0, "borrowed path must be left alone");
+	ASSERT(strcmp(nested, "some/nested/dir/Coffee.lock") == 0, "borrowed path must be left alone");
+	ASSERT(strcmp(slashy, "some/nested/") == 0, "borrowed path must be left alone");
+	ASSERT(strcmp(empty, "") == 0, "borrowed path must be left alone");
+
+	/* Exercise the branch where the directory really is opened. */
+	sds dir = sdsnew("/tmp/coffee-fsync-dir-test");
+	if (mkdir(dir, 0700) == 0) {
+		sds file = sdscatprintf(sdsempty(), "%s/Coffee.toml", dir);
+		safe_fsync_dir(file);
+		sdsfree(file);
+		rmdir(dir);
+	}
+	sdsfree(dir);
+	PASS();
+}
+
+/* ---------------------------------------------------------------
  * The safe-building-block headers must not re-export banned footguns
  * --------------------------------------------------------------- */
 
@@ -1092,5 +1129,6 @@ void coffee_register_security_tests(void)
 	TEST_REGISTER(safe_strtol_invalid);
 	TEST_REGISTER(safe_atol_valid);
 	TEST_REGISTER(safe_atol_invalid);
+	TEST_REGISTER(safe_fsync_dir_handles_any_path_shape);
 	TEST_REGISTER(safe_header_exports_no_banned_wrappers);
 }

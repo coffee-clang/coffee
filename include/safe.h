@@ -244,17 +244,19 @@ static inline void safe_fsync_dir(const char *path) {
         return; /* path too long for the buffer */
     }
     char *slash = strrchr(dir, '/');
-    if (slash != nullptr) {
-        if (slash == dir) {
-            slash[1] = '\0';
-        } else {
-            *slash = '\0';
-        }
-        int fd = safe_open(dir, O_RDONLY | O_DIRECTORY);
-        if (fd >= 0) {
-            (void)fsync(fd);
-            (void)safe_close(fd);
-        }
+    if (slash == nullptr) {
+        /* Bare relative filename: the containing directory is "." */
+        dir[0] = '.';
+        dir[1] = '\0';
+    } else if (slash == dir) {
+        slash[1] = '\0';
+    } else {
+        *slash = '\0';
+    }
+    int fd = safe_open(dir, O_RDONLY | O_DIRECTORY);
+    if (fd >= 0) {
+        (void)fsync(fd);
+        (void)safe_close(fd);
     }
 }
 
