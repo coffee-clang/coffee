@@ -148,7 +148,10 @@ static inline i64 snprintf_safe(char *buf, size_t size, const char *fmt, ...)
 /**
  * @brief Escape a string for inclusion in a TOML basic string literal.
  *
- * Escapes backslash, double quote, newline, carriage return, and tab.
+ * Escapes backslash, double quote, newline, carriage return, tab,
+ * backspace and form feed.  Every other control character (U+0000 to
+ * U+001F and U+007F) is emitted as a \\uXXXX escape, because TOML
+ * forbids them raw and the parser rejects a file containing one.
  * Returns a new sds (caller frees).  A nullptr input yields an empty sds.
  */
 static inline sds toml_escape(const char *s)
@@ -158,16 +161,23 @@ static inline sds toml_escape(const char *s)
 	}
 	sds out = sdsempty();
 	for (const char *p = s; *p != '\0'; p++) {
-		if (*p == '\\') {
+		unsigned char c = (unsigned char)*p;
+		if (c == '\\') {
 			out = sdscatlen(out, "\\\\", 2);
-		} else if (*p == '"') {
+		} else if (c == '"') {
 			out = sdscatlen(out, "\\\"", 2);
-		} else if (*p == '\n') {
+		} else if (c == '\n') {
 			out = sdscatlen(out, "\\n", 2);
-		} else if (*p == '\r') {
+		} else if (c == '\r') {
 			out = sdscatlen(out, "\\r", 2);
-		} else if (*p == '\t') {
+		} else if (c == '\t') {
 			out = sdscatlen(out, "\\t", 2);
+		} else if (c == '\b') {
+			out = sdscatlen(out, "\\b", 2);
+		} else if (c == '\f') {
+			out = sdscatlen(out, "\\f", 2);
+		} else if (c < 0x20 || c == 0x7f) {
+			out = sdscatprintf(out, "\\u%04X", c);
 		} else {
 			out = sdscatlen(out, p, 1);
 		}
