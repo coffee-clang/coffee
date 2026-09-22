@@ -693,19 +693,29 @@ i64 manifest_write(sds path, manifest_t *m)
 			if (m->package.dependencies[i] == nullptr) {
 				continue;
 			}
-			if (strchr(m->package.dependencies[i], '=') == nullptr) {
-				sds  name        = dep_parse_name(m->package.dependencies[i]);
-				bool structured  = false;
+			sds  name       = dep_parse_name(m->package.dependencies[i]);
+			bool valid      = dep_name_is_valid(name);
+			bool structured = false;
+			if (valid && strchr(m->package.dependencies[i], '=') == nullptr) {
 				for (size_t j = 0; j < m->dependencies.deps_count; j++) {
 					if (m->dependencies.deps[j].name != nullptr && strcmp(m->dependencies.deps[j].name, name) == 0) {
 						structured = true;
 						break;
 					}
 				}
-				sdsfree(name);
-				if (structured) {
-					continue;
-				}
+			}
+			sdsfree(name);
+			/* An invalid name (e.g. the bare-key remnant of a quoted
+			 * key such as "../evil") would be written back as an
+			 * unparseable bare key, so drop it — mirroring the
+			 * parse-side guard for inline tables. */
+			if (!valid) {
+				fprintf_safe(stderr, "Warning: dropping invalid dependency entry '%s'\n",
+				             m->package.dependencies[i]);
+				continue;
+			}
+			if (structured) {
+				continue;
 			}
 			fprintf_safe(fp, "%s\n", m->package.dependencies[i]);
 		}

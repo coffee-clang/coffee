@@ -141,10 +141,22 @@ TEST(dep_name_is_valid_unit)
 	ASSERT(!dep_name_is_valid("../etc"), "../etc should be invalid");
 	ASSERT(!dep_name_is_valid("foo/bar"), "foo/bar should be invalid");
 	ASSERT(!dep_name_is_valid("a/b"), "a/b should be invalid");
+	/* The name is also emitted as a TOML bare key, so anything outside
+	 * [A-Za-z0-9_-] must be rejected. */
+	ASSERT(!dep_name_is_valid("..config"), "..config should be invalid (dot is not a bare-key char)");
+	ASSERT(!dep_name_is_valid("a.b"), "a.b should be invalid");
+	ASSERT(!dep_name_is_valid("a b"), "space should be invalid");
+	ASSERT(!dep_name_is_valid("a=b"), "= should be invalid");
+	ASSERT(!dep_name_is_valid("a\"b"), "double quote should be invalid");
+	ASSERT(!dep_name_is_valid("a#b"), "# should be invalid");
+	ASSERT(!dep_name_is_valid("a[b]"), "brackets should be invalid");
+	ASSERT(!dep_name_is_valid("a\nb"), "newline should be invalid");
 	ASSERT(dep_name_is_valid("foo"), "foo should be valid");
-	ASSERT(dep_name_is_valid("..config"), "..config should be valid");
 	ASSERT(dep_name_is_valid("foo-bar"), "foo-bar should be valid");
 	ASSERT(dep_name_is_valid("mylib"), "mylib should be valid");
+	ASSERT(dep_name_is_valid("_x"), "leading underscore should be valid");
+	ASSERT(dep_name_is_valid("A-Z_09"), "mixed charset should be valid");
+	ASSERT(dep_name_is_valid("json-c"), "json-c should be valid");
 	PASS();
 }
 
@@ -624,6 +636,58 @@ TEST(manifest_rejects_traversal_name)
 	ASSERT(m->dependencies.deps[0].name != nullptr, "valid dep should have name");
 	ASSERT(strcmp(m->dependencies.deps[0].name, "normal") == 0, "remaining dep should be 'normal'");
 	manifest_free(m);
+
+	remove("Coffee.toml");
+	chdir(old_cwd);
+	rmdir(tmpdir);
+	sdsfree(tmpdir);
+
+	PASS();
+}
+
+/* ---------------------------------------------------------------
+ * manifest_write — invalid bare-key remnants are not re-emitted
+ * --------------------------------------------------------------- */
+TEST(manifest_write_drops_invalid_flat_remnant)
+{
+	char old_cwd[4096];
+	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
+	sds tmpdir = sdsnew("/tmp/coffee-test-manifest-write-remnant");
+	mkdir(tmpdir, 0755);
+	ASSERT(chdir(tmpdir) == 0, "chdir failed");
+
+	FILE *fp = fopen("Coffee.toml", "w");
+	ASSERT(fp != nullptr, "fopen Coffee.toml failed");
+	fprintf_safe(fp, "[package]\nname = \"test\"\nversion = \"1.0.0\"\nedition = \"c23\"\n");
+	fprintf_safe(fp, "[dependencies]\n");
+	fprintf_safe(fp, "normal = { path = \".\" }\n");
+	fprintf_safe(fp, "\"../evil\" = { path = \".\" }\n");
+	fprintf_safe(fp, "\"../evil2\" = \"1.0\"\n");
+	fprintf_safe(fp, "\"a b\" = { path = \".\" }\n");
+	fclose(fp);
+
+	manifest_t *m = manifest_parse("Coffee.toml");
+	ASSERT(m != nullptr, "manifest_parse should succeed");
+	ASSERT(m->dependencies.deps_count == 1, "only the valid structured dep should parse");
+	ASSERT(manifest_write("Coffee.toml", m) == 0, "manifest_write should succeed");
+	manifest_free(m);
+
+	FILE *rf = fopen("Coffee.toml", "r");
+	ASSERT(rf != nullptr, "fopen for read failed");
+	char buf[4096];
+	size_t n = fread(buf, 1, sizeof(buf) - 1, rf);
+	buf[n] = '\0';
+	fclose(rf);
+	ASSERT(strstr(buf, "../evil") == nullptr, "invalid remnant must not be written back");
+	ASSERT(strstr(buf, "../evil2") == nullptr, "invalid '='-bearing remnant must not be written back");
+	ASSERT(strstr(buf, "a b") == nullptr, "non-bare-key remnant must not be written back");
+
+	manifest_t *re = manifest_parse("Coffee.toml");
+	ASSERT(re != nullptr, "rewritten manifest must still parse");
+	ASSERT(re->dependencies.deps_count == 1, "only the valid dep should remain");
+	ASSERT(re->dependencies.deps[0].name != nullptr, "valid dep should have name");
+	ASSERT(strcmp(re->dependencies.deps[0].name, "normal") == 0, "remaining dep should be 'normal'");
+	manifest_free(re);
 
 	remove("Coffee.toml");
 	chdir(old_cwd);
@@ -1117,6 +1181,7 @@ void coffee_register_security_tests(void)
 	TEST_REGISTER(fetch_rejects_dotdot_dep);
 	TEST_REGISTER(fetch_rejects_slash_dep);
 	TEST_REGISTER(manifest_rejects_traversal_name);
+	TEST_REGISTER(manifest_write_drops_invalid_flat_remnant);
 	TEST_REGISTER(add_remove_exact_name_match);
 	TEST_REGISTER(install_rejects_unsafe_bin_name);
 	TEST_REGISTER(install_rejects_traversal_version);

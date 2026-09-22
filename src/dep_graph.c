@@ -323,8 +323,7 @@ dep_graph_t *dep_graph_create(manifest_t *m, lockfile_t *lf, bool offline)
 	/* Add root node */
 	const char *root_name = m->package.name != nullptr ? m->package.name : "root";
 	if (!dep_name_is_valid(root_name)) {
-		fprintf_safe(stderr, "Error: invalid root package name '%s' (must not contain '/' or be '.'/'..')\n",
-		             root_name);
+		fprintf_safe(stderr, "Error: invalid root package name '%s' (only [A-Za-z0-9_-] allowed)\n", root_name);
 		dep_graph_free(g);
 		return nullptr;
 	}

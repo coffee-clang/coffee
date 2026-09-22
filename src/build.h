@@ -95,9 +95,10 @@ size_t dep_add_flags(const char *dep_dir, const char *dep_name, sds *flags, sds 
 sds dep_parse_name(const char *entry);
 
 /*
- * Validate a dependency name for filesystem safety.
- * Rejects nullptr, empty, ".", "..", and any name containing '/'.
- * Returns true if the name is safe to use in paths.
+ * Validate a dependency name.  The name is used both as a path component
+ * and as a TOML bare key, so only [A-Za-z0-9_-] is accepted; nullptr,
+ * empty, and any other character ('.', '/', '"', whitespace, ...) are
+ * rejected.  Returns true if the name is safe in both roles.
  */
 bool dep_name_is_valid(const char *name);
 
