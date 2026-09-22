@@ -152,6 +152,8 @@ static inline i64 snprintf_safe(char *buf, size_t size, const char *fmt, ...)
  * backspace and form feed.  Every other control character (U+0000 to
  * U+001F and U+007F) is emitted as a \\uXXXX escape, because TOML
  * forbids them raw and the parser rejects a file containing one.
+ * Bytes >= 0x80 are passed through unchanged: the input is assumed to
+ * be valid UTF-8, which is not verified here.
  * Returns a new sds (caller frees).  A nullptr input yields an empty sds.
  */
 static inline sds toml_escape(const char *s)
@@ -189,8 +191,9 @@ static inline sds toml_escape(const char *s)
  * @brief Write a TOML string value with proper escaping.
  *
  * The format string must contain exactly one %s, which is replaced by the
- * escaped value.  Used by the manifest/lockfile writers so that quotes and
- * backslashes in user data cannot corrupt the emitted TOML.
+ * escaped value.  Used by the manifest/lockfile writers so that quotes,
+ * backslashes and control characters in user data cannot corrupt the
+ * emitted TOML.
  */
 static inline void fprintf_toml_value(FILE *stream, const char *fmt, const char *s)
 {

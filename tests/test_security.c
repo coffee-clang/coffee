@@ -393,6 +393,26 @@ TEST(add_ignores_unemitted_values)
 	manifest_t *m = manifest_parse("Coffee.toml");
 	ASSERT(m != nullptr, "manifest should parse");
 	ASSERT(m->dependencies.deps_count == 2, "both deps should be written");
+	bool found_pathwins = false;
+	bool found_gitdep   = false;
+	for (size_t i = 0; i < m->dependencies.deps_count; i++) {
+		dependency_t *d = &m->dependencies.deps[i];
+		if (d->name == nullptr) {
+			continue;
+		}
+		if (strcmp(d->name, "pathwins") == 0) {
+			/* The emitted source must be the --path value, not the
+			 * hostile --git that was ignored. */
+			found_pathwins = d->path != nullptr && strcmp(d->path, "./lib") == 0 && d->git == nullptr;
+		}
+		if (strcmp(d->name, "gitdep") == 0) {
+			/* The ignored --pkg-version must not be written. */
+			found_gitdep = d->git != nullptr && strcmp(d->git, "https://example.com/r.git") == 0 &&
+			               d->version == nullptr;
+		}
+	}
+	ASSERT(found_pathwins, "pathwins should carry the --path value and no git");
+	ASSERT(found_gitdep, "gitdep should carry the --git value and no version");
 	manifest_free(m);
 
 	remove("Coffee.toml");
