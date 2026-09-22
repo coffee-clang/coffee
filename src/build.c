@@ -419,16 +419,17 @@ bool dep_name_is_valid(const char *name)
 	if (name == nullptr || name[0] == '\0') {
 		return false;
 	}
-	if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) {
-		return false;
-	}
-	if (strchr(name, '/') != nullptr) {
-		return false;
-	}
-	/* Reject double quotes: they would break the quoted-argv splitting
-	 * used when building compiler command lines. */
-	if (strchr(name, '"') != nullptr) {
-		return false;
+	/* A dependency name is used both as a path component and as a TOML
+	 * bare key, so only the bare-key charset is accepted.  This rejects
+	 * '.', '..', '/', '"', whitespace and every other TOML
+	 * metacharacter.  Ranges are spelled out instead of using isalnum()
+	 * to stay locale-independent. */
+	for (const char *p = name; *p != '\0'; p++) {
+		bool ok = (*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || (*p >= '0' && *p <= '9') ||
+		          *p == '_' || *p == '-';
+		if (!ok) {
+			return false;
+		}
 	}
 	return true;
 }

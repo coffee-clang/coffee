@@ -50,6 +50,15 @@ authors = "Jane Doe"
 
 Dependencies can be declared in two forms: **flat strings** (simple version constraints) or **inline tables** (detailed source specifications).
 
+### Dependency Names
+
+A dependency name is written back to `Coffee.toml` as a TOML **bare key**, so it is restricted to
+ASCII letters, digits, `_` and `-` (`[A-Za-z0-9_-]+`). Any other character — space, `.`, `/`, `"`,
+`=`, `#`, `[`, `]`, newline — makes the name invalid: the entry is skipped with a warning at parse
+time and is never written back, so a manifest containing such a key stays parseable after
+`coffee add` or `coffee remove`. The same restriction applies to the `[package]` `name` and to
+`[[bin]]` `name`.
+
 ### Flat String Form
 
 The simplest form specifies a name and version constraint:
@@ -275,7 +284,7 @@ src = ["src/tool.c"]
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `name` | String | Yes | Binary name (output filename). |
+| `name` | String | Yes | Binary name (output filename). Must be alphanumeric with `_` or `-`. |
 | `src` | Array of strings | Yes | Source file globs for this binary. |
 
 ---
