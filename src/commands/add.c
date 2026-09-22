@@ -1,3 +1,4 @@
+#include "../build.h"
 #include "../coffee.h"
 #include "../manifest.h"
 #include "../project.h"
@@ -36,7 +37,37 @@ int64_t handle_add(options *opts)
 		return 1;
 	}
 
-	char *package_name  = opts->inputs[1];
+	char *package_name = opts->inputs[1];
+
+	/* Validate everything that will be interpolated into Coffee.toml
+	 * before touching the manifest.  The name is emitted as a bare TOML
+	 * key, so it must be restricted to a charset that cannot terminate
+	 * the key or start a new one.  is_safe_package_name() is the check
+	 * that enforces that; dep_name_is_valid() is kept alongside it for
+	 * parity with the parse-side guard in manifest.c, so relaxing the
+	 * charset rule alone cannot reopen the hole. */
+	if (!dep_name_is_valid(package_name) || !is_safe_package_name(package_name)) {
+		fprintf_safe(stderr, "Error: invalid package name '%s'\n", package_name);
+		fprintf_safe(stderr, "  Names must match [A-Za-z0-9_-]+\n");
+		return 1;
+	}
+	/* Validate only the source that is actually emitted: --path takes
+	 * precedence over --git, and --pkg-version is written only for a
+	 * path dep.  Rejecting a value that would be ignored would be noise. */
+	if (opts->path != nullptr) {
+		if (!url_is_valid(opts->path)) {
+			fprintf_safe(stderr, "Error: invalid path '%s'\n", opts->path);
+			return 1;
+		}
+		if (opts->pkg_version != nullptr && !version_is_valid(opts->pkg_version)) {
+			fprintf_safe(stderr, "Error: invalid version '%s'\n", opts->pkg_version);
+			return 1;
+		}
+	} else if (opts->git != nullptr && !url_is_valid(opts->git)) {
+		fprintf_safe(stderr, "Error: invalid git URL '%s'\n", opts->git);
+		return 1;
+	}
+
 	char *manifest_path = project_find_manifest(nullptr);
 
 	if (manifest_path == nullptr) {
@@ -75,23 +106,31 @@ int64_t handle_add(options *opts)
 		}
 	}
 
-	/* Add new dependency */
+	/* Add new dependency.  The no-source check stays here, after the
+	 * already-exists check, so that re-adding an existing dep without a
+	 * source remains the documented no-op. */
 	sds dep_str;
-	if (!opts->git && !opts->path) {
+	if (opts->git == nullptr && opts->path == nullptr) {
 		fprintf_safe(stderr, "Error: use --git <url> or --path <path> to specify the dependency source\n");
 		manifest_free(m);
 		sdsfree(manifest_path);
 		return 1;
 	}
 	if (opts->path) {
+		sds esc_path = toml_escape(opts->path);
 		if (opts->pkg_version) {
-			dep_str = sdscatprintf(sdsempty(), "%s = { path = \"%s\", version = \"%s\" }", package_name, opts->path,
-			                       opts->pkg_version);
+			sds esc_version = toml_escape(opts->pkg_version);
+			dep_str         = sdscatprintf(sdsempty(), "%s = { path = \"%s\", version = \"%s\" }", package_name,
+			                               esc_path, esc_version);
+			sdsfree(esc_version);
 		} else {
-			dep_str = sdscatprintf(sdsempty(), "%s = { path = \"%s\" }", package_name, opts->path);
+			dep_str = sdscatprintf(sdsempty(), "%s = { path = \"%s\" }", package_name, esc_path);
 		}
+		sdsfree(esc_path);
 	} else {
-		dep_str = sdscatprintf(sdsempty(), "%s = { git = \"%s\" }", package_name, opts->git);
+		sds esc_git = toml_escape(opts->git);
+		dep_str     = sdscatprintf(sdsempty(), "%s = { git = \"%s\" }", package_name, esc_git);
+		sdsfree(esc_git);
 	}
 
 	/* Prefix for dev/build deps */
@@ -127,21 +166,16 @@ int64_t handle_add(options *opts)
 		makefile_path = sdsnew("Makefile");
 	}
 
-	if (!is_safe_package_name(package_name)) {
-		sdsfree(makefile_path);
-		fprintf_safe(stderr, "Warning: package name contains unsafe characters, skipping Makefile update\n");
-	} else {
-		FILE *exist_check = safe_fopen(makefile_path, "r");
-		if (exist_check) {
-			safe_fclose(exist_check);
-			FILE *mf = safe_fopen(makefile_path, "a");
-			if (mf) {
-				fprintf_safe(mf, "\n# Dep: %s\n", package_name);
-				fprintf_safe(mf, "CFLAGS += -Ideps/%s/include\n", package_name);
-				fprintf_safe(mf, "LDFLAGS += -Ldeps/%s/lib -l%s\n", package_name, package_name);
-				if (safe_fclose(mf) != 0) {
-					fprintf_safe(stderr, "Warning: failed to write to Makefile\n");
-				}
+	FILE *exist_check = safe_fopen(makefile_path, "r");
+	if (exist_check) {
+		safe_fclose(exist_check);
+		FILE *mf = safe_fopen(makefile_path, "a");
+		if (mf) {
+			fprintf_safe(mf, "\n# Dep: %s\n", package_name);
+			fprintf_safe(mf, "CFLAGS += -Ideps/%s/include\n", package_name);
+			fprintf_safe(mf, "LDFLAGS += -Ldeps/%s/lib -l%s\n", package_name, package_name);
+			if (safe_fclose(mf) != 0) {
+				fprintf_safe(stderr, "Warning: failed to write to Makefile\n");
 			}
 		}
 	}

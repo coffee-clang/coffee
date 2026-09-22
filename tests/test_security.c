@@ -20,6 +20,9 @@
 
 void coffee_register_security_tests(void);
 
+/* Defined below; used by the add-injection test. */
+static sds read_file(const char *path);
+
 /* ---------------------------------------------------------------
  * run_command_capture
  * --------------------------------------------------------------- */
@@ -210,6 +213,254 @@ TEST(fetch_rejects_slash_dep)
 	remove("Coffee.toml");
 	remove("Coffee.lock");
 	rmdir("deps");
+	chdir(old_cwd);
+	rmdir(tmpdir);
+	sdsfree(tmpdir);
+	PASS();
+}
+
+/* ---------------------------------------------------------------
+ * add — input validation (TOML injection)
+ * --------------------------------------------------------------- */
+TEST(add_rejects_injection_inputs)
+{
+	char old_cwd[4096];
+	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
+	sds tmpdir = sdsnew("/tmp/coffee-test-add-injection");
+	mkdir(tmpdir, 0755);
+	ASSERT(chdir(tmpdir) == 0, "chdir failed");
+
+	FILE *fp = fopen("Coffee.toml", "w");
+	ASSERT(fp != nullptr, "fopen Coffee.toml failed");
+	fprintf_safe(fp, "[package]\nname = \"test\"\nversion = \"1.0.0\"\nedition = \"c23\"\n");
+	fclose(fp);
+
+	sds before = read_file("Coffee.toml");
+
+	/* A name that would close the bare key and inject a new one. */
+	options opt1 = {
+		.inputs     = (char *[]){ "add", "x\" = { evil = \"1\" }" },
+		.inputs_num = 2,
+		.path       = sdsnew("."),
+	};
+	ASSERT(handle_add(&opt1) == 1, "quoted-key injection name should be rejected");
+	sdsfree(opt1.path);
+
+	/* A name containing a newline. */
+	options opt2 = {
+		.inputs     = (char *[]){ "add", "x\nevil = 1" },
+		.inputs_num = 2,
+		.path       = sdsnew("."),
+	};
+	ASSERT(handle_add(&opt2) == 1, "newline injection name should be rejected");
+	sdsfree(opt2.path);
+
+	/* A name with a space and an '='. */
+	options opt3 = {
+		.inputs     = (char *[]){ "add", "x = 1" },
+		.inputs_num = 2,
+		.path       = sdsnew("."),
+	};
+	ASSERT(handle_add(&opt3) == 1, "bare-key injection name should be rejected");
+	sdsfree(opt3.path);
+
+	/* Valid name, hostile source or version. */
+	options opt4 = {
+		.inputs     = (char *[]){ "add", "mylib" },
+		.inputs_num = 2,
+		.git        = sdsnew("-o/tmp/pwned"),
+	};
+	ASSERT(handle_add(&opt4) == 1, "option-injection git URL should be rejected");
+	sdsfree(opt4.git);
+
+	options opt5 = {
+		.inputs     = (char *[]){ "add", "mylib" },
+		.inputs_num = 2,
+		.path       = sdsnew("file:///etc/passwd"),
+	};
+	ASSERT(handle_add(&opt5) == 1, "file:// path should be rejected");
+	sdsfree(opt5.path);
+
+	options opt6 = {
+		.inputs      = (char *[]){ "add", "mylib" },
+		.inputs_num  = 2,
+		.path        = sdsnew("./lib"),
+		.pkg_version = sdsnew("1.0.0/../../x"),
+	};
+	ASSERT(handle_add(&opt6) == 1, "traversal version should be rejected");
+	sdsfree(opt6.path);
+	sdsfree(opt6.pkg_version);
+
+	/* Every rejected call must leave the manifest untouched. */
+	manifest_t *m = manifest_parse("Coffee.toml");
+	ASSERT(m != nullptr, "manifest should still parse");
+	ASSERT(m->dependencies.deps_count == 0, "no structured dependency should have been written");
+	ASSERT(m->package.dependencies_count == 0, "no flat dependency should have been written");
+	manifest_free(m);
+
+	sds after = read_file("Coffee.toml");
+	ASSERT(strcmp(before, after) == 0, "rejected add must leave Coffee.toml byte-identical");
+	sdsfree(after);
+	sdsfree(before);
+
+	remove("Coffee.toml");
+	chdir(old_cwd);
+	rmdir(tmpdir);
+	sdsfree(tmpdir);
+	PASS();
+}
+
+TEST(add_accepts_valid_path_dep)
+{
+	char old_cwd[4096];
+	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
+	sds tmpdir = sdsnew("/tmp/coffee-test-add-valid");
+	mkdir(tmpdir, 0755);
+	ASSERT(chdir(tmpdir) == 0, "chdir failed");
+
+	FILE *fp = fopen("Coffee.toml", "w");
+	ASSERT(fp != nullptr, "fopen Coffee.toml failed");
+	fprintf_safe(fp, "[package]\nname = \"test\"\nversion = \"1.0.0\"\nedition = \"c23\"\n");
+	fclose(fp);
+
+	options opt = {
+		.inputs     = (char *[]){ "add", "mylib" },
+		.inputs_num = 2,
+		.path       = sdsnew("./lib"),
+	};
+	i64 ret = handle_add(&opt);
+	sdsfree(opt.path);
+	ASSERT(ret == 0, "add with a valid path dep should succeed");
+
+	manifest_t *m = manifest_parse("Coffee.toml");
+	ASSERT(m != nullptr, "manifest should parse after add");
+	ASSERT(m->dependencies.deps_count == 1, "one structured dep should be written");
+	bool found = false;
+	if (m->dependencies.deps_count == 1) {
+		dependency_t *d = &m->dependencies.deps[0];
+		found = d->name != nullptr && strcmp(d->name, "mylib") == 0 && d->path != nullptr &&
+		        strcmp(d->path, "./lib") == 0;
+	}
+	ASSERT(found, "mylib path dep should round-trip");
+	manifest_free(m);
+
+	remove("Coffee.toml");
+	chdir(old_cwd);
+	rmdir(tmpdir);
+	sdsfree(tmpdir);
+	PASS();
+}
+
+/* ---------------------------------------------------------------
+ * add — values that are not emitted are not validated
+ * --------------------------------------------------------------- */
+TEST(add_ignores_unemitted_values)
+{
+	char old_cwd[4096];
+	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
+	sds tmpdir = sdsnew("/tmp/coffee-test-add-ignored");
+	mkdir(tmpdir, 0755);
+	ASSERT(chdir(tmpdir) == 0, "chdir failed");
+
+	FILE *fp = fopen("Coffee.toml", "w");
+	ASSERT(fp != nullptr, "fopen Coffee.toml failed");
+	fprintf_safe(fp, "[package]\nname = \"test\"\nversion = \"1.0.0\"\nedition = \"c23\"\n");
+	fclose(fp);
+
+	/* --path wins over --git, so a hostile --git is never emitted and
+	 * must not be rejected. */
+	options opt1 = {
+		.inputs     = (char *[]){ "add", "pathwins" },
+		.inputs_num = 2,
+		.path       = sdsnew("./lib"),
+		.git        = sdsnew("-o/tmp/pwned"),
+	};
+	ASSERT(handle_add(&opt1) == 0, "ignored --git should not be validated");
+	sdsfree(opt1.path);
+	sdsfree(opt1.git);
+
+	/* --pkg-version is written only for a path dep. */
+	options opt2 = {
+		.inputs      = (char *[]){ "add", "gitdep" },
+		.inputs_num  = 2,
+		.git         = sdsnew("https://example.com/r.git"),
+		.pkg_version = sdsnew("bad ver"),
+	};
+	ASSERT(handle_add(&opt2) == 0, "ignored --pkg-version should not be validated");
+	sdsfree(opt2.git);
+	sdsfree(opt2.pkg_version);
+
+	manifest_t *m = manifest_parse("Coffee.toml");
+	ASSERT(m != nullptr, "manifest should parse");
+	ASSERT(m->dependencies.deps_count == 2, "both deps should be written");
+	bool found_pathwins = false;
+	bool found_gitdep   = false;
+	for (size_t i = 0; i < m->dependencies.deps_count; i++) {
+		dependency_t *d = &m->dependencies.deps[i];
+		if (d->name == nullptr) {
+			continue;
+		}
+		if (strcmp(d->name, "pathwins") == 0) {
+			/* The emitted source must be the --path value, not the
+			 * hostile --git that was ignored. */
+			found_pathwins = d->path != nullptr && strcmp(d->path, "./lib") == 0 && d->git == nullptr;
+		}
+		if (strcmp(d->name, "gitdep") == 0) {
+			/* The ignored --pkg-version must not be written. */
+			found_gitdep = d->git != nullptr && strcmp(d->git, "https://example.com/r.git") == 0 &&
+			               d->version == nullptr;
+		}
+	}
+	ASSERT(found_pathwins, "pathwins should carry the --path value and no git");
+	ASSERT(found_gitdep, "gitdep should carry the --git value and no version");
+	manifest_free(m);
+
+	remove("Coffee.toml");
+	chdir(old_cwd);
+	rmdir(tmpdir);
+	sdsfree(tmpdir);
+	PASS();
+}
+
+/* ---------------------------------------------------------------
+ * add — emitted values are escaped, so the file stays parseable
+ * --------------------------------------------------------------- */
+TEST(add_escapes_emitted_values)
+{
+	char old_cwd[4096];
+	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
+	sds tmpdir = sdsnew("/tmp/coffee-test-add-escape");
+	mkdir(tmpdir, 0755);
+	ASSERT(chdir(tmpdir) == 0, "chdir failed");
+
+	FILE *fp = fopen("Coffee.toml", "w");
+	ASSERT(fp != nullptr, "fopen Coffee.toml failed");
+	fprintf_safe(fp, "[package]\nname = \"test\"\nversion = \"1.0.0\"\nedition = \"c23\"\n");
+	fclose(fp);
+
+	/* A double quote and a control character in the path: both must be
+	 * escaped, or the written file is unparseable. */
+	options opt = {
+		.inputs     = (char *[]){ "add", "escaped" },
+		.inputs_num = 2,
+		.path       = sdsnew("./li\"b\x01"),
+	};
+	ASSERT(handle_add(&opt) == 0, "path with quote and control char should be accepted");
+	sdsfree(opt.path);
+
+	manifest_t *m = manifest_parse("Coffee.toml");
+	ASSERT(m != nullptr, "manifest with escaped value should parse");
+	ASSERT(m->dependencies.deps_count == 1, "one dep should be written");
+	bool found = false;
+	if (m->dependencies.deps_count == 1) {
+		dependency_t *d = &m->dependencies.deps[0];
+		found = d->name != nullptr && strcmp(d->name, "escaped") == 0 && d->path != nullptr &&
+		        strcmp(d->path, "./li\"b\x01") == 0;
+	}
+	ASSERT(found, "escaped path should round-trip byte-for-byte");
+	manifest_free(m);
+
+	remove("Coffee.toml");
 	chdir(old_cwd);
 	rmdir(tmpdir);
 	sdsfree(tmpdir);
@@ -1116,6 +1367,10 @@ void coffee_register_security_tests(void)
 	TEST_REGISTER(registry_search_parses_mock_index);
 	TEST_REGISTER(fetch_rejects_dotdot_dep);
 	TEST_REGISTER(fetch_rejects_slash_dep);
+	TEST_REGISTER(add_rejects_injection_inputs);
+	TEST_REGISTER(add_accepts_valid_path_dep);
+	TEST_REGISTER(add_ignores_unemitted_values);
+	TEST_REGISTER(add_escapes_emitted_values);
 	TEST_REGISTER(manifest_rejects_traversal_name);
 	TEST_REGISTER(add_remove_exact_name_match);
 	TEST_REGISTER(install_rejects_unsafe_bin_name);
