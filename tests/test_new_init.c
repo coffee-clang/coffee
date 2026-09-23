@@ -63,7 +63,7 @@ TEST(init_generates_compilable_main)
 	ASSERT(rc == 0, "generated main.c should compile with -std=c23");
 
 	popd();
-	system("rm -rf /tmp/coffee-init-test-*");
+	test_remove_tree_glob("/tmp/coffee-init-test-*");
 	PASS();
 }
 
@@ -92,7 +92,7 @@ TEST(init_has_bin_section_when_main_present)
 	ASSERT(has_bin, "Coffee.toml should contain [[bin]] when main() is present");
 
 	popd();
-	system("rm -rf /tmp/coffee-init-bin-*");
+	test_remove_tree_glob("/tmp/coffee-init-bin-*");
 	PASS();
 }
 
@@ -130,7 +130,7 @@ TEST(new_generates_compilable_main)
 	sdsfree(proj_path);
 
 	popd();
-	system("rm -rf /tmp/coffee-new-test-*");
+	test_remove_tree_glob("/tmp/coffee-new-test-*");
 	PASS();
 }
 
@@ -163,7 +163,7 @@ TEST(new_lib_generates_compilable_lib)
 	sdsfree(proj_path);
 
 	popd();
-	system("rm -rf /tmp/coffee-new-lib-*");
+	test_remove_tree_glob("/tmp/coffee-new-lib-*");
 	PASS();
 }
 
@@ -198,7 +198,7 @@ TEST(new_lib_template_uses_standard_c_types)
 	sdsfree(proj_path);
 
 	popd();
-	system("rm -rf /tmp/coffee-new-lib-types-*");
+	test_remove_tree_glob("/tmp/coffee-new-lib-types-*");
 	PASS();
 }
 
@@ -235,7 +235,7 @@ TEST(new_binary_template_uses_standard_c_types)
 	sdsfree(proj_path);
 
 	popd();
-	system("rm -rf /tmp/coffee-new-bin-types-*");
+	test_remove_tree_glob("/tmp/coffee-new-bin-types-*");
 	PASS();
 }
 

@@ -63,6 +63,12 @@ static i64 create_symlink(const char *target, const char *link_path)
 			if (run_command(rm_argv, 0) != 0) {
 				return -1;
 			}
+		} else if (S_ISREG(st.st_mode)) {
+			/* A regular file would make symlink() fail with EEXIST;
+			 * remove it like the rm -rf above does for links/dirs. */
+			if (unlink(link_path) != 0) {
+				return -1;
+			}
 		}
 	}
 

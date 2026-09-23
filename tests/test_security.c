@@ -662,9 +662,7 @@ TEST(manifest_roundtrip_preserves_inline_deps)
 TEST(registry_search_parses_mock_index)
 {
 	sds tmpdir = sdsnew("/tmp/coffee-test-registry");
-	sds rmcmd  = sdscatprintf(sdsempty(), "rm -rf %s", tmpdir);
-	system(rmcmd);
-	sdsfree(rmcmd);
+	test_remove_tree(tmpdir);
 	mkdir(tmpdir, 0755);
 	char *old_home = getenv("COFFEE_HOME");
 	setenv("COFFEE_HOME", tmpdir, 1);
@@ -1113,6 +1111,99 @@ TEST(install_rejects_traversal_version)
 }
 
 /* ---------------------------------------------------------------
+ * install — a regular file at deps/<name> must not block the symlink
+ * --------------------------------------------------------------- */
+TEST(install_replaces_regular_file)
+{
+	{
+		char *git_argv[] = { "git", "--version", nullptr };
+		if (run_command(git_argv, RUN_CMD_QUIET) != 0) {
+			printf("  (git not available, skipping)\n");
+			PASS();
+		}
+	}
+
+	char old_cwd[4096];
+	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
+
+	/* Source repo with a valid library.toml. */
+	sds repo_dir = sdsnew("/tmp/coffee-test-install-replace-repo");
+	mkdir(repo_dir, 0755);
+	ASSERT(chdir(repo_dir) == 0, "chdir to repo failed");
+
+	FILE *fp = fopen("library.toml", "w");
+	ASSERT(fp != nullptr, "fopen library.toml failed");
+	fprintf_safe(fp, "[package]\nname = \"goodlib\"\nversion = \"1.0.0\"\n");
+	fclose(fp);
+
+	mkdir("src", 0755);
+	fp = fopen("src/main.c", "w");
+	ASSERT(fp != nullptr, "fopen main.c failed");
+	fprintf_safe(fp, "int main(void) { return 0; }\n");
+	fclose(fp);
+
+	{
+		char *init_argv[] = { "git", "init", "-q", nullptr };
+		ASSERT(run_command(init_argv, RUN_CMD_QUIET) == 0, "git init failed");
+		char *add_argv[] = { "git", "add", "-A", nullptr };
+		ASSERT(run_command(add_argv, RUN_CMD_QUIET) == 0, "git add failed");
+		char *commit_argv[] = { "git", "-c", "user.email=test@test", "-c", "user.name=test", "commit", "-q", "-m",
+			                    "init", nullptr, };
+		ASSERT(run_command(commit_argv, RUN_CMD_QUIET) == 0, "git commit failed");
+	}
+
+	/* Sandbox COFFEE_HOME and a project dir. */
+	sds test_home = sdsnew("/tmp/coffee-test-install-replace-home");
+	mkdir(test_home, 0755);
+	const char *old_home = getenv("COFFEE_HOME");
+	setenv("COFFEE_HOME", test_home, 1);
+
+	sds proj_dir = sdsnew("/tmp/coffee-test-install-replace-proj");
+	mkdir(proj_dir, 0755);
+	ASSERT(chdir(proj_dir) == 0, "chdir to project failed");
+
+	fp = fopen("Coffee.toml", "w");
+	ASSERT(fp != nullptr, "fopen project Coffee.toml failed");
+	fprintf_safe(fp, "[package]\nname = \"proj\"\nversion = \"1.0.0\"\nedition = \"c23\"\n");
+	fclose(fp);
+
+	/* A regular file at deps/goodlib must not block the symlink. */
+	mkdir("deps", 0755);
+	fp = fopen("deps/goodlib", "w");
+	ASSERT(fp != nullptr, "fopen blocking file failed");
+	fprintf_safe(fp, "stale\n");
+	fclose(fp);
+
+	options opt = {
+		.inputs     = (char *[]){ "install", "goodlib" },
+		.inputs_num = 2,
+		.git        = repo_dir,
+	};
+	i64 ret = handle_install(&opt);
+
+	ASSERT(ret == 0, "install should succeed");
+	struct stat st;
+	ASSERT(lstat("deps/goodlib", &st) == 0, "deps/goodlib should exist");
+	ASSERT(S_ISLNK(st.st_mode), "deps/goodlib should now be a symlink");
+
+	/* Cleanup */
+	chdir(old_cwd);
+	if (old_home != nullptr) {
+		setenv("COFFEE_HOME", old_home, 1);
+	} else {
+		unsetenv("COFFEE_HOME");
+	}
+	{
+		char *rm_argv[] = { "rm", "-rf", repo_dir, proj_dir, test_home, nullptr };
+		run_command(rm_argv, RUN_CMD_QUIET);
+	}
+	sdsfree(repo_dir);
+	sdsfree(proj_dir);
+	sdsfree(test_home);
+	PASS();
+}
+
+/* ---------------------------------------------------------------
  * toolcheck — probing limited to build/fetch commands
  * --------------------------------------------------------------- */
 
@@ -1511,6 +1602,7 @@ void coffee_register_security_tests(void)
 	TEST_REGISTER(add_remove_exact_name_match);
 	TEST_REGISTER(install_rejects_unsafe_bin_name);
 	TEST_REGISTER(install_rejects_traversal_version);
+	TEST_REGISTER(install_replaces_regular_file);
 	TEST_REGISTER(fetch_transitive_dep_no_lockfile_corruption);
 	TEST_REGISTER(fetch_root_flat_dep_warns);
 	TEST_REGISTER(fetch_symlink_failure_fails);

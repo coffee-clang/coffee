@@ -81,9 +81,7 @@ static void teardown_project(const char *test_name)
 {
 	chdir(saved_cwd);
 	sds tmpdir = sdscatprintf(sdsempty(), "/tmp/coffee-cmd-manifest-%s", test_name);
-	sds cmd    = sdscatprintf(sdsempty(), "rm -rf %s", tmpdir);
-	system(cmd);
-	sdsfree(cmd);
+	test_remove_tree(tmpdir);
 	sdsfree(tmpdir);
 }
 

@@ -106,14 +106,29 @@ i64 dep_graph_fetch_git(dep_graph_t *g, const char *dep_name, bool verbose)
 	}
 
 	i64 ret;
-	if (ref != nullptr) {
+	if (ref != nullptr && ref_is_rev(ref)) {
+		if (verbose) {
+			printf_safe("    Fetching %s (%s)...\n", dep_name, ref);
+		}
+		/* A SHA cannot be fetched as a refspec, and a shallow fetch may
+		 * not contain the object: fetch everything (full), then check
+		 * the rev out (lowercased to match rev-parse output). */
+		char *fetch_argv[] = { "git", "-C", unconst(dep_path), "fetch", "origin", nullptr };
+		ret                = run_command(fetch_argv, RUN_CMD_QUIET);
+		if (ret == 0) {
+			sds   lower     = ref_lowercase(ref);
+			char *co_argv[] = { "git", "-C", unconst(dep_path), "checkout", unconst(lower), nullptr };
+			ret             = run_command(co_argv, RUN_CMD_QUIET);
+			sdsfree(lower);
+		}
+	} else if (ref != nullptr) {
 		if (verbose) {
 			printf_safe("    Fetching %s (%s)...\n", dep_name, ref);
 		}
 		/* '--' before the refspec prevents git from parsing a ref that
 		 * starts with '-' as an option (option injection). */
 		char *fetch_argv[] = {
-			"git", "-C", unconst(dep_path), "fetch", "origin", "--depth", "1", "--", unconst(ref), nullptr
+			"git", "-C", unconst(dep_path), "fetch", "origin", "--depth", "1", "--", unconst(ref), nullptr,
 		};
 		ret = run_command(fetch_argv, RUN_CMD_QUIET);
 		if (ret == 0) {

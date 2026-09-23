@@ -184,16 +184,24 @@ static toml_table_t *dep_graph_read_table(const char *dep_dir, toml_table_t **ou
 }
 
 /*
- * Read library.toml version from a dep directory.
+ * Read the version from a dep directory's manifest.  Prefers
+ * library.toml, falling back to Coffee.toml (as dep_graph_read_table()
+ * does) so Coffee.toml-only deps report a real version instead of "*".
  */
 static sds read_version(const char *dep_dir)
 {
 	sds   toml_path = sdscatprintf(sdsempty(), "%s/library.toml", dep_dir);
 	FILE *fp        = safe_fopen(toml_path, "r");
-	sdsfree(toml_path);
 	if (fp == nullptr) {
-		return sdsnew("*");
+		sdsfree(toml_path);
+		toml_path = sdscatprintf(sdsempty(), "%s/Coffee.toml", dep_dir);
+		fp        = safe_fopen(toml_path, "r");
+		if (fp == nullptr) {
+			sdsfree(toml_path);
+			return sdsnew("*");
+		}
 	}
+	sdsfree(toml_path);
 
 	char          errbuf[256];
 	toml_table_t *conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
@@ -203,8 +211,11 @@ static sds read_version(const char *dep_dir)
 		return sdsnew("*");
 	}
 
-	toml_datum_t ver = toml_string_in(conf, "version");
-	sds          result;
+	/* The version lives in the [package] table; keep a top-level lookup
+	 * as a fallback for manifests that store it at the root. */
+	toml_table_t *pkg = toml_table_in(conf, "package");
+	toml_datum_t  ver = pkg != nullptr ? toml_string_in(pkg, "version") : toml_string_in(conf, "version");
+	sds           result;
 	if (ver.ok) {
 		result = sdsnew(ver.u.s);
 		safe_free(ver.u.s);

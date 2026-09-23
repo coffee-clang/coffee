@@ -57,9 +57,7 @@ static void teardown_proj(const char *name)
 {
 	chdir(saved_cwd);
 	sds tmpdir = sdscatprintf(sdsempty(), "/tmp/coverage-core-%s", name);
-	sds cmd    = sdscatprintf(sdsempty(), "rm -rf %s", tmpdir);
-	system(cmd);
-	sdsfree(cmd);
+	test_remove_tree(tmpdir);
 	sdsfree(tmpdir);
 }
 
@@ -249,9 +247,9 @@ TEST(cov_dep_resolve_global)
 	sdsfree(path);
 
 	/* Cleanup — remove the sandboxed global deps dir */
-	sds cmd = sdscatprintf(sdsempty(), "rm -rf %s/deps/globalpkg", coffee_home_dir());
-	system(cmd);
-	sdsfree(cmd);
+	sds path2 = sdscatprintf(sdsempty(), "%s/deps/globalpkg", coffee_home_dir());
+	test_remove_tree(path2);
+	sdsfree(path2);
 	sdsfree(global_deps);
 	PASS();
 }

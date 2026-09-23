@@ -40,7 +40,11 @@ typedef struct {
 	size_t count;
 } version_list_t;
 
-sds coffee_home_dir(void);
+/*
+ * The coffee home directory (~/.coffee or $COFFEE_HOME).  The returned
+ * pointer is borrowed from a static buffer — never sdsfree() it.
+ */
+const char *coffee_home_dir(void);
 
 recipe_list_t *registry_search(sds query);
 recipe_t      *registry_get(sds name);

@@ -21,6 +21,7 @@
 #include "test_framework.h"
 
 #include <assert.h>
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -44,9 +45,9 @@ static void setup_tmpdir(const char *name)
 static void teardown_tmpdir(const char *name)
 {
 	chdir(saved_cwd);
-	sds cmd = sdscatprintf(sdsempty(), "rm -rf /tmp/depgraph-%s", name);
-	system(cmd);
-	sdsfree(cmd);
+	sds tmpdir = sdscatprintf(sdsempty(), "/tmp/depgraph-%s", name);
+	test_remove_tree(tmpdir);
+	sdsfree(tmpdir);
 }
 
 static void write_file(const char *path, const char *content)
@@ -1206,6 +1207,228 @@ TEST(dep_graph_cache_lockfile_mtime_change)
 	PASS();
 }
 
+/* ===================== VERSION FROM COFFEE.TOML (N2) ===================== */
+
+TEST(dep_graph_version_from_coffee_toml)
+{
+	setup_tmpdir("coffeever");
+	mkdir("src", 0755);
+	mkdir("deps", 0755);
+
+	/* Dep with only a Coffee.toml (no library.toml). */
+	sds dep_dir = sdsnew("deps/libver");
+	mkdir(dep_dir, 0755);
+	sds src_dir = sdscatprintf(sdsempty(), "%s/src", dep_dir);
+	mkdir(src_dir, 0755);
+	write_file("deps/libver/src/libver.c", "int libver_do(void) { return 0; }\n");
+	write_file("deps/libver/Coffee.toml",
+	           "[package]\nname = \"libver\"\nversion = \"2.3.4\"\nedition = \"c23\"\n");
+	sdsfree(src_dir);
+	sdsfree(dep_dir);
+
+	write_manifest("coffeever", "dependencies = [\"libver\"]\n");
+
+	manifest_t *m = manifest_parse("Coffee.toml");
+	ASSERT(m != nullptr, "parse");
+
+	dep_graph_t *g = dep_graph_create(m, nullptr, false);
+	ASSERT(g != nullptr, "graph created");
+	ASSERT(dep_graph_count(g) == 2, "root + dep");
+	ASSERT(g->nodes[1].version != nullptr && strcmp(g->nodes[1].version, "2.3.4") == 0,
+	       "version read from Coffee.toml [package]");
+
+	dep_graph_free(g);
+	manifest_free(m);
+	teardown_tmpdir("coffeever");
+	PASS();
+}
+
+/* ===================== REV-PINNED GIT DEP (S7) ===================== */
+
+TEST(ref_is_rev_unit)
+{
+	sds sha = sdsnew("0123456789abcdef0123456789abcdef01234567");
+	ASSERT(ref_is_rev(sha), "full sha should be a rev");
+	ASSERT(ref_is_rev("abc1234"), "short sha should be a rev");
+	ASSERT(ref_is_rev("ABC1234"), "uppercase sha should be a rev");
+	ASSERT(ref_is_rev("0123456789ABCDEF0123456789ABCDEF01234567"), "uppercase full sha should be a rev");
+	ASSERT(!ref_is_rev(nullptr), "nullptr is not a rev");
+	ASSERT(!ref_is_rev(""), "empty is not a rev");
+	ASSERT(!ref_is_rev("abc"), "too short is not a rev");
+	ASSERT(!ref_is_rev("main"), "branch name is not a rev");
+	ASSERT(!ref_is_rev("feature-1"), "branch name with dash is not a rev");
+	ASSERT(!ref_is_rev("v1.2.3"), "tag is not a rev");
+
+	/* ref_lowercase normalizes hex case for comparison with rev-parse. */
+	sds lower = ref_lowercase(sha);
+	ASSERT(lower != nullptr && strcmp(lower, sha) == 0, "lowercase sha unchanged");
+	sdsfree(lower);
+	lower = ref_lowercase("ABC1234");
+	ASSERT(lower != nullptr && strcmp(lower, "abc1234") == 0, "uppercase sha lowercased");
+	sdsfree(lower);
+	lower = ref_lowercase("Main");
+	ASSERT(lower != nullptr && strcmp(lower, "main") == 0, "non-hex chars lowercased too");
+	sdsfree(lower);
+	ASSERT(ref_lowercase(nullptr) == nullptr, "lowercase of nullptr is nullptr");
+
+	sdsfree(sha);
+	PASS();
+}
+
+TEST(dep_graph_rev_pinned_fetch)
+{
+	{
+		char *git_argv[] = { "git", "--version", nullptr };
+		if (run_command(git_argv, RUN_CMD_QUIET) != 0) {
+			printf("  (git not available, skipping)\n");
+			PASS();
+		}
+	}
+
+	setup_tmpdir("revpin");
+	mkdir("src", 0755);
+	mkdir("deps", 0755);
+
+	char proj_cwd[4096];
+	ASSERT(getcwd(proj_cwd, sizeof(proj_cwd)) != nullptr, "getcwd failed");
+
+	/* Source repo with two commits; pin the first one by full SHA. */
+	sds repo_dir = sdsnew("origin-repo");
+	mkdir(repo_dir, 0755);
+	write_file("origin-repo/src.txt", "one\n");
+
+	{
+		char *init_argv[] = { "git", "-C", "origin-repo", "init", "-q", nullptr };
+		ASSERT(run_command(init_argv, RUN_CMD_QUIET) == 0, "git init failed");
+		char *add_argv[] = { "git", "-C", "origin-repo", "add", "-A", nullptr };
+		ASSERT(run_command(add_argv, RUN_CMD_QUIET) == 0, "git add failed");
+		char *commit_argv[] = { "git", "-C", "origin-repo", "-c", "user.email=test@test", "-c", "user.name=test",
+			                    "commit", "-q", "-m", "one", nullptr, };
+		ASSERT(run_command(commit_argv, RUN_CMD_QUIET) == 0, "git commit failed");
+	}
+
+	sds   rev_argv[] = { "git", "-C", "origin-repo", "rev-parse", "HEAD", nullptr };
+	sds   sha1_out   = run_command_capture(rev_argv, RUN_CMD_QUIET);
+	ASSERT(sha1_out != nullptr, "rev-parse first commit failed");
+	if (sdslen(sha1_out) > 0 && sha1_out[sdslen(sha1_out) - 1] == '\n') {
+		sha1_out[sdslen(sha1_out) - 1] = '\0';
+	}
+	sds sha1 = sdsnew(sha1_out);
+	sdsfree(sha1_out);
+	ASSERT(strlen(sha1) == 40, "full sha captured");
+
+	write_file("origin-repo/src.txt", "two\n");
+	{
+		char *add_argv[] = { "git", "-C", "origin-repo", "add", "-A", nullptr };
+		ASSERT(run_command(add_argv, RUN_CMD_QUIET) == 0, "git add second failed");
+		char *commit_argv[] = { "git", "-C", "origin-repo", "-c", "user.email=test@test", "-c", "user.name=test",
+			                    "commit", "-q", "-m", "two", nullptr, };
+		ASSERT(run_command(commit_argv, RUN_CMD_QUIET) == 0, "git commit second failed");
+	}
+	sds   rev2_argv[] = { "git", "-C", "origin-repo", "rev-parse", "HEAD", nullptr };
+	sds   sha2_out    = run_command_capture(rev2_argv, RUN_CMD_QUIET);
+	ASSERT(sha2_out != nullptr, "rev-parse second commit failed");
+	if (sdslen(sha2_out) > 0 && sha2_out[sdslen(sha2_out) - 1] == '\n') {
+		sha2_out[sdslen(sha2_out) - 1] = '\0';
+	}
+	sds sha2 = sdsnew(sha2_out);
+	sdsfree(sha2_out);
+	ASSERT(strcmp(sha1, sha2) != 0, "two distinct commits");
+
+	/* Sandbox COFFEE_HOME inside the tmpdir so teardown cleans it. */
+	sds         test_home = sdsnew("/tmp/depgraph-revpin/home");
+	mkdir(test_home, 0755);
+	const char *old_home = getenv("COFFEE_HOME");
+	setenv("COFFEE_HOME", test_home, 1);
+
+	/* Manifest pins the dep by full SHA in uppercase: must be treated as a
+	 * rev and normalized to lowercase on checkout. */
+	sds   url       = sdscatprintf(sdsempty(), "%s/origin-repo", proj_cwd);
+	sds   sha1_up   = sdsdup(sha1);
+	for (size_t i = 0; i < sdslen(sha1_up); i++) {
+		sha1_up[i] = (char)toupper((unsigned char)sha1_up[i]);
+	}
+	FILE *fp = fopen("Coffee.toml", "w");
+	ASSERT(fp != nullptr, "fopen Coffee.toml failed");
+	fprintf_safe(fp, "[package]\nname = \"revpin\"\nversion = \"1.0.0\"\nedition = \"c23\"\n");
+	fprintf_safe(fp, "\n[dependencies]\n");
+	fprintf_safe(fp, "librev = { git = \"%s\", rev = \"%s\" }\n", url, sha1_up);
+	fclose(fp);
+
+	/* Fresh clone: `clone --branch <sha>` would fail; must full-clone + checkout. */
+	options opt = {
+		.inputs     = (char *[]){ "fetch" },
+		.inputs_num = 1,
+	};
+	ASSERT(handle_fetch(&opt) == 0, "fetch with rev-pinned dep should succeed");
+
+	lockfile_t *lf = lockfile_parse("Coffee.lock");
+	ASSERT(lf != nullptr, "Coffee.lock should parse");
+	ASSERT(lf->deps_count == 1, "lockfile should have one dep");
+	ASSERT(lf->deps[0].name != nullptr && strcmp(lf->deps[0].name, "librev") == 0, "dep name is librev");
+	ASSERT(lf->deps[0].commit != nullptr && strcmp(lf->deps[0].commit, sha1) == 0,
+	       "recorded commit matches lowercase pinned sha");
+	lockfile_free(lf);
+
+	/* Existing-repo path: advance the clone, then a second fetch must
+	 * re-checkout the pinned rev without error. */
+	{
+		char *co_argv[] = { "git", "-C", "deps/librev", "checkout", "-q", unconst(sha2), nullptr };
+		ASSERT(run_command(co_argv, RUN_CMD_QUIET) == 0, "advance clone to second commit");
+	}
+
+	ASSERT(handle_fetch(&opt) == 0, "second fetch re-checks out the pinned rev");
+
+	lockfile_t *lf2 = lockfile_parse("Coffee.lock");
+	ASSERT(lf2 != nullptr, "second Coffee.lock should parse");
+	ASSERT(lf2->deps_count == 1, "second lockfile has one dep");
+	ASSERT(lf2->deps[0].commit != nullptr && strcmp(lf2->deps[0].commit, sha1) == 0,
+	       "second fetch restored the pinned sha");
+	lockfile_free(lf2);
+
+	manifest_t *m2 = manifest_parse("Coffee.toml");
+	ASSERT(m2 != nullptr, "reparse manifest");
+	dep_graph_t *g = dep_graph_create(m2, nullptr, false);
+	ASSERT(g != nullptr, "graph created");
+
+	i64 idx = -1;
+	for (size_t i = 0; i < dep_graph_count(g); i++) {
+		if (strcmp(dep_graph_node_name(g, i), "librev") == 0) {
+			idx = (i64)i;
+			break;
+		}
+	}
+	ASSERT(idx >= 0, "librev node present in graph");
+	ASSERT(g->nodes[idx].is_git, "librev node detected as git dep");
+	/* Leak-free only because this fixture repo has no [dependencies] table
+	 * of its own: dep_graph_create() leaves git_ref unset here. If a
+	 * manifest table were added to the fixture, free it before
+	 * dep_graph_free(). */
+	g->nodes[idx].git_ref = sdsnew(sha1_up);
+
+	ASSERT(dep_graph_fetch_git(g, "librev", false) == 0, "fetch_git with rev succeeds");
+	ASSERT(dep_graph_commit(g, "librev") != nullptr && strcmp(dep_graph_commit(g, "librev"), sha1) == 0,
+	       "fetch_git checked out the pinned sha");
+
+	dep_graph_free(g);
+	manifest_free(m2);
+
+	/* Cleanup */
+	if (old_home != nullptr) {
+		setenv("COFFEE_HOME", old_home, 1);
+	} else {
+		unsetenv("COFFEE_HOME");
+	}
+	sdsfree(url);
+	sdsfree(sha1_up);
+	sdsfree(sha2);
+	sdsfree(sha1);
+	sdsfree(test_home);
+	sdsfree(repo_dir);
+	teardown_tmpdir("revpin");
+	PASS();
+}
+
 void coffee_register_dep_graph_tests(void)
 {
 	TEST_REGISTER(dep_graph_null_manifest);
@@ -1240,4 +1463,7 @@ void coffee_register_dep_graph_tests(void)
 	TEST_REGISTER(dep_graph_cache_with_lockfile);
 	TEST_REGISTER(dep_graph_cache_lockfile_mtime_change);
 	TEST_REGISTER(dep_graph_growth_realloc);
+	TEST_REGISTER(dep_graph_version_from_coffee_toml);
+	TEST_REGISTER(ref_is_rev_unit);
+	TEST_REGISTER(dep_graph_rev_pinned_fetch);
 }

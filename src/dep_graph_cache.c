@@ -8,6 +8,7 @@
 #include <sds/sds.h>
 #include <sys/stat.h>
 #include <toml.h>
+#include <unistd.h>
 
 /* ------------------------------------------------------------------ */
 /* Graph cache — read / write to .coffee/build-cache/                   */
@@ -15,8 +16,12 @@
 
 static i64 dep_graph_cache_write(const dep_graph_t *g, const char *cache_path, i64 toml_mtime, i64 lock_mtime)
 {
-	FILE *fp = safe_fopen(cache_path, "w");
+	/* Write to a temp file, fsync, then rename over the target so a crash
+	 * or ENOSPC mid-write cannot truncate a previously valid cache. */
+	sds   tmp_path = sdscatprintf(sdsempty(), "%s.tmp", cache_path);
+	FILE *fp       = safe_fopen(tmp_path, "w");
 	if (fp == nullptr) {
+		sdsfree(tmp_path);
 		return -1;
 	}
 
@@ -75,7 +80,30 @@ static i64 dep_graph_cache_write(const dep_graph_t *g, const char *cache_path, i
 		}
 	}
 
-	safe_fclose(fp);
+	if (fflush(fp) != 0) {
+		safe_fclose(fp);
+		remove(tmp_path);
+		sdsfree(tmp_path);
+		return -1;
+	}
+	if (fsync(fileno(fp)) != 0) {
+		safe_fclose(fp);
+		remove(tmp_path);
+		sdsfree(tmp_path);
+		return -1;
+	}
+	if (safe_fclose(fp) != 0) {
+		remove(tmp_path);
+		sdsfree(tmp_path);
+		return -1;
+	}
+	if (safe_rename(tmp_path, cache_path) != 0) {
+		remove(tmp_path);
+		sdsfree(tmp_path);
+		return -1;
+	}
+	safe_fsync_dir(cache_path);
+	sdsfree(tmp_path);
 	return 0;
 }
 

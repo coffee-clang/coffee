@@ -75,9 +75,7 @@ static void teardown_proj(const char *name)
 {
 	chdir(saved_cwd);
 	sds tmpdir = sdscatprintf(sdsempty(), "/tmp/coverage-cmd-%s", name);
-	sds cmd    = sdscatprintf(sdsempty(), "rm -rf %s", tmpdir);
-	system(cmd);
-	sdsfree(cmd);
+	test_remove_tree(tmpdir);
 	sdsfree(tmpdir);
 }
 
@@ -559,9 +557,7 @@ TEST(cov_init_no_arg)
 	ASSERT(ret == 0, "init");
 
 	chdir(old_cwd);
-	sds cmd = sdscatprintf(sdsempty(), "rm -rf %s", tmpdir);
-	system(cmd);
-	sdsfree(cmd);
+	test_remove_tree(tmpdir);
 	sdsfree(tmpdir);
 	PASS();
 }
@@ -574,9 +570,7 @@ TEST(cov_new_lib_mode)
 	struct timespec ts;
 	clock_gettime(CLOCK_REALTIME, &ts);
 	sds tmpdir = sdscatprintf(sdsempty(), "/tmp/coverage-cmd-new-lib-%jd-%ld", (intmax_t)getpid(), ts.tv_nsec);
-	sds rmcmd  = sdscatprintf(sdsempty(), "rm -rf %s", tmpdir);
-	system(rmcmd);
-	sdsfree(rmcmd);
+	test_remove_tree(tmpdir);
 	int mdret = mkdir(tmpdir, 0755);
 	ASSERT(mdret == 0, "mkdir tmpdir should succeed");
 	ASSERT(chdir(tmpdir) == 0, "chdir");
@@ -590,9 +584,7 @@ TEST(cov_new_lib_mode)
 	ASSERT(ret == 0, "new --lib should succeed");
 
 	chdir(old_cwd);
-	sds cmd = sdscatprintf(sdsempty(), "rm -rf %s", tmpdir);
-	system(cmd);
-	sdsfree(cmd);
+	test_remove_tree(tmpdir);
 	sdsfree(tmpdir);
 	PASS();
 }
@@ -636,9 +628,7 @@ TEST(cov_config_set_get_unset)
 
 	unsetenv("COFFEE_HOME");
 	chdir(old_cwd);
-	sds cmd = sdscatprintf(sdsempty(), "rm -rf %s", tmp_home);
-	system(cmd);
-	sdsfree(cmd);
+	test_remove_tree(tmp_home);
 	sdsfree(tmp_home);
 	PASS();
 }
@@ -668,9 +658,7 @@ TEST(cov_config_section_key)
 
 	unsetenv("COFFEE_HOME");
 	chdir(old_cwd);
-	sds cmd = sdscatprintf(sdsempty(), "rm -rf %s", tmp_home);
-	system(cmd);
-	sdsfree(cmd);
+	test_remove_tree(tmp_home);
 	sdsfree(tmp_home);
 	PASS();
 }
@@ -692,9 +680,7 @@ TEST(cov_add_path_dep)
 	sdsfree(opt.path);
 
 	teardown_proj("add-path");
-	sds cmd = sdsnew("rm -rf /tmp/coverage-cmd-add-path-dep");
-	system(cmd);
-	sdsfree(cmd);
+	test_remove_tree("/tmp/coverage-cmd-add-path-dep");
 	PASS();
 }
 
@@ -789,9 +775,7 @@ TEST(cov_check_no_name)
 	ASSERT(ret == 1, "check with no name should return 1");
 
 	chdir(old_cwd);
-	sds cmd = sdscatprintf(sdsempty(), "rm -rf %s", tmpdir);
-	system(cmd);
-	sdsfree(cmd);
+	test_remove_tree(tmpdir);
 	sdsfree(tmpdir);
 	PASS();
 }
@@ -1044,9 +1028,7 @@ TEST(cov_init_existing_project)
 	ASSERT(ret == 0 || ret == 1, "init existing project");
 
 	chdir(old_cwd);
-	sds cmd = sdscatprintf(sdsempty(), "rm -rf %s", tmpdir);
-	system(cmd);
-	sdsfree(cmd);
+	test_remove_tree(tmpdir);
 	sdsfree(tmpdir);
 	PASS();
 }
@@ -1174,9 +1156,7 @@ TEST(cov_install_update_config_basic)
 		strncpy(old_home, env, sizeof(old_home) - 1);
 	}
 	sds tmp_home = sdsnew("/tmp/coverage-cmd-install-update-config");
-	sds rmcmd    = sdscatprintf(sdsempty(), "rm -rf %s", tmp_home);
-	system(rmcmd);
-	sdsfree(rmcmd);
+	test_remove_tree(tmp_home);
 	mkdir(tmp_home, 0755);
 	setenv("COFFEE_HOME", tmp_home, 1);
 
@@ -1198,9 +1178,7 @@ TEST(cov_install_update_config_basic)
 	} else {
 		unsetenv("COFFEE_HOME");
 	}
-	rmcmd = sdscatprintf(sdsempty(), "rm -rf %s", tmp_home);
-	system(rmcmd);
-	sdsfree(rmcmd);
+	test_remove_tree(tmp_home);
 	sdsfree(tmp_home);
 
 	PASS();
@@ -1552,9 +1530,7 @@ TEST(cov_init_with_path)
 	ASSERT(ret == 0, "init with path");
 
 	chdir(old_cwd);
-	sds cmd = sdscatprintf(sdsempty(), "rm -rf %s", tmpdir);
-	system(cmd);
-	sdsfree(cmd);
+	test_remove_tree(tmpdir);
 	sdsfree(tmpdir);
 	PASS();
 }
@@ -1606,9 +1582,7 @@ TEST(cov_check_missing_version)
 	ASSERT(ret == 1, "check missing version should fail");
 
 	chdir(old_cwd);
-	sds cmd = sdscatprintf(sdsempty(), "rm -rf %s", tmpdir);
-	system(cmd);
-	sdsfree(cmd);
+	test_remove_tree(tmpdir);
 	sdsfree(tmpdir);
 	PASS();
 }
@@ -1632,9 +1606,7 @@ TEST(cov_check_parse_error)
 	ASSERT(ret == 1, "check parse error should return 1");
 
 	chdir(old_cwd);
-	sds cmd = sdscatprintf(sdsempty(), "rm -rf %s", tmpdir);
-	system(cmd);
-	sdsfree(cmd);
+	test_remove_tree(tmpdir);
 	sdsfree(tmpdir);
 	PASS();
 }
@@ -1658,9 +1630,7 @@ TEST(cov_fetch_parse_error)
 	ASSERT(ret == 1, "fetch parse error should return 1");
 
 	chdir(old_cwd);
-	sds cmd = sdscatprintf(sdsempty(), "rm -rf %s", tmpdir);
-	system(cmd);
-	sdsfree(cmd);
+	test_remove_tree(tmpdir);
 	sdsfree(tmpdir);
 	PASS();
 }
@@ -1684,9 +1654,7 @@ TEST(cov_vendor_parse_error)
 	ASSERT(ret == 1, "vendor parse error should return 1");
 
 	chdir(old_cwd);
-	sds cmd = sdscatprintf(sdsempty(), "rm -rf %s", tmpdir);
-	system(cmd);
-	sdsfree(cmd);
+	test_remove_tree(tmpdir);
 	sdsfree(tmpdir);
 	PASS();
 }
@@ -1720,9 +1688,7 @@ TEST(cov_init_lib_mode)
 	ASSERT(ret == 0 || ret == 1, "init lib mode");
 
 	chdir(old_cwd);
-	sds cmd = sdscatprintf(sdsempty(), "rm -rf %s", tmpdir);
-	system(cmd);
-	sdsfree(cmd);
+	test_remove_tree(tmpdir);
 	sdsfree(tmpdir);
 	PASS();
 }
@@ -1763,9 +1729,7 @@ TEST(cov_new_existing_dir)
 	ASSERT(ret == 0 || ret == 1, "new existing dir should not crash");
 
 	chdir(old_cwd);
-	sds cmd = sdscatprintf(sdsempty(), "rm -rf %s", tmpdir);
-	system(cmd);
-	sdsfree(cmd);
+	test_remove_tree(tmpdir);
 	sdsfree(tmpdir);
 	PASS();
 }

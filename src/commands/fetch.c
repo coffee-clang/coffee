@@ -40,7 +40,19 @@ static i64 fetch_git_dep(const char *name, const char *url, const char *global_d
 			printf_safe("    Updating %s...\n", name);
 		}
 		i64 ret;
-		if (ref != nullptr) {
+		if (ref != nullptr && ref_is_rev(ref)) {
+			/* A SHA cannot be fetched as a refspec, and a shallow fetch
+			 * may not contain the object: fetch everything (full), then
+			 * check the rev out (lowercased to match rev-parse output). */
+			char *argv1[] = { "git", "-C", target_dir, "fetch", "origin", nullptr };
+			ret           = run_command(argv1, RUN_CMD_QUIET);
+			if (ret == 0) {
+				sds   lower   = ref_lowercase(ref);
+				char *argv2[] = { "git", "-C", target_dir, "checkout", unconst(lower), nullptr };
+				ret           = run_command(argv2, RUN_CMD_QUIET);
+				sdsfree(lower);
+			}
+		} else if (ref != nullptr) {
 			/* '--' before the refspec prevents git from parsing a
 			 * ref that starts with '-' as an option (option injection). */
 			char *argv1[] = { "git", "-C", target_dir, "fetch", "--depth", "1", "origin", "--", unconst(ref), nullptr };
@@ -65,7 +77,19 @@ static i64 fetch_git_dep(const char *name, const char *url, const char *global_d
 	rmdir(target_dir);
 
 	i64 ret;
-	if (ref != nullptr) {
+	if (ref != nullptr && ref_is_rev(ref)) {
+		/* `clone --branch` only accepts branches/tags, and a shallow
+		 * clone cannot contain an arbitrary SHA: clone fully, then
+		 * check the rev out (lowercased to match rev-parse output). */
+		char *argv1[] = { "git", "clone", "--", unconst(url), target_dir, nullptr };
+		ret           = run_command(argv1, RUN_CMD_QUIET);
+		if (ret == 0) {
+			sds   lower   = ref_lowercase(ref);
+			char *argv2[] = { "git", "-C", target_dir, "checkout", unconst(lower), nullptr };
+			ret           = run_command(argv2, RUN_CMD_QUIET);
+			sdsfree(lower);
+		}
+	} else if (ref != nullptr) {
 		char *argv[] = { "git", "clone", "--depth", "1", "--branch", unconst(ref), "--", unconst(url), target_dir, nullptr };
 		ret          = run_command(argv, RUN_CMD_QUIET);
 	} else {

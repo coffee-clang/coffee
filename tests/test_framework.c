@@ -2,6 +2,9 @@
 
 #include "../src/strings.h"
 
+#include <ftw.h>
+#include <glob.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -121,4 +124,32 @@ void test_framework_reset(void)
 	tests_run            = 0;
 	tests_passed         = 0;
 	tests_failed         = 0;
+}
+
+/* Remove a file/dir tree without shelling out to `rm -rf`. */
+static int test_remove_tree_entry(const char *path, const struct stat *st, int type, struct FTW *ftw)
+{
+	(void)st;
+	(void)type;
+	(void)ftw;
+	return remove(path);
+}
+
+void test_remove_tree(const char *path)
+{
+	if (path == nullptr) {
+		return;
+	}
+	nftw(path, test_remove_tree_entry, 64, FTW_DEPTH | FTW_PHYS);
+}
+
+void test_remove_tree_glob(const char *pattern)
+{
+	glob_t g;
+	if (glob(pattern, 0, nullptr, &g) == 0) {
+		for (size_t i = 0; i < (size_t)g.gl_pathc; i++) {
+			test_remove_tree(g.gl_pathv[i]);
+		}
+		globfree(&g);
+	}
 }

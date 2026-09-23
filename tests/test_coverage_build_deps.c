@@ -67,9 +67,7 @@ static void teardown_proj(const char *name)
 {
 	chdir(saved_cwd);
 	sds tmpdir = sdscatprintf(sdsempty(), "/tmp/coverage-bdep-%s", name);
-	sds cmd    = sdscatprintf(sdsempty(), "rm -rf %s", tmpdir);
-	system(cmd);
-	sdsfree(cmd);
+	test_remove_tree(tmpdir);
 	sdsfree(tmpdir);
 }
 
@@ -156,9 +154,7 @@ TEST(cov_build_dep_loop_lockfile)
 
 	manifest_free(m);
 	remove("Coffee.lock");
-	sds cmd = sdsnew("rm -rf /tmp/coverage-bdep-lockdep");
-	system(cmd);
-	sdsfree(cmd);
+	test_remove_tree("/tmp/coverage-bdep-lockdep");
 	teardown_proj("deplock");
 	PASS();
 }
@@ -227,9 +223,9 @@ TEST(cov_build_dep_resolve_global)
 	ASSERT(strstr(path, "/deps/global-test") != nullptr, "global path");
 
 	sdsfree(path);
-	sds cmd = sdscatprintf(sdsempty(), "rm -rf %s/deps/global-test", coffee_home_dir());
-	system(cmd);
-	sdsfree(cmd);
+	sds path2 = sdscatprintf(sdsempty(), "%s/deps/global-test", coffee_home_dir());
+	test_remove_tree(path2);
+	sdsfree(path2);
 	sdsfree(global_dir);
 	PASS();
 }

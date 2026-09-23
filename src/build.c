@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <ctype.h>
 #include <dirent.h>
 #include <fcntl.h>
 #include <glob.h>
@@ -483,6 +484,51 @@ bool ref_is_valid(const char *ref)
 		}
 	}
 	return true;
+}
+
+/*
+ * True when a ref looks like a full git object id: at least 7 hex
+ * characters (case-insensitive).  Such refs are revisions and must be
+ * checked out directly — `clone --branch` only accepts branches and
+ * tags, and a shallow fetch may not contain the object.  Assumes
+ * ref_is_valid() has already accepted the ref; a hex-looking branch name
+ * routed through the rev path still resolves via git's rev-parse object
+ * lookup (both hex and the abbreviation resolve to the same object).
+ */
+bool ref_is_rev(const char *ref)
+{
+	if (ref == nullptr) {
+		return false;
+	}
+	size_t len = strlen(ref);
+	if (len < 7) {
+		return false;
+	}
+	for (size_t i = 0; i < len; i++) {
+		char c = ref[i];
+		if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'))) {
+			return false;
+		}
+	}
+	return true;
+}
+
+/*
+ * Lowercase a revision ref (hex object ids are case-insensitive) so
+ * callers can compare it against `rev-parse` output, which is always
+ * lowercase.  Returns a new sds the caller must free; returns nullptr
+ * for nullptr.
+ */
+sds ref_lowercase(const char *ref)
+{
+	if (ref == nullptr) {
+		return nullptr;
+	}
+	sds out = sdsnew(ref);
+	for (size_t i = 0; i < sdslen(out); i++) {
+		out[i] = (char)tolower((unsigned char)out[i]);
+	}
+	return out;
 }
 
 /*

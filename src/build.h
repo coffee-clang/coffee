@@ -118,7 +118,23 @@ bool version_is_valid(const char *version);
 bool ref_is_valid(const char *ref);
 
 /*
- * Validate a git clone URL.  Explicit schemes (https, http, git, ssh,
+ * True when a ref looks like a full git object id (revision): at least 7
+ * hex characters, uppercase or lowercase.  Revisions must be checked out
+ * directly instead of being passed to `clone --branch`, which only
+ * accepts branches and tags.
+ */
+bool ref_is_rev(const char *ref);
+
+/*
+ * Lowercase a revision ref (hex object ids are case-insensitive) so
+ * callers can compare it against `rev-parse` output, which is always
+ * lowercase.  Returns a new sds the caller must free; returns nullptr
+ * for nullptr.
+ */
+sds ref_lowercase(const char *ref);
+
+/*
+ * Validate a git clone URL.  Explicit schemes (https, git, ssh,
  * git+ssh, git+https), local filesystem paths, and scp-style
  * user@host:path URLs are accepted; anything that could be parsed as a
  * git option (leading '-') or that contains shell metacharacters is

@@ -80,4 +80,12 @@ void test_framework_summary(void);
 /* Reset all state (for re-running) */
 void test_framework_reset(void);
 
+/* --- Filesystem cleanup helpers (nftw-based, no shell) --- */
+
+/* Remove a file/dir tree without shelling out to `rm -rf`. */
+void test_remove_tree(const char *path);
+
+/* Remove every path matching a glob pattern (e.g. "/tmp/coffee-*-test-*"). */
+void test_remove_tree_glob(const char *pattern);
+
 #endif /* TEST_FRAMEWORK_H_ */

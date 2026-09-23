@@ -15,7 +15,11 @@
 #include <toml.h>
 #include <unistd.h>
 
-sds coffee_home_dir(void)
+/*
+ * The coffee home directory (~/.coffee or $COFFEE_HOME).  The returned
+ * pointer is borrowed from a static buffer — never sdsfree() it.
+ */
+const char *coffee_home_dir(void)
 {
 	static char home_dir[4096];
 	const char *coffee_home = getenv("COFFEE_HOME");
@@ -31,7 +35,7 @@ sds coffee_home_dir(void)
 	return home_dir;
 }
 
-static char *get_cache_dir(void)
+static const char *get_cache_dir(void)
 {
 	return coffee_home_dir();
 }
@@ -55,7 +59,7 @@ static i64 ensure_index_cached(void)
 		}
 	}
 
-	char *cache_dir = get_cache_dir();
+	const char *cache_dir = get_cache_dir();
 
 	{
 		char *argv[] = { "mkdir", "-p", cache_dir, nullptr };

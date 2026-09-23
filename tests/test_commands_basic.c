@@ -166,9 +166,7 @@ TEST(init_initializes_project)
 	/* Cleanup */
 	chdir(old_cwd);
 
-	sds cmd = sdscatprintf(sdsempty(), "rm -rf %s", tmpdir);
-	system(cmd);
-	sdsfree(cmd);
+	test_remove_tree(tmpdir);
 	sdsfree(tmpdir);
 
 	ASSERT(ret == 0, "init should return 0");
@@ -203,9 +201,7 @@ TEST(install_update_config_basic)
 		strncpy(old_home, env, sizeof(old_home) - 1);
 	}
 	sds tmp_home = sdsnew("/tmp/coffee-test-install-update-config");
-	sds rmcmd    = sdscatprintf(sdsempty(), "rm -rf %s", tmp_home);
-	system(rmcmd);
-	sdsfree(rmcmd);
+	test_remove_tree(tmp_home);
 	mkdir(tmp_home, 0755);
 	setenv("COFFEE_HOME", tmp_home, 1);
 
@@ -231,9 +227,7 @@ TEST(install_update_config_basic)
 	} else {
 		unsetenv("COFFEE_HOME");
 	}
-	rmcmd = sdscatprintf(sdsempty(), "rm -rf %s", tmp_home);
-	system(rmcmd);
-	sdsfree(rmcmd);
+	test_remove_tree(tmp_home);
 	sdsfree(tmp_home);
 	PASS();
 }
@@ -261,9 +255,7 @@ TEST(new_creates_project)
 	sdsfree(toml_check);
 
 	/* Cleanup */
-	sds cmd = sdscatprintf(sdsempty(), "rm -rf %s", tmpdir);
-	system(cmd);
-	sdsfree(cmd);
+	test_remove_tree(tmpdir);
 	sdsfree(tmpdir);
 
 	ASSERT(ret == 0, "new should return 0");
@@ -289,9 +281,7 @@ TEST(new_no_arg)
 	ASSERT(ret == 0, "new without path should create project");
 
 	chdir(old_cwd);
-	sds cmd = sdscatprintf(sdsempty(), "rm -rf %s", tmpdir);
-	system(cmd);
-	sdsfree(cmd);
+	test_remove_tree(tmpdir);
 	sdsfree(tmpdir);
 	PASS();
 }

@@ -38,9 +38,9 @@ static void setup_build_test(const char *name)
 static void teardown_build_test(const char *name)
 {
 	chdir(saved_cwd);
-	sds cmd = sdscatprintf(sdsempty(), "rm -rf /tmp/coverage-build-%s", name);
-	system(cmd);
-	sdsfree(cmd);
+	sds path = sdscatprintf(sdsempty(), "/tmp/coverage-build-%s", name);
+	test_remove_tree(path);
+	sdsfree(path);
 }
 
 #include <assert.h>
