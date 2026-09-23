@@ -1418,6 +1418,71 @@ TEST(fetch_root_flat_dep_warns)
 	PASS();
 }
 
+/* ---------------------------------------------------------------
+ * fetch — a failed symlink must be reported and fail the dep
+ * --------------------------------------------------------------- */
+TEST(fetch_symlink_failure_fails)
+{
+	char old_cwd[4096];
+	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
+
+	{
+		char *clean_argv[] = { "rm", "-rf", "/tmp/coffee-test-fetch-symlink-proj", "/tmp/coffee-test-fetch-symlink-home",
+			                   nullptr };
+		run_command(clean_argv, RUN_CMD_QUIET);
+	}
+
+	sds test_home = sdsnew("/tmp/coffee-test-fetch-symlink-home");
+	mkdir(test_home, 0755);
+	const char *old_home = getenv("COFFEE_HOME");
+	setenv("COFFEE_HOME", test_home, 1);
+
+	sds proj_dir = sdsnew("/tmp/coffee-test-fetch-symlink-proj");
+	mkdir(proj_dir, 0755);
+	ASSERT(chdir(proj_dir) == 0, "chdir to project failed");
+
+	mkdir("lib", 0755);
+
+	FILE *fp = fopen("Coffee.toml", "w");
+	ASSERT(fp != nullptr, "fopen project Coffee.toml failed");
+	fprintf_safe(fp, "[package]\nname = \"proj\"\nversion = \"1.0.0\"\nedition = \"c23\"\n");
+	fprintf_safe(fp, "\n[dependencies]\nmylib = { path = \"./lib\" }\n");
+	fclose(fp);
+
+	/* A regular file at 'deps' makes symlink("deps/mylib", ...) fail with ENOTDIR. */
+	fp = fopen("deps", "w");
+	ASSERT(fp != nullptr, "fopen deps blocker file failed");
+	fclose(fp);
+
+	options opt = {
+		.inputs     = (char *[]){ "fetch" },
+		.inputs_num = 1,
+	};
+
+	i64 ret = handle_fetch(&opt);
+	ASSERT(ret == 1, "fetch should fail when symlink cannot be created");
+
+	lockfile_t *lf = lockfile_parse("Coffee.lock");
+	ASSERT(lf != nullptr, "Coffee.lock should parse");
+	ASSERT(lf->deps_count == 0, "no lockfile entry when symlink failed");
+	lockfile_free(lf);
+
+	/* Cleanup */
+	chdir(old_cwd);
+	if (old_home != nullptr) {
+		setenv("COFFEE_HOME", old_home, 1);
+	} else {
+		unsetenv("COFFEE_HOME");
+	}
+	{
+		char *rm_argv[] = { "rm", "-rf", proj_dir, test_home, nullptr };
+		run_command(rm_argv, RUN_CMD_QUIET);
+	}
+	sdsfree(proj_dir);
+	sdsfree(test_home);
+	PASS();
+}
+
 void coffee_register_security_tests(void)
 {
 	TEST_REGISTER(run_command_capture_echo);
@@ -1448,6 +1513,7 @@ void coffee_register_security_tests(void)
 	TEST_REGISTER(install_rejects_traversal_version);
 	TEST_REGISTER(fetch_transitive_dep_no_lockfile_corruption);
 	TEST_REGISTER(fetch_root_flat_dep_warns);
+	TEST_REGISTER(fetch_symlink_failure_fails);
 	TEST_REGISTER(toolcheck_skips_non_build_commands);
 	TEST_REGISTER(toolcheck_fetch_needs_only_git);
 	TEST_REGISTER(toolcheck_build_needs_clang);

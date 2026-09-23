@@ -113,7 +113,12 @@ static i64 fetch_path_dep(const char *name, const char *path, const char *local_
 		char *rm_argv[] = { "rm", "-rf", link_path, nullptr };
 		run_command(rm_argv, 0);
 	}
-	symlink(target, link_path);
+	if (symlink(target, link_path) != 0) {
+		fprintf_safe(stderr, "  Error: cannot create symlink '%s' -> '%s'\n", link_path, target);
+		sdsfree(link_path);
+		sdsfree(target);
+		return 1;
+	}
 
 	sdsfree(link_path);
 	sdsfree(target);
@@ -242,25 +247,28 @@ int64_t handle_fetch(options *opts)
 						char *rm_argv[] = { "rm", "-rf", dep_dir, nullptr };
 						run_command(rm_argv, 0);
 					}
-					symlink(cache_path, dep_dir);
+					if (symlink(cache_path, dep_dir) != 0) {
+						fprintf_safe(stderr, "  Error: cannot create symlink '%s' -> '%s'\n", dep_dir, cache_path);
+						ret = 1;
+					} else {
+						lf.deps[dep_idx].name = sdsnew(dep_name);
+						lf.deps[dep_idx].path = sdsnew(cache_path);
 
-					lf.deps[dep_idx].name = sdsnew(dep_name);
-					lf.deps[dep_idx].path = sdsnew(cache_path);
+						char *rev_argv[] = { "git", "-C", dep_dir, "rev-parse", "HEAD", nullptr };
+						sds   output     = run_command_capture(rev_argv, RUN_CMD_QUIET);
+						if (output != nullptr) {
+							size_t olen = sdslen(output);
+							if (olen > 0 && output[olen - 1] == '\n') {
+								output[olen - 1] = '\0';
+							}
+							if (output[0] != '\0') {
+								lf.deps[dep_idx].commit = sdsnew(output);
+							}
+							sdsfree(output);
+						}
 
-					char *rev_argv[] = { "git", "-C", dep_dir, "rev-parse", "HEAD", nullptr };
-					sds   output     = run_command_capture(rev_argv, RUN_CMD_QUIET);
-					if (output != nullptr) {
-						size_t olen = sdslen(output);
-						if (olen > 0 && output[olen - 1] == '\n') {
-							output[olen - 1] = '\0';
-						}
-						if (output[0] != '\0') {
-							lf.deps[dep_idx].commit = sdsnew(output);
-						}
-						sdsfree(output);
+						lf.deps[dep_idx].version = sdsnew("*");
 					}
-
-					lf.deps[dep_idx].version = sdsnew("*");
 					sdsfree(cache_path);
 					sdsfree(dep_dir);
 				} else {
