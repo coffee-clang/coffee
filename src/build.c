@@ -486,7 +486,9 @@ bool ref_is_valid(const char *ref)
 }
 
 /*
- * Validate a git clone URL.  Only explicit schemes are allowed; anything
+ * Validate a git clone URL.  Allowed: the schemes https, git, ssh,
+ * git+ssh and git+https, local filesystem paths, and scp-style ssh
+ * (user@host:path).  The http scheme is deliberately rejected.  Anything
  * that could be interpreted as a git option (leading '-') is rejected.
  */
 bool url_is_valid(const char *url)
@@ -494,8 +496,8 @@ bool url_is_valid(const char *url)
 	if (url == nullptr) {
 		return false;
 	}
-	if (strncmp(url, "https://", 8) == 0 || strncmp(url, "http://", 7) == 0 || strncmp(url, "git://", 6) == 0 ||
-	    strncmp(url, "ssh://", 6) == 0 || strncmp(url, "git+ssh://", 10) == 0 || strncmp(url, "git+https://", 12) == 0) {
+	if (strncmp(url, "https://", 8) == 0 || strncmp(url, "git://", 6) == 0 || strncmp(url, "ssh://", 6) == 0 ||
+	    strncmp(url, "git+ssh://", 10) == 0 || strncmp(url, "git+https://", 12) == 0) {
 		return true;
 	}
 	/* Local filesystem paths (git clone supports them).  These cannot be
@@ -503,6 +505,13 @@ bool url_is_valid(const char *url)
 	 * '--' separator in the argv provides the real protection. */
 	if (url[0] == '/' || strncmp(url, "./", 2) == 0 || strncmp(url, "../", 3) == 0) {
 		return true;
+	}
+	/* Any other scheme ('http', 'ftp', 'file', ...) is not on the
+	 * allow-list; reject it here so a scheme-bearing URL can only pass
+	 * through the whitelist above, never via the scp-style test below
+	 * (e.g. http://user@host:8080/x contains '@' and ':'). */
+	if (strstr(url, "://") != nullptr) {
+		return false;
 	}
 	/* scp-style syntax: user@host:path (e.g. git@github.com:org/repo.git).
 	 * user/host are [A-Za-z0-9._-]+ with exactly one '@' separator, path

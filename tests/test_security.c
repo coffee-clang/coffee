@@ -502,22 +502,28 @@ TEST(ref_is_valid_unit)
 TEST(url_is_valid_unit)
 {
 	ASSERT(url_is_valid("https://github.com/x/y.git"), "https should be valid");
-	ASSERT(url_is_valid("http://example.com/x"), "http should be valid");
 	ASSERT(url_is_valid("git://example.com/x"), "git should be valid");
 	ASSERT(url_is_valid("ssh://git@example.com/x"), "ssh should be valid");
 	ASSERT(url_is_valid("git+ssh://git@example.com/x"), "git+ssh should be valid");
 	ASSERT(url_is_valid("git+https://example.com/x"), "git+https should be valid");
 	ASSERT(url_is_valid("/tmp/local-repo"), "absolute local path should be valid");
 	ASSERT(url_is_valid("./local-repo"), "relative local path should be valid");
+	ASSERT(url_is_valid("../local-repo"), "parent-relative local path should be valid");
 	ASSERT(url_is_valid("git@github.com:org/repo.git"), "scp form should be valid");
 	ASSERT(url_is_valid("git@host:~/path"), "scp form with tilde should be valid");
 	ASSERT(!url_is_valid(nullptr), "nullptr should be invalid");
 	ASSERT(!url_is_valid(""), "empty should be invalid");
+	ASSERT(!url_is_valid("http://example.com/x"), "http scheme should be invalid");
+	ASSERT(!url_is_valid("HTTPS://example.com/x"), "uppercase https scheme should be invalid");
 	ASSERT(!url_is_valid("-o/tmp/pwned"), "option injection should be invalid");
 	ASSERT(!url_is_valid("file:///etc/passwd"), "file scheme should be invalid");
 	ASSERT(!url_is_valid("ftp://example.com"), "ftp scheme should be invalid");
 	ASSERT(!url_is_valid("javascript:alert(1)"), "javascript scheme should be invalid");
 	ASSERT(!url_is_valid("github.com/x/y"), "no scheme should be invalid");
+	/* A non-allow-listed scheme embedding '@' and ':' must not slip
+	 * through the scp-style fallback. */
+	ASSERT(!url_is_valid("http://user@host:8080/x"), "http with @ and port should be invalid");
+	ASSERT(!url_is_valid("ftp://u@h:1/x"), "ftp with @ and port should be invalid");
 	ASSERT(!url_is_valid("git@host:;rm -rf /"), "scp path with metacharacters should be invalid");
 	ASSERT(!url_is_valid("git@host:-o/tmp/x"), "scp path with leading dash should be invalid");
 	ASSERT(!url_is_valid("git@host:"), "scp form with empty path should be invalid");
