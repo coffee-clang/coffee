@@ -36,6 +36,9 @@ static char saved_cwd[4096];
 static void setup_tmpdir(const char *name)
 {
 	sds tmpdir = sdscatprintf(sdsempty(), "/tmp/depgraph-%s", name);
+	/* A leftover dir from a crashed run would make git add/commit fail
+	 * with "nothing to commit"; clear it first (no-op when absent). */
+	test_remove_tree(tmpdir);
 	mkdir(tmpdir, 0755);
 	assert(getcwd(saved_cwd, sizeof(saved_cwd)) != nullptr);
 	assert(chdir(tmpdir) == 0);
@@ -1568,6 +1571,143 @@ TEST(dep_graph_transitive_git_fetch)
 	PASS();
 }
 
+/* A transitive dep declared as a plain version string ("nested = \"1.0\"")
+ * is materialized through the registry: the recipe's recipe_url is cloned
+ * into the global cache and symlinked into deps/. */
+TEST(dep_graph_transitive_registry_fetch)
+{
+	/* Requires git and curl; skip (pass) when unavailable. */
+	{
+		char *git_argv[] = { "git", "--version", nullptr };
+		if (run_command(git_argv, RUN_CMD_QUIET) != 0) {
+			printf("  (git not available, skipping)\n");
+			PASS();
+		}
+	}
+	{
+		char *curl_argv[] = { "curl", "--version", nullptr };
+		if (run_command(curl_argv, RUN_CMD_QUIET) != 0) {
+			printf("  (curl not available, skipping)\n");
+			PASS();
+		}
+	}
+
+	setup_tmpdir("transreg");
+	mkdir("src", 0755);
+	mkdir("deps", 0755);
+
+	char proj_cwd[4096];
+	ASSERT(getcwd(proj_cwd, sizeof(proj_cwd)) != nullptr, "getcwd failed");
+
+	/* Nested repo: the registry recipe for "nested" points here. */
+	sds nested_dir = sdsnew("nested-repo");
+	mkdir(nested_dir, 0755);
+	write_file("nested-repo/Coffee.toml",
+	           "[package]\nname = \"nested\"\nversion = \"1.0.0\"\nedition = \"c23\"\n");
+	{
+		char *init_argv[] = { "git", "-C", "nested-repo", "init", "-q", nullptr };
+		ASSERT(run_command(init_argv, RUN_CMD_QUIET) == 0, "git init nested failed");
+		char *add_argv[] = { "git", "-C", "nested-repo", "add", "-A", nullptr };
+		ASSERT(run_command(add_argv, RUN_CMD_QUIET) == 0, "git add nested failed");
+		char *commit_argv[] = { "git", "-C", "nested-repo", "-c", "user.email=test@test", "-c", "user.name=test",
+			                    "commit", "-q", "-m", "init", nullptr };
+		ASSERT(run_command(commit_argv, RUN_CMD_QUIET) == 0, "git commit nested failed");
+	}
+
+	/* Local registry fixture: recipe for "nested" with an absolute
+	 * recipe_url pointing at the nested repo. */
+	sds reg_dir = sdsnew("registry");
+	mkdir(reg_dir, 0755);
+	sds reg_recipes = sdscatprintf(sdsempty(), "%s/recipes", reg_dir);
+	mkdir(reg_recipes, 0755);
+	sds reg_letter = sdscatprintf(sdsempty(), "%s/recipes/n", reg_dir);
+	mkdir(reg_letter, 0755);
+	sds reg_pkg = sdscatprintf(sdsempty(), "%s/nested", reg_letter);
+	mkdir(reg_pkg, 0755);
+	sds reg_toml = sdscatprintf(sdsempty(), "%s/library.toml", reg_pkg);
+	sds nested_abs = sdscatprintf(sdsempty(), "%s/nested-repo", proj_cwd);
+	sds recipe = sdscatprintf(sdsempty(), "version = \"1.0\"\nrecipe_url = \"%s\"\n", nested_abs);
+	write_file(reg_toml, recipe);
+	sdsfree(recipe);
+
+	/* Parent: a path dep that itself declares nested = "1.0". */
+	sds parent_dir = sdsnew("parent-repo");
+	mkdir(parent_dir, 0755);
+	write_file("parent-repo/Coffee.toml",
+	           "[package]\nname = \"parent\"\nversion = \"1.0.0\"\nedition = \"c23\"\n"
+	           "\n[dependencies]\nnested = \"1.0\"\n");
+
+	/* Root manifest: parent is a path dep. */
+	FILE *fp = fopen("Coffee.toml", "w");
+	ASSERT(fp != nullptr, "fopen Coffee.toml failed");
+	fprintf_safe(fp, "[package]\nname = \"transreg\"\nversion = \"1.0.0\"\nedition = \"c23\"\n");
+	fprintf_safe(fp, "\n[dependencies]\nparent = { path = \"./parent-repo\" }\n");
+	fclose(fp);
+
+	/* Sandbox COFFEE_HOME and the registry URL inside the tmpdir. */
+	sds         test_home = sdsnew("/tmp/depgraph-transreg/home");
+	mkdir(test_home, 0755);
+	const char *old_home = getenv("COFFEE_HOME");
+	setenv("COFFEE_HOME", test_home, 1);
+	const char *old_reg = getenv("COFFEE_REGISTRY_URL");
+	sds reg_abs = sdscatprintf(sdsempty(), "%s/registry", proj_cwd);
+	sds reg_url = sdscatprintf(sdsempty(), "file://%s", reg_abs);
+	setenv("COFFEE_REGISTRY_URL", reg_url, 1);
+
+	options opt = {
+		.inputs     = (char *[]){ "fetch" },
+		.inputs_num = 1,
+	};
+	ASSERT(handle_fetch(&opt) == 0, "fetch with transitive flat dep should succeed");
+
+	/* Both deps materialized: deps/parent (path) and deps/nested (registry). */
+	ASSERT(safe_access("deps/parent", F_OK) == 0, "parent materialized");
+	ASSERT(safe_access("deps/nested", F_OK) == 0, "nested materialized");
+	ASSERT(safe_access("deps/nested/.git", F_OK) == 0, "nested is a git checkout");
+
+	/* Lockfile records both deps. */
+	lockfile_t *lf = lockfile_parse("Coffee.lock");
+	ASSERT(lf != nullptr, "Coffee.lock should parse");
+	ASSERT(lf->deps_count == 2, "lockfile has both deps");
+	bool found_parent = false, found_nested = false;
+	for (size_t i = 0; i < lf->deps_count; i++) {
+		if (strcmp(lf->deps[i].name, "parent") == 0) {
+			found_parent = true;
+		}
+		if (strcmp(lf->deps[i].name, "nested") == 0) {
+			found_nested = true;
+			ASSERT(lf->deps[i].commit != nullptr, "nested commit recorded");
+		}
+	}
+	ASSERT(found_parent && found_nested, "both deps in lockfile");
+	lockfile_free(lf);
+
+	/* Cleanup */
+	if (old_home != nullptr) {
+		setenv("COFFEE_HOME", old_home, 1);
+	} else {
+		unsetenv("COFFEE_HOME");
+	}
+	if (old_reg != nullptr) {
+		setenv("COFFEE_REGISTRY_URL", old_reg, 1);
+	} else {
+		unsetenv("COFFEE_REGISTRY_URL");
+	}
+	sdsfree(reg_url);
+	sdsfree(reg_abs);
+	sdsfree(nested_abs);
+	sdsfree(reg_toml);
+	sdsfree(reg_pkg);
+	sdsfree(reg_letter);
+	sdsfree(reg_recipes);
+	sdsfree(reg_dir);
+	sdsfree(nested_dir);
+	sdsfree(parent_dir);
+	sdsfree(test_home);
+	teardown_tmpdir("transreg");
+	PASS();
+}
+
 /* A transitive path dep inside its parent is captured; one that escapes
  * (or is absolute) is rejected. */
 TEST(dep_graph_transitive_path_source)
@@ -1646,5 +1786,6 @@ void coffee_register_dep_graph_tests(void)
 	TEST_REGISTER(dep_graph_rev_pinned_fetch);
 	TEST_REGISTER(dep_graph_transitive_source_capture);
 	TEST_REGISTER(dep_graph_transitive_git_fetch);
+	TEST_REGISTER(dep_graph_transitive_registry_fetch);
 	TEST_REGISTER(dep_graph_transitive_path_source);
 }

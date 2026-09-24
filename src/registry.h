@@ -52,6 +52,26 @@ i64            registry_fetch(sds name, const char *version, sds dest_dir);
 void           registry_free_recipes(recipe_list_t *list);
 void           registry_free_recipe(recipe_t *r);
 
+/*
+ * Resolve the upstream source URL for a package from the registry.
+ * Returns a new sds (caller frees) or nullptr when no source URL could be
+ * used.  When it returns nullptr and recipe_found is non-null,
+ * *recipe_found reports whether the recipe itself was retrieved: false
+ * means the registry could not be queried at all (unknown package,
+ * unreachable, malformed recipe); true means the recipe exists but has no
+ * recipe_url or one that fails url_is_valid_remote().
+ */
+sds registry_source_url(const char *name, bool *recipe_found);
+
+/*
+ * Validate a recipe's source URL before it is used for a git clone.
+ * Network schemes (https, git, ssh, git+ssh, git+https, scp-style) are
+ * always accepted; local filesystem paths are accepted only when the
+ * registry base itself is local (COFFEE_REGISTRY_URL is a file:// URL or
+ * a path), so a remote registry cannot point clones at local paths.
+ */
+bool registry_recipe_url_is_valid(const char *url);
+
 version_list_t *registry_get_versions(sds name);
 void            registry_free_versions(version_list_t *list);
 

@@ -11,6 +11,7 @@
 #include "../src/toolcheck.h"
 #include "test_framework.h"
 
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -693,6 +694,416 @@ TEST(registry_search_parses_mock_index)
 	PASS();
 }
 
+/* registry — registry_source_url resolves recipe_url from a local fixture */
+TEST(registry_source_url_resolves_recipe_url)
+{
+	/* Requires curl; skip (pass) when unavailable. */
+	{
+		char *curl_argv[] = { "curl", "--version", nullptr };
+		if (run_command(curl_argv, RUN_CMD_QUIET) != 0) {
+			printf("  (curl not available, skipping)\n");
+			PASS();
+		}
+	}
+
+	{
+		char *clean_argv[] = { "rm", "-rf", "/tmp/coffee-test-regsrc", nullptr };
+		run_command(clean_argv, RUN_CMD_QUIET);
+	}
+
+	sds base = sdsnew("/tmp/coffee-test-regsrc");
+	mkdir(base, 0755);
+	sds reg_dir = sdscatprintf(sdsempty(), "%s/registry", base);
+	mkdir(reg_dir, 0755);
+	sds recipes = sdscatprintf(sdsempty(), "%s/recipes", reg_dir);
+	mkdir(recipes, 0755);
+	sds letter = sdscatprintf(sdsempty(), "%s/recipes/a", reg_dir);
+	mkdir(letter, 0755);
+	sds pkg = sdscatprintf(sdsempty(), "%s/alpha", letter);
+	mkdir(pkg, 0755);
+	sds toml = sdscatprintf(sdsempty(), "%s/library.toml", pkg);
+	FILE *fp = fopen(toml, "w");
+	ASSERT(fp != nullptr, "fopen recipe library.toml failed");
+	fprintf_safe(fp, "version = \"1.0\"\n");
+	fprintf_safe(fp, "recipe_url = \"/tmp/coffee-test-regsrc/alpha-repo\"\n");
+	fclose(fp);
+
+	const char *old_reg = getenv("COFFEE_REGISTRY_URL");
+	sds reg_url = sdscatprintf(sdsempty(), "file://%s", reg_dir);
+	setenv("COFFEE_REGISTRY_URL", reg_url, 1);
+
+	bool found = false;
+	sds  url   = registry_source_url("alpha", &found);
+	ASSERT(found, "alpha recipe should be found");
+	ASSERT(url != nullptr, "alpha should have a source URL");
+	ASSERT(url != nullptr && strcmp(url, "/tmp/coffee-test-regsrc/alpha-repo") == 0,
+	       "source URL should match recipe_url");
+
+	bool missing_found = true;
+	sds  missing       = registry_source_url("nope", &missing_found);
+	ASSERT(!missing_found, "unknown package should not be found");
+	ASSERT(missing == nullptr, "unknown package should have no source URL");
+
+	sdsfree(url);
+	sdsfree(missing);
+	sdsfree(reg_url);
+	sdsfree(toml);
+	sdsfree(pkg);
+	sdsfree(letter);
+	sdsfree(recipes);
+	sdsfree(reg_dir);
+	sdsfree(base);
+
+	if (old_reg != nullptr) {
+		setenv("COFFEE_REGISTRY_URL", old_reg, 1);
+	} else {
+		unsetenv("COFFEE_REGISTRY_URL");
+	}
+	{
+		char *rm_argv[] = { "rm", "-rf", "/tmp/coffee-test-regsrc", nullptr };
+		run_command(rm_argv, RUN_CMD_QUIET);
+	}
+	PASS();
+}
+
+/* registry — recipe URL policy: local paths only for a local registry */
+TEST(registry_recipe_url_policy)
+{
+	const char *old_reg = getenv("COFFEE_REGISTRY_URL");
+
+	/* Remote registry: local recipe URLs rejected, network ones accepted. */
+	setenv("COFFEE_REGISTRY_URL", "https://example.com/reg", 1);
+	ASSERT(!registry_recipe_url_is_valid("/tmp/foo"), "local path rejected for remote registry");
+	ASSERT(!registry_recipe_url_is_valid("./foo"), "relative path rejected for remote registry");
+	ASSERT(registry_recipe_url_is_valid("https://github.com/x/y.git"), "https accepted");
+	ASSERT(registry_recipe_url_is_valid("git@github.com:x/y.git"), "scp-style accepted");
+	ASSERT(!registry_recipe_url_is_valid("http://x/y.git"), "http rejected");
+
+	/* Local registry: local recipe URLs accepted. */
+	setenv("COFFEE_REGISTRY_URL", "file:///tmp/reg", 1);
+	ASSERT(registry_recipe_url_is_valid("/tmp/foo"), "local path accepted for local registry");
+
+	/* Unset: default remote registry. */
+	unsetenv("COFFEE_REGISTRY_URL");
+	ASSERT(!registry_recipe_url_is_valid("/tmp/foo"), "local path rejected for default registry");
+
+	if (old_reg != nullptr) {
+		setenv("COFFEE_REGISTRY_URL", old_reg, 1);
+	} else {
+		unsetenv("COFFEE_REGISTRY_URL");
+	}
+	PASS();
+}
+
+/* ---------------------------------------------------------------
+ * registry/fetch fixtures — local git repo + recipe
+ * --------------------------------------------------------------- */
+static void make_local_git_repo(const char *repo_dir, const char *name)
+{
+	mkdir(repo_dir, 0755);
+	assert(chdir(repo_dir) == 0);
+
+	FILE *fp = fopen("Coffee.toml", "w");
+	assert(fp != nullptr);
+	fprintf_safe(fp, "[package]\nname = \"%s\"\nversion = \"1.0.0\"\nedition = \"c23\"\n", name);
+	fclose(fp);
+
+	{
+		char *init_argv[] = { "git", "init", "-q", nullptr };
+		assert(run_command(init_argv, RUN_CMD_QUIET) == 0);
+		char *add_argv[] = { "git", "add", "-A", nullptr };
+		assert(run_command(add_argv, RUN_CMD_QUIET) == 0);
+		char *commit_argv[] = { "git", "-c", "user.email=test@test", "-c", "user.name=test", "commit", "-q", "-m",
+			                    "init", nullptr };
+		assert(run_command(commit_argv, RUN_CMD_QUIET) == 0);
+	}
+}
+
+/* Write a recipe fixture for `name` under reg_dir.  A null recipe_url
+ * omits the key entirely. */
+static void write_recipe(const char *reg_dir, const char *name, const char *recipe_url)
+{
+	sds recipes = sdscatprintf(sdsempty(), "%s/recipes", reg_dir);
+	mkdir(recipes, 0755);
+	sdsfree(recipes);
+
+	char first = (char)tolower((unsigned char)name[0]);
+	sds  letter = sdscatprintf(sdsempty(), "%s/recipes/%c", reg_dir, first);
+	mkdir(letter, 0755);
+	sds pkg = sdscatprintf(sdsempty(), "%s/%s", letter, name);
+	mkdir(pkg, 0755);
+	sds toml = sdscatprintf(sdsempty(), "%s/library.toml", pkg);
+	FILE *fp = fopen(toml, "w");
+	assert(fp != nullptr);
+	fprintf_safe(fp, "version = \"1.0\"\n");
+	if (recipe_url != nullptr) {
+		fprintf_safe(fp, "recipe_url = \"%s\"\n", recipe_url);
+	}
+	fclose(fp);
+	sdsfree(toml);
+	sdsfree(pkg);
+	sdsfree(letter);
+}
+
+/* ---------------------------------------------------------------
+ * fetch — a direct flat dep materializes from the registry
+ * --------------------------------------------------------------- */
+TEST(fetch_direct_flat_dep_from_registry)
+{
+	/* Requires git and curl; skip (pass) when unavailable. */
+	{
+		char *git_argv[] = { "git", "--version", nullptr };
+		if (run_command(git_argv, RUN_CMD_QUIET) != 0) {
+			printf("  (git not available, skipping)\n");
+			PASS();
+		}
+	}
+	{
+		char *curl_argv[] = { "curl", "--version", nullptr };
+		if (run_command(curl_argv, RUN_CMD_QUIET) != 0) {
+			printf("  (curl not available, skipping)\n");
+			PASS();
+		}
+	}
+
+	{
+		char *clean_argv[] = { "rm", "-rf", "/tmp/coffee-test-fetch-direct-repo",
+			                   "/tmp/coffee-test-fetch-direct-proj", "/tmp/coffee-test-fetch-direct-home",
+			                   "/tmp/coffee-test-fetch-direct-registry", nullptr };
+		run_command(clean_argv, RUN_CMD_QUIET);
+	}
+
+	char old_cwd[4096];
+	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
+
+	/* The registry recipe for "foo" points at this repo. */
+	sds repo_dir = sdsnew("/tmp/coffee-test-fetch-direct-repo");
+	make_local_git_repo(repo_dir, "foo");
+
+	/* Local registry fixture. */
+	sds reg_dir = sdsnew("/tmp/coffee-test-fetch-direct-registry");
+	mkdir(reg_dir, 0755);
+	write_recipe(reg_dir, "foo", repo_dir);
+
+	/* Sandbox COFFEE_HOME and the registry URL. */
+	sds test_home = sdsnew("/tmp/coffee-test-fetch-direct-home");
+	mkdir(test_home, 0755);
+	const char *old_home = getenv("COFFEE_HOME");
+	setenv("COFFEE_HOME", test_home, 1);
+	const char *old_reg = getenv("COFFEE_REGISTRY_URL");
+	sds reg_url = sdscatprintf(sdsempty(), "file://%s", reg_dir);
+	setenv("COFFEE_REGISTRY_URL", reg_url, 1);
+
+	/* Project with a direct flat dep. */
+	sds proj_dir = sdsnew("/tmp/coffee-test-fetch-direct-proj");
+	mkdir(proj_dir, 0755);
+	ASSERT(chdir(proj_dir) == 0, "chdir to project failed");
+
+	FILE *fp = fopen("Coffee.toml", "w");
+	ASSERT(fp != nullptr, "fopen project Coffee.toml failed");
+	fprintf_safe(fp, "[package]\nname = \"proj\"\nversion = \"1.0.0\"\nedition = \"c23\"\n");
+	fprintf_safe(fp, "\n[dependencies]\nfoo = \"1.0\"\n");
+	fclose(fp);
+
+	options opt = {
+		.inputs     = (char *[]){ "fetch" },
+		.inputs_num = 1,
+	};
+
+	i64 ret = handle_fetch(&opt);
+	ASSERT(ret == 0, "fetch with direct flat dep should succeed");
+	ASSERT(access("deps/foo", F_OK) == 0, "foo materialized");
+
+	lockfile_t *lf = lockfile_parse("Coffee.lock");
+	ASSERT(lf != nullptr, "Coffee.lock should parse");
+	ASSERT(lf->deps_count == 1, "lockfile has one dep");
+	ASSERT(lf->deps[0].name != nullptr && strcmp(lf->deps[0].name, "foo") == 0, "lockfile dep is foo");
+	ASSERT(lf->deps[0].commit != nullptr, "foo commit recorded");
+	lockfile_free(lf);
+
+	/* Cleanup */
+	chdir(old_cwd);
+	if (old_home != nullptr) {
+		setenv("COFFEE_HOME", old_home, 1);
+	} else {
+		unsetenv("COFFEE_HOME");
+	}
+	if (old_reg != nullptr) {
+		setenv("COFFEE_REGISTRY_URL", old_reg, 1);
+	} else {
+		unsetenv("COFFEE_REGISTRY_URL");
+	}
+	{
+		char *rm_argv[] = { "rm", "-rf", repo_dir, proj_dir, test_home, reg_dir, nullptr };
+		run_command(rm_argv, RUN_CMD_QUIET);
+	}
+	sdsfree(reg_url);
+	sdsfree(reg_dir);
+	sdsfree(repo_dir);
+	sdsfree(proj_dir);
+	sdsfree(test_home);
+	PASS();
+}
+
+/* ---------------------------------------------------------------
+ * fetch — a recipe whose recipe_url is not a valid remote URL fails
+ * --------------------------------------------------------------- */
+TEST(fetch_registry_dep_rejects_unsafe_recipe_url)
+{
+	/* Requires curl; skip (pass) when unavailable. */
+	{
+		char *curl_argv[] = { "curl", "--version", nullptr };
+		if (run_command(curl_argv, RUN_CMD_QUIET) != 0) {
+			printf("  (curl not available, skipping)\n");
+			PASS();
+		}
+	}
+
+	{
+		char *clean_argv[] = { "rm", "-rf", "/tmp/coffee-test-fetch-badurl-proj",
+			                   "/tmp/coffee-test-fetch-badurl-home", "/tmp/coffee-test-fetch-badurl-registry",
+			                   nullptr };
+		run_command(clean_argv, RUN_CMD_QUIET);
+	}
+
+	char old_cwd[4096];
+	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
+
+	/* Local registry fixture: the recipe exists but its recipe_url is
+	 * http, which is not on the allow-list. */
+	sds reg_dir = sdsnew("/tmp/coffee-test-fetch-badurl-registry");
+	mkdir(reg_dir, 0755);
+	write_recipe(reg_dir, "foo", "http://127.0.0.1/foo.git");
+
+	sds test_home = sdsnew("/tmp/coffee-test-fetch-badurl-home");
+	mkdir(test_home, 0755);
+	const char *old_home = getenv("COFFEE_HOME");
+	setenv("COFFEE_HOME", test_home, 1);
+	const char *old_reg = getenv("COFFEE_REGISTRY_URL");
+	sds reg_url = sdscatprintf(sdsempty(), "file://%s", reg_dir);
+	setenv("COFFEE_REGISTRY_URL", reg_url, 1);
+
+	sds proj_dir = sdsnew("/tmp/coffee-test-fetch-badurl-proj");
+	mkdir(proj_dir, 0755);
+	ASSERT(chdir(proj_dir) == 0, "chdir to project failed");
+
+	FILE *fp = fopen("Coffee.toml", "w");
+	ASSERT(fp != nullptr, "fopen project Coffee.toml failed");
+	fprintf_safe(fp, "[package]\nname = \"proj\"\nversion = \"1.0.0\"\nedition = \"c23\"\n");
+	fprintf_safe(fp, "\n[dependencies]\nfoo = \"1.0\"\n");
+	fclose(fp);
+
+	options opt = {
+		.inputs     = (char *[]){ "fetch" },
+		.inputs_num = 1,
+	};
+
+	i64 ret = handle_fetch(&opt);
+	ASSERT(ret == 1, "unsafe recipe_url should fail the fetch");
+	ASSERT(lockfile_parse("Coffee.lock") == nullptr, "no Coffee.lock written");
+
+	/* Cleanup */
+	chdir(old_cwd);
+	if (old_home != nullptr) {
+		setenv("COFFEE_HOME", old_home, 1);
+	} else {
+		unsetenv("COFFEE_HOME");
+	}
+	if (old_reg != nullptr) {
+		setenv("COFFEE_REGISTRY_URL", old_reg, 1);
+	} else {
+		unsetenv("COFFEE_REGISTRY_URL");
+	}
+	{
+		char *rm_argv[] = { "rm", "-rf", proj_dir, test_home, reg_dir, nullptr };
+		run_command(rm_argv, RUN_CMD_QUIET);
+	}
+	sdsfree(reg_url);
+	sdsfree(reg_dir);
+	sdsfree(proj_dir);
+	sdsfree(test_home);
+	PASS();
+}
+
+/* ---------------------------------------------------------------
+ * fetch — a recipe with no recipe_url fails cleanly
+ * --------------------------------------------------------------- */
+TEST(fetch_registry_dep_missing_recipe_url)
+{
+	/* Requires curl; skip (pass) when unavailable. */
+	{
+		char *curl_argv[] = { "curl", "--version", nullptr };
+		if (run_command(curl_argv, RUN_CMD_QUIET) != 0) {
+			printf("  (curl not available, skipping)\n");
+			PASS();
+		}
+	}
+
+	{
+		char *clean_argv[] = { "rm", "-rf", "/tmp/coffee-test-fetch-nourl-proj",
+			                   "/tmp/coffee-test-fetch-nourl-home", "/tmp/coffee-test-fetch-nourl-registry",
+			                   nullptr };
+		run_command(clean_argv, RUN_CMD_QUIET);
+	}
+
+	char old_cwd[4096];
+	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
+
+	/* Local registry fixture: the recipe exists but has no recipe_url. */
+	sds reg_dir = sdsnew("/tmp/coffee-test-fetch-nourl-registry");
+	mkdir(reg_dir, 0755);
+	write_recipe(reg_dir, "foo", nullptr);
+
+	sds test_home = sdsnew("/tmp/coffee-test-fetch-nourl-home");
+	mkdir(test_home, 0755);
+	const char *old_home = getenv("COFFEE_HOME");
+	setenv("COFFEE_HOME", test_home, 1);
+	const char *old_reg = getenv("COFFEE_REGISTRY_URL");
+	sds reg_url = sdscatprintf(sdsempty(), "file://%s", reg_dir);
+	setenv("COFFEE_REGISTRY_URL", reg_url, 1);
+
+	sds proj_dir = sdsnew("/tmp/coffee-test-fetch-nourl-proj");
+	mkdir(proj_dir, 0755);
+	ASSERT(chdir(proj_dir) == 0, "chdir to project failed");
+
+	FILE *fp = fopen("Coffee.toml", "w");
+	ASSERT(fp != nullptr, "fopen project Coffee.toml failed");
+	fprintf_safe(fp, "[package]\nname = \"proj\"\nversion = \"1.0.0\"\nedition = \"c23\"\n");
+	fprintf_safe(fp, "\n[dependencies]\nfoo = \"1.0\"\n");
+	fclose(fp);
+
+	options opt = {
+		.inputs     = (char *[]){ "fetch" },
+		.inputs_num = 1,
+	};
+
+	i64 ret = handle_fetch(&opt);
+	ASSERT(ret == 1, "missing recipe_url should fail the fetch");
+	ASSERT(lockfile_parse("Coffee.lock") == nullptr, "no Coffee.lock written");
+
+	/* Cleanup */
+	chdir(old_cwd);
+	if (old_home != nullptr) {
+		setenv("COFFEE_HOME", old_home, 1);
+	} else {
+		unsetenv("COFFEE_HOME");
+	}
+	if (old_reg != nullptr) {
+		setenv("COFFEE_REGISTRY_URL", old_reg, 1);
+	} else {
+		unsetenv("COFFEE_REGISTRY_URL");
+	}
+	{
+		char *rm_argv[] = { "rm", "-rf", proj_dir, test_home, reg_dir, nullptr };
+		run_command(rm_argv, RUN_CMD_QUIET);
+	}
+	sdsfree(reg_url);
+	sdsfree(reg_dir);
+	sdsfree(proj_dir);
+	sdsfree(test_home);
+	PASS();
+}
+
 /* ---------------------------------------------------------------
  * safe_strtol / safe_atol unit tests
  * --------------------------------------------------------------- */
@@ -1369,19 +1780,57 @@ TEST(fetch_transitive_dep_no_lockfile_corruption)
 	{
 		char *clean_argv[] = { "rm", "-rf", "/tmp/coffee-test-fetch-transitive-repo",
 			                   "/tmp/coffee-test-fetch-transitive-proj", "/tmp/coffee-test-fetch-transitive-home",
-			                   nullptr };
+			                   "/tmp/coffee-test-fetch-transitive-nested",
+			                   "/tmp/coffee-test-fetch-transitive-registry", nullptr };
 		run_command(clean_argv, RUN_CMD_QUIET);
 	}
 
 	char old_cwd[4096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
 
+	/* Nested repo: the registry recipe for "nested" points here. */
+	sds nested_dir = sdsnew("/tmp/coffee-test-fetch-transitive-nested");
+	mkdir(nested_dir, 0755);
+	ASSERT(chdir(nested_dir) == 0, "chdir to nested failed");
+
+	FILE *fp = fopen("Coffee.toml", "w");
+	ASSERT(fp != nullptr, "fopen nested Coffee.toml failed");
+	fprintf_safe(fp, "[package]\nname = \"nested\"\nversion = \"1.0.0\"\nedition = \"c23\"\n");
+	fclose(fp);
+
+	{
+		char *init_argv[] = { "git", "init", "-q", nullptr };
+		ASSERT(run_command(init_argv, RUN_CMD_QUIET) == 0, "git init nested failed");
+		char *add_argv[] = { "git", "add", "-A", nullptr };
+		ASSERT(run_command(add_argv, RUN_CMD_QUIET) == 0, "git add nested failed");
+		char *commit_argv[] = { "git", "-c", "user.email=test@test", "-c", "user.name=test", "commit", "-q", "-m",
+			                    "init", nullptr };
+		ASSERT(run_command(commit_argv, RUN_CMD_QUIET) == 0, "git commit nested failed");
+	}
+
+	/* Local registry fixture: a recipe for "nested" whose recipe_url is
+	 * the nested repo above. */
+	sds reg_dir = sdsnew("/tmp/coffee-test-fetch-transitive-registry");
+	mkdir(reg_dir, 0755);
+	sds reg_recipes = sdscatprintf(sdsempty(), "%s/recipes", reg_dir);
+	mkdir(reg_recipes, 0755);
+	sds reg_letter = sdscatprintf(sdsempty(), "%s/recipes/n", reg_dir);
+	mkdir(reg_letter, 0755);
+	sds reg_pkg = sdscatprintf(sdsempty(), "%s/nested", reg_letter);
+	mkdir(reg_pkg, 0755);
+	sds reg_toml = sdscatprintf(sdsempty(), "%s/library.toml", reg_pkg);
+	fp = fopen(reg_toml, "w");
+	ASSERT(fp != nullptr, "fopen recipe library.toml failed");
+	fprintf_safe(fp, "version = \"1.0\"\n");
+	fprintf_safe(fp, "recipe_url = \"%s\"\n", nested_dir);
+	fclose(fp);
+
 	/* Parent repo: a git dep that itself declares a nested dependency. */
 	sds repo_dir = sdsnew("/tmp/coffee-test-fetch-transitive-repo");
 	mkdir(repo_dir, 0755);
 	ASSERT(chdir(repo_dir) == 0, "chdir to repo failed");
 
-	FILE *fp = fopen("Coffee.toml", "w");
+	fp = fopen("Coffee.toml", "w");
 	ASSERT(fp != nullptr, "fopen repo Coffee.toml failed");
 	fprintf_safe(fp, "[package]\nname = \"parent\"\nversion = \"1.0.0\"\nedition = \"c23\"\n");
 	fprintf_safe(fp, "\n[dependencies]\nnested = \"1.0\"\n");
@@ -1403,11 +1852,14 @@ TEST(fetch_transitive_dep_no_lockfile_corruption)
 		ASSERT(run_command(commit_argv, RUN_CMD_QUIET) == 0, "git commit failed");
 	}
 
-	/* Sandbox COFFEE_HOME and a project dir */
+	/* Sandbox COFFEE_HOME, the registry URL, and a project dir */
 	sds test_home = sdsnew("/tmp/coffee-test-fetch-transitive-home");
 	mkdir(test_home, 0755);
 	const char *old_home = getenv("COFFEE_HOME");
 	setenv("COFFEE_HOME", test_home, 1);
+	const char *old_reg = getenv("COFFEE_REGISTRY_URL");
+	sds reg_url = sdscatprintf(sdsempty(), "file://%s", reg_dir);
+	setenv("COFFEE_REGISTRY_URL", reg_url, 1);
 
 	sds proj_dir = sdsnew("/tmp/coffee-test-fetch-transitive-proj");
 	mkdir(proj_dir, 0755);
@@ -1427,11 +1879,24 @@ TEST(fetch_transitive_dep_no_lockfile_corruption)
 	i64 ret1 = handle_fetch(&opt);
 	ASSERT(ret1 == 0, "first fetch should succeed");
 
+	/* The transitive flat dep "nested" is materialized from the registry. */
+	ASSERT(access("deps/nested", F_OK) == 0, "nested materialized");
+
 	lockfile_t *lf1 = lockfile_parse("Coffee.lock");
 	ASSERT(lf1 != nullptr, "first Coffee.lock should parse");
-	ASSERT(lf1->deps_count == 1, "first lockfile should have exactly one dep");
-	ASSERT(lf1->deps[0].name != nullptr && strcmp(lf1->deps[0].name, "parent") == 0,
-	       "first dep should be 'parent'");
+	ASSERT(lf1->deps_count == 2, "first lockfile should have both deps");
+	bool found_parent = false, found_nested = false;
+	for (size_t i = 0; i < lf1->deps_count; i++) {
+		if (strcmp(lf1->deps[i].name, "parent") == 0) {
+			found_parent = true;
+			ASSERT(lf1->deps[i].commit != nullptr, "parent commit recorded");
+		}
+		if (strcmp(lf1->deps[i].name, "nested") == 0) {
+			found_nested = true;
+			ASSERT(lf1->deps[i].commit != nullptr, "nested commit recorded");
+		}
+	}
+	ASSERT(found_parent && found_nested, "both deps in first lockfile");
 	lockfile_free(lf1);
 
 	i64 ret2 = handle_fetch(&opt);
@@ -1439,9 +1904,7 @@ TEST(fetch_transitive_dep_no_lockfile_corruption)
 
 	lockfile_t *lf2 = lockfile_parse("Coffee.lock");
 	ASSERT(lf2 != nullptr, "second Coffee.lock should parse");
-	ASSERT(lf2->deps_count == 1, "second lockfile should still have exactly one dep");
-	ASSERT(lf2->deps[0].name != nullptr && strcmp(lf2->deps[0].name, "parent") == 0,
-	       "second dep should be 'parent'");
+	ASSERT(lf2->deps_count == 2, "second lockfile should still have both deps");
 	lockfile_free(lf2);
 
 	/* Cleanup */
@@ -1451,24 +1914,36 @@ TEST(fetch_transitive_dep_no_lockfile_corruption)
 	} else {
 		unsetenv("COFFEE_HOME");
 	}
+	if (old_reg != nullptr) {
+		setenv("COFFEE_REGISTRY_URL", old_reg, 1);
+	} else {
+		unsetenv("COFFEE_REGISTRY_URL");
+	}
 	{
-		char *rm_argv[] = { "rm", "-rf", repo_dir, proj_dir, test_home, nullptr };
+		char *rm_argv[] = { "rm", "-rf", repo_dir, proj_dir, test_home, reg_dir, nested_dir, nullptr };
 		run_command(rm_argv, RUN_CMD_QUIET);
 	}
+	sdsfree(reg_url);
+	sdsfree(reg_toml);
+	sdsfree(reg_pkg);
+	sdsfree(reg_letter);
+	sdsfree(reg_recipes);
+	sdsfree(reg_dir);
 	sdsfree(repo_dir);
 	sdsfree(proj_dir);
 	sdsfree(test_home);
+	sdsfree(nested_dir);
 	PASS();
 }
 
 /* ---------------------------------------------------------------
- * fetch — a root flat dep with no git/path source warns and fails
+ * fetch — a root flat dep not in the registry fails
  * --------------------------------------------------------------- */
-TEST(fetch_root_flat_dep_warns)
+TEST(fetch_root_flat_dep_not_in_registry_fails)
 {
 	{
 		char *clean_argv[] = { "rm", "-rf", "/tmp/coffee-test-fetch-flat-proj", "/tmp/coffee-test-fetch-flat-home",
-			                   nullptr };
+			                   "/tmp/coffee-test-fetch-flat-registry", nullptr };
 		run_command(clean_argv, RUN_CMD_QUIET);
 	}
 
@@ -1479,6 +1954,14 @@ TEST(fetch_root_flat_dep_warns)
 	mkdir(test_home, 0755);
 	const char *old_home = getenv("COFFEE_HOME");
 	setenv("COFFEE_HOME", test_home, 1);
+
+	/* Empty registry fixture: the flat dep is not in it, so the lookup
+	 * fails fast instead of hitting the network. */
+	sds reg_dir = sdsnew("/tmp/coffee-test-fetch-flat-registry");
+	mkdir(reg_dir, 0755);
+	const char *old_reg = getenv("COFFEE_REGISTRY_URL");
+	sds reg_url = sdscatprintf(sdsempty(), "file://%s", reg_dir);
+	setenv("COFFEE_REGISTRY_URL", reg_url, 1);
 
 	sds proj_dir = sdsnew("/tmp/coffee-test-fetch-flat-proj");
 	mkdir(proj_dir, 0755);
@@ -1508,10 +1991,17 @@ TEST(fetch_root_flat_dep_warns)
 	} else {
 		unsetenv("COFFEE_HOME");
 	}
+	if (old_reg != nullptr) {
+		setenv("COFFEE_REGISTRY_URL", old_reg, 1);
+	} else {
+		unsetenv("COFFEE_REGISTRY_URL");
+	}
 	{
-		char *rm_argv[] = { "rm", "-rf", proj_dir, test_home, nullptr };
+		char *rm_argv[] = { "rm", "-rf", proj_dir, test_home, reg_dir, nullptr };
 		run_command(rm_argv, RUN_CMD_QUIET);
 	}
+	sdsfree(reg_url);
+	sdsfree(reg_dir);
 	sdsfree(proj_dir);
 	sdsfree(test_home);
 	PASS();
@@ -1666,6 +2156,8 @@ void coffee_register_security_tests(void)
 	TEST_REGISTER(version_is_valid_unit);
 	TEST_REGISTER(manifest_roundtrip_preserves_inline_deps);
 	TEST_REGISTER(registry_search_parses_mock_index);
+	TEST_REGISTER(registry_source_url_resolves_recipe_url);
+	TEST_REGISTER(registry_recipe_url_policy);
 	TEST_REGISTER(fetch_rejects_dotdot_dep);
 	TEST_REGISTER(fetch_rejects_slash_dep);
 	TEST_REGISTER(add_rejects_injection_inputs);
@@ -1680,8 +2172,11 @@ void coffee_register_security_tests(void)
 	TEST_REGISTER(install_replaces_regular_file);
 	TEST_REGISTER(fetch_transitive_dep_no_lockfile_corruption);
 	TEST_REGISTER(fetch_transitive_invalid_url_fails);
-	TEST_REGISTER(fetch_root_flat_dep_warns);
+	TEST_REGISTER(fetch_root_flat_dep_not_in_registry_fails);
 	TEST_REGISTER(fetch_symlink_failure_fails);
+	TEST_REGISTER(fetch_direct_flat_dep_from_registry);
+	TEST_REGISTER(fetch_registry_dep_rejects_unsafe_recipe_url);
+	TEST_REGISTER(fetch_registry_dep_missing_recipe_url);
 	TEST_REGISTER(toolcheck_skips_non_build_commands);
 	TEST_REGISTER(toolcheck_fetch_needs_only_git);
 	TEST_REGISTER(toolcheck_build_needs_clang);

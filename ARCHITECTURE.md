@@ -193,12 +193,17 @@ handle_fetch(&opt)
       → If git source → git clone/fetch into ~/.coffee/deps/<name>,
         symlink to deps/<name>, record commit SHA in lockfile
       → If path source → resolve absolute path, symlink to deps/<name>
-      → Transitive deps already on disk are recorded without re-fetching;
-        transitive deps without a source are skipped
-    → Write Coffee.lock with every materialized dep
+      → If no source (plain version string) → registry_get() the recipe and
+        clone its recipe_url into ~/.coffee/deps/<name>; the recipe_url must
+        pass url_is_valid_remote() (network schemes only; local paths are
+        rejected unless COFFEE_REGISTRY_URL is overridden); a dep that is
+        not in the registry fails the fetch; --offline refuses registry
+        resolution
+      → Transitive deps already on disk are recorded without re-fetching
+    → Write Coffee.lock with every materialized dep (only on full success)
 ```
 
-**Registry flow** (`src/commands/search.c`, `install.c`, `metadata.c`, etc.):
+**Registry flow** (`src/commands/search.c`, `fetch.c`, `install.c`, `metadata.c`, etc.):
 
 ```
 registry_search() / registry_get()
@@ -206,8 +211,12 @@ registry_search() / registry_get()
     → parse JSON lines → recipe_t / recipe_list_t
 ```
 
-This is a secondary, deprecated path. The project is designed for git/path-based
-dependency management without a central registry.
+`registry_get()` is also used by `fetch` to resolve plain-version-string deps
+(`registry_source_url()` returns the recipe's `recipe_url`, which is cloned).
+The base URL is `REGISTRY_RAW_URL`, overridable via `COFFEE_REGISTRY_URL`
+(used by the test suite to point at local fixtures). This remains a secondary
+path: the project is designed for git/path-based dependency management without
+a central registry.
 
 **Dep graph flow** (`src/dep_graph.c`, `src/dep_graph_git.c`, `src/dep_graph_cache.c`):
 
@@ -215,7 +224,8 @@ dependency management without a central registry.
 dep_graph_create(manifest, lockfile, offline)
     → Add root package as node[0] from manifest
     → For each direct dependency:
-      → Resolve path: lockfile → dep_resolve_dir() → registry
+      → Resolve path: lockfile → dep_resolve_dir() (filesystem only;
+        the graph never consults the registry)
       → If git dep: git rev-parse HEAD → pinned commit
       → Add dep node with flags (-I, -L, -l) and source files
       → Recurse: parse dep's library.toml or Coffee.toml for transitive deps

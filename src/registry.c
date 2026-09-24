@@ -35,6 +35,22 @@ const char *coffee_home_dir(void)
 	return home_dir;
 }
 
+/*
+ * The registry base URL.  COFFEE_REGISTRY_URL overrides the compiled-in
+ * default so tests can point the client at a local fixture.  The override
+ * applies to the raw recipe URL only (REGISTRY_RAW_URL), not to the
+ * package index (REGISTRY_INDEX_URL); local paths and file:// URLs are
+ * accepted here, while recipe_url values are validated separately.
+ */
+static const char *registry_raw_url(void)
+{
+	const char *override = getenv("COFFEE_REGISTRY_URL");
+	if (override != nullptr && override[0] != '\0') {
+		return override;
+	}
+	return REGISTRY_RAW_URL;
+}
+
 static const char *get_cache_dir(void)
 {
 	return coffee_home_dir();
@@ -72,8 +88,9 @@ static i64 ensure_index_cached(void)
 	 * --max-filesize: bound the compressed download. */
 	{
 		sds   tmp_path    = sdscatprintf(sdsempty(), "%s.zst", index_path);
-		char *curl_argv[] = { "curl", "-sL", "--fail", "--proto-redir", "https", "--max-filesize", "10485760",
-			                  REGISTRY_INDEX_URL, "-o", tmp_path, nullptr };
+		char *curl_argv[] = { "curl", "-sL", "--fail", "--proto-redir", "https", "--connect-timeout", "10",
+			                  "--max-time", "30", "--max-filesize", "10485760", REGISTRY_INDEX_URL, "-o", tmp_path,
+			                  nullptr };
 		i64   r           = run_command(curl_argv, 0);
 		if (r == 0) {
 			char *zstd_argv[] = { "zstd", "-df", tmp_path, "-o", index_path, nullptr };
@@ -94,8 +111,8 @@ static i64 ensure_index_cached(void)
 
 static char *fetch_url(const char *url)
 {
-	char *argv[] = { "curl", "-sL", "--fail", "--proto-redir", "https", "--max-filesize", "10485760", unconst(url),
-		             nullptr };
+	char *argv[] = { "curl", "-sL", "--fail", "--proto-redir", "https", "--connect-timeout", "10", "--max-time", "30",
+		             "--max-filesize", "10485760", unconst(url), nullptr };
 	sds   result = run_command_capture(argv, RUN_CMD_QUIET);
 	if (result == nullptr) {
 		return nullptr;
@@ -327,7 +344,7 @@ recipe_t *registry_get(sds name)
 
 	char first = (char)tolower((unsigned char)name[0]);
 	char url[4096];
-	snprintf_safe(url, sizeof(url), REGISTRY_RAW_URL "/recipes/%c/%s/library.toml", first, name);
+	snprintf_safe(url, sizeof(url), "%s/recipes/%c/%s/library.toml", registry_raw_url(), first, name);
 
 	char *meta = fetch_url(url);
 	if (meta == nullptr) {
@@ -380,6 +397,56 @@ recipe_t *registry_get(sds name)
 	return r;
 }
 
+/*
+ * Validate a recipe's source URL.  Network schemes are always accepted.
+ * Local filesystem paths are accepted only when the registry itself is
+ * local (COFFEE_REGISTRY_URL is a file:// URL or a path — a mirror or
+ * test fixture); a remote registry must not be able to point clones at
+ * arbitrary local paths.
+ */
+bool registry_recipe_url_is_valid(const char *url)
+{
+	if (url_is_valid_remote(url)) {
+		return true;
+	}
+	if (!url_is_valid(url)) {
+		return false;
+	}
+	const char *base = registry_raw_url();
+	if (strncmp(base, "file://", 7) == 0 || base[0] == '/' || strncmp(base, "./", 2) == 0 ||
+	    strncmp(base, "../", 3) == 0) {
+		return true;
+	}
+	return false;
+}
+
+sds registry_source_url(const char *name, bool *recipe_found)
+{
+	if (recipe_found != nullptr) {
+		*recipe_found = false;
+	}
+	/* The name is interpolated into a URL; re-check it even though
+	 * callers are expected to have validated it already. */
+	if (name == nullptr || name[0] == '\0' || !dep_name_is_valid(name)) {
+		return nullptr;
+	}
+	sds       key = sdsnew(name);
+	recipe_t *r   = registry_get(key);
+	sdsfree(key);
+	if (r == nullptr) {
+		return nullptr;
+	}
+	if (recipe_found != nullptr) {
+		*recipe_found = true;
+	}
+	sds url = nullptr;
+	if (r->download_url != nullptr && registry_recipe_url_is_valid(r->download_url)) {
+		url = sdsnew(r->download_url);
+	}
+	registry_free_recipe(r);
+	return url;
+}
+
 i64 registry_fetch(sds name, const char *version, sds dest_dir)
 {
 	(void)version;
@@ -397,7 +464,7 @@ i64 registry_fetch(sds name, const char *version, sds dest_dir)
 	}
 
 	{
-		sds   url    = sdscatprintf(sdsempty(), REGISTRY_RAW_URL "/recipes/%c/%s/library.toml", first, name);
+		sds   url    = sdscatprintf(sdsempty(), "%s/recipes/%c/%s/library.toml", registry_raw_url(), first, name);
 		sds   out    = sdscatprintf(sdsempty(), "%s/library.toml", dest_dir);
 		char *argv[] = { "curl", "-sL", "--fail", "--proto-redir", "https", "--max-filesize", "10485760", url, "-o",
 			             out, nullptr };
@@ -410,7 +477,7 @@ i64 registry_fetch(sds name, const char *version, sds dest_dir)
 	}
 
 	{
-		sds   url    = sdscatprintf(sdsempty(), REGISTRY_RAW_URL "/recipes/%c/%s/install.sh", first, name);
+		sds   url    = sdscatprintf(sdsempty(), "%s/recipes/%c/%s/install.sh", registry_raw_url(), first, name);
 		sds   out    = sdscatprintf(sdsempty(), "%s/install.sh", dest_dir);
 		char *argv[] = { "curl", "-sL", "--fail", "--proto-redir", "https", "--max-filesize", "10485760", url, "-o",
 			             out, nullptr };
@@ -430,7 +497,7 @@ version_list_t *registry_get_versions(sds name)
 
 	char first = (char)tolower((unsigned char)name[0]);
 	char url[4096];
-	snprintf_safe(url, sizeof(url), REGISTRY_RAW_URL "/recipes/%c/%s/library.toml", first, name);
+	snprintf_safe(url, sizeof(url), "%s/recipes/%c/%s/library.toml", registry_raw_url(), first, name);
 
 	char *meta = fetch_url(url);
 	if (meta == nullptr) {

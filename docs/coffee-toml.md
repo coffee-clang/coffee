@@ -70,6 +70,8 @@ cjson = "2.1"
 ```
 
 This form is used for registry-based dependencies. The version string supports semver constraints.
+`coffee fetch` materializes such a dependency by looking up the recipe and cloning its
+`recipe_url` into `~/.coffee/deps/`; a dep that is not in the registry fails the fetch.
 
 ### Inline Table Form
 

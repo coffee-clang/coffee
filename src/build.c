@@ -596,6 +596,17 @@ bool url_is_valid(const char *url)
 	return false;
 }
 
+bool url_is_valid_remote(const char *url)
+{
+	if (url == nullptr || !url_is_valid(url)) {
+		return false;
+	}
+	if (url[0] == '/' || strncmp(url, "./", 2) == 0 || strncmp(url, "../", 3) == 0) {
+		return false;
+	}
+	return true;
+}
+
 size_t count_flag_tokens(const char *flags)
 {
 	if (flags == nullptr || flags[0] == '\0') {

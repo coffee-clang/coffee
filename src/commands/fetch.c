@@ -215,6 +215,65 @@ static sds git_head_commit(const char *dep_dir)
 	return output;
 }
 
+/* Symlink deps/<name> to the global cache and record the dep in the
+ * lockfile entry list.  Returns 0 on success. */
+static i64 link_git_dep(const char *name, const char *global_dir, lockfile_dep_t **deps, size_t *count, size_t *cap)
+{
+	sds         cache_path = sdscatprintf(sdsempty(), "%s/%s", global_dir, name);
+	sds         dep_dir    = sdscatprintf(sdsempty(), "deps/%s", name);
+	struct stat st;
+	if (lstat(dep_dir, &st) == 0) {
+		char *rm_argv[] = { "rm", "-rf", dep_dir, nullptr };
+		run_command(rm_argv, 0);
+	}
+	i64 ret = 0;
+	if (symlink(cache_path, dep_dir) != 0) {
+		fprintf_safe(stderr, "  Error: cannot create symlink '%s' -> '%s'\n", dep_dir, cache_path);
+		ret = 1;
+	} else {
+		sds commit = git_head_commit(dep_dir);
+		lf_record(deps, count, cap, name, cache_path, commit);
+		sdsfree(commit);
+	}
+	sdsfree(cache_path);
+	sdsfree(dep_dir);
+	return ret;
+}
+
+/*
+ * Materialize a dependency declared as a plain version string (no git or
+ * path source) by resolving it through the registry: look up the recipe,
+ * clone its recipe_url into the global deps cache, and symlink deps/<name>
+ * to the cache.  Records the dep in the lockfile entry list.
+ *
+ * Returns 0 on success, non-zero on failure.
+ */
+static i64 fetch_registry_dep(const char *name, const char *global_dir, lockfile_dep_t **deps, size_t *count,
+                              size_t *cap, bool verbose, bool offline)
+{
+	if (offline) {
+		fprintf_safe(stderr, "  Error: cannot resolve '%s' from the registry in offline mode\n", name);
+		return 1;
+	}
+	bool recipe_found = false;
+	sds  url          = registry_source_url(name, &recipe_found);
+	if (url == nullptr) {
+		if (recipe_found) {
+			fprintf_safe(stderr, "  Error: recipe for '%s' has no usable source URL\n", name);
+		} else {
+			fprintf_safe(stderr, "  Error: cannot resolve '%s' from the registry (unknown package or unreachable)\n",
+			             name);
+		}
+		return 1;
+	}
+	i64 ret = fetch_git_dep(name, url, global_dir, nullptr, verbose);
+	sdsfree(url);
+	if (ret != 0) {
+		return ret;
+	}
+	return link_git_dep(name, global_dir, deps, count, cap);
+}
+
 int64_t handle_fetch(options *opts)
 {
 	char *manifest_path = project_find_manifest(nullptr);
@@ -257,7 +316,7 @@ int64_t handle_fetch(options *opts)
 	while (progress) {
 		progress = false;
 
-		dep_graph_t *g = dep_graph_create(m, old_lf, false);
+		dep_graph_t *g = dep_graph_create(m, old_lf, opts->offline);
 		if (g == nullptr) {
 			lockfile_free(old_lf);
 			manifest_free(m);
@@ -329,27 +388,28 @@ int64_t handle_fetch(options *opts)
 
 			i64 ret = -1;
 			if (git_url != nullptr) {
-				ret = fetch_git_dep(dep_name, git_url, global_deps, ref, opts->verbose);
-				if (ret == 0) {
-					sds         cache_path = sdscatprintf(sdsempty(), "%s/%s", global_deps, dep_name);
-					sds         dep_dir    = sdscatprintf(sdsempty(), "deps/%s", dep_name);
-					struct stat st;
-					if (lstat(dep_dir, &st) == 0) {
-						char *rm_argv[] = { "rm", "-rf", dep_dir, nullptr };
-						run_command(rm_argv, 0);
-					}
-					if (symlink(cache_path, dep_dir) != 0) {
-						fprintf_safe(stderr, "  Error: cannot create symlink '%s' -> '%s'\n", dep_dir, cache_path);
-						ret = 1;
-					} else {
-						sds commit = git_head_commit(dep_dir);
-						lf_record(&lf_deps, &lf_count, &lf_cap, dep_name, cache_path, commit);
+				if (opts->offline) {
+					/* Offline: no network.  Record the dep only if it is
+					 * already on disk; otherwise fail. */
+					sds existing = dep_resolve_dir(dep_name);
+					if (existing != nullptr) {
+						sds commit = g->nodes[gi].is_git ? git_head_commit(existing) : nullptr;
+						lf_record(&lf_deps, &lf_count, &lf_cap, dep_name, existing, commit);
 						sdsfree(commit);
+						sdsfree(existing);
+						ret = 0;
+					} else {
+						fprintf_safe(stderr, "  Error: cannot fetch git dependency '%s' in offline mode\n", dep_name);
+						ret = 1;
 					}
-					sdsfree(cache_path);
-					sdsfree(dep_dir);
 				} else {
-					fprintf_safe(stderr, "  Error: Failed to clone git dependency '%s' from %s\n", dep_name, git_url);
+					ret = fetch_git_dep(dep_name, git_url, global_deps, ref, opts->verbose);
+					if (ret == 0) {
+						ret = link_git_dep(dep_name, global_deps, &lf_deps, &lf_count, &lf_cap);
+					} else {
+						fprintf_safe(stderr, "  Error: Failed to clone git dependency '%s' from %s\n", dep_name,
+						             git_url);
+					}
 				}
 			} else if (path != nullptr) {
 				ret = fetch_path_dep(dep_name, path, "deps");
@@ -360,12 +420,11 @@ int64_t handle_fetch(options *opts)
 				} else {
 					fprintf_safe(stderr, "  Error: Failed to materialize path dependency '%s'\n", dep_name);
 				}
-			} else if (!direct) {
-				/* A transitive dep without a git/path source cannot be
-				 * materialized here; that is the parent's concern. */
-				continue;
 			} else {
-				fprintf_safe(stderr, "  Warning: '%s' has no git or path source — skipping\n", dep_name);
+				/* A dep with no git or path source is declared as a plain
+				 * version string; resolve it through the registry. */
+				ret = fetch_registry_dep(dep_name, global_deps, &lf_deps, &lf_count, &lf_cap, opts->verbose,
+				                         opts->offline);
 			}
 
 			if (ret != 0) {

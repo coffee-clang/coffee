@@ -125,6 +125,13 @@ sds ref_lowercase(const char *ref);
  */
 bool url_is_valid(const char *url);
 
+/*
+ * Validate a URL that came from untrusted data (a registry recipe).
+ * Stricter than url_is_valid(): local filesystem paths are rejected, so
+ * such a URL can only point at a network location.
+ */
+bool url_is_valid_remote(const char *url);
+
 size_t count_flag_tokens(const char *flags);
 
 sds split_flags_to_argv(const char *flags, char **argv, size_t start_idx, size_t *end_idx);

@@ -328,11 +328,27 @@ TEST(cov_check_valid)
 TEST(cov_fetch_with_deps)
 {
 	setup_proj("fetch-deps", "dependencies = [\"fetch-dep\"]", true);
+
+	/* Point the registry at an empty local fixture so the flat dep
+	 * lookup fails fast instead of hitting the network. */
+	const char *old_reg = getenv("COFFEE_REGISTRY_URL");
+	sds reg_dir = sdsnew("/tmp/coverage-cmd-fetch-registry");
+	mkdir(reg_dir, 0755);
+	sds reg_url = sdscatprintf(sdsempty(), "file://%s", reg_dir);
+	setenv("COFFEE_REGISTRY_URL", reg_url, 1);
+
 	options opt = { .inputs = (char *[]){ "fetch" }, .inputs_num = 1 };
 	i64     ret = handle_fetch(&opt);
 	/* fetch may fail for non-registry deps — just ensure it runs */
 	ASSERT(ret == 0 || ret == 1, "fetch should run without crash");
 
+	if (old_reg != nullptr) {
+		setenv("COFFEE_REGISTRY_URL", old_reg, 1);
+	} else {
+		unsetenv("COFFEE_REGISTRY_URL");
+	}
+	sdsfree(reg_url);
+	sdsfree(reg_dir);
 	teardown_proj("fetch-deps");
 	PASS();
 }
