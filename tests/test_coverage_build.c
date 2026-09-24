@@ -5,8 +5,6 @@
  *   - dep_resolve_dir with found dirs (deps/, vendor/, global)
  *   - dep_parse_name
  *   - dep_add_flags with library.toml, fallbacks, source glob
- *   - build_run
- *   - build_project with locked/verbose/release/features modes
  */
 
 #include "../src/build.h"
@@ -23,27 +21,6 @@
 #include <unistd.h>
 
 void coffee_register_coverage_build_tests(void);
-
-static char saved_cwd[4096];
-
-static void setup_build_test(const char *name)
-{
-	sds tmpdir = sdscatprintf(sdsempty(), "/tmp/coverage-build-%s", name);
-	mkdir(tmpdir, 0755);
-	assert(getcwd(saved_cwd, sizeof(saved_cwd)) != nullptr);
-	assert(chdir(tmpdir) == 0);
-	sdsfree(tmpdir);
-}
-
-static void teardown_build_test(const char *name)
-{
-	chdir(saved_cwd);
-	sds path = sdscatprintf(sdsempty(), "/tmp/coverage-build-%s", name);
-	test_remove_tree(path);
-	sdsfree(path);
-}
-
-#include <assert.h>
 
 TEST(cov_dep_resolve_dir_deps_local)
 {
@@ -174,152 +151,6 @@ TEST(cov_dep_parse_name_path)
 	PASS();
 }
 
-/* build_project with --locked flag (lockfile exists and is fresh) */
-TEST(cov_build_project_locked)
-{
-	setup_build_test("locked");
-
-	mkdir("src", 0755);
-	FILE *fp = fopen("src/main.c", "w");
-	ASSERT(fp != nullptr, "create main.c");
-	fprintf_safe(fp, "int main(void) { return 0; }\n");
-	fclose(fp);
-
-	fp = fopen("Coffee.toml", "w");
-	ASSERT(fp != nullptr, "create Coffee.toml");
-	fprintf_safe(fp, "[package]\n");
-	fprintf_safe(fp, "name = \"lockedtest\"\n");
-	fprintf_safe(fp, "version = \"1.0\"\n");
-	fprintf_safe(fp, "edition = \"c23\"\n");
-	fclose(fp);
-
-	/* Create lockfile (newer than Coffee.toml) */
-	sleep(1);
-	fp = fopen("Coffee.lock", "w");
-	ASSERT(fp != nullptr, "create Coffee.lock");
-	fprintf_safe(fp, "version = \"1\"\n");
-	fclose(fp);
-
-	manifest_t *m = manifest_parse("Coffee.toml");
-	ASSERT(m != nullptr, "parse manifest");
-
-	build_opts_t opts = {
-		.locked  = true,
-		.verbose = false,
-	};
-
-	i64 ret = build_project(m, &opts);
-	ASSERT(ret == 0 || ret == 1, "build_project locked");
-	manifest_free(m);
-
-	teardown_build_test("locked");
-	PASS();
-}
-
-/* build_project with release mode */
-TEST(cov_build_project_release)
-{
-	setup_build_test("release");
-
-	mkdir("src", 0755);
-	FILE *fp = fopen("src/main.c", "w");
-	ASSERT(fp != nullptr, "create main.c");
-	fprintf_safe(fp, "int main(void) { return 0; }\n");
-	fclose(fp);
-
-	fp = fopen("Coffee.toml", "w");
-	ASSERT(fp != nullptr, "create Coffee.toml");
-	fprintf_safe(fp, "[package]\n");
-	fprintf_safe(fp, "name = \"releasetest\"\n");
-	fprintf_safe(fp, "version = \"1.0\"\n");
-	fprintf_safe(fp, "edition = \"c23\"\n");
-	fclose(fp);
-
-	manifest_t *m = manifest_parse("Coffee.toml");
-	ASSERT(m != nullptr, "parse manifest");
-
-	build_opts_t opts = {
-		.release = true,
-	};
-
-	i64 ret = build_project(m, &opts);
-	ASSERT(ret == 0 || ret == 1, "build_project release");
-	manifest_free(m);
-
-	teardown_build_test("release");
-	PASS();
-}
-
-/* build_project with features */
-TEST(cov_build_project_features)
-{
-	setup_build_test("features");
-
-	mkdir("src", 0755);
-	FILE *fp = fopen("src/main.c", "w");
-	ASSERT(fp != nullptr, "create main.c");
-	fprintf_safe(fp, "int main(void) { return 0; }\n");
-	fclose(fp);
-
-	fp = fopen("Coffee.toml", "w");
-	ASSERT(fp != nullptr, "create Coffee.toml");
-	fprintf_safe(fp, "[package]\n");
-	fprintf_safe(fp, "name = \"feattest\"\n");
-	fprintf_safe(fp, "version = \"1.0\"\n");
-	fprintf_safe(fp, "edition = \"c23\"\n");
-	fprintf_safe(fp, "[features]\n");
-	fprintf_safe(fp, "extra = []\n");
-	fclose(fp);
-
-	manifest_t *m = manifest_parse("Coffee.toml");
-	ASSERT(m != nullptr, "parse manifest");
-
-	sds          feats[] = { sdsnew("extra") };
-	build_opts_t opts    = {
-		.features       = feats,
-		.features_count = 1,
-	};
-
-	i64 ret = build_project(m, &opts);
-	ASSERT(ret == 0 || ret == 1, "build_project features");
-	manifest_free(m);
-	sdsfree(feats[0]);
-
-	teardown_build_test("features");
-	PASS();
-}
-
-/* build_run */
-TEST(cov_build_run_basic)
-{
-	setup_build_test("run");
-
-	mkdir("src", 0755);
-	FILE *fp = fopen("src/main.c", "w");
-	ASSERT(fp != nullptr, "create main.c");
-	fprintf_safe(fp, "int main(void) { return 0; }\n");
-	fclose(fp);
-
-	fp = fopen("Coffee.toml", "w");
-	ASSERT(fp != nullptr, "create Coffee.toml");
-	fprintf_safe(fp, "[package]\n");
-	fprintf_safe(fp, "name = \"runtest\"\n");
-	fprintf_safe(fp, "version = \"1.0\"\n");
-	fprintf_safe(fp, "edition = \"c23\"\n");
-	fclose(fp);
-
-	manifest_t *m = manifest_parse("Coffee.toml");
-	ASSERT(m != nullptr, "parse manifest");
-
-	build_opts_t opts = {};
-	i64          ret  = build_run(m, &opts, nullptr, 0);
-	ASSERT(ret == 0 || ret == 1, "build_run");
-	manifest_free(m);
-
-	teardown_build_test("run");
-	PASS();
-}
-
 void coffee_register_coverage_build_tests(void)
 {
 	TEST_REGISTER(cov_dep_resolve_dir_deps_local);
@@ -331,8 +162,4 @@ void coffee_register_coverage_build_tests(void)
 	TEST_REGISTER(cov_dep_parse_name_simple);
 	TEST_REGISTER(cov_dep_parse_name_no_version);
 	TEST_REGISTER(cov_dep_parse_name_path);
-	TEST_REGISTER(cov_build_project_locked);
-	TEST_REGISTER(cov_build_project_release);
-	TEST_REGISTER(cov_build_project_features);
-	TEST_REGISTER(cov_build_run_basic);
 }

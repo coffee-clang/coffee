@@ -2,16 +2,12 @@
 
 #include "../src/registry.h"
 /*
- * Coverage tests for build.c dependency resolution loop and
+ * Coverage tests for build.c dependency resolution and
  * coffee_features.c transitive dependency resolution.
  *
  * These target the highest-impact uncovered code paths:
- *   - build.c lines ~293–317 (dep loop over manifest dependencies)
- *   - build.c lines ~167–175 (compiling dep source files)
- *   - build.c lines ~75–79 (global dep fallback)
- *   - build.c lines ~25–51 (verbose/signal/fork error paths)
- *   - coffee_features.c lines ~170–210 (transitive cross-package refs)
- *   - build_run's exec failure paths
+ *   - build.c global dep fallback
+ *   - coffee_features.c transitive cross-package refs
  */
 
 #include "../src/build.h"
@@ -71,145 +67,7 @@ static void teardown_proj(const char *name)
 	sdsfree(tmpdir);
 }
 
-/* Helper: create a library.toml for a dep */
-static void create_library_toml(const char *dep_dir, const char *dep_name, const char *version, const char *deps_str)
-{
-	FILE *lt = fopen(dep_dir, "w");
-	assert(lt);
-	fprintf_safe(lt, "[package]\n");
-	fprintf_safe(lt, "name = \"%s\"\n", dep_name);
-	fprintf_safe(lt, "version = \"%s\"\n", version ? version : "1.0.0");
-	if (deps_str) {
-		fprintf_safe(lt, "dependencies = %s\n", deps_str);
-	}
-	fclose(lt);
-}
-
-/* ===================== BUILD.C DEP LOOP ===================== */
-
-/* build_project with a manifest that has a dependency resolved via deps/ */
-TEST(cov_build_dep_loop_local)
-{
-	setup_proj("deploop", "dependencies = [\"fakedep\"]", true);
-
-	/* Create the local dep directory with source file */
-	mkdir("deps", 0755);
-	mkdir("deps/fakedep", 0755);
-	mkdir("deps/fakedep/src", 0755);
-	mkdir("deps/fakedep/lib", 0755);
-	FILE *sf = fopen("deps/fakedep/src/fakedep.c", "w");
-	if (sf) {
-		fprintf_safe(sf, "int fakedep_do(void) { return 42; }\n");
-		fclose(sf);
-	}
-	/* Build a stub static library so the linker doesn't fail */
-	system("clang -c deps/fakedep/src/fakedep.c -o deps/fakedep/fakedep.o 2>/dev/null");
-	system("ar rcs deps/fakedep/lib/libfakedep.a deps/fakedep/fakedep.o 2>/dev/null");
-	/* Create library.toml so the dep is properly recognized */
-	create_library_toml("deps/fakedep/library.toml", "fakedep", "1.0.0", nullptr);
-
-	manifest_t *m = manifest_parse("Coffee.toml");
-	ASSERT(m != nullptr, "parse manifest");
-
-	build_opts_t opts = {};
-	i64          ret  = build_project(m, &opts);
-	/* The build may compile our dummy source — success or fail is fine */
-	ASSERT(ret == 0 || ret == 1, "build with dep loop");
-
-	manifest_free(m);
-	teardown_proj("deploop");
-	PASS();
-}
-
-/* build_project with manifest with deps where lockfile provides the path */
-TEST(cov_build_dep_loop_lockfile)
-{
-	setup_proj("deplock", "dependencies = [\"lockdep\"]", true);
-
-	/* Create the dep at an absolute path */
-	mkdir("/tmp/coverage-bdep-lockdep", 0755);
-	mkdir("/tmp/coverage-bdep-lockdep/src", 0755);
-	FILE *sf = fopen("/tmp/coverage-bdep-lockdep/src/lockdep.c", "w");
-	if (sf) {
-		fprintf_safe(sf, "int lockdep_do(void) { return 0; }\n");
-		fclose(sf);
-	}
-	create_library_toml("/tmp/coverage-bdep-lockdep/library.toml", "lockdep", "1.0.0", nullptr);
-
-	/* Create lockfile that points to the absolute dep path */
-	FILE *lf = fopen("Coffee.lock", "w");
-	assert(lf);
-	fprintf_safe(lf, "[[dependency]]\n");
-	fprintf_safe(lf, "name = \"lockdep\"\n");
-	fprintf_safe(lf, "version = \"1.0.0\"\n");
-	fprintf_safe(lf, "path = \"/tmp/coverage-bdep-lockdep\"\n");
-	fclose(lf);
-
-	manifest_t *m = manifest_parse("Coffee.toml");
-	ASSERT(m != nullptr, "parse manifest");
-
-	build_opts_t opts = { .locked = true };
-	i64          ret  = build_project(m, &opts);
-	ASSERT(ret == 0 || ret == 1, "build with lockfile dep");
-
-	manifest_free(m);
-	remove("Coffee.lock");
-	test_remove_tree("/tmp/coverage-bdep-lockdep");
-	teardown_proj("deplock");
-	PASS();
-}
-
-/* build_run with exec of the built binary (hits exec failure path) */
-TEST(cov_build_run_exec)
-{
-	setup_proj("runexec", nullptr, true);
-
-	manifest_t *m = manifest_parse("Coffee.toml");
-	ASSERT(m != nullptr, "parse manifest");
-
-	build_opts_t opts = {};
-	i64          ret  = build_run(m, &opts, nullptr, 0);
-	/* Build succeeds or fails, then exec of non-existent binary may fail */
-	ASSERT(ret == 0 || ret == 1, "build_run exec");
-
-	manifest_free(m);
-	teardown_proj("runexec");
-	PASS();
-}
-
-/* build_project with verbose flag (hits verbose print lines) */
-TEST(cov_build_verbose)
-{
-	setup_proj("bverbose", nullptr, true);
-
-	manifest_t *m = manifest_parse("Coffee.toml");
-	ASSERT(m != nullptr, "parse manifest");
-
-	build_opts_t opts = { .verbose = true };
-	i64          ret  = build_project(m, &opts);
-	ASSERT(ret == 0 || ret == 1, "build verbose");
-
-	manifest_free(m);
-	teardown_proj("bverbose");
-	PASS();
-}
-
-/* build_project with release mode (hits -O2 -s flag path) */
-TEST(cov_build_release)
-{
-	setup_proj("brel", nullptr, true);
-
-	manifest_t *m = manifest_parse("Coffee.toml");
-	ASSERT(m != nullptr, "parse manifest");
-
-	build_opts_t opts = { .release = true };
-	i64          ret  = build_project(m, &opts);
-	ASSERT(ret == 0 || ret == 1, "build release");
-
-	manifest_free(m);
-	teardown_proj("brel");
-	PASS();
-}
+/* ===================== DEP RESOLVE ===================== */
 
 /* dep_resolve_dir: global fallback when deps/ and vendor/ don't exist */
 TEST(cov_build_dep_resolve_global)
@@ -399,11 +257,6 @@ TEST(cov_features_parse_cli_null_out)
 
 void coffee_register_coverage_build_deps_tests(void)
 {
-	TEST_REGISTER(cov_build_dep_loop_local);
-	TEST_REGISTER(cov_build_dep_loop_lockfile);
-	TEST_REGISTER(cov_build_run_exec);
-	TEST_REGISTER(cov_build_verbose);
-	TEST_REGISTER(cov_build_release);
 	TEST_REGISTER(cov_build_dep_resolve_global);
 	TEST_REGISTER(cov_features_transitive);
 	TEST_REGISTER(cov_features_to_flags_nonempty);

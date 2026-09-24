@@ -77,13 +77,12 @@ static i64 create_symlink(const char *target, const char *link_path)
 	if (last_slash) {
 		*last_slash        = '\0';
 		char *mkdir_argv[] = { "mkdir", "-p", link_copy, nullptr };
-		sdsfree(link_copy);
 		if (run_command(mkdir_argv, 0) != 0) {
+			sdsfree(link_copy);
 			return -1;
 		}
-	} else {
-		sdsfree(link_copy);
 	}
+	sdsfree(link_copy);
 
 	if (symlink(target, link_path) != 0) {
 		return -1;

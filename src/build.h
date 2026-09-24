@@ -35,20 +35,6 @@ i64 run_command(char **argv, int flags);
  */
 sds run_command_capture(char **argv, int flags);
 
-typedef struct {
-	bool verbose;
-	bool release;
-	bool debug;
-	bool locked;
-
-	sds    target_dir;
-	i64    jobs;
-	sds   *features;
-	size_t features_count;
-	bool   all_features;
-	bool   no_default_features;
-} build_opts_t;
-
 /*
  * Compile a set of source files into a single binary.
  * src_files: array of .c file paths
@@ -60,9 +46,6 @@ typedef struct {
  * Returns 0 on success, non-zero on failure.
  */
 i64 compile_sources(sds *src_files, size_t n, sds output, char *cc, const char *flags_in, bool verbose);
-
-i64 build_project(manifest_t *manifest, build_opts_t *opts);
-i64 build_run(manifest_t *manifest, build_opts_t *opts, sds *args, i64 argc);
 
 /*
  * Resolve a dependency directory: check local deps/<name>/, vendor/<name>/,

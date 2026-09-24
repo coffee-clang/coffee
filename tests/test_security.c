@@ -1123,6 +1123,16 @@ TEST(install_replaces_regular_file)
 		}
 	}
 
+	/* Drop leftovers from an aborted previous run so the fixture is
+	 * re-created from scratch (fixed paths, like the sibling fetch
+	 * tests). */
+	{
+		char *clean_argv[] = { "rm", "-rf", "/tmp/coffee-test-install-replace-repo",
+			                   "/tmp/coffee-test-install-replace-proj", "/tmp/coffee-test-install-replace-home",
+			                   nullptr };
+		run_command(clean_argv, RUN_CMD_QUIET);
+	}
+
 	char old_cwd[4096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
 
@@ -1489,9 +1499,7 @@ TEST(fetch_root_flat_dep_warns)
 	ASSERT(ret == 1, "root flat dep with no source should fail");
 
 	lockfile_t *lf = lockfile_parse("Coffee.lock");
-	ASSERT(lf != nullptr, "Coffee.lock should parse");
-	ASSERT(lf->deps_count == 0, "no lockfile entry for an unfetchable dep");
-	lockfile_free(lf);
+	ASSERT(lf == nullptr, "no Coffee.lock written when the fetch failed");
 
 	/* Cleanup */
 	chdir(old_cwd);
@@ -1554,9 +1562,7 @@ TEST(fetch_symlink_failure_fails)
 	ASSERT(ret == 1, "fetch should fail when symlink cannot be created");
 
 	lockfile_t *lf = lockfile_parse("Coffee.lock");
-	ASSERT(lf != nullptr, "Coffee.lock should parse");
-	ASSERT(lf->deps_count == 0, "no lockfile entry when symlink failed");
-	lockfile_free(lf);
+	ASSERT(lf == nullptr, "no Coffee.lock written when the fetch failed");
 
 	/* Cleanup */
 	chdir(old_cwd);
@@ -1569,6 +1575,75 @@ TEST(fetch_symlink_failure_fails)
 		char *rm_argv[] = { "rm", "-rf", proj_dir, test_home, nullptr };
 		run_command(rm_argv, RUN_CMD_QUIET);
 	}
+	sdsfree(proj_dir);
+	sdsfree(test_home);
+	PASS();
+}
+
+/* A transitive dep with an invalid URL fails the fetch, leaves no lockfile,
+ * and does not loop forever. */
+TEST(fetch_transitive_invalid_url_fails)
+{
+	{
+		char *git_argv[] = { "git", "--version", nullptr };
+		if (run_command(git_argv, RUN_CMD_QUIET) != 0) {
+			printf("  (git not available, skipping)\n");
+			PASS();
+		}
+	}
+	char *clean_argv[] = { "rm", "-rf", "/tmp/coffee-test-ftr-repo", "/tmp/coffee-test-ftr-proj",
+		                   "/tmp/coffee-test-ftr-home", nullptr };
+	run_command(clean_argv, RUN_CMD_QUIET);
+
+	char old_cwd[4096];
+	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
+
+	sds repo_dir = sdsnew("/tmp/coffee-test-ftr-repo");
+	mkdir(repo_dir, 0755);
+	ASSERT(chdir(repo_dir) == 0, "chdir to repo failed");
+	FILE *fp = fopen("Coffee.toml", "w");
+	ASSERT(fp != nullptr, "fopen repo Coffee.toml failed");
+	fprintf_safe(fp, "[package]\nname = \"parent\"\nversion = \"1.0.0\"\nedition = \"c23\"\n");
+	/* 'http' is deliberately not an allowed scheme, so this must fail. */
+	fprintf_safe(fp, "\n[dependencies]\nnested = { git = \"http://127.0.0.1/nested.git\" }\n");
+	fclose(fp);
+	{
+		char *init_argv[] = { "git", "init", "-q", nullptr };
+		ASSERT(run_command(init_argv, RUN_CMD_QUIET) == 0, "git init failed");
+		char *add_argv[] = { "git", "add", "-A", nullptr };
+		ASSERT(run_command(add_argv, RUN_CMD_QUIET) == 0, "git add failed");
+		char *commit_argv[] = { "git", "-c", "user.email=test@test", "-c", "user.name=test", "commit", "-q", "-m",
+			                    "init", nullptr };
+		ASSERT(run_command(commit_argv, RUN_CMD_QUIET) == 0, "git commit failed");
+	}
+
+	sds test_home = sdsnew("/tmp/coffee-test-ftr-home");
+	mkdir(test_home, 0755);
+	const char *old_home = getenv("COFFEE_HOME");
+	setenv("COFFEE_HOME", test_home, 1);
+
+	sds proj_dir = sdsnew("/tmp/coffee-test-ftr-proj");
+	mkdir(proj_dir, 0755);
+	ASSERT(chdir(proj_dir) == 0, "chdir to project failed");
+	fp = fopen("Coffee.toml", "w");
+	ASSERT(fp != nullptr, "fopen project Coffee.toml failed");
+	fprintf_safe(fp, "[package]\nname = \"proj\"\nversion = \"1.0.0\"\nedition = \"c23\"\n");
+	fprintf_safe(fp, "\n[dependencies]\nparent = { git = \"%s\" }\n", repo_dir);
+	fclose(fp);
+
+	options opt = { .inputs = (char *[]){ "fetch" }, .inputs_num = 1 };
+	i64     ret = handle_fetch(&opt);
+	ASSERT(ret == 1, "invalid transitive URL should fail the fetch");
+	ASSERT(lockfile_parse("Coffee.lock") == nullptr, "no lockfile after a failed fetch");
+
+	chdir(old_cwd);
+	if (old_home != nullptr) {
+		setenv("COFFEE_HOME", old_home, 1);
+	} else {
+		unsetenv("COFFEE_HOME");
+	}
+	run_command(clean_argv, RUN_CMD_QUIET);
+	sdsfree(repo_dir);
 	sdsfree(proj_dir);
 	sdsfree(test_home);
 	PASS();
@@ -1604,6 +1679,7 @@ void coffee_register_security_tests(void)
 	TEST_REGISTER(install_rejects_traversal_version);
 	TEST_REGISTER(install_replaces_regular_file);
 	TEST_REGISTER(fetch_transitive_dep_no_lockfile_corruption);
+	TEST_REGISTER(fetch_transitive_invalid_url_fails);
 	TEST_REGISTER(fetch_root_flat_dep_warns);
 	TEST_REGISTER(fetch_symlink_failure_fails);
 	TEST_REGISTER(toolcheck_skips_non_build_commands);

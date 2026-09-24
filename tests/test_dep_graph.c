@@ -1400,11 +1400,9 @@ TEST(dep_graph_rev_pinned_fetch)
 	}
 	ASSERT(idx >= 0, "librev node present in graph");
 	ASSERT(g->nodes[idx].is_git, "librev node detected as git dep");
-	/* Leak-free only because this fixture repo has no [dependencies] table
-	 * of its own: dep_graph_create() leaves git_ref unset here. If a
-	 * manifest table were added to the fixture, free it before
-	 * dep_graph_free(). */
-	g->nodes[idx].git_ref = sdsnew(sha1_up);
+	/* git_ref now comes from the root manifest's inline table. */
+	ASSERT(g->nodes[idx].git_ref != nullptr && strcmp(g->nodes[idx].git_ref, sha1_up) == 0,
+	       "git_ref captured from the root manifest");
 
 	ASSERT(dep_graph_fetch_git(g, "librev", false) == 0, "fetch_git with rev succeeds");
 	ASSERT(dep_graph_commit(g, "librev") != nullptr && strcmp(dep_graph_commit(g, "librev"), sha1) == 0,
@@ -1426,6 +1424,186 @@ TEST(dep_graph_rev_pinned_fetch)
 	sdsfree(test_home);
 	sdsfree(repo_dir);
 	teardown_tmpdir("revpin");
+	PASS();
+}
+
+/* ===================== TRANSITIVE SOURCE CAPTURE (L2) ===================== */
+
+TEST(dep_graph_transitive_source_capture)
+{
+	setup_tmpdir("srcapture");
+	mkdir("src", 0755);
+	mkdir("deps", 0755);
+
+	/* libA declares libB as a git dep; libB is not materialized. */
+	create_dep("libA", "[dependencies]\nlibB = { git = \"/tmp/nonexistent-repo\" }\n");
+	write_manifest("srcapture", "dependencies = [\"libA\"]\n");
+
+	manifest_t *m = manifest_parse("Coffee.toml");
+	ASSERT(m != nullptr, "parse");
+
+	dep_graph_t *g = dep_graph_create(m, nullptr, false);
+	ASSERT(g != nullptr, "graph created");
+	ASSERT(dep_graph_count(g) == 3, "root + libA + libB");
+
+	i64 idx = dep_graph_find_node(g, "libB");
+	ASSERT(idx >= 0, "libB node present");
+	ASSERT(g->nodes[idx].git_url != nullptr, "libB git_url captured");
+	ASSERT(strcmp(g->nodes[idx].git_url, "/tmp/nonexistent-repo") == 0, "git_url value");
+	ASSERT(g->nodes[idx].path == nullptr, "libB not materialized");
+
+	dep_graph_free(g);
+	manifest_free(m);
+	teardown_tmpdir("srcapture");
+	PASS();
+}
+
+TEST(dep_graph_transitive_git_fetch)
+{
+	/* Requires git; skip (pass) when unavailable. */
+	{
+		char *git_argv[] = { "git", "--version", nullptr };
+		if (run_command(git_argv, RUN_CMD_QUIET) != 0) {
+			printf("  (git not available, skipping)\n");
+			PASS();
+		}
+	}
+
+	setup_tmpdir("transgit");
+	mkdir("src", 0755);
+	mkdir("deps", 0755);
+
+	char proj_cwd[4096];
+	ASSERT(getcwd(proj_cwd, sizeof(proj_cwd)) != nullptr, "getcwd failed");
+
+	/* Nested repo: a plain library with no deps of its own. */
+	sds nested_dir = sdsnew("nested-repo");
+	mkdir(nested_dir, 0755);
+	write_file("nested-repo/Coffee.toml",
+	           "[package]\nname = \"nested\"\nversion = \"1.0.0\"\nedition = \"c23\"\n");
+	{
+		char *init_argv[] = { "git", "-C", "nested-repo", "init", "-q", nullptr };
+		ASSERT(run_command(init_argv, RUN_CMD_QUIET) == 0, "git init nested failed");
+		char *add_argv[] = { "git", "-C", "nested-repo", "add", "-A", nullptr };
+		ASSERT(run_command(add_argv, RUN_CMD_QUIET) == 0, "git add nested failed");
+		char *commit_argv[] = { "git", "-C", "nested-repo", "-c", "user.email=test@test", "-c", "user.name=test",
+			                    "commit", "-q", "-m", "init", nullptr };
+		ASSERT(run_command(commit_argv, RUN_CMD_QUIET) == 0, "git commit nested failed");
+	}
+
+	/* Parent repo: declares the nested dep by git URL. */
+	sds   nested_url = sdscatprintf(sdsempty(), "%s/nested-repo", proj_cwd);
+	sds   parent_dir = sdsnew("parent-repo");
+	mkdir(parent_dir, 0755);
+	FILE *fp = fopen("parent-repo/Coffee.toml", "w");
+	ASSERT(fp != nullptr, "fopen parent Coffee.toml failed");
+	fprintf_safe(fp, "[package]\nname = \"parent\"\nversion = \"1.0.0\"\nedition = \"c23\"\n");
+	fprintf_safe(fp, "\n[dependencies]\nnested = { git = \"%s\" }\n", nested_url);
+	fclose(fp);
+	{
+		char *init_argv[] = { "git", "-C", "parent-repo", "init", "-q", nullptr };
+		ASSERT(run_command(init_argv, RUN_CMD_QUIET) == 0, "git init parent failed");
+		char *add_argv[] = { "git", "-C", "parent-repo", "add", "-A", nullptr };
+		ASSERT(run_command(add_argv, RUN_CMD_QUIET) == 0, "git add parent failed");
+		char *commit_argv[] = { "git", "-C", "parent-repo", "-c", "user.email=test@test", "-c", "user.name=test",
+			                    "commit", "-q", "-m", "init", nullptr };
+		ASSERT(run_command(commit_argv, RUN_CMD_QUIET) == 0, "git commit parent failed");
+	}
+
+	/* Sandbox COFFEE_HOME inside the tmpdir so teardown cleans it. */
+	sds         test_home = sdsnew("/tmp/depgraph-transgit/home");
+	mkdir(test_home, 0755);
+	const char *old_home = getenv("COFFEE_HOME");
+	setenv("COFFEE_HOME", test_home, 1);
+
+	/* Root manifest: parent = { git = <parent url> } */
+	sds parent_url = sdscatprintf(sdsempty(), "%s/parent-repo", proj_cwd);
+	fp = fopen("Coffee.toml", "w");
+	ASSERT(fp != nullptr, "fopen Coffee.toml failed");
+	fprintf_safe(fp, "[package]\nname = \"transgit\"\nversion = \"1.0.0\"\nedition = \"c23\"\n");
+	fprintf_safe(fp, "\n[dependencies]\nparent = { git = \"%s\" }\n", parent_url);
+	fclose(fp);
+
+	options opt = {
+		.inputs     = (char *[]){ "fetch" },
+		.inputs_num = 1,
+	};
+	ASSERT(handle_fetch(&opt) == 0, "fetch with transitive git dep should succeed");
+
+	/* Both deps materialized: deps/parent and deps/nested symlinks. */
+	ASSERT(safe_access("deps/parent", F_OK) == 0, "parent materialized");
+	ASSERT(safe_access("deps/nested", F_OK) == 0, "nested materialized");
+	ASSERT(safe_access("deps/nested/.git", F_OK) == 0, "nested is a git checkout");
+
+	/* Lockfile records both deps with commits. */
+	lockfile_t *lf = lockfile_parse("Coffee.lock");
+	ASSERT(lf != nullptr, "Coffee.lock should parse");
+	ASSERT(lf->deps_count == 2, "lockfile has both deps");
+	bool found_parent = false, found_nested = false;
+	for (size_t i = 0; i < lf->deps_count; i++) {
+		if (strcmp(lf->deps[i].name, "parent") == 0) {
+			found_parent = true;
+			ASSERT(lf->deps[i].commit != nullptr, "parent commit recorded");
+		}
+		if (strcmp(lf->deps[i].name, "nested") == 0) {
+			found_nested = true;
+			ASSERT(lf->deps[i].commit != nullptr, "nested commit recorded");
+		}
+	}
+	ASSERT(found_parent && found_nested, "both deps in lockfile");
+	lockfile_free(lf);
+
+	/* Cleanup */
+	if (old_home != nullptr) {
+		setenv("COFFEE_HOME", old_home, 1);
+	} else {
+		unsetenv("COFFEE_HOME");
+	}
+	sdsfree(parent_url);
+	sdsfree(nested_url);
+	sdsfree(parent_dir);
+	sdsfree(nested_dir);
+	sdsfree(test_home);
+	teardown_tmpdir("transgit");
+	PASS();
+}
+
+/* A transitive path dep inside its parent is captured; one that escapes
+ * (or is absolute) is rejected. */
+TEST(dep_graph_transitive_path_source)
+{
+	setup_tmpdir("tpath");
+	mkdir("src", 0755);
+	mkdir("deps", 0755);
+
+	/* libA ships a nested lib; the escape target sits outside libA. */
+	create_dep("libA",
+	           "[dependencies]\n"
+	           "inside = { path = \"./nested\" }\n"
+	           "escape = { path = \"../outside\" }\n"
+	           "absolute = { path = \"/etc\" }\n");
+	mkdir("deps/libA/nested", 0755);
+	mkdir("deps/outside", 0755);
+	write_manifest("tpath", "dependencies = [\"libA\"]\n");
+
+	manifest_t *m = manifest_parse("Coffee.toml");
+	ASSERT(m != nullptr, "parse");
+	dep_graph_t *g = dep_graph_create(m, nullptr, false);
+	ASSERT(g != nullptr, "graph created");
+
+	i64 inside = dep_graph_find_node(g, "inside");
+	ASSERT(inside >= 0 && g->nodes[inside].source_path != nullptr, "contained path captured");
+	ASSERT(strstr(g->nodes[inside].source_path, "/libA/nested") != nullptr, "resolved inside parent");
+
+	i64 esc = dep_graph_find_node(g, "escape");
+	ASSERT(esc >= 0 && g->nodes[esc].source_path == nullptr, "escaping path rejected");
+
+	i64 abs = dep_graph_find_node(g, "absolute");
+	ASSERT(abs >= 0 && g->nodes[abs].source_path == nullptr, "absolute path rejected");
+
+	dep_graph_free(g);
+	manifest_free(m);
+	teardown_tmpdir("tpath");
 	PASS();
 }
 
@@ -1466,4 +1644,7 @@ void coffee_register_dep_graph_tests(void)
 	TEST_REGISTER(dep_graph_version_from_coffee_toml);
 	TEST_REGISTER(ref_is_rev_unit);
 	TEST_REGISTER(dep_graph_rev_pinned_fetch);
+	TEST_REGISTER(dep_graph_transitive_source_capture);
+	TEST_REGISTER(dep_graph_transitive_git_fetch);
+	TEST_REGISTER(dep_graph_transitive_path_source);
 }

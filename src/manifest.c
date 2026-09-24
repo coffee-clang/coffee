@@ -148,6 +148,41 @@ static size_t array_nelem_safe(toml_array_t *arr)
 	return n > 0 ? (size_t)n : 0;
 }
 
+/* Parse the fields of a single dependency table (an inline table under
+ * [dependencies] or a [[dependencies]] entry) into dep.  The name must
+ * already be set by the caller. */
+static void parse_dep_fields(toml_table_t *tbl, dependency_t *dep)
+{
+	toml_datum_t v = toml_string_in(tbl, "version");
+	if (v.ok) {
+		dep->version = toml_datum_to_string(v);
+	}
+	toml_datum_t p = toml_string_in(tbl, "path");
+	if (p.ok) {
+		dep->path = toml_datum_to_string(p);
+	}
+	toml_datum_t g = toml_string_in(tbl, "git");
+	if (g.ok) {
+		dep->git = toml_datum_to_string(g);
+	}
+	toml_datum_t b = toml_string_in(tbl, "branch");
+	if (b.ok) {
+		dep->branch = toml_datum_to_string(b);
+	}
+	toml_datum_t t = toml_string_in(tbl, "tag");
+	if (t.ok) {
+		dep->tag = toml_datum_to_string(t);
+	}
+	toml_datum_t r = toml_string_in(tbl, "rev");
+	if (r.ok) {
+		dep->rev = toml_datum_to_string(r);
+	}
+	toml_datum_t opt = toml_bool_in(tbl, "optional");
+	if (opt.ok) {
+		dep->optional = opt.u.b != 0;
+	}
+}
+
 manifest_t *manifest_parse(sds path)
 {
 	FILE *fp = safe_fopen(path, "r");
@@ -196,17 +231,24 @@ manifest_t *manifest_parse(sds path)
 
 	toml_array_t *deps_arr = toml_array_in(conf, "dependencies");
 	if (deps_arr) {
-		m->package.dependencies_count = array_nelem_safe(deps_arr);
-		m->package.dependencies       = safe_calloc(m->package.dependencies_count, sizeof(sds));
-		if (m->package.dependencies == nullptr && m->package.dependencies_count > 0) {
+		/* String array (legacy) or [[dependencies]] array of tables.
+		 * Table elements are parsed into structured deps below. */
+		size_t n = array_nelem_safe(deps_arr);
+		m->package.dependencies = safe_calloc(n, sizeof(sds));
+		if (m->package.dependencies == nullptr && n > 0) {
 			manifest_free(m);
 			toml_free(conf);
 			return nullptr;
 		}
-		for (size_t i = 0; i < m->package.dependencies_count; i++) {
-			toml_datum_t dep           = toml_string_at(deps_arr, (i64)i);
-			m->package.dependencies[i] = toml_datum_to_string(dep);
+		size_t idx = 0;
+		for (size_t i = 0; i < n; i++) {
+			toml_datum_t dep = toml_string_at(deps_arr, (i64)i);
+			if (!dep.ok) {
+				continue; /* table element — handled by the structured parse */
+			}
+			m->package.dependencies[idx++] = toml_datum_to_string(dep);
 		}
+		m->package.dependencies_count = idx;
 	} else {
 		/* Also try table format: [dependencies]\nname = "version" */
 		toml_table_t *deps_table = toml_table_in(conf, "dependencies");
@@ -220,34 +262,38 @@ manifest_t *manifest_parse(sds path)
 				}
 				count++;
 			}
-			m->package.dependencies_count = count;
-			m->package.dependencies       = safe_calloc(count, sizeof(sds));
+			m->package.dependencies = safe_calloc(count, sizeof(sds));
 			if (m->package.dependencies == nullptr && count > 0) {
 				manifest_free(m);
 				toml_free(conf);
 				return nullptr;
 			}
 			size_t idx = 0;
-			/* Build "name = value" strings matching array format */
+			/* Build "name = value" strings matching array format.
+			 * Inline tables are parsed into structured deps below; any
+			 * other non-string value is dropped with a warning (a bare
+			 * key would be written back as invalid TOML). */
 			for (i64 i = 0; idx < count; i++) {
 				const char *key = toml_key_in(deps_table, i);
 				if (key == nullptr) {
 					break;
 				}
 				toml_datum_t val = toml_string_in(deps_table, key);
-				sds          str;
 				if (val.ok) {
 					sds vstr = toml_datum_to_string(val);
-					str      = sdscatfmt(sdsnew(key), " = \"%s\"", vstr);
+					m->package.dependencies[idx] = sdscatfmt(sdsnew(key), " = \"%s\"", vstr);
 					sdsfree(vstr);
-				} else {
-					str = sdsnew(key);
-				}
-				if (str) {
-					m->package.dependencies[idx] = str;
 					idx++;
+				} else if (toml_table_in(deps_table, key) != nullptr) {
+					/* Inline table — keep a bare-key remnant so commands
+					 * that walk the flat array still see the dep;
+					 * manifest_write skips it (matches a structured dep). */
+					m->package.dependencies[idx++] = sdsnew(key);
+				} else {
+					fprintf_safe(stderr, "Warning: skipping non-string dependency value for '%s'\n", key);
 				}
 			}
+			m->package.dependencies_count = idx;
 		}
 	}
 
@@ -404,31 +450,48 @@ manifest_t *manifest_parse(sds path)
 		}
 	}
 
-	/* Parse [dependencies] inline tables into structured dependency_t */
-	/* Parse [dependencies] inline tables into structured dependency_t */
+	/* Parse [dependencies] inline tables and [[dependencies]] array of
+	 * tables into structured dependency_t */
 	{
-		toml_table_t *dt = toml_table_in(conf, "dependencies");
+		toml_table_t *dt  = toml_table_in(conf, "dependencies");
+		toml_array_t *aot = nullptr;
+		if (dt == nullptr) {
+			toml_array_t *arr = toml_array_in(conf, "dependencies");
+			/* toml_table_at() on a value array would return a garbage
+			 * pointer, so check the array kind instead.  A 'm'ixed array
+			 * holds both: string elements are taken by the flat branch
+			 * above, table elements here. */
+			if (arr != nullptr && (toml_array_kind(arr) == 't' || toml_array_kind(arr) == 'm')) {
+				aot = arr;
+			}
+		}
+
+		size_t count = 0;
 		if (dt) {
-			size_t count = 0;
 			for (i64 ii = 0;; ii++) {
 				const char *key = toml_key_in(dt, ii);
 				if (key == nullptr) {
 					break;
 				}
 				/* Check if this key is an inline table (not a plain string) */
-				toml_table_t *inline_tbl = toml_table_in(dt, key);
-				if (inline_tbl) {
+				if (toml_table_in(dt, key) != nullptr) {
 					count++;
 				}
 			}
-			if (count > 0) {
-				m->dependencies.deps = safe_calloc(count, sizeof(dependency_t));
-				if (m->dependencies.deps == nullptr) {
-					manifest_free(m);
-					toml_free(conf);
-					return nullptr;
-				}
-				size_t idx = 0;
+		}
+		if (aot != nullptr) {
+			count += array_nelem_safe(aot);
+		}
+
+		if (count > 0) {
+			m->dependencies.deps = safe_calloc(count, sizeof(dependency_t));
+			if (m->dependencies.deps == nullptr) {
+				manifest_free(m);
+				toml_free(conf);
+				return nullptr;
+			}
+			size_t idx = 0;
+			if (dt) {
 				for (i64 ii = 0; idx < count; ii++) {
 					const char *key = toml_key_in(dt, ii);
 					if (key == nullptr) {
@@ -443,38 +506,34 @@ manifest_t *manifest_parse(sds path)
 						continue;
 					}
 					m->dependencies.deps[idx].name = sdsnew(key);
-					toml_datum_t v                 = toml_string_in(inline_tbl, "version");
-					if (v.ok) {
-						m->dependencies.deps[idx].version = toml_datum_to_string(v);
-					}
-					toml_datum_t p = toml_string_in(inline_tbl, "path");
-					if (p.ok) {
-						m->dependencies.deps[idx].path = toml_datum_to_string(p);
-					}
-					toml_datum_t g = toml_string_in(inline_tbl, "git");
-					if (g.ok) {
-						m->dependencies.deps[idx].git = toml_datum_to_string(g);
-					}
-					toml_datum_t b = toml_string_in(inline_tbl, "branch");
-					if (b.ok) {
-						m->dependencies.deps[idx].branch = toml_datum_to_string(b);
-					}
-					toml_datum_t t = toml_string_in(inline_tbl, "tag");
-					if (t.ok) {
-						m->dependencies.deps[idx].tag = toml_datum_to_string(t);
-					}
-					toml_datum_t r = toml_string_in(inline_tbl, "rev");
-					if (r.ok) {
-						m->dependencies.deps[idx].rev = toml_datum_to_string(r);
-					}
-					toml_datum_t opt = toml_bool_in(inline_tbl, "optional");
-					if (opt.ok) {
-						m->dependencies.deps[idx].optional = opt.u.b != 0;
-					}
+					parse_dep_fields(inline_tbl, &m->dependencies.deps[idx]);
 					idx++;
 				}
-				m->dependencies.deps_count = idx;
 			}
+			if (aot != nullptr) {
+				size_t n = array_nelem_safe(aot);
+				for (size_t i = 0; i < n; i++) {
+					toml_table_t *tbl = toml_table_at(aot, (i64)i);
+					if (tbl == nullptr) {
+						continue;
+					}
+					toml_datum_t nm = toml_string_in(tbl, "name");
+					if (!nm.ok) {
+						fprintf_safe(stderr, "Warning: skipping [[dependencies]] entry without a name\n");
+						continue;
+					}
+					sds name = toml_datum_to_string(nm);
+					if (!dep_name_is_valid(name)) {
+						fprintf_safe(stderr, "Warning: skipping invalid dependency name '%s'\n", name);
+						sdsfree(name);
+						continue;
+					}
+					m->dependencies.deps[idx].name = name;
+					parse_dep_fields(tbl, &m->dependencies.deps[idx]);
+					idx++;
+				}
+			}
+			m->dependencies.deps_count = idx;
 		}
 	}
 
@@ -717,7 +776,14 @@ i64 manifest_write(sds path, manifest_t *m)
 			if (structured) {
 				continue;
 			}
-			fprintf_safe(fp, "%s\n", m->package.dependencies[i]);
+			/* A valid name with no '=' is a bare key, which is not valid
+			 * TOML on its own; give it a wildcard constraint so the file
+			 * re-parses instead of corrupting the manifest. */
+			if (strchr(m->package.dependencies[i], '=') == nullptr) {
+				fprintf_safe(fp, "%s = \"*\"\n", m->package.dependencies[i]);
+			} else {
+				fprintf_safe(fp, "%s\n", m->package.dependencies[i]);
+			}
 		}
 	}
 

@@ -19,6 +19,6 @@ coffee run [options] [-- <args>...]
 
 ## Implementation Notes
 
-- First calls build_project()
-- Then executes the compiled binary
+- Requires a Makefile; builds with `make -C <project_dir> [RELEASE=1] [DEBUG=1] [-j<N>] [CFLAGS_EXTRA=...]`
+- Then executes the compiled binary from `build/debug/<name>` (or `--target-dir`)
 - Passes remaining arguments to the program

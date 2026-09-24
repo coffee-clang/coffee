@@ -30,7 +30,7 @@ static i64 dep_graph_cache_write(const dep_graph_t *g, const char *cache_path, i
 	fprintf_safe(fp, "[metadata]\n");
 	fprintf_safe(fp, "coffee_toml_mtime = %lld\n", (long long)toml_mtime);
 	fprintf_safe(fp, "coffee_lock_mtime = %lld\n", (long long)lock_mtime);
-	fprintf_safe(fp, "cache_version = 2\n");
+	fprintf_safe(fp, "cache_version = 3\n");
 	fprintf_safe(fp, "offline = %s\n", (int)g->offline ? "true" : "false");
 
 	for (size_t i = 0; i < g->count; i++) {
@@ -62,6 +62,16 @@ static i64 dep_graph_cache_write(const dep_graph_t *g, const char *cache_path, i
 		if (n->git_ref != nullptr) {
 			sds esc = toml_escape(n->git_ref);
 			fprintf_safe(fp, "git_ref = \"%s\"\n", esc);
+			sdsfree(esc);
+		}
+		if (n->git_url != nullptr) {
+			sds esc = toml_escape(n->git_url);
+			fprintf_safe(fp, "git_url = \"%s\"\n", esc);
+			sdsfree(esc);
+		}
+		if (n->source_path != nullptr) {
+			sds esc = toml_escape(n->source_path);
+			fprintf_safe(fp, "source_path = \"%s\"\n", esc);
 			sdsfree(esc);
 		}
 		if (n->flags != nullptr) {
@@ -130,7 +140,7 @@ static dep_graph_t *dep_graph_load_cached(const char *cache_path, i64 toml_mtime
 	}
 
 	toml_datum_t cached_ver = toml_int_in(meta, "cache_version");
-	if (!cached_ver.ok || cached_ver.u.i != 2) {
+	if (!cached_ver.ok || cached_ver.u.i != 3) {
 		toml_free(conf);
 		return nullptr;
 	}
@@ -229,6 +239,18 @@ static dep_graph_t *dep_graph_load_cached(const char *cache_path, i64 toml_mtime
 		if (ref_d.ok) {
 			g->nodes[i].git_ref = sdsnew(ref_d.u.s);
 			safe_free(ref_d.u.s);
+		}
+
+		toml_datum_t url_d = toml_string_in(ntbl, "git_url");
+		if (url_d.ok) {
+			g->nodes[i].git_url = sdsnew(url_d.u.s);
+			safe_free(url_d.u.s);
+		}
+
+		toml_datum_t sp_d = toml_string_in(ntbl, "source_path");
+		if (sp_d.ok) {
+			g->nodes[i].source_path = sdsnew(sp_d.u.s);
+			safe_free(sp_d.u.s);
 		}
 
 		toml_datum_t flags_d = toml_string_in(ntbl, "flags");

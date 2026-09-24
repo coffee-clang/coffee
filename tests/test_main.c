@@ -38,6 +38,7 @@ void coffee_register_version_tests(void);
 void coffee_register_dep_graph_tests(void);
 void coffee_register_new_init_tests(void);
 void coffee_register_security_tests(void);
+void coffee_register_manifest_deps_tests(void);
 
 /* Remove a file/dir tree (used to clean up the per-run COFFEE_HOME). */
 static int remove_tree_entry(const char *path, const struct stat *st, int type, struct FTW *ftw)
@@ -109,6 +110,7 @@ int main(int argc, char **argv)
 	coffee_register_dep_graph_tests();
 	coffee_register_new_init_tests();
 	coffee_register_security_tests();
+	coffee_register_manifest_deps_tests();
 
 	if (verbose) {
 		printf("Registered %lu tests\n", (unsigned long)test_framework_count);

@@ -18,32 +18,85 @@
 /* ------------------------------------------------------------------ */
 
 /*
- * Extract version constraint from a TOML table entry.
- * The value at key can be:
- *   - a plain string (e.g. ">= 2.0")  -> return it
- *   - an inline table with a "version" field (e.g. { version = ">= 2.0" }) -> return the version
- * Returns an sds the caller must free, or nullptr.
+ * Find a structured dependency by name, or nullptr.
  */
-static sds get_toml_constraint(toml_table_t *table, const char *key)
+static const dependency_t *find_manifest_dep(const manifest_t *m, const char *name)
 {
-	toml_datum_t str_val = toml_string_in(table, key);
-	if (str_val.ok) {
-		sds result = sdsnew(str_val.u.s);
-		safe_free(str_val.u.s);
-		return result;
-	}
-
-	toml_table_t *inline_tbl = toml_table_in(table, key);
-	if (inline_tbl != nullptr) {
-		toml_datum_t ver = toml_string_in(inline_tbl, "version");
-		if (ver.ok) {
-			sds result = sdsnew(ver.u.s);
-			safe_free(ver.u.s);
-			return result;
+	for (size_t i = 0; i < m->dependencies.deps_count; i++) {
+		if (m->dependencies.deps[i].name != nullptr && strcmp(m->dependencies.deps[i].name, name) == 0) {
+			return &m->dependencies.deps[i];
 		}
 	}
-
 	return nullptr;
+}
+
+/*
+ * True when child_path lies inside parent_dir (both realpath()-resolved).
+ * A transitive path dependency may only point inside its own parent's
+ * directory tree; anything else would let a third-party manifest symlink
+ * an arbitrary location into deps/.  An exact match counts as inside.
+ */
+static bool path_within(const char *parent_dir, const char *child_path)
+{
+	size_t plen = strlen(parent_dir);
+	if (strncmp(parent_dir, child_path, plen) != 0) {
+		return false;
+	}
+	return child_path[plen] == '\0' || child_path[plen] == '/';
+}
+
+/*
+ * Copy a structured dependency's git/path source into a graph node.
+ *
+ * parent_dir is nullptr for a root (user-authored, trusted) dependency, and
+ * the materialized directory of the declaring dependency otherwise.  A
+ * transitive path dependency is resolved against its parent and rejected
+ * unless it stays inside that parent's directory; a root absolute path is
+ * kept verbatim.
+ */
+static void apply_dep_source(dep_node_t *node, const dependency_t *sd, const char *dep_name, const char *parent_dir)
+{
+	if (sd->git != nullptr) {
+		node->git_url = sdsnew(sd->git);
+		if (sd->tag != nullptr) {
+			node->git_ref = sdsnew(sd->tag);
+		} else if (sd->branch != nullptr) {
+			node->git_ref = sdsnew(sd->branch);
+		} else if (sd->rev != nullptr) {
+			node->git_ref = sdsnew(sd->rev);
+		}
+		return;
+	}
+	if (sd->path == nullptr) {
+		return;
+	}
+	if (parent_dir == nullptr && sd->path[0] == '/') {
+		node->source_path = sdsnew(sd->path);
+		return;
+	}
+
+	const char *base = parent_dir != nullptr ? parent_dir : ".";
+	sds         full = sdscatprintf(sdsempty(), "%s/%s", base, sd->path);
+	char       *real = realpath(full, nullptr);
+	sdsfree(full);
+
+	if (real == nullptr) {
+		fprintf_safe(stderr, "Warning: path '%s' for '%s' does not exist\n", sd->path, dep_name);
+		return;
+	}
+	if (parent_dir != nullptr) {
+		char *base_real = realpath(parent_dir, nullptr);
+		bool  inside    = base_real != nullptr && path_within(base_real, real);
+		safe_free(base_real);
+		if (!inside) {
+			fprintf_safe(stderr, "Warning: transitive path '%s' for '%s' escapes its parent -- ignored\n", sd->path,
+			             dep_name);
+			safe_free(real);
+			return;
+		}
+	}
+	node->source_path = sdsnew(real);
+	safe_free(real);
 }
 
 /*
@@ -144,49 +197,45 @@ static i64 add_node(dep_graph_t *g, const char *name)
 }
 
 /*
- * Read [dependencies] from a library.toml or Coffee.toml file.
- * Returns the toml_table_t for dependencies (borrowed from conf).
- * The caller must free conf via toml_free().
+ * Register a dependency declared in `requester`'s manifest.  Validates or
+ * adds the node, records its version constraint, and copies its git/path
+ * source (sd may be nullptr for a flat version string).  parent_dir is
+ * nullptr for the root manifest and the declaring dep's directory for a
+ * transitive dependency.  Returns 0 on success, -1 on allocation failure.
  */
-static toml_table_t *dep_graph_read_table(const char *dep_dir, toml_table_t **out_conf)
+static i64 register_dep(dep_graph_t *g, const char *requester, const char *name, const char *constraint,
+                        const dependency_t *sd, const char *parent_dir)
 {
-	*out_conf = nullptr;
-
-	sds   toml_path = sdscatprintf(sdsempty(), "%s/Coffee.toml", dep_dir);
-	FILE *fp        = safe_fopen(toml_path, "r");
-	if (fp == nullptr) {
-		sdsfree(toml_path);
-		toml_path = sdscatprintf(sdsempty(), "%s/library.toml", dep_dir);
-		fp        = safe_fopen(toml_path, "r");
-		if (fp == nullptr) {
-			sdsfree(toml_path);
-			return nullptr;
+	i64 existing = dep_graph_find_node(g, name);
+	if (existing >= 0) {
+		if (constraint != nullptr && g->nodes[existing].version != nullptr &&
+		    !version_satisfies(g->nodes[existing].version, constraint)) {
+			fprintf_safe(stderr, "Warning: %s requires %s %s but %s is resolved\n", requester, name, constraint,
+			             g->nodes[existing].version);
 		}
+		return 0;
 	}
-	sdsfree(toml_path);
-
-	char          errbuf[256];
-	toml_table_t *conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
-	safe_fclose(fp);
-
-	if (conf == nullptr) {
-		return nullptr;
+	if (!dep_name_is_valid(name)) {
+		fprintf_safe(stderr, "Warning: skipping invalid dependency name '%s'\n", name);
+		return 0;
 	}
-
-	toml_table_t *deps = toml_table_in(conf, "dependencies");
-	if (deps == nullptr) {
-		toml_free(conf);
-		return nullptr;
+	i64 child_idx = add_node(g, name);
+	if (child_idx < 0) {
+		return -1;
 	}
-
-	*out_conf = conf;
-	return deps;
+	if (constraint != nullptr) {
+		g->nodes[child_idx].version_constraint = sdsnew(constraint);
+	}
+	if (sd != nullptr) {
+		apply_dep_source(&g->nodes[child_idx], sd, name, parent_dir);
+	}
+	return 0;
 }
 
 /*
  * Read the version from a dep directory's manifest.  Prefers
- * library.toml, falling back to Coffee.toml (as dep_graph_read_table()
- * does) so Coffee.toml-only deps report a real version instead of "*".
+ * library.toml, falling back to Coffee.toml, so Coffee.toml-only deps
+ * report a real version instead of "*".
  */
 static sds read_version(const char *dep_dir)
 {
@@ -224,70 +273,6 @@ static sds read_version(const char *dep_dir)
 	}
 	toml_free(conf);
 	return result;
-}
-
-/*
- * Get a git ref from a dep's manifest inline table.
- * Checks tag, branch, rev in that order of precedence.
- */
-static sds get_git_ref_from_manifest(const char *dep_dir)
-{
-	sds   toml_path = sdscatprintf(sdsempty(), "%s/Coffee.toml", dep_dir);
-	FILE *fp        = safe_fopen(toml_path, "r");
-	if (fp == nullptr) {
-		sdsfree(toml_path);
-		toml_path = sdscatprintf(sdsempty(), "%s/library.toml", dep_dir);
-		fp        = safe_fopen(toml_path, "r");
-		if (fp == nullptr) {
-			sdsfree(toml_path);
-			return nullptr;
-		}
-	}
-	sdsfree(toml_path);
-
-	char          errbuf[256];
-	toml_table_t *conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
-	safe_fclose(fp);
-
-	if (conf == nullptr) {
-		return nullptr;
-	}
-
-	toml_table_t *deps = toml_table_in(conf, "dependencies");
-	sds           ref  = nullptr;
-	if (deps) {
-		/* Look through each dep for the inline table */
-		for (i64 i = 0;; i++) {
-			const char *key = toml_key_in(deps, i);
-			if (key == nullptr) {
-				break;
-			}
-			toml_table_t *tbl = toml_table_in(deps, key);
-			if (tbl == nullptr) {
-				continue;
-			}
-			toml_datum_t tag = toml_string_in(tbl, "tag");
-			if (tag.ok) {
-				ref = sdsnew(tag.u.s);
-				safe_free(tag.u.s);
-				break;
-			}
-			toml_datum_t branch = toml_string_in(tbl, "branch");
-			if (branch.ok) {
-				ref = sdsnew(branch.u.s);
-				safe_free(branch.u.s);
-				break;
-			}
-			toml_datum_t rev = toml_string_in(tbl, "rev");
-			if (rev.ok) {
-				ref = sdsnew(rev.u.s);
-				safe_free(rev.u.s);
-				break;
-			}
-		}
-	}
-	toml_free(conf);
-	return ref;
 }
 
 /*
@@ -387,11 +372,6 @@ dep_graph_t *dep_graph_create(manifest_t *m, lockfile_t *lf, bool offline)
 			sds git_dir = sdscatprintf(sdsempty(), "%s/.git", dep_dir);
 			if (safe_access(git_dir, F_OK) == 0) {
 				cur->is_git = true;
-				/* Get the git ref from the manifest (branch/tag/rev) */
-				sds ref = get_git_ref_from_manifest(dep_dir);
-				if (ref != nullptr) {
-					cur->git_ref = ref;
-				}
 			}
 			sdsfree(git_dir);
 
@@ -404,116 +384,99 @@ dep_graph_t *dep_graph_create(manifest_t *m, lockfile_t *lf, bool offline)
 			collect_sources(dep_dir, &cur->sources, &cur->src_count);
 		}
 
-		/* Read transitive dependencies from dep's manifest */
+		/* Read transitive dependencies from the dep's manifest, using the
+		 * full manifest parser so inline tables and [[dependencies]] are
+		 * both understood. */
 		if (dep_dir != nullptr) {
-			toml_table_t *dep_conf        = nullptr;
-			toml_table_t *transitive_deps = dep_graph_read_table(dep_dir, &dep_conf);
-			if (transitive_deps) {
-				for (i64 i = 0;; i++) {
-					const char *dep_key = toml_key_in(transitive_deps, i);
-					if (dep_key == nullptr) {
-						break;
-					}
-					/* Skip self-references */
-					if (cur_name != nullptr && strcmp(dep_key, cur_name) == 0) {
-						continue;
-					}
-					/* Extract version constraint for this dep */
-					sds constraint = get_toml_constraint(transitive_deps, dep_key);
+			sds manifest_path = sdscatprintf(sdsempty(), "%s/Coffee.toml", dep_dir);
+			if (safe_access(manifest_path, F_OK) != 0) {
+				sdsfree(manifest_path);
+				manifest_path = sdscatprintf(sdsempty(), "%s/library.toml", dep_dir);
+			}
+			manifest_t *dm = manifest_parse(manifest_path);
+			sdsfree(manifest_path);
 
-					/* Check if already in graph — validate version constraint */
-					i64 existing = dep_graph_find_node(g, dep_key);
-					if (existing >= 0) {
-						if (constraint != nullptr && g->nodes[existing].version != nullptr) {
-							if (!version_satisfies(g->nodes[existing].version, constraint)) {
-								fprintf_safe(stderr, "Warning: %s requires %s %s but %s is resolved\n",
-								             cur_name != nullptr ? cur_name : "(root)", dep_key, constraint,
-								             g->nodes[existing].version);
-							}
-						}
-						sdsfree(constraint);
+			if (dm != nullptr) {
+				const char *requester = cur_name != nullptr ? cur_name : "(root)";
+				/* Flat strings: "name = \"1.0\"" or a bare "name". */
+				for (size_t i = 0; i < dm->package.dependencies_count; i++) {
+					sds dep_name = dep_parse_name(dm->package.dependencies[i]);
+					if (dep_name == nullptr) {
 						continue;
 					}
-					if (!dep_name_is_valid(dep_key)) {
-						fprintf_safe(stderr, "Warning: skipping invalid dependency name '%s'\n", dep_key);
-						sdsfree(constraint);
+					if (cur_name != nullptr && strcmp(dep_name, cur_name) == 0) {
+						sdsfree(dep_name);
 						continue;
 					}
-					/* Add as a new node */
-					i64 child_idx = add_node(g, dep_key);
-					if (child_idx < 0) {
-						sdsfree(constraint);
-						toml_free(dep_conf);
+					const dependency_t *sd = find_manifest_dep(dm, dep_name);
+					sds constraint = sd != nullptr && sd->version != nullptr
+					                     ? sdsnew(sd->version)
+					                     : dep_extract_constraint(dm->package.dependencies[i]);
+					i64 bad = register_dep(g, requester, dep_name, constraint, sd, dep_dir);
+					sdsfree(constraint);
+					sdsfree(dep_name);
+					if (bad != 0) {
+						manifest_free(dm);
 						sdsfree(dep_dir);
 						dep_graph_free(g);
 						return nullptr;
 					}
-					if (constraint != nullptr) {
-						g->nodes[child_idx].version_constraint = constraint;
+				}
+				/* Structured entries (inline tables and [[dependencies]]). */
+				for (size_t j = 0; j < dm->dependencies.deps_count; j++) {
+					dependency_t *sd = &dm->dependencies.deps[j];
+					if (sd->name == nullptr) {
+						continue;
+					}
+					if (cur_name != nullptr && strcmp(sd->name, cur_name) == 0) {
+						continue;
+					}
+					if (register_dep(g, requester, sd->name, sd->version, sd, dep_dir) != 0) {
+						manifest_free(dm);
+						sdsfree(dep_dir);
+						dep_graph_free(g);
+						return nullptr;
 					}
 				}
-				toml_free(dep_conf);
+				manifest_free(dm);
 			}
 		}
 
 		/* For root (dep_cursor == 1 after increment), also process root's own deps */
 		if (dep_cursor == 1) {
-			/* Process root manifest's dependencies */
+			const char *requester = m->package.name != nullptr ? m->package.name : "(root)";
+
+			/* Flat dependencies.  An inline-table dep also has a bare-key
+			 * remnant here, which is how its git/path source reaches the
+			 * node (apply_dep_source below). */
 			for (size_t i = 0; i < m->package.dependencies_count; i++) {
 				sds dep_name = dep_parse_name(m->package.dependencies[i]);
 				if (dep_name == nullptr) {
 					continue;
 				}
-
-				/* Extract version constraint from raw string or structured deps */
-				sds constraint = nullptr;
-				/* Check structured deps for inline table version */
-				for (size_t j = 0; j < m->dependencies.deps_count; j++) {
-					if (m->dependencies.deps[j].name != nullptr &&
-					    strcmp(m->dependencies.deps[j].name, dep_name) == 0) {
-						if (m->dependencies.deps[j].version != nullptr) {
-							constraint = sdsnew(m->dependencies.deps[j].version);
-						}
-						break;
-					}
-				}
-				if (constraint == nullptr) {
-					constraint = dep_extract_constraint(m->package.dependencies[i]);
-				}
-
-				/* Check if already in graph — validate version constraint */
-				i64 existing = dep_graph_find_node(g, dep_name);
-				if (existing >= 0) {
-					if (constraint != nullptr && g->nodes[existing].version != nullptr) {
-						if (!version_satisfies(g->nodes[existing].version, constraint)) {
-							fprintf_safe(stderr, "Warning: %s requires %s %s but %s is resolved\n",
-							             m->package.name != nullptr ? m->package.name : "(root)", dep_name, constraint,
-							             g->nodes[existing].version);
-						}
-					}
-					sdsfree(constraint);
-					sdsfree(dep_name);
-					continue;
-				}
-
-				if (!dep_name_is_valid(dep_name)) {
-					fprintf_safe(stderr, "Warning: skipping invalid dependency name '%s'\n", dep_name);
-					sdsfree(constraint);
-					sdsfree(dep_name);
-					continue;
-				}
-
-				i64 child_idx = add_node(g, dep_name);
-				if (child_idx < 0) {
-					sdsfree(constraint);
-					sdsfree(dep_name);
+				const dependency_t *sd = find_manifest_dep(m, dep_name);
+				sds constraint = sd != nullptr && sd->version != nullptr
+				                     ? sdsnew(sd->version)
+				                     : dep_extract_constraint(m->package.dependencies[i]);
+				i64 bad = register_dep(g, requester, dep_name, constraint, sd, nullptr);
+				sdsfree(constraint);
+				sdsfree(dep_name);
+				if (bad != 0) {
 					dep_graph_free(g);
 					return nullptr;
 				}
-				if (constraint != nullptr) {
-					g->nodes[child_idx].version_constraint = constraint;
+			}
+
+			/* Structured entries with no flat remnant ([[dependencies]]). */
+			for (size_t j = 0; j < m->dependencies.deps_count; j++) {
+				dependency_t *sd = &m->dependencies.deps[j];
+				if (sd->name == nullptr) {
+					continue;
 				}
-				sdsfree(dep_name);
+				if (register_dep(g, requester, sd->name, sd->version, sd, nullptr) != 0) {
+					dep_graph_free(g);
+					return nullptr;
+				}
 			}
 		}
 
@@ -535,6 +498,8 @@ void dep_graph_free(dep_graph_t *g)
 		sdsfree(g->nodes[i].version_constraint);
 		sdsfree(g->nodes[i].commit);
 		sdsfree(g->nodes[i].git_ref);
+		sdsfree(g->nodes[i].git_url);
+		sdsfree(g->nodes[i].source_path);
 		sdsfree(g->nodes[i].flags);
 		for (size_t j = 0; j < g->nodes[i].src_count; j++) {
 			sdsfree(g->nodes[i].sources[j]);

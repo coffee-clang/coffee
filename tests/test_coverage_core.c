@@ -1,6 +1,6 @@
 #include "safe.h"
 /*
- * Coverage tests for core modules: build, project, registry, install,
+ * Coverage tests for core modules: project, registry, install,
  * cflags, libs — targeting uncovered code paths.
  */
 
@@ -95,134 +95,6 @@ TEST(cov_project_find_manifest_missing)
 {
 	sds path = project_find_manifest("/nonexistent-dir-xyzzy");
 	ASSERT(path == nullptr, "no manifest found");
-	PASS();
-}
-
-/* ======================== BUILD ======================== */
-
-/* build_project — debug mode */
-TEST(cov_build_debug)
-{
-	setup_proj("bdebug", nullptr, true);
-	manifest_t *m = manifest_parse("Coffee.toml");
-	ASSERT(m != nullptr, "parse");
-
-	build_opts_t opts = { .debug = true };
-	i64          ret  = build_project(m, &opts);
-	ASSERT(ret == 0 || ret == 1, "build debug ok");
-	manifest_free(m);
-	teardown_proj("bdebug");
-	PASS();
-}
-
-/* build_project — null manifest */
-TEST(cov_build_null_manifest)
-{
-	i64 ret = build_project(nullptr, nullptr);
-	ASSERT(ret != 0, "null manifest should fail");
-	PASS();
-}
-
-/* build_project — locked without lockfile */
-TEST(cov_build_locked_no_lockfile)
-{
-	setup_proj("nolock", nullptr, true);
-	manifest_t *m = manifest_parse("Coffee.toml");
-	ASSERT(m != nullptr, "parse");
-
-	build_opts_t opts = { .locked = true };
-	i64          ret  = build_project(m, &opts);
-	ASSERT(ret != 0, "locked without lockfile should fail");
-	manifest_free(m);
-	teardown_proj("nolock");
-	PASS();
-}
-
-/* build_project — stale lockfile */
-TEST(cov_build_stale_lockfile)
-{
-	setup_proj("stale", nullptr, false);
-	/* Create lockfile first */
-	FILE *lf = fopen("Coffee.lock", "w");
-	assert(lf);
-	fprintf_safe(lf, "version = \"1\"\n");
-	fclose(lf);
-
-	/* Wait and update Coffee.toml to be newer */
-	sleep(1);
-	FILE *fp = fopen("Coffee.toml", "a");
-	assert(fp);
-	fprintf_safe(fp, "# stale marker\n");
-	fclose(fp);
-
-	manifest_t *m = manifest_parse("Coffee.toml");
-	ASSERT(m != nullptr, "parse");
-
-	build_opts_t opts = { .locked = true };
-	i64          ret  = build_project(m, &opts);
-	ASSERT(ret != 0, "stale lockfile should fail");
-	manifest_free(m);
-	remove("Coffee.lock");
-	teardown_proj("stale");
-	PASS();
-}
-
-/* build_project — all_features */
-TEST(cov_build_all_features)
-{
-	setup_proj("allf", "features = { extra = [] }\n", true);
-	manifest_t *m = manifest_parse("Coffee.toml");
-	ASSERT(m != nullptr, "parse");
-
-	build_opts_t opts = { .all_features = true };
-	i64          ret  = build_project(m, &opts);
-	ASSERT(ret == 0 || ret == 1, "build all_features ok");
-	manifest_free(m);
-	teardown_proj("allf");
-	PASS();
-}
-
-/* build_project — no source files error */
-TEST(cov_build_no_sources)
-{
-	setup_proj("nosrc", nullptr, false);
-	/* Remove the src directory we just created */
-	rmdir("src");
-
-	manifest_t *m = manifest_parse("Coffee.toml");
-	ASSERT(m != nullptr, "parse");
-
-	build_opts_t opts = {};
-	i64          ret  = build_project(m, &opts);
-	ASSERT(ret != 0, "no sources should fail");
-	manifest_free(m);
-	teardown_proj("nosrc");
-	PASS();
-}
-
-/* build_run — with args */
-TEST(cov_build_run_with_args)
-{
-	setup_proj("runargs", nullptr, true);
-	manifest_t *m = manifest_parse("Coffee.toml");
-	ASSERT(m != nullptr, "parse");
-
-	sds          args[] = { sdsnew("--help") };
-	build_opts_t opts   = {};
-	i64          ret    = build_run(m, &opts, args, 1);
-	ASSERT(ret == 0 || ret == 1, "build_run with args");
-	manifest_free(m);
-	sdsfree(args[0]);
-	teardown_proj("runargs");
-	PASS();
-}
-
-/* build_run — with failure (build_project fails first) */
-TEST(cov_build_run_no_project)
-{
-	build_opts_t opts = {};
-	i64          ret  = build_run(nullptr, &opts, nullptr, 0);
-	ASSERT(ret != 0, "build_run with null manifest should fail");
 	PASS();
 }
 
@@ -477,14 +349,6 @@ void coffee_register_coverage_core_tests(void)
 	TEST_REGISTER(cov_project_find_manifest);
 	TEST_REGISTER(cov_project_get_name);
 	TEST_REGISTER(cov_project_find_manifest_missing);
-	TEST_REGISTER(cov_build_debug);
-	TEST_REGISTER(cov_build_null_manifest);
-	TEST_REGISTER(cov_build_locked_no_lockfile);
-	TEST_REGISTER(cov_build_stale_lockfile);
-	TEST_REGISTER(cov_build_all_features);
-	TEST_REGISTER(cov_build_no_sources);
-	TEST_REGISTER(cov_build_run_with_args);
-	TEST_REGISTER(cov_build_run_no_project);
 	TEST_REGISTER(cov_dep_resolve_global);
 	TEST_REGISTER(cov_registry_home_dir);
 	TEST_REGISTER(cov_registry_free_recipe_null);

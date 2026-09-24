@@ -25,10 +25,20 @@ int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size)
 	write((int)fd, Data, Size);
 	close((int)fd);
 
-	/* Parse the manifest */
+	/* Parse the manifest, then round-trip it through manifest_write so
+	 * the writer is exercised on arbitrary (possibly hostile) input. */
 	sds         path = sdsnew(template);
 	manifest_t *m    = manifest_parse(path);
 	if (m) {
+		sds out_path = sdsnew(template);
+		out_path     = sdscat(out_path, ".out");
+		manifest_write(out_path, m);
+		manifest_t *m2 = manifest_parse(out_path);
+		if (m2) {
+			manifest_free(m2);
+		}
+		unlink(out_path);
+		sdsfree(out_path);
 		manifest_free(m);
 	}
 	sdsfree(path);
