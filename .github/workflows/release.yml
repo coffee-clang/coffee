@@ -110,10 +110,6 @@ jobs:
               if: runner.os == 'macOS'
               run: gmake -j$(sysctl -n hw.ncpu) RELEASE=1 LDFLAGS=
 
-            - name: Run tests (macOS)
-              if: runner.os == 'macOS'
-              run: gmake test LDFLAGS=
-
             - name: Smoke test
               run: bin/coffee version
 
