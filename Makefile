@@ -235,6 +235,7 @@ FUZZ_BINS := $(FUZZ_SRCS:fuzz/fuzz_%.c=$(FUZZ_DIR)/fuzz_%)
 
 FUZZ_SUPPORT_FILE := $(FUZZ_DIR)/fuzz_support_unity.c
 FUZZ_SUPPORT_OBJ  := $(FUZZ_DIR)/fuzz_support_unity.o
+FUZZ_COFFEE_OBJ   := $(FUZZ_DIR)/coffee_fuzz_support.o
 
 # Same sources as test support (all project code minus coffee.c main())
 FUZZ_SUPPORT_SRCS := $(TEST_SUPPORT_SRCS)
@@ -275,9 +276,13 @@ $(FUZZ_SUPPORT_FILE): $(FUZZ_SUPPORT_SRCS)
 $(FUZZ_SUPPORT_OBJ): $(FUZZ_SUPPORT_FILE) $(SKELETONS_H)
 	$(CC) $(FUZZ_CFLAGS) -c $(FUZZ_SUPPORT_FILE) -o $@
 
-$(FUZZ_DIR)/fuzz_%: fuzz/fuzz_%.c $(FUZZ_SUPPORT_OBJ)
+$(FUZZ_COFFEE_OBJ): $(SRC_DIR)/coffee.c
 	@mkdir -p $(FUZZ_DIR)
-	$(CC) $(FUZZ_CFLAGS) -fsanitize=fuzzer,address $< $(FUZZ_SUPPORT_OBJ) -o $@
+	$(CC) $(FUZZ_CFLAGS) -DCOFFEE_TEST_RUNNER -c $< -o $@
+
+$(FUZZ_DIR)/fuzz_%: fuzz/fuzz_%.c $(FUZZ_SUPPORT_OBJ) $(FUZZ_COFFEE_OBJ)
+	@mkdir -p $(FUZZ_DIR)
+	$(CC) $(FUZZ_CFLAGS) -fsanitize=fuzzer,address $< $(FUZZ_SUPPORT_OBJ) $(FUZZ_COFFEE_OBJ) -o $@
 
 fuzz: $(FUZZ_BINS)
 
