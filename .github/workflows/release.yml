@@ -1,0 +1,214 @@
+name: Release
+
+on:
+    push:
+        tags: ["v*"]
+    # Manual runs must target a tag ref (see the `guard` job below); a
+    # branch dispatch has no release to attach to. Note the UI ref dropdown
+    # lists branches, so this is effectively an API-only path
+    # (ref: refs/tags/v1.0).
+    workflow_dispatch:
+
+# Serialize re-pushes of the same tag so they cannot race on the same
+# release. Different tags get different groups and run in parallel.
+concurrency:
+    group: release-${{ github.ref }}
+    cancel-in-progress: false
+
+permissions:
+    contents: read
+
+jobs:
+    # Fail fast on a branch dispatch: without a tag there is no release to
+    # attach to, so do not burn the build runners.
+    guard:
+        name: Require a tag ref
+        runs-on: ubuntu-24.04
+        timeout-minutes: 5
+        steps:
+            - name: Fail on non-tag ref
+              if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+              run: |
+                  echo "::error::Release workflow must run on a tag (push a v* tag or dispatch on a tag ref)"
+                  exit 1
+
+            - uses: actions/checkout@v7
+
+            # A v1.2.3 tag on a 1.2.2 manifest would publish a mislabeled
+            # release; refuse the mismatch. `make release` appends a timestamp
+            # to the manifest version (0.1.0 -> 0.1.0.20260101T0000), so the
+            # tag must be a prefix of the manifest version, not equal to it.
+            - name: Tag must match Coffee.toml version
+              run: |
+                  tag="${GITHUB_REF_NAME#v}"
+                  manifest=$(sed -n 's/^version = "\([^"]*\)".*/\1/p' Coffee.toml | head -n1)
+                  case "$manifest" in
+                    "$tag"|"$tag".*) ;;
+                    *)
+                      echo "::error::Tag v$tag does not match Coffee.toml version $manifest"
+                      exit 1
+                      ;;
+                  esac
+
+    build-unix:
+        name: Build ${{ matrix.artifact }}
+        needs: guard
+        runs-on: ${{ matrix.os }}
+        timeout-minutes: 60
+        # checkout needs contents: read. upload-artifact@v4 uploads via the
+        # runner-injected ACTIONS_RUNTIME_TOKEN, not GITHUB_TOKEN, so no
+        # actions scope is needed here.
+        permissions:
+            contents: read
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - os: ubuntu-24.04
+                      artifact: coffee-linux-amd64
+                    # ubuntu-24.04-arm hosted runners are free only on public repos;
+                    # on a private repo this job will not start.
+                    - os: ubuntu-24.04-arm
+                      artifact: coffee-linux-arm64
+                    # macos-13 is the last Intel (x86_64) runner; when GitHub
+                    # retires it, switch to the then-current Intel label.
+                    - os: macos-13
+                      artifact: coffee-macos-x86_64
+                    - os: macos-14
+                      artifact: coffee-macos-arm64
+        steps:
+            - uses: actions/checkout@v7
+
+            - name: Install dependencies (Linux)
+              if: runner.os == 'Linux'
+              run: |
+                  sudo apt-get update && \
+                  sudo apt-get install -y clang
+
+            # macOS ships GNU make 3.81, which predates .SHELLFLAGS (3.82+);
+            # brew's make (gmake) is used so the Makefile's -eu -o pipefail
+            # recipe shell applies. Vendored deps are committed, so bootstrap
+            # is a no-op kept for parity with the other jobs.
+            - name: Install GNU make (macOS)
+              if: runner.os == 'macOS'
+              run: brew install make
+
+            - name: Bootstrap dependencies (Linux)
+              if: runner.os == 'Linux'
+              run: make bootstrap
+
+            - name: Bootstrap dependencies (macOS)
+              if: runner.os == 'macOS'
+              run: gmake bootstrap
+
+            # -static works on Linux (glibc) but not on macOS; macOS ships clang.
+            - name: Build (Linux, static)
+              if: runner.os == 'Linux'
+              run: make -j$(nproc) RELEASE=1
+
+            - name: Build (macOS, no static linking)
+              if: runner.os == 'macOS'
+              run: gmake -j$(sysctl -n hw.ncpu) RELEASE=1 LDFLAGS=
+
+            - name: Run tests (macOS)
+              if: runner.os == 'macOS'
+              run: gmake test LDFLAGS=
+
+            - name: Smoke test
+              run: bin/coffee version
+
+            - name: Rename binary
+              run: cp bin/coffee ${{ matrix.artifact }}
+
+            - name: Upload artifact
+              uses: actions/upload-artifact@v7
+              with:
+                  name: ${{ matrix.artifact }}
+                  path: ${{ matrix.artifact }}
+                  if-no-files-found: error
+
+    # The codebase is POSIX (fork/execvp/getopt_long), so a native MinGW
+    # build is not possible without porting. The MSYS2 MSYS environment
+    # (Cygwin runtime) provides that POSIX layer; the resulting binary
+    # depends on msys-2.0.dll. Only a smoke test runs here: the full test
+    # suite is exercised on Linux (build-test.yml) and macOS above.
+    build-windows:
+        name: Build coffee-windows-x86_64
+        needs: guard
+        runs-on: windows-latest
+        timeout-minutes: 60
+        permissions:
+            contents: read
+        steps:
+            - uses: actions/checkout@v7
+
+            - uses: msys2/setup-msys2msys2/setup-msys2@v2
+              with:
+                  msystem: MSYS
+                  update: true
+                  install: git make clang curl
+
+            - name: Bootstrap dependencies
+              shell: msys2 {0}
+              run: make bootstrap
+
+            - name: Build (MSYS2, no static linking)
+              shell: msys2 {0}
+              run: make RELEASE=1 LDFLAGS=
+
+            - name: Smoke test
+              shell: msys2 {0}
+              run: |
+                  if [ -f bin/coffee.exe ]; then
+                    bin/coffee.exe version
+                  else
+                    bin/coffee version
+                  fi
+
+            # Cygwin clang appends .exe to an extensionless -o name; fall back
+            # to the bare name if it does not. The .exe extension is kept on
+            # purpose: Windows users expect it (the Unix artifacts are
+            # extensionless).
+            - name: Rename binary
+              shell: msys2 {0}
+              run: |
+                  if [ -f bin/coffee.exe ]; then
+                    cp bin/coffee.exe coffee-windows-x86_64.exe
+                  else
+                    cp bin/coffee coffee-windows-x86_64.exe
+                  fi
+
+            - name: Upload artifact
+              uses: actions/upload-artifact@v7
+              with:
+                  name: coffee-windows-x86_64
+                  path: coffee-windows-x86_64.exe
+                  if-no-files-found: error
+
+    release:
+        name: Attach to GitHub Release
+        needs: [guard, build-unix, build-windows]
+        runs-on: ubuntu-24.04
+        timeout-minutes: 30
+        # gh-release needs contents: write; download-artifact@v4 uses the
+        # runtime token, so no actions scope is needed here.
+        permissions:
+            contents: write
+        steps:
+            - uses: actions/download-artifact@v8
+              with:
+                  path: artifacts
+                  merge-multiple: true
+
+            - name: Generate checksums
+              run: |
+                  cd artifacts
+                  # Every artifact is named coffee-*; SHA256SUMS is not, so the
+                  # glob cannot match the redirect target.
+                  sha256sum coffee-* > SHA256SUMS
+
+            - name: Attach binaries to release
+              uses: softprops/action-gh-release@v3
+              with:
+                  tag_name: ${{ github.ref_name }}
+                  files: artifacts/*
