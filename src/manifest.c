@@ -233,7 +233,7 @@ manifest_t *manifest_parse(sds path)
 	if (deps_arr) {
 		/* String array (legacy) or [[dependencies]] array of tables.
 		 * Table elements are parsed into structured deps below. */
-		size_t n = array_nelem_safe(deps_arr);
+		size_t n                = array_nelem_safe(deps_arr);
 		m->package.dependencies = safe_calloc(n, sizeof(sds));
 		if (m->package.dependencies == nullptr && n > 0) {
 			manifest_free(m);
@@ -280,7 +280,7 @@ manifest_t *manifest_parse(sds path)
 				}
 				toml_datum_t val = toml_string_in(deps_table, key);
 				if (val.ok) {
-					sds vstr = toml_datum_to_string(val);
+					sds vstr                     = toml_datum_to_string(val);
 					m->package.dependencies[idx] = sdscatfmt(sdsnew(key), " = \"%s\"", vstr);
 					sdsfree(vstr);
 					idx++;
@@ -769,8 +769,7 @@ i64 manifest_write(sds path, manifest_t *m)
 			 * unparseable bare key, so drop it — mirroring the
 			 * parse-side guard for inline tables. */
 			if (!valid) {
-				fprintf_safe(stderr, "Warning: dropping invalid dependency entry '%s'\n",
-				             m->package.dependencies[i]);
+				fprintf_safe(stderr, "Warning: dropping invalid dependency entry '%s'\n", m->package.dependencies[i]);
 				continue;
 			}
 			if (structured) {

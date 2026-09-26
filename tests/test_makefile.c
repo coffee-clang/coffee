@@ -48,7 +48,7 @@ TEST(makefile_is_created)
 	ASSERT(fp, "Makefile should be readable");
 
 	sds    buf = sdsempty();
-	char   chunk[4096];
+	char   chunk[4'096];
 	size_t n;
 	while ((n = fread(chunk, 1, sizeof(chunk), fp)) > 0) {
 		buf = sdscatlen(buf, chunk, n);
@@ -88,7 +88,7 @@ TEST(dep_appended_to_makefile)
 	fp = fopen(tmp_make, "r");
 	ASSERT(fp, "could not reopen Makefile");
 	sds    buf = sdsempty();
-	char   chunk[4096];
+	char   chunk[4'096];
 	size_t n;
 	while ((n = fread(chunk, 1, sizeof(chunk), fp)) > 0) {
 		buf = sdscatlen(buf, chunk, n);

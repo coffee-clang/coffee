@@ -159,34 +159,36 @@ TEST(cov_cli_toolchain_invalid)
 TEST(cov_cli_long_bool_options)
 {
 	struct cli_args args;
-	char           *argv[] = { (char *)"coffee",
-		                       (char *)"--debug",
-		                       (char *)"--release",
-		                       (char *)"--locked",
-		                       (char *)"--offline",
-		                       (char *)"--frozen",
-		                       (char *)"--all-features",
-		                       (char *)"--no-default-features",
-		                       (char *)"--unit-graph",
-		                       (char *)"--workspace",
-		                       (char *)"--lib",
-		                       (char *)"--keep-going",
-		                       (char *)"--bins",
-		                       (char *)"--examples",
-		                       (char *)"--tests",
-		                       (char *)"--benches",
-		                       (char *)"--all-targets",
-		                       (char *)"--no-run",
-		                       (char *)"--no-fail-fast",
-		                       (char *)"--fix",
-		                       (char *)"--dry-run",
-		                       (char *)"--build-plan",
-		                       (char *)"--dev",
-		                       (char *)"--build",
-		                       (char *)"--optional",
-		                       (char *)"--no-optional",
-		                       nullptr };
-	i64             ret    = cmdline_parser(26, argv, &args);
+	char           *argv[] = {
+		(char *)"coffee",
+		(char *)"--debug",
+		(char *)"--release",
+		(char *)"--locked",
+		(char *)"--offline",
+		(char *)"--frozen",
+		(char *)"--all-features",
+		(char *)"--no-default-features",
+		(char *)"--unit-graph",
+		(char *)"--workspace",
+		(char *)"--lib",
+		(char *)"--keep-going",
+		(char *)"--bins",
+		(char *)"--examples",
+		(char *)"--tests",
+		(char *)"--benches",
+		(char *)"--all-targets",
+		(char *)"--no-run",
+		(char *)"--no-fail-fast",
+		(char *)"--fix",
+		(char *)"--dry-run",
+		(char *)"--build-plan",
+		(char *)"--dev",
+		(char *)"--build",
+		(char *)"--optional",
+		(char *)"--no-optional",
+		nullptr,
+	};
+	i64 ret = cmdline_parser(26, argv, &args);
 	ASSERT(ret == 0, "parser ok");
 
 	ASSERT(args.debug_given, "--debug");
@@ -248,17 +250,19 @@ TEST(cov_cli_long_bool_options)
 TEST(cov_cli_str_opts_1)
 {
 	struct cli_args args;
-	char           *argv[] = { (char *)"coffee",
-		                       (char *)"--color",
-		                       (char *)"always",
-		                       (char *)"--message-format",
-		                       (char *)"json",
-		                       (char *)"--manifest-path",
-		                       (char *)"/tmp/Coffee.toml",
-		                       (char *)"--target",
-		                       (char *)"x86_64",
-		                       nullptr };
-	i64             ret    = cmdline_parser(9, argv, &args);
+	char           *argv[] = {
+		(char *)"coffee",
+		(char *)"--color",
+		(char *)"always",
+		(char *)"--message-format",
+		(char *)"json",
+		(char *)"--manifest-path",
+		(char *)"/tmp/Coffee.toml",
+		(char *)"--target",
+		(char *)"x86_64",
+		nullptr,
+	};
+	i64 ret = cmdline_parser(9, argv, &args);
 	ASSERT(ret == 0, "parser ok");
 	ASSERT(args.color_given, "--color");
 	ASSERT(strcmp(args.color_arg, "always") == 0, "color=always");
@@ -276,9 +280,11 @@ TEST(cov_cli_str_opts_1)
 TEST(cov_cli_str_opts_2)
 {
 	struct cli_args args;
-	char *argv[] = { (char *)"coffee",     (char *)"--bin", (char *)"mybin",     (char *)"--example", (char *)"myex",
-		             (char *)"--features", (char *)"feat1", (char *)"--profile", (char *)"release",   nullptr };
-	i64   ret    = cmdline_parser(9, argv, &args);
+	char           *argv[] = {
+		(char *)"coffee",     (char *)"--bin", (char *)"mybin",     (char *)"--example", (char *)"myex",
+		(char *)"--features", (char *)"feat1", (char *)"--profile", (char *)"release",   nullptr,
+	};
+	i64 ret = cmdline_parser(9, argv, &args);
 	ASSERT(ret == 0, "parser ok");
 	ASSERT(args.bin_given, "--bin");
 	ASSERT(strcmp(args.bin_arg, "mybin") == 0, "bin");
@@ -296,10 +302,12 @@ TEST(cov_cli_str_opts_2)
 TEST(cov_cli_str_opts_3)
 {
 	struct cli_args args;
-	char           *argv[] = { (char *)"coffee", (char *)"--target-dir", (char *)"/tmp/build", (char *)"--timings",
-		                       (char *)"info",   (char *)"--exclude",    (char *)"pkg1",       (char *)"--include",
-		                       (char *)"pkg2",   (char *)"--config",     (char *)"key=val",    nullptr };
-	i64             ret    = cmdline_parser(11, argv, &args);
+	char           *argv[] = {
+		(char *)"coffee", (char *)"--target-dir", (char *)"/tmp/build", (char *)"--timings",
+		(char *)"info",   (char *)"--exclude",    (char *)"pkg1",       (char *)"--include",
+		(char *)"pkg2",   (char *)"--config",     (char *)"key=val",    nullptr,
+	};
+	i64 ret = cmdline_parser(11, argv, &args);
 	ASSERT(ret == 0, "parser ok");
 	ASSERT(args.target_dir_given, "--target-dir");
 	ASSERT(strcmp(args.target_dir_arg, "/tmp/build") == 0, "target-dir");
@@ -319,21 +327,23 @@ TEST(cov_cli_str_opts_3)
 TEST(cov_cli_str_opts_4)
 {
 	struct cli_args args;
-	char           *argv[] = { (char *)"coffee",
-		                       (char *)"--rename",
-		                       (char *)"newname",
-		                       (char *)"--path",
-		                       (char *)"/some/path",
-		                       (char *)"--git",
-		                       (char *)"https://example.com/repo",
-		                       (char *)"--branch",
-		                       (char *)"main",
-		                       (char *)"--tag",
-		                       (char *)"v1.0",
-		                       (char *)"--rev",
-		                       (char *)"abc123",
-		                       nullptr };
-	i64             ret    = cmdline_parser(13, argv, &args);
+	char           *argv[] = {
+		(char *)"coffee",
+		(char *)"--rename",
+		(char *)"newname",
+		(char *)"--path",
+		(char *)"/some/path",
+		(char *)"--git",
+		(char *)"https://example.com/repo",
+		(char *)"--branch",
+		(char *)"main",
+		(char *)"--tag",
+		(char *)"v1.0",
+		(char *)"--rev",
+		(char *)"abc123",
+		nullptr,
+	};
+	i64 ret = cmdline_parser(13, argv, &args);
 	ASSERT(ret == 0, "parser ok");
 	ASSERT(args.rename_given, "--rename");
 	ASSERT(strcmp(args.rename_arg, "newname") == 0, "rename");
@@ -355,9 +365,11 @@ TEST(cov_cli_str_opts_4)
 TEST(cov_cli_str_opts_5)
 {
 	struct cli_args args;
-	char           *argv[] = { (char *)"coffee",   (char *)"--registry", (char *)"myreg", (char *)"--out-dir",
-		                       (char *)"/tmp/out", (char *)"--command",  (char *)"test",  nullptr };
-	i64             ret    = cmdline_parser(7, argv, &args);
+	char           *argv[] = {
+		(char *)"coffee",   (char *)"--registry", (char *)"myreg", (char *)"--out-dir",
+		(char *)"/tmp/out", (char *)"--command",  (char *)"test",  nullptr,
+	};
+	i64 ret = cmdline_parser(7, argv, &args);
 	ASSERT(ret == 0, "parser ok");
 	ASSERT(args.registry_given, "--registry");
 	ASSERT(strcmp(args.registry_arg, "myreg") == 0, "registry");

@@ -18,7 +18,7 @@ void coffee_register_config_tests(void);
  * coupling test success to the TOML library behavior.
  */
 
-static char saved_coffee_home[4096];
+static char saved_coffee_home[4'096];
 
 static void set_test_home(const char *test_name)
 {
@@ -57,7 +57,7 @@ static i64 file_has_key(const char *path, const char *key)
 	if (fp == nullptr) {
 		return 0;
 	}
-	char buf[4096];
+	char buf[4'096];
 	while (fgets(buf, sizeof(buf), fp)) {
 		/* Look for `key =` anywhere in the line */
 		if (strstr(buf, key) && strstr(buf, "=")) {

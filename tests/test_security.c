@@ -11,11 +11,11 @@
 #include "../src/toolcheck.h"
 #include "test_framework.h"
 
-#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include <ctype.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -169,7 +169,7 @@ TEST(dep_name_is_valid_unit)
  * --------------------------------------------------------------- */
 TEST(fetch_rejects_dotdot_dep)
 {
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
 	sds tmpdir = sdsnew("/tmp/coffee-test-fetch-dotdot");
 	mkdir(tmpdir, 0755);
@@ -201,7 +201,7 @@ TEST(fetch_rejects_dotdot_dep)
 
 TEST(fetch_rejects_slash_dep)
 {
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
 	sds tmpdir = sdsnew("/tmp/coffee-test-fetch-slash");
 	mkdir(tmpdir, 0755);
@@ -237,7 +237,7 @@ TEST(fetch_rejects_slash_dep)
  * --------------------------------------------------------------- */
 TEST(add_rejects_injection_inputs)
 {
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
 	sds tmpdir = sdsnew("/tmp/coffee-test-add-injection");
 	mkdir(tmpdir, 0755);
@@ -325,7 +325,7 @@ TEST(add_rejects_injection_inputs)
 
 TEST(add_accepts_valid_path_dep)
 {
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
 	sds tmpdir = sdsnew("/tmp/coffee-test-add-valid");
 	mkdir(tmpdir, 0755);
@@ -351,8 +351,8 @@ TEST(add_accepts_valid_path_dep)
 	bool found = false;
 	if (m->dependencies.deps_count == 1) {
 		dependency_t *d = &m->dependencies.deps[0];
-		found = d->name != nullptr && strcmp(d->name, "mylib") == 0 && d->path != nullptr &&
-		        strcmp(d->path, "./lib") == 0;
+		found =
+		    d->name != nullptr && strcmp(d->name, "mylib") == 0 && d->path != nullptr && strcmp(d->path, "./lib") == 0;
 	}
 	ASSERT(found, "mylib path dep should round-trip");
 	manifest_free(m);
@@ -369,7 +369,7 @@ TEST(add_accepts_valid_path_dep)
  * --------------------------------------------------------------- */
 TEST(add_ignores_unemitted_values)
 {
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
 	sds tmpdir = sdsnew("/tmp/coffee-test-add-ignored");
 	mkdir(tmpdir, 0755);
@@ -420,8 +420,8 @@ TEST(add_ignores_unemitted_values)
 		}
 		if (strcmp(d->name, "gitdep") == 0) {
 			/* The ignored --pkg-version must not be written. */
-			found_gitdep = d->git != nullptr && strcmp(d->git, "https://example.com/r.git") == 0 &&
-			               d->version == nullptr;
+			found_gitdep =
+			    d->git != nullptr && strcmp(d->git, "https://example.com/r.git") == 0 && d->version == nullptr;
 		}
 	}
 	ASSERT(found_pathwins, "pathwins should carry the --path value and no git");
@@ -440,7 +440,7 @@ TEST(add_ignores_unemitted_values)
  * --------------------------------------------------------------- */
 TEST(add_escapes_emitted_values)
 {
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
 	sds tmpdir = sdsnew("/tmp/coffee-test-add-escape");
 	mkdir(tmpdir, 0755);
@@ -467,8 +467,8 @@ TEST(add_escapes_emitted_values)
 	bool found = false;
 	if (m->dependencies.deps_count == 1) {
 		dependency_t *d = &m->dependencies.deps[0];
-		found = d->name != nullptr && strcmp(d->name, "escaped") == 0 && d->path != nullptr &&
-		        strcmp(d->path, "./li\"b\x01") == 0;
+		found           = d->name != nullptr && strcmp(d->name, "escaped") == 0 && d->path != nullptr &&
+		                  strcmp(d->path, "./li\"b\x01") == 0;
 	}
 	ASSERT(found, "escaped path should round-trip byte-for-byte");
 	manifest_free(m);
@@ -564,7 +564,7 @@ TEST(version_is_valid_unit)
  * --------------------------------------------------------------- */
 TEST(manifest_roundtrip_preserves_inline_deps)
 {
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
 	sds tmpdir = sdsnew("/tmp/coffee-test-roundtrip");
 	mkdir(tmpdir, 0755);
@@ -605,8 +605,7 @@ TEST(manifest_roundtrip_preserves_inline_deps)
 		}
 	}
 	for (size_t i = 0; i < m2->package.dependencies_count; i++) {
-		if (m2->package.dependencies[i] != nullptr &&
-		    strncmp(m2->package.dependencies[i], "plain", 5) == 0) {
+		if (m2->package.dependencies[i] != nullptr && strncmp(m2->package.dependencies[i], "plain", 5) == 0) {
 			found_plain = true;
 		}
 	}
@@ -637,7 +636,7 @@ TEST(manifest_roundtrip_preserves_inline_deps)
 		if (m3->package.dependencies[i] == nullptr) {
 			continue;
 		}
-		sds  dep_name = dep_parse_name(m3->package.dependencies[i]);
+		sds dep_name = dep_parse_name(m3->package.dependencies[i]);
 		if (strcmp(dep_name, "mylib") == 0) {
 			mylib_gone = false;
 		}
@@ -721,15 +720,15 @@ TEST(registry_source_url_resolves_recipe_url)
 	mkdir(letter, 0755);
 	sds pkg = sdscatprintf(sdsempty(), "%s/alpha", letter);
 	mkdir(pkg, 0755);
-	sds toml = sdscatprintf(sdsempty(), "%s/library.toml", pkg);
-	FILE *fp = fopen(toml, "w");
+	sds   toml = sdscatprintf(sdsempty(), "%s/library.toml", pkg);
+	FILE *fp   = fopen(toml, "w");
 	ASSERT(fp != nullptr, "fopen recipe library.toml failed");
 	fprintf_safe(fp, "version = \"1.0\"\n");
 	fprintf_safe(fp, "recipe_url = \"/tmp/coffee-test-regsrc/alpha-repo\"\n");
 	fclose(fp);
 
 	const char *old_reg = getenv("COFFEE_REGISTRY_URL");
-	sds reg_url = sdscatprintf(sdsempty(), "file://%s", reg_dir);
+	sds         reg_url = sdscatprintf(sdsempty(), "file://%s", reg_dir);
 	setenv("COFFEE_REGISTRY_URL", reg_url, 1);
 
 	bool found = false;
@@ -813,8 +812,9 @@ static void make_local_git_repo(const char *repo_dir, const char *name)
 		assert(run_command(init_argv, RUN_CMD_QUIET) == 0);
 		char *add_argv[] = { "git", "add", "-A", nullptr };
 		assert(run_command(add_argv, RUN_CMD_QUIET) == 0);
-		char *commit_argv[] = { "git", "-c", "user.email=test@test", "-c", "user.name=test", "commit", "-q", "-m",
-			                    "init", nullptr };
+		char *commit_argv[] = {
+			"git", "-c", "user.email=test@test", "-c", "user.name=test", "commit", "-q", "-m", "init", nullptr,
+		};
 		assert(run_command(commit_argv, RUN_CMD_QUIET) == 0);
 	}
 }
@@ -827,13 +827,13 @@ static void write_recipe(const char *reg_dir, const char *name, const char *reci
 	mkdir(recipes, 0755);
 	sdsfree(recipes);
 
-	char first = (char)tolower((unsigned char)name[0]);
+	char first  = (char)tolower((unsigned char)name[0]);
 	sds  letter = sdscatprintf(sdsempty(), "%s/recipes/%c", reg_dir, first);
 	mkdir(letter, 0755);
 	sds pkg = sdscatprintf(sdsempty(), "%s/%s", letter, name);
 	mkdir(pkg, 0755);
-	sds toml = sdscatprintf(sdsempty(), "%s/library.toml", pkg);
-	FILE *fp = fopen(toml, "w");
+	sds   toml = sdscatprintf(sdsempty(), "%s/library.toml", pkg);
+	FILE *fp   = fopen(toml, "w");
 	assert(fp != nullptr);
 	fprintf_safe(fp, "version = \"1.0\"\n");
 	if (recipe_url != nullptr) {
@@ -867,13 +867,19 @@ TEST(fetch_direct_flat_dep_from_registry)
 	}
 
 	{
-		char *clean_argv[] = { "rm", "-rf", "/tmp/coffee-test-fetch-direct-repo",
-			                   "/tmp/coffee-test-fetch-direct-proj", "/tmp/coffee-test-fetch-direct-home",
-			                   "/tmp/coffee-test-fetch-direct-registry", nullptr };
+		char *clean_argv[] = {
+			"rm",
+			"-rf",
+			"/tmp/coffee-test-fetch-direct-repo",
+			"/tmp/coffee-test-fetch-direct-proj",
+			"/tmp/coffee-test-fetch-direct-home",
+			"/tmp/coffee-test-fetch-direct-registry",
+			nullptr,
+		};
 		run_command(clean_argv, RUN_CMD_QUIET);
 	}
 
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
 
 	/* The registry recipe for "foo" points at this repo. */
@@ -891,7 +897,7 @@ TEST(fetch_direct_flat_dep_from_registry)
 	const char *old_home = getenv("COFFEE_HOME");
 	setenv("COFFEE_HOME", test_home, 1);
 	const char *old_reg = getenv("COFFEE_REGISTRY_URL");
-	sds reg_url = sdscatprintf(sdsempty(), "file://%s", reg_dir);
+	sds         reg_url = sdscatprintf(sdsempty(), "file://%s", reg_dir);
 	setenv("COFFEE_REGISTRY_URL", reg_url, 1);
 
 	/* Project with a direct flat dep. */
@@ -960,13 +966,18 @@ TEST(fetch_registry_dep_rejects_unsafe_recipe_url)
 	}
 
 	{
-		char *clean_argv[] = { "rm", "-rf", "/tmp/coffee-test-fetch-badurl-proj",
-			                   "/tmp/coffee-test-fetch-badurl-home", "/tmp/coffee-test-fetch-badurl-registry",
-			                   nullptr };
+		char *clean_argv[] = {
+			"rm",
+			"-rf",
+			"/tmp/coffee-test-fetch-badurl-proj",
+			"/tmp/coffee-test-fetch-badurl-home",
+			"/tmp/coffee-test-fetch-badurl-registry",
+			nullptr,
+		};
 		run_command(clean_argv, RUN_CMD_QUIET);
 	}
 
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
 
 	/* Local registry fixture: the recipe exists but its recipe_url is
@@ -980,7 +991,7 @@ TEST(fetch_registry_dep_rejects_unsafe_recipe_url)
 	const char *old_home = getenv("COFFEE_HOME");
 	setenv("COFFEE_HOME", test_home, 1);
 	const char *old_reg = getenv("COFFEE_REGISTRY_URL");
-	sds reg_url = sdscatprintf(sdsempty(), "file://%s", reg_dir);
+	sds         reg_url = sdscatprintf(sdsempty(), "file://%s", reg_dir);
 	setenv("COFFEE_REGISTRY_URL", reg_url, 1);
 
 	sds proj_dir = sdsnew("/tmp/coffee-test-fetch-badurl-proj");
@@ -1040,13 +1051,18 @@ TEST(fetch_registry_dep_missing_recipe_url)
 	}
 
 	{
-		char *clean_argv[] = { "rm", "-rf", "/tmp/coffee-test-fetch-nourl-proj",
-			                   "/tmp/coffee-test-fetch-nourl-home", "/tmp/coffee-test-fetch-nourl-registry",
-			                   nullptr };
+		char *clean_argv[] = {
+			"rm",
+			"-rf",
+			"/tmp/coffee-test-fetch-nourl-proj",
+			"/tmp/coffee-test-fetch-nourl-home",
+			"/tmp/coffee-test-fetch-nourl-registry",
+			nullptr,
+		};
 		run_command(clean_argv, RUN_CMD_QUIET);
 	}
 
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
 
 	/* Local registry fixture: the recipe exists but has no recipe_url. */
@@ -1059,7 +1075,7 @@ TEST(fetch_registry_dep_missing_recipe_url)
 	const char *old_home = getenv("COFFEE_HOME");
 	setenv("COFFEE_HOME", test_home, 1);
 	const char *old_reg = getenv("COFFEE_REGISTRY_URL");
-	sds reg_url = sdscatprintf(sdsempty(), "file://%s", reg_dir);
+	sds         reg_url = sdscatprintf(sdsempty(), "file://%s", reg_dir);
 	setenv("COFFEE_REGISTRY_URL", reg_url, 1);
 
 	sds proj_dir = sdsnew("/tmp/coffee-test-fetch-nourl-proj");
@@ -1200,7 +1216,7 @@ static sds read_file(const char *path)
 		return body;
 	}
 
-	char   buf[4096];
+	char   buf[4'096];
 	size_t got;
 	do {
 		got  = fread(buf, 1, sizeof(buf), fp);
@@ -1229,8 +1245,8 @@ static sds header_path(const char *relative)
 TEST(safe_header_exports_no_banned_wrappers)
 {
 	static const char *const banned[] = {
-		"safe_snprintf", "safe_fprintf", "safe_printf",  "safe_memcpy", "safe_memset",
-		"safe_sprintf",  "safe_strcpy",   "safe_scanf",   "safe_system", "safe_popen",
+		"safe_snprintf", "safe_fprintf", "safe_printf", "safe_memcpy", "safe_memset",
+		"safe_sprintf",  "safe_strcpy",  "safe_scanf",  "safe_system", "safe_popen",
 	};
 	static const char *const guarded[] = {
 		"../include/safe.h",
@@ -1284,7 +1300,7 @@ TEST(safe_header_exports_no_banned_wrappers)
  * --------------------------------------------------------------- */
 TEST(manifest_rejects_traversal_name)
 {
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
 	sds tmpdir = sdsnew("/tmp/coffee-test-manifest-traversal");
 	mkdir(tmpdir, 0755);
@@ -1316,7 +1332,7 @@ TEST(manifest_rejects_traversal_name)
  * --------------------------------------------------------------- */
 TEST(manifest_write_drops_invalid_flat_remnant)
 {
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
 	sds tmpdir = sdsnew("/tmp/coffee-test-manifest-write-remnant");
 	mkdir(tmpdir, 0755);
@@ -1340,9 +1356,9 @@ TEST(manifest_write_drops_invalid_flat_remnant)
 
 	FILE *rf = fopen("Coffee.toml", "r");
 	ASSERT(rf != nullptr, "fopen for read failed");
-	char buf[4096];
+	char   buf[4'096];
 	size_t n = fread(buf, 1, sizeof(buf) - 1, rf);
-	buf[n] = '\0';
+	buf[n]   = '\0';
 	fclose(rf);
 	ASSERT(strstr(buf, "../evil") == nullptr, "invalid remnant must not be written back");
 	ASSERT(strstr(buf, "../evil2") == nullptr, "invalid '='-bearing remnant must not be written back");
@@ -1368,7 +1384,7 @@ TEST(manifest_write_drops_invalid_flat_remnant)
  * --------------------------------------------------------------- */
 TEST(add_remove_exact_name_match)
 {
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
 	sds tmpdir = sdsnew("/tmp/coffee-test-exact-name");
 	mkdir(tmpdir, 0755);
@@ -1402,7 +1418,7 @@ TEST(add_remove_exact_name_match)
  * --------------------------------------------------------------- */
 TEST(install_rejects_unsafe_bin_name)
 {
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
 	sds tmpdir = sdsnew("/tmp/coffee-test-unsafe-bin");
 	mkdir(tmpdir, 0755);
@@ -1443,7 +1459,7 @@ TEST(install_rejects_traversal_version)
 		}
 	}
 
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
 
 	/* Build a malicious repo whose version escapes the deps dir */
@@ -1467,8 +1483,9 @@ TEST(install_rejects_traversal_version)
 		ASSERT(run_command(init_argv, RUN_CMD_QUIET) == 0, "git init failed");
 		char *add_argv[] = { "git", "add", "-A", nullptr };
 		ASSERT(run_command(add_argv, RUN_CMD_QUIET) == 0, "git add failed");
-		char *commit_argv[] = { "git", "-c", "user.email=test@test", "-c", "user.name=test", "commit", "-q", "-m",
-			                    "init", nullptr };
+		char *commit_argv[] = {
+			"git", "-c", "user.email=test@test", "-c", "user.name=test", "commit", "-q", "-m", "init", nullptr,
+		};
 		ASSERT(run_command(commit_argv, RUN_CMD_QUIET) == 0, "git commit failed");
 	}
 
@@ -1538,13 +1555,18 @@ TEST(install_replaces_regular_file)
 	 * re-created from scratch (fixed paths, like the sibling fetch
 	 * tests). */
 	{
-		char *clean_argv[] = { "rm", "-rf", "/tmp/coffee-test-install-replace-repo",
-			                   "/tmp/coffee-test-install-replace-proj", "/tmp/coffee-test-install-replace-home",
-			                   nullptr };
+		char *clean_argv[] = {
+			"rm",
+			"-rf",
+			"/tmp/coffee-test-install-replace-repo",
+			"/tmp/coffee-test-install-replace-proj",
+			"/tmp/coffee-test-install-replace-home",
+			nullptr,
+		};
 		run_command(clean_argv, RUN_CMD_QUIET);
 	}
 
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
 
 	/* Source repo with a valid library.toml. */
@@ -1568,8 +1590,9 @@ TEST(install_replaces_regular_file)
 		ASSERT(run_command(init_argv, RUN_CMD_QUIET) == 0, "git init failed");
 		char *add_argv[] = { "git", "add", "-A", nullptr };
 		ASSERT(run_command(add_argv, RUN_CMD_QUIET) == 0, "git add failed");
-		char *commit_argv[] = { "git", "-c", "user.email=test@test", "-c", "user.name=test", "commit", "-q", "-m",
-			                    "init", nullptr, };
+		char *commit_argv[] = {
+			"git", "-c", "user.email=test@test", "-c", "user.name=test", "commit", "-q", "-m", "init", nullptr,
+		};
 		ASSERT(run_command(commit_argv, RUN_CMD_QUIET) == 0, "git commit failed");
 	}
 
@@ -1778,14 +1801,20 @@ TEST(fetch_transitive_dep_no_lockfile_corruption)
 	/* Drop leftovers from an aborted previous run so the fixture is
 	 * re-created from scratch. */
 	{
-		char *clean_argv[] = { "rm", "-rf", "/tmp/coffee-test-fetch-transitive-repo",
-			                   "/tmp/coffee-test-fetch-transitive-proj", "/tmp/coffee-test-fetch-transitive-home",
-			                   "/tmp/coffee-test-fetch-transitive-nested",
-			                   "/tmp/coffee-test-fetch-transitive-registry", nullptr };
+		char *clean_argv[] = {
+			"rm",
+			"-rf",
+			"/tmp/coffee-test-fetch-transitive-repo",
+			"/tmp/coffee-test-fetch-transitive-proj",
+			"/tmp/coffee-test-fetch-transitive-home",
+			"/tmp/coffee-test-fetch-transitive-nested",
+			"/tmp/coffee-test-fetch-transitive-registry",
+			nullptr,
+		};
 		run_command(clean_argv, RUN_CMD_QUIET);
 	}
 
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
 
 	/* Nested repo: the registry recipe for "nested" points here. */
@@ -1803,8 +1832,9 @@ TEST(fetch_transitive_dep_no_lockfile_corruption)
 		ASSERT(run_command(init_argv, RUN_CMD_QUIET) == 0, "git init nested failed");
 		char *add_argv[] = { "git", "add", "-A", nullptr };
 		ASSERT(run_command(add_argv, RUN_CMD_QUIET) == 0, "git add nested failed");
-		char *commit_argv[] = { "git", "-c", "user.email=test@test", "-c", "user.name=test", "commit", "-q", "-m",
-			                    "init", nullptr };
+		char *commit_argv[] = {
+			"git", "-c", "user.email=test@test", "-c", "user.name=test", "commit", "-q", "-m", "init", nullptr,
+		};
 		ASSERT(run_command(commit_argv, RUN_CMD_QUIET) == 0, "git commit nested failed");
 	}
 
@@ -1819,7 +1849,7 @@ TEST(fetch_transitive_dep_no_lockfile_corruption)
 	sds reg_pkg = sdscatprintf(sdsempty(), "%s/nested", reg_letter);
 	mkdir(reg_pkg, 0755);
 	sds reg_toml = sdscatprintf(sdsempty(), "%s/library.toml", reg_pkg);
-	fp = fopen(reg_toml, "w");
+	fp           = fopen(reg_toml, "w");
 	ASSERT(fp != nullptr, "fopen recipe library.toml failed");
 	fprintf_safe(fp, "version = \"1.0\"\n");
 	fprintf_safe(fp, "recipe_url = \"%s\"\n", nested_dir);
@@ -1847,8 +1877,9 @@ TEST(fetch_transitive_dep_no_lockfile_corruption)
 		ASSERT(run_command(init_argv, RUN_CMD_QUIET) == 0, "git init failed");
 		char *add_argv[] = { "git", "add", "-A", nullptr };
 		ASSERT(run_command(add_argv, RUN_CMD_QUIET) == 0, "git add failed");
-		char *commit_argv[] = { "git", "-c", "user.email=test@test", "-c", "user.name=test", "commit", "-q", "-m",
-			                    "init", nullptr };
+		char *commit_argv[] = {
+			"git", "-c", "user.email=test@test", "-c", "user.name=test", "commit", "-q", "-m", "init", nullptr,
+		};
 		ASSERT(run_command(commit_argv, RUN_CMD_QUIET) == 0, "git commit failed");
 	}
 
@@ -1858,7 +1889,7 @@ TEST(fetch_transitive_dep_no_lockfile_corruption)
 	const char *old_home = getenv("COFFEE_HOME");
 	setenv("COFFEE_HOME", test_home, 1);
 	const char *old_reg = getenv("COFFEE_REGISTRY_URL");
-	sds reg_url = sdscatprintf(sdsempty(), "file://%s", reg_dir);
+	sds         reg_url = sdscatprintf(sdsempty(), "file://%s", reg_dir);
 	setenv("COFFEE_REGISTRY_URL", reg_url, 1);
 
 	sds proj_dir = sdsnew("/tmp/coffee-test-fetch-transitive-proj");
@@ -1942,12 +1973,18 @@ TEST(fetch_transitive_dep_no_lockfile_corruption)
 TEST(fetch_root_flat_dep_not_in_registry_fails)
 {
 	{
-		char *clean_argv[] = { "rm", "-rf", "/tmp/coffee-test-fetch-flat-proj", "/tmp/coffee-test-fetch-flat-home",
-			                   "/tmp/coffee-test-fetch-flat-registry", nullptr };
+		char *clean_argv[] = {
+			"rm",
+			"-rf",
+			"/tmp/coffee-test-fetch-flat-proj",
+			"/tmp/coffee-test-fetch-flat-home",
+			"/tmp/coffee-test-fetch-flat-registry",
+			nullptr,
+		};
 		run_command(clean_argv, RUN_CMD_QUIET);
 	}
 
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
 
 	sds test_home = sdsnew("/tmp/coffee-test-fetch-flat-home");
@@ -1960,7 +1997,7 @@ TEST(fetch_root_flat_dep_not_in_registry_fails)
 	sds reg_dir = sdsnew("/tmp/coffee-test-fetch-flat-registry");
 	mkdir(reg_dir, 0755);
 	const char *old_reg = getenv("COFFEE_REGISTRY_URL");
-	sds reg_url = sdscatprintf(sdsempty(), "file://%s", reg_dir);
+	sds         reg_url = sdscatprintf(sdsempty(), "file://%s", reg_dir);
 	setenv("COFFEE_REGISTRY_URL", reg_url, 1);
 
 	sds proj_dir = sdsnew("/tmp/coffee-test-fetch-flat-proj");
@@ -2012,12 +2049,13 @@ TEST(fetch_root_flat_dep_not_in_registry_fails)
  * --------------------------------------------------------------- */
 TEST(fetch_symlink_failure_fails)
 {
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
 
 	{
-		char *clean_argv[] = { "rm", "-rf", "/tmp/coffee-test-fetch-symlink-proj", "/tmp/coffee-test-fetch-symlink-home",
-			                   nullptr };
+		char *clean_argv[] = {
+			"rm", "-rf", "/tmp/coffee-test-fetch-symlink-proj", "/tmp/coffee-test-fetch-symlink-home", nullptr,
+		};
 		run_command(clean_argv, RUN_CMD_QUIET);
 	}
 
@@ -2081,11 +2119,12 @@ TEST(fetch_transitive_invalid_url_fails)
 			PASS();
 		}
 	}
-	char *clean_argv[] = { "rm", "-rf", "/tmp/coffee-test-ftr-repo", "/tmp/coffee-test-ftr-proj",
-		                   "/tmp/coffee-test-ftr-home", nullptr };
+	char *clean_argv[] = {
+		"rm", "-rf", "/tmp/coffee-test-ftr-repo", "/tmp/coffee-test-ftr-proj", "/tmp/coffee-test-ftr-home", nullptr,
+	};
 	run_command(clean_argv, RUN_CMD_QUIET);
 
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
 
 	sds repo_dir = sdsnew("/tmp/coffee-test-ftr-repo");
@@ -2102,8 +2141,9 @@ TEST(fetch_transitive_invalid_url_fails)
 		ASSERT(run_command(init_argv, RUN_CMD_QUIET) == 0, "git init failed");
 		char *add_argv[] = { "git", "add", "-A", nullptr };
 		ASSERT(run_command(add_argv, RUN_CMD_QUIET) == 0, "git add failed");
-		char *commit_argv[] = { "git", "-c", "user.email=test@test", "-c", "user.name=test", "commit", "-q", "-m",
-			                    "init", nullptr };
+		char *commit_argv[] = {
+			"git", "-c", "user.email=test@test", "-c", "user.name=test", "commit", "-q", "-m", "init", nullptr,
+		};
 		ASSERT(run_command(commit_argv, RUN_CMD_QUIET) == 0, "git commit failed");
 	}
 

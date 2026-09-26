@@ -63,7 +63,7 @@ int64_t handle_remove(options *opts)
 
 		sds content = sdsempty();
 		if (content) {
-			char   buf[4096];
+			char   buf[4'096];
 			size_t n;
 			fseek(mf, 0, SEEK_SET);
 			while ((n = fread(buf, 1, sizeof(buf), mf)) > 0) {

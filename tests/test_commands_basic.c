@@ -65,7 +65,7 @@ TEST(clean_custom_target_dir)
 TEST(compile_delegates_to_build)
 {
 	/* compile without manifest should return error like build does */
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
 
 	sds tmpdir = sdsnew("/tmp/coffee-test-compile");
@@ -146,7 +146,7 @@ TEST(help_basic)
  * --------------------------------------------------------------- */
 TEST(init_initializes_project)
 {
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	sds  tmpdir = sdsnew("/tmp/coffee-test-init");
 	mkdir(tmpdir, 0755);
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
@@ -195,8 +195,8 @@ TEST(install_update_no_packages)
  * --------------------------------------------------------------- */
 TEST(install_update_config_basic)
 {
-	char        old_home[4096] = { 0 };
-	const char *env            = getenv("COFFEE_HOME");
+	char        old_home[4'096] = { 0 };
+	const char *env             = getenv("COFFEE_HOME");
 	if (env != nullptr) {
 		strncpy(old_home, env, sizeof(old_home) - 1);
 	}
@@ -237,7 +237,7 @@ TEST(install_update_config_basic)
  * --------------------------------------------------------------- */
 TEST(new_creates_project)
 {
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
 
 	sds tmpdir = sdsnew("/tmp/coffee-test-new-project");
@@ -268,7 +268,7 @@ TEST(new_no_arg)
 	sds tmpdir = sdsnew("/tmp/coffee-test-new-noarg");
 	mkdir(tmpdir, 0755);
 
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
 	ASSERT(chdir(tmpdir) == 0, "chdir failed");
 

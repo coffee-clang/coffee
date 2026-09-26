@@ -22,7 +22,7 @@ void coffee_register_commands_deps_tests(void);
 
 /* ---- helpers ---- */
 
-static char saved_cwd[4096];
+static char saved_cwd[4'096];
 
 static void setup_project(const char *test_name, const char *extra_toml)
 {
@@ -81,7 +81,7 @@ TEST(add_no_package_name)
 
 TEST(add_no_manifest)
 {
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
 	sds tmpdir = sdsnew("/tmp/coffee-test-add-nomanifest");
 	mkdir(tmpdir, 0755);
@@ -120,7 +120,7 @@ TEST(add_with_manifest)
  * --------------------------------------------------------------- */
 TEST(build_no_manifest)
 {
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
 	sds tmpdir = sdsnew("/tmp/coffee-test-build-nomanifest");
 	mkdir(tmpdir, 0755);
@@ -165,7 +165,7 @@ TEST(build_with_manifest_and_makefile)
  * --------------------------------------------------------------- */
 TEST(cflags_no_manifest)
 {
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
 	sds tmpdir = sdsnew("/tmp/coffee-test-cflags-nomanifest");
 	mkdir(tmpdir, 0755);
@@ -215,7 +215,7 @@ TEST(cflags_by_package)
  * --------------------------------------------------------------- */
 TEST(libs_no_manifest)
 {
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
 	sds tmpdir = sdsnew("/tmp/coffee-test-libs-nomanifest");
 	mkdir(tmpdir, 0755);
@@ -275,7 +275,7 @@ TEST(remove_no_package)
 
 TEST(remove_no_manifest)
 {
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
 	sds tmpdir = sdsnew("/tmp/coffee-test-remove-nomanifest");
 	mkdir(tmpdir, 0755);
@@ -327,7 +327,7 @@ TEST(rm_no_package)
  * --------------------------------------------------------------- */
 TEST(run_no_manifest)
 {
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
 	sds tmpdir = sdsnew("/tmp/coffee-test-run-nomanifest");
 	mkdir(tmpdir, 0755);
@@ -378,7 +378,7 @@ TEST(run_with_manifest)
  * --------------------------------------------------------------- */
 TEST(tree_no_manifest)
 {
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
 	sds tmpdir = sdsnew("/tmp/coffee-test-tree-nomanifest");
 	mkdir(tmpdir, 0755);
@@ -416,7 +416,7 @@ TEST(tree_no_deps)
  * --------------------------------------------------------------- */
 TEST(generate_lockfile_no_manifest)
 {
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
 	sds tmpdir = sdsnew("/tmp/coffee-test-genlock-nomanifest");
 	mkdir(tmpdir, 0755);
@@ -454,7 +454,7 @@ TEST(generate_lockfile_no_deps)
  * --------------------------------------------------------------- */
 TEST(outdated_no_manifest)
 {
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
 	sds tmpdir = sdsnew("/tmp/coffee-test-outdated-nomanifest");
 	mkdir(tmpdir, 0755);
@@ -493,7 +493,7 @@ TEST(outdated_no_lockfile)
  * --------------------------------------------------------------- */
 TEST(update_no_manifest)
 {
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
 	sds tmpdir = sdsnew("/tmp/coffee-test-update-nomanifest");
 	mkdir(tmpdir, 0755);

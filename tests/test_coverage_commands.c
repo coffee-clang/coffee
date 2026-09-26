@@ -22,7 +22,7 @@
 
 void coffee_register_coverage_commands_tests(void);
 
-static char saved_cwd[4096];
+static char saved_cwd[4'096];
 
 static void setup_proj(const char *name, const char *deps_toml, bool with_main)
 {
@@ -332,7 +332,7 @@ TEST(cov_fetch_with_deps)
 	/* Point the registry at an empty local fixture so the flat dep
 	 * lookup fails fast instead of hitting the network. */
 	const char *old_reg = getenv("COFFEE_REGISTRY_URL");
-	sds reg_dir = sdsnew("/tmp/coverage-cmd-fetch-registry");
+	sds         reg_dir = sdsnew("/tmp/coverage-cmd-fetch-registry");
 	mkdir(reg_dir, 0755);
 	sds reg_url = sdscatprintf(sdsempty(), "file://%s", reg_dir);
 	setenv("COFFEE_REGISTRY_URL", reg_url, 1);
@@ -562,7 +562,7 @@ TEST(cov_uninstall_not_installed_again)
 /* ---------- init in empty dir ---------- */
 TEST(cov_init_no_arg)
 {
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd");
 	sds tmpdir = sdsnew("/tmp/coverage-cmd-init-empty");
 	mkdir(tmpdir, 0755);
@@ -581,7 +581,7 @@ TEST(cov_init_no_arg)
 /* ===== new: --lib mode ===== */
 TEST(cov_new_lib_mode)
 {
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd");
 	struct timespec ts;
 	clock_gettime(CLOCK_REALTIME, &ts);
@@ -608,7 +608,7 @@ TEST(cov_new_lib_mode)
 /* ===== config: set/get/unset with isolated COFFEE_HOME ===== */
 TEST(cov_config_set_get_unset)
 {
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd");
 	sds tmp_home = sdsnew("/tmp/coverage-cmd-cfghome");
 	mkdir(tmp_home, 0755);
@@ -652,7 +652,7 @@ TEST(cov_config_set_get_unset)
 /* ===== config: set/unset with section.key ===== */
 TEST(cov_config_section_key)
 {
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd");
 	sds tmp_home = sdsnew("/tmp/coverage-cmd-cfgsec");
 	mkdir(tmp_home, 0755);
@@ -774,7 +774,7 @@ TEST(cov_check_no_name)
 {
 	sds tmpdir = sdscatprintf(sdsempty(), "/tmp/coverage-cmd-check-noname");
 	mkdir(tmpdir, 0755);
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd");
 	ASSERT(chdir(tmpdir) == 0, "chdir");
 
@@ -1027,7 +1027,7 @@ TEST(cov_outdated_lockfile_with_deps)
 /* ===== init: in directory with existing Coffee.toml ===== */
 TEST(cov_init_existing_project)
 {
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd");
 	sds tmpdir = sdsnew("/tmp/coverage-cmd-init-exist");
 	mkdir(tmpdir, 0755);
@@ -1166,8 +1166,8 @@ TEST(cov_install_update_with_package)
 /* ===== install_update_config: basic run ===== */
 TEST(cov_install_update_config_basic)
 {
-	char        old_home[4096] = { 0 };
-	const char *env            = getenv("COFFEE_HOME");
+	char        old_home[4'096] = { 0 };
+	const char *env             = getenv("COFFEE_HOME");
 	if (env != nullptr) {
 		strncpy(old_home, env, sizeof(old_home) - 1);
 	}
@@ -1532,7 +1532,7 @@ TEST(cov_install_update_update_pkg)
 /* ===== init: with explicit path ===== */
 TEST(cov_init_with_path)
 {
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd");
 	sds tmpdir = sdsnew("/tmp/coverage-cmd-init-path");
 	mkdir(tmpdir, 0755);
@@ -1579,7 +1579,7 @@ TEST(cov_uninstall_installed)
 /* ===== check: missing version error ===== */
 TEST(cov_check_missing_version)
 {
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd");
 	sds tmpdir = sdsnew("/tmp/coverage-cmd-chk-noversion");
 	mkdir(tmpdir, 0755);
@@ -1606,7 +1606,7 @@ TEST(cov_check_missing_version)
 /* ===== check: parse error (malformed Coffee.toml) ===== */
 TEST(cov_check_parse_error)
 {
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd");
 	sds tmpdir = sdsnew("/tmp/coverage-cmd-chk-badparse");
 	mkdir(tmpdir, 0755);
@@ -1630,7 +1630,7 @@ TEST(cov_check_parse_error)
 /* ===== fetch: manifest parse error ===== */
 TEST(cov_fetch_parse_error)
 {
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd");
 	sds tmpdir = sdsnew("/tmp/coverage-cmd-fetch-bad");
 	mkdir(tmpdir, 0755);
@@ -1654,7 +1654,7 @@ TEST(cov_fetch_parse_error)
 /* ===== vendor: manifest parse error ===== */
 TEST(cov_vendor_parse_error)
 {
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd");
 	sds tmpdir = sdsnew("/tmp/coverage-cmd-vendor-bad");
 	mkdir(tmpdir, 0755);
@@ -1693,7 +1693,7 @@ TEST(cov_check_dep_eq)
 /* ===== init: library mode (no bin detected) ===== */
 TEST(cov_init_lib_mode)
 {
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd");
 	sds tmpdir = sdsnew("/tmp/coverage-cmd-init-lib");
 	mkdir(tmpdir, 0755);
@@ -1729,7 +1729,7 @@ TEST(cov_metadata_with_features)
 /* ===== new: existing directory failure path ===== */
 TEST(cov_new_existing_dir)
 {
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd");
 	sds tmpdir = sdsnew("/tmp/coverage-cmd-new-exist");
 	mkdir(tmpdir, 0755);

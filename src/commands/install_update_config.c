@@ -48,7 +48,7 @@ static size_t read_config_lines(const char *path, sds **lines_out)
 	sds   *lines  = nullptr;
 	size_t nlines = 0;
 	size_t cap    = 0;
-	char   buf[4096];
+	char   buf[4'096];
 
 	while (fgets(buf, (int)sizeof(buf), fp)) {
 		if (nlines >= cap) {

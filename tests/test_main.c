@@ -5,9 +5,8 @@
  * its coffee_register_tests() function below.
  */
 
-#include "test_framework.h"
-
 #include "../src/strings.h"
+#include "test_framework.h"
 
 #include <ftw.h>
 #include <unistd.h>

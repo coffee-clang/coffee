@@ -69,8 +69,8 @@ TEST(extract_no_version)
 
 TEST(extract_null_input)
 {
-	sds name    = (sds)0xdeadbeef;
-	sds version = (sds)0xdeadbeef;
+	sds name    = (sds)0xdead'beef;
+	sds version = (sds)0xdead'beef;
 
 	manifest_extract_dep_info(nullptr, &name, &version);
 	ASSERT(name == nullptr, "name should be nullptr for nullptr entry");

@@ -21,17 +21,17 @@
 #include "test_framework.h"
 
 #include <assert.h>
-#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include <ctype.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
 void coffee_register_dep_graph_tests(void);
 
-static char saved_cwd[4096];
+static char saved_cwd[4'096];
 
 static void setup_tmpdir(const char *name)
 {
@@ -606,7 +606,7 @@ TEST(dep_graph_with_lockfile)
 	write_manifest("lockint", "dependencies = [\"libLock\"]\n");
 
 	/* Create lockfile with explicit path */
-	char cwd_buf[4096];
+	char cwd_buf[4'096];
 	ASSERT(getcwd(cwd_buf, sizeof(cwd_buf)) != nullptr, "getcwd");
 	sds lockpath = sdscatprintf(sdsempty(), "%s/deps/libLock", cwd_buf);
 
@@ -1127,7 +1127,7 @@ TEST(dep_graph_cache_with_lockfile)
 	create_dep("libLocked", nullptr);
 	write_manifest("cachelock", "dependencies = [\"libLocked\"]\n");
 
-	char cwd_buf[4096];
+	char cwd_buf[4'096];
 	ASSERT(getcwd(cwd_buf, sizeof(cwd_buf)) != nullptr, "getcwd");
 	sds lockpath = sdscatprintf(sdsempty(), "%s/deps/libLocked", cwd_buf);
 
@@ -1224,8 +1224,7 @@ TEST(dep_graph_version_from_coffee_toml)
 	sds src_dir = sdscatprintf(sdsempty(), "%s/src", dep_dir);
 	mkdir(src_dir, 0755);
 	write_file("deps/libver/src/libver.c", "int libver_do(void) { return 0; }\n");
-	write_file("deps/libver/Coffee.toml",
-	           "[package]\nname = \"libver\"\nversion = \"2.3.4\"\nedition = \"c23\"\n");
+	write_file("deps/libver/Coffee.toml", "[package]\nname = \"libver\"\nversion = \"2.3.4\"\nedition = \"c23\"\n");
 	sdsfree(src_dir);
 	sdsfree(dep_dir);
 
@@ -1292,7 +1291,7 @@ TEST(dep_graph_rev_pinned_fetch)
 	mkdir("src", 0755);
 	mkdir("deps", 0755);
 
-	char proj_cwd[4096];
+	char proj_cwd[4'096];
 	ASSERT(getcwd(proj_cwd, sizeof(proj_cwd)) != nullptr, "getcwd failed");
 
 	/* Source repo with two commits; pin the first one by full SHA. */
@@ -1305,13 +1304,15 @@ TEST(dep_graph_rev_pinned_fetch)
 		ASSERT(run_command(init_argv, RUN_CMD_QUIET) == 0, "git init failed");
 		char *add_argv[] = { "git", "-C", "origin-repo", "add", "-A", nullptr };
 		ASSERT(run_command(add_argv, RUN_CMD_QUIET) == 0, "git add failed");
-		char *commit_argv[] = { "git", "-C", "origin-repo", "-c", "user.email=test@test", "-c", "user.name=test",
-			                    "commit", "-q", "-m", "one", nullptr, };
+		char *commit_argv[] = {
+			"git", "-C", "origin-repo", "-c",    "user.email=test@test", "-c", "user.name=test", "commit",
+			"-q",  "-m", "one",         nullptr,
+		};
 		ASSERT(run_command(commit_argv, RUN_CMD_QUIET) == 0, "git commit failed");
 	}
 
-	sds   rev_argv[] = { "git", "-C", "origin-repo", "rev-parse", "HEAD", nullptr };
-	sds   sha1_out   = run_command_capture(rev_argv, RUN_CMD_QUIET);
+	sds rev_argv[] = { "git", "-C", "origin-repo", "rev-parse", "HEAD", nullptr };
+	sds sha1_out   = run_command_capture(rev_argv, RUN_CMD_QUIET);
 	ASSERT(sha1_out != nullptr, "rev-parse first commit failed");
 	if (sdslen(sha1_out) > 0 && sha1_out[sdslen(sha1_out) - 1] == '\n') {
 		sha1_out[sdslen(sha1_out) - 1] = '\0';
@@ -1324,12 +1325,14 @@ TEST(dep_graph_rev_pinned_fetch)
 	{
 		char *add_argv[] = { "git", "-C", "origin-repo", "add", "-A", nullptr };
 		ASSERT(run_command(add_argv, RUN_CMD_QUIET) == 0, "git add second failed");
-		char *commit_argv[] = { "git", "-C", "origin-repo", "-c", "user.email=test@test", "-c", "user.name=test",
-			                    "commit", "-q", "-m", "two", nullptr, };
+		char *commit_argv[] = {
+			"git", "-C", "origin-repo", "-c",    "user.email=test@test", "-c", "user.name=test", "commit",
+			"-q",  "-m", "two",         nullptr,
+		};
 		ASSERT(run_command(commit_argv, RUN_CMD_QUIET) == 0, "git commit second failed");
 	}
-	sds   rev2_argv[] = { "git", "-C", "origin-repo", "rev-parse", "HEAD", nullptr };
-	sds   sha2_out    = run_command_capture(rev2_argv, RUN_CMD_QUIET);
+	sds rev2_argv[] = { "git", "-C", "origin-repo", "rev-parse", "HEAD", nullptr };
+	sds sha2_out    = run_command_capture(rev2_argv, RUN_CMD_QUIET);
 	ASSERT(sha2_out != nullptr, "rev-parse second commit failed");
 	if (sdslen(sha2_out) > 0 && sha2_out[sdslen(sha2_out) - 1] == '\n') {
 		sha2_out[sdslen(sha2_out) - 1] = '\0';
@@ -1339,15 +1342,15 @@ TEST(dep_graph_rev_pinned_fetch)
 	ASSERT(strcmp(sha1, sha2) != 0, "two distinct commits");
 
 	/* Sandbox COFFEE_HOME inside the tmpdir so teardown cleans it. */
-	sds         test_home = sdsnew("/tmp/depgraph-revpin/home");
+	sds test_home = sdsnew("/tmp/depgraph-revpin/home");
 	mkdir(test_home, 0755);
 	const char *old_home = getenv("COFFEE_HOME");
 	setenv("COFFEE_HOME", test_home, 1);
 
 	/* Manifest pins the dep by full SHA in uppercase: must be treated as a
 	 * rev and normalized to lowercase on checkout. */
-	sds   url       = sdscatprintf(sdsempty(), "%s/origin-repo", proj_cwd);
-	sds   sha1_up   = sdsdup(sha1);
+	sds url     = sdscatprintf(sdsempty(), "%s/origin-repo", proj_cwd);
+	sds sha1_up = sdsdup(sha1);
 	for (size_t i = 0; i < sdslen(sha1_up); i++) {
 		sha1_up[i] = (char)toupper((unsigned char)sha1_up[i]);
 	}
@@ -1476,27 +1479,28 @@ TEST(dep_graph_transitive_git_fetch)
 	mkdir("src", 0755);
 	mkdir("deps", 0755);
 
-	char proj_cwd[4096];
+	char proj_cwd[4'096];
 	ASSERT(getcwd(proj_cwd, sizeof(proj_cwd)) != nullptr, "getcwd failed");
 
 	/* Nested repo: a plain library with no deps of its own. */
 	sds nested_dir = sdsnew("nested-repo");
 	mkdir(nested_dir, 0755);
-	write_file("nested-repo/Coffee.toml",
-	           "[package]\nname = \"nested\"\nversion = \"1.0.0\"\nedition = \"c23\"\n");
+	write_file("nested-repo/Coffee.toml", "[package]\nname = \"nested\"\nversion = \"1.0.0\"\nedition = \"c23\"\n");
 	{
 		char *init_argv[] = { "git", "-C", "nested-repo", "init", "-q", nullptr };
 		ASSERT(run_command(init_argv, RUN_CMD_QUIET) == 0, "git init nested failed");
 		char *add_argv[] = { "git", "-C", "nested-repo", "add", "-A", nullptr };
 		ASSERT(run_command(add_argv, RUN_CMD_QUIET) == 0, "git add nested failed");
-		char *commit_argv[] = { "git", "-C", "nested-repo", "-c", "user.email=test@test", "-c", "user.name=test",
-			                    "commit", "-q", "-m", "init", nullptr };
+		char *commit_argv[] = {
+			"git", "-C", "nested-repo", "-c",    "user.email=test@test", "-c", "user.name=test", "commit",
+			"-q",  "-m", "init",        nullptr,
+		};
 		ASSERT(run_command(commit_argv, RUN_CMD_QUIET) == 0, "git commit nested failed");
 	}
 
 	/* Parent repo: declares the nested dep by git URL. */
-	sds   nested_url = sdscatprintf(sdsempty(), "%s/nested-repo", proj_cwd);
-	sds   parent_dir = sdsnew("parent-repo");
+	sds nested_url = sdscatprintf(sdsempty(), "%s/nested-repo", proj_cwd);
+	sds parent_dir = sdsnew("parent-repo");
 	mkdir(parent_dir, 0755);
 	FILE *fp = fopen("parent-repo/Coffee.toml", "w");
 	ASSERT(fp != nullptr, "fopen parent Coffee.toml failed");
@@ -1508,20 +1512,22 @@ TEST(dep_graph_transitive_git_fetch)
 		ASSERT(run_command(init_argv, RUN_CMD_QUIET) == 0, "git init parent failed");
 		char *add_argv[] = { "git", "-C", "parent-repo", "add", "-A", nullptr };
 		ASSERT(run_command(add_argv, RUN_CMD_QUIET) == 0, "git add parent failed");
-		char *commit_argv[] = { "git", "-C", "parent-repo", "-c", "user.email=test@test", "-c", "user.name=test",
-			                    "commit", "-q", "-m", "init", nullptr };
+		char *commit_argv[] = {
+			"git", "-C", "parent-repo", "-c",    "user.email=test@test", "-c", "user.name=test", "commit",
+			"-q",  "-m", "init",        nullptr,
+		};
 		ASSERT(run_command(commit_argv, RUN_CMD_QUIET) == 0, "git commit parent failed");
 	}
 
 	/* Sandbox COFFEE_HOME inside the tmpdir so teardown cleans it. */
-	sds         test_home = sdsnew("/tmp/depgraph-transgit/home");
+	sds test_home = sdsnew("/tmp/depgraph-transgit/home");
 	mkdir(test_home, 0755);
 	const char *old_home = getenv("COFFEE_HOME");
 	setenv("COFFEE_HOME", test_home, 1);
 
 	/* Root manifest: parent = { git = <parent url> } */
 	sds parent_url = sdscatprintf(sdsempty(), "%s/parent-repo", proj_cwd);
-	fp = fopen("Coffee.toml", "w");
+	fp             = fopen("Coffee.toml", "w");
 	ASSERT(fp != nullptr, "fopen Coffee.toml failed");
 	fprintf_safe(fp, "[package]\nname = \"transgit\"\nversion = \"1.0.0\"\nedition = \"c23\"\n");
 	fprintf_safe(fp, "\n[dependencies]\nparent = { git = \"%s\" }\n", parent_url);
@@ -1596,21 +1602,22 @@ TEST(dep_graph_transitive_registry_fetch)
 	mkdir("src", 0755);
 	mkdir("deps", 0755);
 
-	char proj_cwd[4096];
+	char proj_cwd[4'096];
 	ASSERT(getcwd(proj_cwd, sizeof(proj_cwd)) != nullptr, "getcwd failed");
 
 	/* Nested repo: the registry recipe for "nested" points here. */
 	sds nested_dir = sdsnew("nested-repo");
 	mkdir(nested_dir, 0755);
-	write_file("nested-repo/Coffee.toml",
-	           "[package]\nname = \"nested\"\nversion = \"1.0.0\"\nedition = \"c23\"\n");
+	write_file("nested-repo/Coffee.toml", "[package]\nname = \"nested\"\nversion = \"1.0.0\"\nedition = \"c23\"\n");
 	{
 		char *init_argv[] = { "git", "-C", "nested-repo", "init", "-q", nullptr };
 		ASSERT(run_command(init_argv, RUN_CMD_QUIET) == 0, "git init nested failed");
 		char *add_argv[] = { "git", "-C", "nested-repo", "add", "-A", nullptr };
 		ASSERT(run_command(add_argv, RUN_CMD_QUIET) == 0, "git add nested failed");
-		char *commit_argv[] = { "git", "-C", "nested-repo", "-c", "user.email=test@test", "-c", "user.name=test",
-			                    "commit", "-q", "-m", "init", nullptr };
+		char *commit_argv[] = {
+			"git", "-C", "nested-repo", "-c",    "user.email=test@test", "-c", "user.name=test", "commit",
+			"-q",  "-m", "init",        nullptr,
+		};
 		ASSERT(run_command(commit_argv, RUN_CMD_QUIET) == 0, "git commit nested failed");
 	}
 
@@ -1624,18 +1631,17 @@ TEST(dep_graph_transitive_registry_fetch)
 	mkdir(reg_letter, 0755);
 	sds reg_pkg = sdscatprintf(sdsempty(), "%s/nested", reg_letter);
 	mkdir(reg_pkg, 0755);
-	sds reg_toml = sdscatprintf(sdsempty(), "%s/library.toml", reg_pkg);
+	sds reg_toml   = sdscatprintf(sdsempty(), "%s/library.toml", reg_pkg);
 	sds nested_abs = sdscatprintf(sdsempty(), "%s/nested-repo", proj_cwd);
-	sds recipe = sdscatprintf(sdsempty(), "version = \"1.0\"\nrecipe_url = \"%s\"\n", nested_abs);
+	sds recipe     = sdscatprintf(sdsempty(), "version = \"1.0\"\nrecipe_url = \"%s\"\n", nested_abs);
 	write_file(reg_toml, recipe);
 	sdsfree(recipe);
 
 	/* Parent: a path dep that itself declares nested = "1.0". */
 	sds parent_dir = sdsnew("parent-repo");
 	mkdir(parent_dir, 0755);
-	write_file("parent-repo/Coffee.toml",
-	           "[package]\nname = \"parent\"\nversion = \"1.0.0\"\nedition = \"c23\"\n"
-	           "\n[dependencies]\nnested = \"1.0\"\n");
+	write_file("parent-repo/Coffee.toml", "[package]\nname = \"parent\"\nversion = \"1.0.0\"\nedition = \"c23\"\n"
+	                                      "\n[dependencies]\nnested = \"1.0\"\n");
 
 	/* Root manifest: parent is a path dep. */
 	FILE *fp = fopen("Coffee.toml", "w");
@@ -1645,13 +1651,13 @@ TEST(dep_graph_transitive_registry_fetch)
 	fclose(fp);
 
 	/* Sandbox COFFEE_HOME and the registry URL inside the tmpdir. */
-	sds         test_home = sdsnew("/tmp/depgraph-transreg/home");
+	sds test_home = sdsnew("/tmp/depgraph-transreg/home");
 	mkdir(test_home, 0755);
 	const char *old_home = getenv("COFFEE_HOME");
 	setenv("COFFEE_HOME", test_home, 1);
 	const char *old_reg = getenv("COFFEE_REGISTRY_URL");
-	sds reg_abs = sdscatprintf(sdsempty(), "%s/registry", proj_cwd);
-	sds reg_url = sdscatprintf(sdsempty(), "file://%s", reg_abs);
+	sds         reg_abs = sdscatprintf(sdsempty(), "%s/registry", proj_cwd);
+	sds         reg_url = sdscatprintf(sdsempty(), "file://%s", reg_abs);
 	setenv("COFFEE_REGISTRY_URL", reg_url, 1);
 
 	options opt = {
@@ -1717,11 +1723,10 @@ TEST(dep_graph_transitive_path_source)
 	mkdir("deps", 0755);
 
 	/* libA ships a nested lib; the escape target sits outside libA. */
-	create_dep("libA",
-	           "[dependencies]\n"
-	           "inside = { path = \"./nested\" }\n"
-	           "escape = { path = \"../outside\" }\n"
-	           "absolute = { path = \"/etc\" }\n");
+	create_dep("libA", "[dependencies]\n"
+	                   "inside = { path = \"./nested\" }\n"
+	                   "escape = { path = \"../outside\" }\n"
+	                   "absolute = { path = \"/etc\" }\n");
 	mkdir("deps/libA/nested", 0755);
 	mkdir("deps/outside", 0755);
 	write_manifest("tpath", "dependencies = [\"libA\"]\n");

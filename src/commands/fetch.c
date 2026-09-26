@@ -90,8 +90,10 @@ static i64 fetch_git_dep(const char *name, const char *url, const char *global_d
 			sdsfree(lower);
 		}
 	} else if (ref != nullptr) {
-		char *argv[] = { "git", "clone", "--depth", "1", "--branch", unconst(ref), "--", unconst(url), target_dir, nullptr };
-		ret          = run_command(argv, RUN_CMD_QUIET);
+		char *argv[] = {
+			"git", "clone", "--depth", "1", "--branch", unconst(ref), "--", unconst(url), target_dir, nullptr,
+		};
+		ret = run_command(argv, RUN_CMD_QUIET);
 	} else {
 		char *argv[] = { "git", "clone", "--depth", "1", "--", unconst(url), target_dir, nullptr };
 		ret          = run_command(argv, RUN_CMD_QUIET);
@@ -167,8 +169,8 @@ static dependency_t *find_dep(manifest_t *m, const char *name)
 static bool is_root_dep(manifest_t *m, const char *name)
 {
 	for (size_t i = 0; i < m->package.dependencies_count; i++) {
-		sds parsed = dep_parse_name(m->package.dependencies[i]);
-		bool match = parsed != nullptr && strcmp(parsed, name) == 0;
+		sds  parsed = dep_parse_name(m->package.dependencies[i]);
+		bool match  = parsed != nullptr && strcmp(parsed, name) == 0;
 		sdsfree(parsed);
 		if (match) {
 			return true;

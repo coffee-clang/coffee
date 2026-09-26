@@ -1,5 +1,4 @@
 #include "dep_graph.h"
-
 #include "safe.h"
 #include "strings.h"
 
@@ -302,13 +301,13 @@ dep_graph_t *dep_graph_get(manifest_t *m, lockfile_t *lf, bool offline, const ch
 	struct stat st;
 	sds         toml_path = sdscatprintf(sdsempty(), "%s/Coffee.toml", project_dir);
 	if (safe_stat(toml_path, &st) == 0) {
-		toml_mtime = (i64)st.st_mtim.tv_sec * 1000000000 + st.st_mtim.tv_nsec;
+		toml_mtime = ((i64)st.st_mtim.tv_sec * 1'000'000'000) + st.st_mtim.tv_nsec;
 	}
 	sdsfree(toml_path);
 
 	sds lock_path = sdscatprintf(sdsempty(), "%s/Coffee.lock", project_dir);
 	if (safe_stat(lock_path, &st) == 0) {
-		lock_mtime = (i64)st.st_mtim.tv_sec * 1000000000 + st.st_mtim.tv_nsec;
+		lock_mtime = ((i64)st.st_mtim.tv_sec * 1'000'000'000) + st.st_mtim.tv_nsec;
 	}
 	sdsfree(lock_path);
 

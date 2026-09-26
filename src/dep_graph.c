@@ -408,11 +408,11 @@ dep_graph_t *dep_graph_create(manifest_t *m, lockfile_t *lf, bool offline)
 						sdsfree(dep_name);
 						continue;
 					}
-					const dependency_t *sd = find_manifest_dep(dm, dep_name);
-					sds constraint = sd != nullptr && sd->version != nullptr
-					                     ? sdsnew(sd->version)
-					                     : dep_extract_constraint(dm->package.dependencies[i]);
-					i64 bad = register_dep(g, requester, dep_name, constraint, sd, dep_dir);
+					const dependency_t *sd         = find_manifest_dep(dm, dep_name);
+					sds                 constraint = sd != nullptr && sd->version != nullptr ?
+					                                     sdsnew(sd->version) :
+					                                     dep_extract_constraint(dm->package.dependencies[i]);
+					i64                 bad        = register_dep(g, requester, dep_name, constraint, sd, dep_dir);
 					sdsfree(constraint);
 					sdsfree(dep_name);
 					if (bad != 0) {
@@ -454,11 +454,11 @@ dep_graph_t *dep_graph_create(manifest_t *m, lockfile_t *lf, bool offline)
 				if (dep_name == nullptr) {
 					continue;
 				}
-				const dependency_t *sd = find_manifest_dep(m, dep_name);
-				sds constraint = sd != nullptr && sd->version != nullptr
-				                     ? sdsnew(sd->version)
-				                     : dep_extract_constraint(m->package.dependencies[i]);
-				i64 bad = register_dep(g, requester, dep_name, constraint, sd, nullptr);
+				const dependency_t *sd         = find_manifest_dep(m, dep_name);
+				sds                 constraint = sd != nullptr && sd->version != nullptr ?
+				                                     sdsnew(sd->version) :
+				                                     dep_extract_constraint(m->package.dependencies[i]);
+				i64                 bad        = register_dep(g, requester, dep_name, constraint, sd, nullptr);
 				sdsfree(constraint);
 				sdsfree(dep_name);
 				if (bad != 0) {
@@ -614,4 +614,3 @@ const char *dep_graph_git_ref(const dep_graph_t *g, const char *dep_name)
 	}
 	return g->nodes[idx].git_ref;
 }
-

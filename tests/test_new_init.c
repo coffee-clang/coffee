@@ -19,7 +19,7 @@
 
 void coffee_register_new_init_tests(void);
 
-static char saved_cwd[4096];
+static char saved_cwd[4'096];
 
 static void pushd(const char *dir)
 {
@@ -80,7 +80,7 @@ TEST(init_has_bin_section_when_main_present)
 	/* Coffee.toml should contain [[bin]] since main() is present */
 	FILE *fp = fopen("Coffee.toml", "r");
 	ASSERT(fp != nullptr, "Coffee.toml should be readable");
-	char buf[4096];
+	char buf[4'096];
 	bool has_bin = false;
 	while (fgets(buf, sizeof(buf), fp) != nullptr) {
 		if (strstr(buf, "[[bin]]") != nullptr) {
@@ -183,8 +183,8 @@ TEST(new_lib_template_uses_standard_c_types)
 	sds   lib_c_path = sdscatprintf(sdsempty(), "%s/src/lib.c", proj_path);
 	FILE *fp         = fopen(lib_c_path, "r");
 	ASSERT(fp != nullptr, "should be able to open lib.c");
-	char   buf[4096] = { 0 };
-	size_t total     = 0;
+	char   buf[4'096] = { 0 };
+	size_t total      = 0;
 	while (fgets(buf + total, sizeof(buf) - total - 1, fp) != nullptr) {
 		total += strlen(buf + total);
 	}
@@ -218,8 +218,8 @@ TEST(new_binary_template_uses_standard_c_types)
 	sds   main_c_path = sdscatprintf(sdsempty(), "%s/src/main.c", proj_path);
 	FILE *fp          = fopen(main_c_path, "r");
 	ASSERT(fp != nullptr, "should be able to open main.c");
-	char   buf[4096] = { 0 };
-	size_t total     = 0;
+	char   buf[4'096] = { 0 };
+	size_t total      = 0;
 	while (fgets(buf + total, sizeof(buf) - total - 1, fp) != nullptr) {
 		total += strlen(buf + total);
 	}

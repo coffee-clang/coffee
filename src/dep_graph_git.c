@@ -1,6 +1,5 @@
-#include "dep_graph.h"
-
 #include "build.h"
+#include "dep_graph.h"
 #include "safe.h"
 #include "strings.h"
 

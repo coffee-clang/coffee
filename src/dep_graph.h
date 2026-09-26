@@ -23,11 +23,11 @@ typedef struct {
 	sds    version_constraint; /* constraint from parent manifest (e.g. ">= 2.0") */
 	sds    commit;             /* pinned git commit SHA */
 	bool   is_git;
-	sds    git_ref; /* branch, tag, or rev to track */
-	sds    git_url; /* git clone URL, when declared in a parent manifest */
+	sds    git_ref;     /* branch, tag, or rev to track */
+	sds    git_url;     /* git clone URL, when declared in a parent manifest */
 	sds    source_path; /* declared path (resolved), when declared in a parent manifest */
-	sds    flags;   /* accumulated compiler flags (-I/-L/-l) */
-	sds   *sources; /* source .c files */
+	sds    flags;       /* accumulated compiler flags (-I/-L/-l) */
+	sds   *sources;     /* source .c files */
 	size_t src_count;
 	bool   visited; /* for cycle detection during build */
 } dep_node_t;

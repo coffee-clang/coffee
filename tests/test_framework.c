@@ -60,9 +60,9 @@ i64 test_framework_run(const char *filter)
 			/* Tests that chdir() and then fail return early without
 			 * restoring the cwd; restore it here so the in-process
 			 * pass stays deterministic. */
-			char old_cwd[4096];
+			char old_cwd[4'096];
 			bool have_cwd = getcwd(old_cwd, sizeof(old_cwd)) != nullptr;
-			i64   result  = test_framework_tests[i].func();
+			i64  result   = test_framework_tests[i].func();
 			if (have_cwd && chdir(old_cwd) != 0) {
 				fprintf_safe(stderr, "Error: cannot restore cwd to '%s' after test '%s'\n", old_cwd, name);
 				result = 0;

@@ -11,9 +11,11 @@ int64_t handle_fmt(options *opts)
 
 	// Use find to get all .c and .h files in src and tests
 
-	char *argv[] = { "find", "src",   "tests",        "(",  "-name", "*.c", "-o",   "-name", "*.h",
-		             ")",    "-exec", "clang-format", "-i", "{}",    "+",   nullptr };
-	i64   ret    = run_command(argv, RUN_CMD_QUIET);
+	char *argv[] = {
+		"find", "src",   "tests",        "(",  "-name", "*.c", "-o",    "-name", "*.h",
+		")",    "-exec", "clang-format", "-i", "{}",    "+",   nullptr,
+	};
+	i64 ret = run_command(argv, RUN_CMD_QUIET);
 
 	if (ret != 0) {
 		fprintf_safe(stderr, "Error: Formatting failed. Please ensure 'clang-format' is installed.\n");

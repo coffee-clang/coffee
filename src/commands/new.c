@@ -42,11 +42,9 @@ int64_t handle_new(options *opts)
 		path = ".";
 	}
 
-	if (strcmp(path, ".") != 0) {
-		if (create_dir(path) != 0) {
-			fprintf_safe(stderr, "Error: Could not create project directory\n");
-			return 1;
-		}
+	if (strcmp(path, ".") != 0 && create_dir(path) != 0) {
+		fprintf_safe(stderr, "Error: Could not create project directory\n");
+		return 1;
 	}
 
 	sds manifest_path = sdscatprintf(sdsempty(), "%s/Coffee.toml", path);

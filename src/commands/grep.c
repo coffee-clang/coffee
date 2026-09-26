@@ -13,7 +13,7 @@ int64_t handle_grep(options *opts)
 
 	char *pattern     = opts->inputs[1];
 	char *grep_argv[] = {
-		"grep", "-rn", "--exclude-dir=target", "--exclude-dir=.git", pattern, "src", "tests", nullptr
+		"grep", "-rn", "--exclude-dir=target", "--exclude-dir=.git", pattern, "src", "tests", nullptr,
 	};
 	printf_safe("Searching for '%s'...\n", pattern);
 

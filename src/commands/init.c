@@ -19,7 +19,7 @@ static bool has_main_function(const char *path)
 	if (fp == nullptr) {
 		return false;
 	}
-	char buf[4096];
+	char buf[4'096];
 	bool found = false;
 	while (fgets(buf, sizeof(buf), fp) != nullptr) {
 		if (strstr(buf, "int main(") != nullptr) {
@@ -33,8 +33,8 @@ static bool has_main_function(const char *path)
 
 static sds get_name_from_current_dir(void)
 {
-	sds cwd = sdsnewlen(nullptr, 1024);
-	if (getcwd(cwd, 1024) == nullptr) {
+	sds cwd = sdsnewlen(nullptr, 1'024);
+	if (getcwd(cwd, 1'024) == nullptr) {
 		sdsfree(cwd);
 		return sdsnew("project");
 	}

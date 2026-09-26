@@ -120,8 +120,8 @@ int64_t handle_add(options *opts)
 		sds esc_path = toml_escape(opts->path);
 		if (opts->pkg_version) {
 			sds esc_version = toml_escape(opts->pkg_version);
-			dep_str         = sdscatprintf(sdsempty(), "%s = { path = \"%s\", version = \"%s\" }", package_name,
-			                               esc_path, esc_version);
+			dep_str = sdscatprintf(sdsempty(), "%s = { path = \"%s\", version = \"%s\" }", package_name, esc_path,
+			                       esc_version);
 			sdsfree(esc_version);
 		} else {
 			dep_str = sdscatprintf(sdsempty(), "%s = { path = \"%s\" }", package_name, esc_path);

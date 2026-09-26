@@ -1,6 +1,5 @@
-#include "safe.h"
-
 #include "../src/registry.h"
+#include "safe.h"
 /*
  * Coverage tests for build.c dependency resolution and
  * coffee_features.c transitive dependency resolution.
@@ -28,7 +27,7 @@
 
 void coffee_register_coverage_build_deps_tests(void);
 
-static char saved_cwd[4096];
+static char saved_cwd[4'096];
 
 static void setup_proj(const char *name, const char *extra_toml, bool with_main)
 {

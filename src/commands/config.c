@@ -162,7 +162,7 @@ static i64 config_set_raw(const char *section, const char *key, const char *valu
 	size_t cap    = 0;
 
 	if (fp) {
-		char buf[4096];
+		char buf[4'096];
 		while (fgets(buf, (int)sizeof(buf), fp)) {
 			if (nlines >= cap) {
 				cap   = cap ? cap * 2 : 64;
@@ -231,12 +231,10 @@ static i64 config_set_raw(const char *section, const char *key, const char *valu
 
 		/* Within target section, check for matching key */
 		bool match = false;
-		if (in_target_section) {
-			/* Skip comment/empty lines when looking for key */
-			if (strncmp(trimmed, key, strlen(key)) == 0 &&
-			    (trimmed[strlen(key)] == '=' || trimmed[strlen(key)] == ' ' || trimmed[strlen(key)] == '\0')) {
-				match = true;
-			}
+		/* Skip comment/empty lines when looking for key */
+		if (in_target_section && strncmp(trimmed, key, strlen(key)) == 0 &&
+		    (trimmed[strlen(key)] == '=' || trimmed[strlen(key)] == ' ' || trimmed[strlen(key)] == '\0')) {
+			match = true;
 		}
 
 		if (match) {
@@ -295,7 +293,7 @@ static i64 config_unset_raw(const char *section, const char *key)
 	sds   *lines  = nullptr;
 	size_t nlines = 0;
 	size_t cap    = 0;
-	char   buf[4096];
+	char   buf[4'096];
 
 	while (fgets(buf, (int)sizeof(buf), fp)) {
 		if (nlines >= cap) {

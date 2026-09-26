@@ -33,7 +33,7 @@ TEST(doc_generate_doxyfile_with_doc_section)
 	fclose(fp);
 
 	/* Save CWD, chdir to test dir */
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
 	i64 chdir_ok = (chdir(test_dir) == 0);
 	ASSERT(chdir_ok, "chdir failed");
@@ -51,7 +51,7 @@ TEST(doc_generate_doxyfile_with_doc_section)
 	/* Cleanup first, then assert */
 	fp = fopen("Doxyfile", "r");
 	if (fp) {
-		char   buf[4096];
+		char   buf[4'096];
 		size_t n = fread(buf, 1, sizeof(buf) - 1, fp);
 		buf[n]   = '\0';
 		fclose(fp);
@@ -77,7 +77,7 @@ TEST(doc_no_doc_section)
 	fprintf_safe(fp, "version = \"1.0.0\"\n");
 	fclose(fp);
 
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
 	ASSERT(chdir(test_dir) == 0, "chdir failed");
 

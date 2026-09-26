@@ -60,7 +60,7 @@ TEST(library_toml_with_include)
 	FILE *fp = fopen(toml_path, "r");
 	ASSERT(fp, "library.toml should exist");
 	sds    buf = sdsempty();
-	char   chunk[1024];
+	char   chunk[1'024];
 	size_t n;
 	while ((n = fread(chunk, 1, sizeof(chunk), fp)) > 0) {
 		buf = sdscatlen(buf, chunk, n);
@@ -99,7 +99,7 @@ TEST(library_toml_with_libname)
 	FILE *fp = fopen(toml_path, "r");
 	ASSERT(fp, "library.toml should exist");
 	sds    buf = sdsempty();
-	char   chunk[1024];
+	char   chunk[1'024];
 	size_t n;
 	while ((n = fread(chunk, 1, sizeof(chunk), fp)) > 0) {
 		buf = sdscatlen(buf, chunk, n);

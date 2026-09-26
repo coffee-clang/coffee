@@ -73,7 +73,7 @@ int64_t handle_vendor(options *opts)
 						break;
 					}
 					char *git_argv[] = {
-						"git", "clone", "--depth", "1", "--", m->dependencies.deps[j].git, dest_dir, nullptr
+						"git", "clone", "--depth", "1", "--", m->dependencies.deps[j].git, dest_dir, nullptr,
 					};
 					i64 ret = run_command(git_argv, RUN_CMD_QUIET);
 

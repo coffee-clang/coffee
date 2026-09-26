@@ -15,7 +15,7 @@
 #ifndef COFFEE_COMPAT_LIMITS_H
 #define COFFEE_COMPAT_LIMITS_H
 
-#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 202311L
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 202'311L
 
 # ifndef BOOL_WIDTH
 #  define BOOL_WIDTH __BOOL_WIDTH__

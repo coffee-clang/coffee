@@ -17,7 +17,7 @@
 
 void coffee_register_manifest_deps_tests(void);
 
-static char saved_cwd[4096];
+static char saved_cwd[4'096];
 
 static void setup_tmpdir(const char *name)
 {
@@ -48,22 +48,21 @@ static void write_file(const char *path, const char *content)
 TEST(manifest_deps_array_of_tables)
 {
 	setup_tmpdir("aot");
-	write_file("Coffee.toml",
-	           "[[dependencies]]\n"
-	           "name = \"libgit\"\n"
-	           "git = \"https://example.com/libgit.git\"\n"
-	           "branch = \"main\"\n"
-	           "\n"
-	           "[[dependencies]]\n"
-	           "name = \"libpath\"\n"
-	           "path = \"./libpath\"\n"
-	           "version = \"1.0.0\"\n"
-	           "optional = true\n"
-	           "\n"
-	           "[package]\n"
-	           "name = \"aot\"\n"
-	           "version = \"1.0.0\"\n"
-	           "edition = \"c23\"\n");
+	write_file("Coffee.toml", "[[dependencies]]\n"
+	                          "name = \"libgit\"\n"
+	                          "git = \"https://example.com/libgit.git\"\n"
+	                          "branch = \"main\"\n"
+	                          "\n"
+	                          "[[dependencies]]\n"
+	                          "name = \"libpath\"\n"
+	                          "path = \"./libpath\"\n"
+	                          "version = \"1.0.0\"\n"
+	                          "optional = true\n"
+	                          "\n"
+	                          "[package]\n"
+	                          "name = \"aot\"\n"
+	                          "version = \"1.0.0\"\n"
+	                          "edition = \"c23\"\n");
 
 	manifest_t *m = manifest_parse("Coffee.toml");
 	ASSERT(m != nullptr, "parse manifest");
@@ -95,15 +94,14 @@ TEST(manifest_deps_array_of_tables)
 TEST(manifest_deps_non_string_value)
 {
 	setup_tmpdir("nonstr");
-	write_file("Coffee.toml",
-	           "[dependencies]\n"
-	           "good = \"1.0\"\n"
-	           "bad = 1.0\n"
-	           "\n"
-	           "[package]\n"
-	           "name = \"nonstr\"\n"
-	           "version = \"1.0.0\"\n"
-	           "edition = \"c23\"\n");
+	write_file("Coffee.toml", "[dependencies]\n"
+	                          "good = \"1.0\"\n"
+	                          "bad = 1.0\n"
+	                          "\n"
+	                          "[package]\n"
+	                          "name = \"nonstr\"\n"
+	                          "version = \"1.0.0\"\n"
+	                          "edition = \"c23\"\n");
 
 	manifest_t *m = manifest_parse("Coffee.toml");
 	ASSERT(m != nullptr, "parse manifest");
@@ -119,16 +117,15 @@ TEST(manifest_deps_non_string_value)
 TEST(manifest_deps_roundtrip)
 {
 	setup_tmpdir("roundtrip");
-	write_file("Coffee.toml",
-	           "[[dependencies]]\n"
-	           "name = \"libgit\"\n"
-	           "git = \"https://example.com/libgit.git\"\n"
-	           "tag = \"v1.2.0\"\n"
-	           "\n"
-	           "[package]\n"
-	           "name = \"roundtrip\"\n"
-	           "version = \"1.0.0\"\n"
-	           "edition = \"c23\"\n");
+	write_file("Coffee.toml", "[[dependencies]]\n"
+	                          "name = \"libgit\"\n"
+	                          "git = \"https://example.com/libgit.git\"\n"
+	                          "tag = \"v1.2.0\"\n"
+	                          "\n"
+	                          "[package]\n"
+	                          "name = \"roundtrip\"\n"
+	                          "version = \"1.0.0\"\n"
+	                          "edition = \"c23\"\n");
 
 	manifest_t *m = manifest_parse("Coffee.toml");
 	ASSERT(m != nullptr, "parse manifest");
@@ -139,9 +136,9 @@ TEST(manifest_deps_roundtrip)
 	/* The emitted form is canonical: an inline table under [dependencies]. */
 	FILE *rf = fopen("Coffee.toml.out", "r");
 	ASSERT(rf != nullptr, "fopen written manifest failed");
-	char   buf[4096];
+	char   buf[4'096];
 	size_t rn = fread(buf, 1, sizeof(buf) - 1, rf);
-	buf[rn] = '\0';
+	buf[rn]   = '\0';
 	fclose(rf);
 	ASSERT(strstr(buf, "[dependencies]") != nullptr, "emitted as a [dependencies] table");
 	ASSERT(strstr(buf, "git = ") != nullptr, "git emitted as an inline-table field");

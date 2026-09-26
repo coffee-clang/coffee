@@ -48,7 +48,8 @@ i64 run_command(char **argv, int flags)
 
 		perror("execvp");
 		exit(1);
-	} else if (pid > 0) {
+	}
+	if (pid > 0) {
 		int wstatus;
 		waitpid(pid, &wstatus, 0);
 		if (WIFEXITED(wstatus)) {
@@ -99,11 +100,12 @@ sds run_command_capture(char **argv, int flags)
 
 		execvp(argv[0], argv);
 		_exit(1);
-	} else if (pid > 0) {
+	}
+	if (pid > 0) {
 		safe_close(pipefd[1]);
 
 		sds     result = sdsempty();
-		char    buf[4096];
+		char    buf[4'096];
 		ssize_t n;
 
 		while ((n = read(pipefd[0], buf, sizeof(buf))) != 0) {
@@ -423,8 +425,8 @@ bool dep_name_is_valid(const char *name)
 	 * metacharacter.  Ranges are spelled out instead of using isalnum()
 	 * to stay locale-independent. */
 	for (const char *p = name; *p != '\0'; p++) {
-		bool ok = (*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || (*p >= '0' && *p <= '9') ||
-		          *p == '_' || *p == '-';
+		bool ok =
+		    (*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || (*p >= '0' && *p <= '9') || *p == '_' || *p == '-';
 		if (!ok) {
 			return false;
 		}

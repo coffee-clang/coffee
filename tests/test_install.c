@@ -18,7 +18,7 @@ void coffee_register_install_tests(void);
  * Install/list tests use a temporary COFFEE_HOME to avoid test pollution.
  */
 
-static char saved_coffee_home[4096];
+static char saved_coffee_home[4'096];
 
 static void set_test_home(const char *test_name)
 {
@@ -75,7 +75,7 @@ TEST(install_list_deps_no_manifest)
 	set_test_home("list-deps-no-manifest");
 
 	/* chdir to a temp dir with no Coffee.toml */
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
 	sds tmpdir = sdsnew("/tmp/coffee-install-nomanifest");
 	mkdir(tmpdir, 0755);
@@ -115,7 +115,7 @@ TEST(install_list_project_with_bin)
 	fprintf_safe(fp, "src = [\"src/main.c\"]\n");
 	fclose(fp);
 
-	char old_cwd[4096];
+	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
 	ASSERT(chdir(tmpdir) == 0, "chdir failed");
 
@@ -136,7 +136,7 @@ TEST(install_list_project_with_bin)
 	/* Read captured output */
 	fp = fopen("/tmp/coffee-list-out2.txt", "r");
 	ASSERT(fp != nullptr, "should have output file");
-	char   buf[4096];
+	char   buf[4'096];
 	size_t n = fread(buf, 1, sizeof(buf) - 1, fp);
 	buf[n]   = '\0';
 	fclose(fp);

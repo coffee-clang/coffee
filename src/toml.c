@@ -24,7 +24,7 @@
   SOFTWARE.
 
 */
-#define _POSIX_C_SOURCE 200809L
+#define _POSIX_C_SOURCE 200'809L
 #include "toml.h"
 
 #include <stdbool.h>
@@ -198,7 +198,7 @@ i64 toml_ucs_to_utf8(int64_t code, char buf[6])
 	/* 0x00000080 - 0x000007FF:
 	   110xxxxx 10xxxxxx
 	*/
-	if (code <= 0x000007FF) {
+	if (code <= 0x0000'07FF) {
 		buf[0] = (unsigned char)(0xc0 | (code >> 6));
 		buf[1] = (unsigned char)(0x80 | (code & 0x3f));
 		return 2;
@@ -207,7 +207,7 @@ i64 toml_ucs_to_utf8(int64_t code, char buf[6])
 	/* 0x00000800 - 0x0000FFFF:
 	   1110xxxx 10xxxxxx 10xxxxxx
 	*/
-	if (code <= 0x0000FFFF) {
+	if (code <= 0x0000'FFFF) {
 		buf[0] = (unsigned char)(0xe0 | (code >> 12));
 		buf[1] = (unsigned char)(0x80 | ((code >> 6) & 0x3f));
 		buf[2] = (unsigned char)(0x80 | (code & 0x3f));
@@ -217,7 +217,7 @@ i64 toml_ucs_to_utf8(int64_t code, char buf[6])
 	/* 0x00010000 - 0x001FFFFF:
 	   11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
 	*/
-	if (code <= 0x001FFFFF) {
+	if (code <= 0x001F'FFFF) {
 		buf[0] = (unsigned char)(0xf0 | (code >> 18));
 		buf[1] = (unsigned char)(0x80 | ((code >> 12) & 0x3f));
 		buf[2] = (unsigned char)(0x80 | ((code >> 6) & 0x3f));
@@ -228,7 +228,7 @@ i64 toml_ucs_to_utf8(int64_t code, char buf[6])
 	/* 0x00200000 - 0x03FFFFFF:
 	   111110xx 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx
 	*/
-	if (code <= 0x03FFFFFF) {
+	if (code <= 0x03FF'FFFF) {
 		buf[0] = (unsigned char)(0xf8 | (code >> 24));
 		buf[1] = (unsigned char)(0x80 | ((code >> 18) & 0x3f));
 		buf[2] = (unsigned char)(0x80 | ((code >> 12) & 0x3f));
@@ -240,7 +240,7 @@ i64 toml_ucs_to_utf8(int64_t code, char buf[6])
 	/* 0x04000000 - 0x7FFFFFFF:
 	   1111110x 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx
 	*/
-	if (code <= 0x7FFFFFFF) {
+	if (code <= 0x7FFF'FFFF) {
 		buf[0] = (unsigned char)(0xfc | (code >> 30));
 		buf[1] = (unsigned char)(0x80 | ((code >> 24) & 0x3f));
 		buf[2] = (unsigned char)(0x80 | ((code >> 18) & 0x3f));
@@ -463,12 +463,11 @@ static char *norm_lit_str(const char *src, i64 srclen, i64 multiline, char *errb
 
 		ch = *sp++;
 		/* control characters other than tab is not allowed */
-		if ((0 <= ch && ch <= 0x08) || (0x0a <= ch && ch <= 0x1f) || (ch == 0x7f)) {
-			if (!(multiline && (ch == '\r' || ch == '\n'))) {
-				xfree(dst);
-				snprintf(errbuf, errbufsz, "invalid char U+%04x", ch);
-				return 0;
-			}
+		if (((0 <= ch && ch <= 0x08) || (0x0a <= ch && ch <= 0x1f) || (ch == 0x7f)) &&
+		    !(multiline && (ch == '\r' || ch == '\n'))) {
+			xfree(dst);
+			snprintf(errbuf, errbufsz, "invalid char U+%04x", ch);
+			return 0;
 		}
 
 		// a plain copy suffice
@@ -515,12 +514,11 @@ static char *norm_basic_str(const char *src, i64 srclen, i64 multiline, char *er
 		if (ch != '\\') {
 			/* these chars must be escaped: U+0000 to U+0008, U+000A to U+001F, U+007F
 			 */
-			if ((0 <= ch && ch <= 0x08) || (0x0a <= ch && ch <= 0x1f) || (ch == 0x7f)) {
-				if (!(multiline && (ch == '\r' || ch == '\n'))) {
-					xfree(dst);
-					snprintf(errbuf, errbufsz, "invalid char U+%04x", ch);
-					return 0;
-				}
+			if (((0 <= ch && ch <= 0x08) || (0x0a <= ch && ch <= 0x1f) || (ch == 0x7f)) &&
+			    !(multiline && (ch == '\r' || ch == '\n'))) {
+				xfree(dst);
+				snprintf(errbuf, errbufsz, "invalid char U+%04x", ch);
+				return 0;
 			}
 
 			// a plain copy suffice
@@ -536,13 +534,10 @@ static char *norm_basic_str(const char *src, i64 srclen, i64 multiline, char *er
 		}
 
 		/* for multi-line, we want to kill line-ending-backslash ... */
-		if (multiline) {
-			// if there is only whitespace after the backslash ...
-			if (sp[strspn(sp, " \t\r")] == '\n') {
-				/* skip all the following whitespaces */
-				sp += strspn(sp, " \t\r\n");
-				continue;
-			}
+		if (multiline && sp[strspn(sp, " \t\r")] == '\n') {
+			/* skip all the following whitespaces */
+			sp += strspn(sp, " \t\r\n");
+			continue;
 		}
 
 		/* get the escaped char */
@@ -1579,7 +1574,7 @@ toml_table_t *toml_parse_file(FILE *fp, char *errbuf, i64 errbufsz)
 	/* read from fp into buf */
 	while (!feof(fp)) {
 		if (off == bufsz) {
-			i64   xsz = bufsz + 1000;
+			i64   xsz = bufsz + 1'000;
 			char *x   = expand(buf, bufsz, xsz);
 			if (!x) {
 				snprintf(errbuf, errbufsz, "out of memory");

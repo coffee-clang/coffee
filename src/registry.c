@@ -21,7 +21,7 @@
  */
 const char *coffee_home_dir(void)
 {
-	static char home_dir[4096];
+	static char home_dir[4'096];
 	const char *coffee_home = getenv("COFFEE_HOME");
 	if (coffee_home) {
 		snprintf_safe(home_dir, sizeof(home_dir), "%s", coffee_home);
@@ -58,7 +58,7 @@ static const char *get_cache_dir(void)
 
 static char *get_index_path(void)
 {
-	static char index_path[4096];
+	static char index_path[4'096];
 	snprintf_safe(index_path, sizeof(index_path), "%s/packages.json", get_cache_dir());
 	return index_path;
 }
@@ -88,17 +88,19 @@ static i64 ensure_index_cached(void)
 	 * --max-filesize: bound the compressed download. */
 	{
 		sds   tmp_path    = sdscatprintf(sdsempty(), "%s.zst", index_path);
-		char *curl_argv[] = { "curl", "-sL", "--fail", "--proto-redir", "https", "--connect-timeout", "10",
-			                  "--max-time", "30", "--max-filesize", "10485760", REGISTRY_INDEX_URL, "-o", tmp_path,
-			                  nullptr };
-		i64   r           = run_command(curl_argv, 0);
+		char *curl_argv[] = {
+			"curl", "-sL",        "--fail", "--proto-redir",  "https",    "--connect-timeout",
+			"10",   "--max-time", "30",     "--max-filesize", "10485760", REGISTRY_INDEX_URL,
+			"-o",   tmp_path,     nullptr,
+		};
+		i64 r = run_command(curl_argv, 0);
 		if (r == 0) {
 			char *zstd_argv[] = { "zstd", "-df", tmp_path, "-o", index_path, nullptr };
 			r                 = run_command(zstd_argv, RUN_CMD_QUIET);
 			if (r == 0) {
 				/* Bound the decompressed size (decompression bomb guard). */
 				struct stat st;
-				if (safe_stat(index_path, &st) != 0 || st.st_size > 64 * 1024 * 1024) {
+				if (safe_stat(index_path, &st) != 0 || st.st_size > 64 * 1'024 * 1'024) {
 					remove(index_path);
 					r = 1;
 				}
@@ -111,9 +113,12 @@ static i64 ensure_index_cached(void)
 
 static char *fetch_url(const char *url)
 {
-	char *argv[] = { "curl", "-sL", "--fail", "--proto-redir", "https", "--connect-timeout", "10", "--max-time", "30",
-		             "--max-filesize", "10485760", unconst(url), nullptr };
-	sds   result = run_command_capture(argv, RUN_CMD_QUIET);
+	char *argv[] = {
+		"curl",  "-sL",        "--fail", "--proto-redir",  "https",    "--connect-timeout",
+		"10",    "--max-time", "30",     "--max-filesize", "10485760", unconst(url),
+		nullptr,
+	};
+	sds result = run_command_capture(argv, RUN_CMD_QUIET);
 	if (result == nullptr) {
 		return nullptr;
 	}
@@ -257,7 +262,7 @@ recipe_list_t *registry_search(sds query)
 	long len = ftell(fp);
 	fseek(fp, 0, SEEK_SET);
 
-	if (len <= 0 || len > 64 * 1024 * 1024) {
+	if (len <= 0 || len > 64 * 1'024 * 1'024) {
 		safe_fclose(fp);
 		recipe_list_t *empty = safe_calloc(1, sizeof(recipe_list_t));
 		return empty;
@@ -343,7 +348,7 @@ recipe_t *registry_get(sds name)
 	}
 
 	char first = (char)tolower((unsigned char)name[0]);
-	char url[4096];
+	char url[4'096];
 	snprintf_safe(url, sizeof(url), "%s/recipes/%c/%s/library.toml", registry_raw_url(), first, name);
 
 	char *meta = fetch_url(url);
@@ -413,11 +418,8 @@ bool registry_recipe_url_is_valid(const char *url)
 		return false;
 	}
 	const char *base = registry_raw_url();
-	if (strncmp(base, "file://", 7) == 0 || base[0] == '/' || strncmp(base, "./", 2) == 0 ||
-	    strncmp(base, "../", 3) == 0) {
-		return true;
-	}
-	return false;
+	return strncmp(base, "file://", 7) == 0 || base[0] == '/' || strncmp(base, "./", 2) == 0 ||
+	       strncmp(base, "../", 3) == 0;
 }
 
 sds registry_source_url(const char *name, bool *recipe_found)
@@ -466,9 +468,10 @@ i64 registry_fetch(sds name, const char *version, sds dest_dir)
 	{
 		sds   url    = sdscatprintf(sdsempty(), "%s/recipes/%c/%s/library.toml", registry_raw_url(), first, name);
 		sds   out    = sdscatprintf(sdsempty(), "%s/library.toml", dest_dir);
-		char *argv[] = { "curl", "-sL", "--fail", "--proto-redir", "https", "--max-filesize", "10485760", url, "-o",
-			             out, nullptr };
-		i64   r      = run_command(argv, 0);
+		char *argv[] = {
+			"curl", "-sL", "--fail", "--proto-redir", "https", "--max-filesize", "10485760", url, "-o", out, nullptr,
+		};
+		i64 r = run_command(argv, 0);
 		sdsfree(url);
 		sdsfree(out);
 		if (r != 0) {
@@ -479,8 +482,9 @@ i64 registry_fetch(sds name, const char *version, sds dest_dir)
 	{
 		sds   url    = sdscatprintf(sdsempty(), "%s/recipes/%c/%s/install.sh", registry_raw_url(), first, name);
 		sds   out    = sdscatprintf(sdsempty(), "%s/install.sh", dest_dir);
-		char *argv[] = { "curl", "-sL", "--fail", "--proto-redir", "https", "--max-filesize", "10485760", url, "-o",
-			             out, nullptr };
+		char *argv[] = {
+			"curl", "-sL", "--fail", "--proto-redir", "https", "--max-filesize", "10485760", url, "-o", out, nullptr,
+		};
 		run_command(argv, RUN_CMD_QUIET);
 		sdsfree(url);
 		sdsfree(out);
@@ -496,7 +500,7 @@ version_list_t *registry_get_versions(sds name)
 	}
 
 	char first = (char)tolower((unsigned char)name[0]);
-	char url[4096];
+	char url[4'096];
 	snprintf_safe(url, sizeof(url), "%s/recipes/%c/%s/library.toml", registry_raw_url(), first, name);
 
 	char *meta = fetch_url(url);

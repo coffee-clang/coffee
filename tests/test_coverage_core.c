@@ -22,7 +22,7 @@
 
 void coffee_register_coverage_core_tests(void);
 
-static char saved_cwd[4096];
+static char saved_cwd[4'096];
 
 static void setup_proj(const char *name, const char *extra_toml, bool with_main)
 {

@@ -598,7 +598,7 @@ sds sdsfromlonglong(long long value)
 sds sdscatvprintf(sds s, const char *fmt, va_list ap)
 {
 	va_list cpy;
-	char    staticbuf[1024], *buf = staticbuf, *t;
+	char    staticbuf[1'024], *buf = staticbuf, *t;
 	size_t  buflen = strlen(fmt) * 2;
 	i64     bufstrlen;
 
@@ -714,8 +714,7 @@ sds sdscatfmt(sds s, const char *fmt, ...)
 			s = sdsMakeRoomFor(s, 1);
 		}
 
-		switch (*f) {
-		case '%':
+		if (*f == '%') {
 			next = *(f + 1);
 			if (next == '\0') {
 				break;
@@ -774,11 +773,9 @@ sds sdscatfmt(sds s, const char *fmt, ...)
 				sdsinclen(s, 1);
 				break;
 			}
-			break;
-		default:
+		} else {
 			s[i++] = *f;
 			sdsinclen(s, 1);
-			break;
 		}
 		f++;
 	}
@@ -992,15 +989,16 @@ sds *sdssplitlen(const char *s, ssize_t len, const char *sep, i64 seplen, i64 *c
 	*count = elements;
 	return tokens;
 
-cleanup: {
-	i64 i;
-	for (i = 0; i < elements; i++) {
-		sdsfree(tokens[i]);
+cleanup:
+	{
+		i64 i;
+		for (i = 0; i < elements; i++) {
+			sdsfree(tokens[i]);
+		}
+		s_free(tokens);
+		*count = 0;
+		return NULL;
 	}
-	s_free(tokens);
-	*count = 0;
-	return NULL;
-}
 }
 
 /* Free the result returned by sdssplitlen(), or do nothing if 'tokens' is NULL. */
@@ -1380,7 +1378,7 @@ i64 sdsTest(void)
 
 		{
 			sdsfree(x);
-			char etalon[1024 * 1024];
+			char etalon[1'024 * 1'024];
 			for (size_t i = 0; i < sizeof(etalon); i++) {
 				etalon[i] = '0';
 			}
