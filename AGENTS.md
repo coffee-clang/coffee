@@ -81,6 +81,13 @@ and 79-column limit.
 After each change, follow the instructions in the README.md. When those instructions conflict with AGENTS.md or the
 command specific documentation, ask for additional instructions.
 
+## Vendored upstream code
+
+The files `src/sds.c`, `src/toml.c` and everything under `include/` are vendored from upstream projects
+(antirez/sds, cktan/tomlc99, safe). We never edit vendored code in-tree: it would diverge from upstream and
+conflict with the next `make bootstrap`. Vendored files are excluded from `make tidy`; if a vendored file trips a
+linter, fix it upstream or extend the exclusion — do not patch the vendored copy.
+
 ## Command Documentation
 
 When planning or implementing any subcommand, read the corresponding markdown file in `docs/commands/` for detailed documentation about that command's purpose, usage, and implementation notes.

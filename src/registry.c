@@ -78,7 +78,7 @@ static i64 ensure_index_cached(void)
 	const char *cache_dir = get_cache_dir();
 
 	{
-		char *argv[] = { "mkdir", "-p", cache_dir, nullptr };
+		char *argv[] = { "mkdir", "-p", unconst(cache_dir), nullptr };
 		run_command(argv, 0);
 	}
 
@@ -99,8 +99,8 @@ static i64 ensure_index_cached(void)
 			r                 = run_command(zstd_argv, RUN_CMD_QUIET);
 			if (r == 0) {
 				/* Bound the decompressed size (decompression bomb guard). */
-				struct stat st;
-				if (safe_stat(index_path, &st) != 0 || st.st_size > 64 * 1'024 * 1'024) {
+				struct stat st_size;
+				if (safe_stat(index_path, &st_size) != 0 || st_size.st_size > 64 * 1'024 * 1'024) {
 					remove(index_path);
 					r = 1;
 				}

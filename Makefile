@@ -205,7 +205,7 @@ test: $(TEST_RUNNER)
 	fi
 
 tidy:
-	find src tests -name "*.c" -print0 | xargs -0 -I{} clang-tidy --quiet --warnings-as-errors='*' {} -- -Isrc -Iinclude -Iinclude/sds -I. -Ideps -std=c23 -D_GNU_SOURCE
+	find src tests -name "*.c" ! -name "toml.c" ! -name "sds.c" -print0 | xargs -0 -I{} clang-tidy --quiet --warnings-as-errors='*' {} -- -Isrc -Iinclude -Iinclude/sds -I. -Ideps -std=c23 -D_GNU_SOURCE
 
 INSTALL_DIR ?= $(HOME)/.coffee/bin
 install: $(TARGET)
