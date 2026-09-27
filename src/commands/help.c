@@ -6,12 +6,6 @@
 int64_t handle_help(options *opt)
 {
 	(void)opt;
-	printf_safe("Available commands:\n\n");
-	for (i64 i = 0; commands[i].name; i++) {
-		if (commands[i].description != nullptr && commands[i].description[0] != '\0') {
-			printf_safe("  %-24s %s\n", commands[i].name, commands[i].description);
-		}
-	}
-	printf_safe("\nAliases: b = build, c = check\n");
+	cmdline_parser_print_help();
 	return 0;
 }

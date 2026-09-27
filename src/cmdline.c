@@ -7,6 +7,7 @@
  */
 
 #include "cmdline.h"
+#include "coffee.h"
 #include "strings.h"
 
 #include <stdio.h>
@@ -204,7 +205,13 @@ void cmdline_parser_print_version(void)
 
 void cmdline_parser_print_help(void)
 {
-	printf_safe("%s", usage_str);
+	/* usage_str ends with '\n', so this prints a blank line before the
+	 * command list below. */
+	printf_safe("%s\n", usage_str);
+	/* Intentional coupling: the parser help also lists subcommands from the
+	 * command table in coffee.c, so -h/--help and bare `coffee` match
+	 * `coffee help`. */
+	commands_print();
 }
 
 /* ------------------------------------------------------------------ */

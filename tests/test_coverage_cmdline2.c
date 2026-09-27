@@ -31,7 +31,28 @@ TEST(cov_cli_free_null)
 /* ---------- print_help / print_version (don't exit) ---------- */
 TEST(cov_cli_print_help)
 {
+	/* Per-test temp file: avoid a shared path in case tests are parallelized later. */
+	FILE *old = stdout;
+	FILE *tmp = fopen("/tmp/coffee-help-cmdline-out.txt", "w");
+	ASSERT(tmp != nullptr, "help output file writable");
+	stdout = tmp;
+
 	cmdline_parser_print_help();
+
+	fclose(tmp);
+	stdout = old;
+
+	FILE *in = fopen("/tmp/coffee-help-cmdline-out.txt", "r");
+	ASSERT(in != nullptr, "help output file readable");
+	char   buf[8'192];
+	size_t n = fread(buf, 1, sizeof(buf) - 1, in);
+	fclose(in);
+	ASSERT(n < sizeof(buf) - 1, "help output fits in buffer");
+	buf[n] = '\0';
+	remove("/tmp/coffee-help-cmdline-out.txt");
+
+	ASSERT(strstr(buf, "Usage: coffee") != nullptr, "help lists options");
+	ASSERT(strstr(buf, "Available commands:") != nullptr, "help lists commands");
 	PASS();
 }
 

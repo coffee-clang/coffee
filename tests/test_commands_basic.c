@@ -136,8 +136,32 @@ TEST(help_basic)
 		.inputs     = (char *[]){ "help" },
 		.inputs_num = 1,
 	};
+
+	/* Per-test temp file: avoid a shared path in case tests are parallelized later. */
+	FILE *old = stdout;
+	FILE *tmp = fopen("/tmp/coffee-help-basic-out.txt", "w");
+	ASSERT(tmp != nullptr, "help output file writable");
+	stdout = tmp;
+
 	i64 ret = handle_help(&opt);
+
+	fclose(tmp);
+	stdout = old;
+
 	ASSERT(ret == 0, "help should return 0");
+
+	FILE *in = fopen("/tmp/coffee-help-basic-out.txt", "r");
+	ASSERT(in != nullptr, "help output file readable");
+	char   buf[8'192];
+	size_t n = fread(buf, 1, sizeof(buf) - 1, in);
+	fclose(in);
+	ASSERT(n < sizeof(buf) - 1, "help output fits in buffer");
+	buf[n] = '\0';
+	remove("/tmp/coffee-help-basic-out.txt");
+
+	ASSERT(strstr(buf, "Usage: coffee") != nullptr, "help lists options");
+	ASSERT(strstr(buf, "Available commands:") != nullptr, "help lists commands");
+	ASSERT(strstr(buf, "build") != nullptr, "help lists the build command");
 	PASS();
 }
 

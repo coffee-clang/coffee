@@ -89,6 +89,9 @@ typedef struct {
 
 extern command_s commands[];
 
+/* Print the list of available subcommands (used by help and -h) */
+void commands_print(void);
+
 /*
  * List of all available commands
  */
