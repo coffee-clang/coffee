@@ -5,7 +5,7 @@ Add a dependency to the project.
 ## Usage
 
 ```
-coffee add <package> [options]
+coffee add <package> [--git <url> | --path <path>]
 ```
 
 ## Options
@@ -17,7 +17,10 @@ coffee add <package> [options]
 ## Implementation Notes
 
 - Modifies Coffee.toml to add the dependency
-- Requires `--git <url>` or `--path <path>` to specify the dependency source
+- A bare package name is resolved from the recipes catalog: the recipe's `recipe_url` is recorded
+  as the dependency source (`name = { git = "<recipe_url>" }`). The lookup fails in offline mode
+  and when the package is unknown or its recipe has no usable source URL
+- `--git <url>` adds a git dependency; `--path <path>` adds a local path dependency
 - Validates the values it writes before touching the manifest: the package name must match
   `[A-Za-z0-9_-]+`, and the emitted source (`--path`, or `--git` when no `--path` is given) and
   `--pkg-version` are checked with the same validators used by `fetch`/`install` (rejecting option
@@ -25,4 +28,4 @@ coffee add <package> [options]
   and scp-style ssh — `http` is rejected) and path traversal)
 - Appends dependency flags to Makefile
 - Does not materialize the dependency: `coffee fetch` creates the `deps/<name>` symlink
-- Supports git and path dependencies only (use `--git <url>` or `--path <path>`)
+- Supports git, path and catalog-resolved dependencies only

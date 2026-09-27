@@ -79,6 +79,32 @@ static void teardown_proj(const char *name)
 	sdsfree(tmpdir);
 }
 
+/* Point the registry at an empty local fixture so bare-name add lookups
+ * fail fast instead of hitting the network.  Returns the previous
+ * COFFEE_REGISTRY_URL (or nullptr) and the fixture URL to restore with
+ * restore_registry(). */
+static const char *use_empty_registry(sds *reg_url)
+{
+	const char *old_reg = getenv("COFFEE_REGISTRY_URL");
+	sds         reg_dir = sdsnew("/tmp/coverage-cmd-empty-registry");
+	mkdir(reg_dir, 0755);
+	*reg_url = sdscatprintf(sdsempty(), "file://%s", reg_dir);
+	setenv("COFFEE_REGISTRY_URL", *reg_url, 1);
+	sdsfree(reg_dir);
+	return old_reg;
+}
+
+static void restore_registry(const char *old_reg, sds reg_url)
+{
+	if (old_reg != nullptr) {
+		setenv("COFFEE_REGISTRY_URL", old_reg, 1);
+	} else {
+		unsetenv("COFFEE_REGISTRY_URL");
+	}
+	sdsfree(reg_url);
+	test_remove_tree("/tmp/coverage-cmd-empty-registry");
+}
+
 TEST(cov_machete_with_deps)
 {
 	setup_proj("machete-deps", "dependencies = [\"used-dep\", \"unused-dep\"]", true);
@@ -269,13 +295,16 @@ TEST(cov_add_with_version)
 {
 	setup_proj("add-ver", nullptr, true);
 
-	options opt = {
+	sds         reg_url = nullptr;
+	const char *old_reg = use_empty_registry(&reg_url);
+	options     opt     = {
 		.inputs     = (char *[]){ "add", "ver-dep" },
 		.inputs_num = 2,
 	};
 	i64 ret = handle_add(&opt);
 	/* add may succeed or fail depending on registry — just ensure it runs */
 	ASSERT(ret == 0 || ret == 1, "add should run without crash");
+	restore_registry(old_reg, reg_url);
 
 	teardown_proj("add-ver");
 	PASS();
@@ -705,13 +734,16 @@ TEST(cov_add_dev_dep)
 {
 	setup_proj("add-dev", nullptr, true);
 
-	options opt = {
+	sds         reg_url = nullptr;
+	const char *old_reg = use_empty_registry(&reg_url);
+	options     opt     = {
 		.inputs     = (char *[]){ "add", "dev-dep" },
 		.inputs_num = 2,
 		.dev        = true,
 	};
 	i64 ret = handle_add(&opt);
 	ASSERT(ret == 0 || ret == 1, "add --dev");
+	restore_registry(old_reg, reg_url);
 
 	teardown_proj("add-dev");
 	PASS();
@@ -722,13 +754,16 @@ TEST(cov_add_build_dep)
 {
 	setup_proj("add-build", nullptr, true);
 
-	options opt = {
+	sds         reg_url = nullptr;
+	const char *old_reg = use_empty_registry(&reg_url);
+	options     opt     = {
 		.inputs     = (char *[]){ "add", "build-dep" },
 		.inputs_num = 2,
 		.build_dep  = true,
 	};
 	i64 ret = handle_add(&opt);
 	ASSERT(ret == 0 || ret == 1, "add --build");
+	restore_registry(old_reg, reg_url);
 
 	teardown_proj("add-build");
 	PASS();
@@ -739,13 +774,16 @@ TEST(cov_add_optional_dep)
 {
 	setup_proj("add-opt", nullptr, true);
 
-	options opt = {
+	sds         reg_url = nullptr;
+	const char *old_reg = use_empty_registry(&reg_url);
+	options     opt     = {
 		.inputs     = (char *[]){ "add", "opt-dep" },
 		.inputs_num = 2,
 		.optional   = true,
 	};
 	i64 ret = handle_add(&opt);
 	ASSERT(ret == 0 || ret == 1, "add --optional");
+	restore_registry(old_reg, reg_url);
 
 	teardown_proj("add-opt");
 	PASS();
@@ -756,7 +794,9 @@ TEST(cov_add_with_features)
 {
 	setup_proj("add-feat", nullptr, true);
 
-	options opt = {
+	sds         reg_url = nullptr;
+	const char *old_reg = use_empty_registry(&reg_url);
+	options     opt     = {
 		.inputs     = (char *[]){ "add", "feat-dep" },
 		.inputs_num = 2,
 		.features   = sdsnew("foo,bar"),
@@ -764,6 +804,7 @@ TEST(cov_add_with_features)
 	i64 ret = handle_add(&opt);
 	ASSERT(ret == 0 || ret == 1, "add --features");
 	sdsfree(opt.features);
+	restore_registry(old_reg, reg_url);
 
 	teardown_proj("add-feat");
 	PASS();
@@ -1809,12 +1850,15 @@ TEST(cov_add_auto_fetch)
 {
 	setup_proj("add-autof", nullptr, true);
 
-	options opt = {
+	sds         reg_url = nullptr;
+	const char *old_reg = use_empty_registry(&reg_url);
+	options     opt     = {
 		.inputs     = (char *[]){ "add", "autofetch-dep" },
 		.inputs_num = 2,
 	};
 	i64 ret = handle_add(&opt);
 	ASSERT(ret == 0 || ret == 1, "add auto-fetch");
+	restore_registry(old_reg, reg_url);
 
 	teardown_proj("add-autof");
 	PASS();

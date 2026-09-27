@@ -2,6 +2,7 @@
 #include "../coffee.h"
 #include "../manifest.h"
 #include "../project.h"
+#include "../registry.h"
 #include "safe.h"
 
 #include <stdio.h>
@@ -32,12 +33,15 @@ int64_t handle_add(options *opts)
 {
 	if (opts->inputs_num < 2) {
 		fprintf_safe(stderr, "Error: No package specified\n");
-		fprintf_safe(stderr, "Usage: coffee add <package>\n");
-		fprintf_safe(stderr, "  Use --git <url> or --path <path> to specify the source\n");
+		fprintf_safe(stderr, "Usage: coffee add <package> [--git <url> | --path <path>]\n");
 		return 1;
 	}
 
-	char *package_name = opts->inputs[1];
+	/* The dependency source comes from --git or --path; without either,
+	 * the bare package name is resolved through the recipes catalog. */
+	const char *package_name = opts->inputs[1];
+	const char *git_url      = opts->git;
+	const char *path         = opts->path;
 
 	/* Validate everything that will be interpolated into Coffee.toml
 	 * before touching the manifest.  The name is emitted as a bare TOML
@@ -54,17 +58,17 @@ int64_t handle_add(options *opts)
 	/* Validate only the source that is actually emitted: --path takes
 	 * precedence over --git, and --pkg-version is written only for a
 	 * path dep.  Rejecting a value that would be ignored would be noise. */
-	if (opts->path != nullptr) {
-		if (!url_is_valid(opts->path)) {
-			fprintf_safe(stderr, "Error: invalid path '%s'\n", opts->path);
+	if (path != nullptr) {
+		if (!url_is_valid(path)) {
+			fprintf_safe(stderr, "Error: invalid path '%s'\n", path);
 			return 1;
 		}
 		if (opts->pkg_version != nullptr && !version_is_valid(opts->pkg_version)) {
 			fprintf_safe(stderr, "Error: invalid version '%s'\n", opts->pkg_version);
 			return 1;
 		}
-	} else if (opts->git != nullptr && !url_is_valid(opts->git)) {
-		fprintf_safe(stderr, "Error: invalid git URL '%s'\n", opts->git);
+	} else if (git_url != nullptr && !url_is_valid(git_url)) {
+		fprintf_safe(stderr, "Error: invalid git URL '%s'\n", git_url);
 		return 1;
 	}
 
@@ -106,18 +110,37 @@ int64_t handle_add(options *opts)
 		}
 	}
 
-	/* Add new dependency.  The no-source check stays here, after the
-	 * already-exists check, so that re-adding an existing dep without a
-	 * source remains the documented no-op. */
-	sds dep_str;
-	if (opts->git == nullptr && opts->path == nullptr) {
-		fprintf_safe(stderr, "Error: use --git <url> or --path <path> to specify the dependency source\n");
-		manifest_free(m);
-		sdsfree(manifest_path);
-		return 1;
+	/* A bare package name is resolved through the recipes catalog.  The
+	 * lookup stays after the already-exists check, so that re-adding an
+	 * existing dep remains a no-op that never touches the network. */
+	sds registry_url = nullptr;
+	if (git_url == nullptr && path == nullptr) {
+		if (opts->offline) {
+			fprintf_safe(stderr, "Error: cannot resolve '%s' from the registry in offline mode\n", package_name);
+			manifest_free(m);
+			sdsfree(manifest_path);
+			return 1;
+		}
+		bool recipe_found = false;
+		registry_url      = registry_source_url(package_name, &recipe_found);
+		if (registry_url == nullptr) {
+			if (recipe_found) {
+				fprintf_safe(stderr, "Error: recipe for '%s' has no usable source URL\n", package_name);
+			} else {
+				fprintf_safe(stderr, "Error: cannot resolve '%s' from the registry (unknown package or unreachable)\n",
+				             package_name);
+			}
+			manifest_free(m);
+			sdsfree(manifest_path);
+			return 1;
+		}
+		git_url = registry_url;
 	}
-	if (opts->path) {
-		sds esc_path = toml_escape(opts->path);
+
+	/* Add new dependency. */
+	sds dep_str;
+	if (path != nullptr) {
+		sds esc_path = toml_escape(path);
 		if (opts->pkg_version) {
 			sds esc_version = toml_escape(opts->pkg_version);
 			dep_str = sdscatprintf(sdsempty(), "%s = { path = \"%s\", version = \"%s\" }", package_name, esc_path,
@@ -128,7 +151,7 @@ int64_t handle_add(options *opts)
 		}
 		sdsfree(esc_path);
 	} else {
-		sds esc_git = toml_escape(opts->git);
+		sds esc_git = toml_escape(git_url);
 		dep_str     = sdscatprintf(sdsempty(), "%s = { git = \"%s\" }", package_name, esc_git);
 		sdsfree(esc_git);
 	}
@@ -148,6 +171,7 @@ int64_t handle_add(options *opts)
 	if (manifest_write(manifest_path, m) != 0) {
 		fprintf_safe(stderr, "Error: Could not write manifest at %s\n", manifest_path);
 		manifest_free(m);
+		sdsfree(registry_url);
 		sdsfree(manifest_path);
 		return 1;
 	}
@@ -181,6 +205,7 @@ int64_t handle_add(options *opts)
 	}
 
 	sdsfree(makefile_path);
+	sdsfree(registry_url);
 	manifest_free(m);
 	sdsfree(manifest_path);
 	return 0;

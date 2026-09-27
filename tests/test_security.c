@@ -846,6 +846,203 @@ static void write_recipe(const char *reg_dir, const char *name, const char *reci
 }
 
 /* ---------------------------------------------------------------
+ * add — a bare package name resolves from the recipes catalog
+ * --------------------------------------------------------------- */
+TEST(add_bare_name_from_registry)
+{
+	char old_cwd[4'096];
+	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
+	sds tmpdir = sdsnew("/tmp/coffee-test-add-registry");
+	mkdir(tmpdir, 0755);
+	ASSERT(chdir(tmpdir) == 0, "chdir failed");
+
+	FILE *fp = fopen("Coffee.toml", "w");
+	ASSERT(fp != nullptr, "fopen Coffee.toml failed");
+	fprintf_safe(fp, "[package]\nname = \"test\"\nversion = \"1.0.0\"\nedition = \"c23\"\n");
+	fclose(fp);
+
+	/* Local registry fixture: a recipe for "alpha" with a recipe_url. */
+	sds reg_dir = sdsnew("/tmp/coffee-test-add-registry-dir");
+	mkdir(reg_dir, 0755);
+	write_recipe(reg_dir, "alpha", "https://example.com/alpha.git");
+
+	const char *old_reg = getenv("COFFEE_REGISTRY_URL");
+	sds         reg_url = sdscatprintf(sdsempty(), "file://%s", reg_dir);
+	setenv("COFFEE_REGISTRY_URL", reg_url, 1);
+
+	options opt = {
+		.inputs     = (char *[]){ "add", "alpha" },
+		.inputs_num = 2,
+	};
+	ASSERT(handle_add(&opt) == 0, "add with a bare name from the catalog should succeed");
+
+	manifest_t *m = manifest_parse("Coffee.toml");
+	ASSERT(m != nullptr, "manifest should parse after add");
+	ASSERT(m->dependencies.deps_count == 1, "one structured dep should be written");
+	bool found = false;
+	if (m->dependencies.deps_count == 1) {
+		dependency_t *d = &m->dependencies.deps[0];
+		found           = d->name != nullptr && strcmp(d->name, "alpha") == 0 && d->git != nullptr &&
+		                  strcmp(d->git, "https://example.com/alpha.git") == 0;
+	}
+	ASSERT(found, "alpha should carry the recipe_url as its git source");
+	manifest_free(m);
+
+	if (old_reg != nullptr) {
+		setenv("COFFEE_REGISTRY_URL", old_reg, 1);
+	} else {
+		unsetenv("COFFEE_REGISTRY_URL");
+	}
+	sdsfree(reg_url);
+	sdsfree(reg_dir);
+	{
+		char *rm_argv[] = { "rm", "-rf", "/tmp/coffee-test-add-registry-dir", nullptr };
+		run_command(rm_argv, RUN_CMD_QUIET);
+	}
+	remove("Coffee.toml");
+	chdir(old_cwd);
+	rmdir(tmpdir);
+	sdsfree(tmpdir);
+	PASS();
+}
+
+TEST(add_bare_name_unknown_fails)
+{
+	char old_cwd[4'096];
+	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
+	sds tmpdir = sdsnew("/tmp/coffee-test-add-registry-unknown");
+	mkdir(tmpdir, 0755);
+	ASSERT(chdir(tmpdir) == 0, "chdir failed");
+
+	FILE *fp = fopen("Coffee.toml", "w");
+	ASSERT(fp != nullptr, "fopen Coffee.toml failed");
+	fprintf_safe(fp, "[package]\nname = \"test\"\nversion = \"1.0.0\"\nedition = \"c23\"\n");
+	fclose(fp);
+
+	/* Empty local registry fixture: the lookup must fail fast. */
+	sds reg_dir = sdsnew("/tmp/coffee-test-add-registry-empty");
+	mkdir(reg_dir, 0755);
+
+	const char *old_reg = getenv("COFFEE_REGISTRY_URL");
+	sds         reg_url = sdscatprintf(sdsempty(), "file://%s", reg_dir);
+	setenv("COFFEE_REGISTRY_URL", reg_url, 1);
+
+	options opt = {
+		.inputs     = (char *[]){ "add", "nope" },
+		.inputs_num = 2,
+	};
+	ASSERT(handle_add(&opt) == 1, "unknown package should fail");
+
+	manifest_t *m = manifest_parse("Coffee.toml");
+	ASSERT(m != nullptr, "manifest should still parse");
+	ASSERT(m->dependencies.deps_count == 0, "no dependency should have been written");
+	manifest_free(m);
+
+	if (old_reg != nullptr) {
+		setenv("COFFEE_REGISTRY_URL", old_reg, 1);
+	} else {
+		unsetenv("COFFEE_REGISTRY_URL");
+	}
+	sdsfree(reg_url);
+	sdsfree(reg_dir);
+	{
+		char *rm_argv[] = { "rm", "-rf", "/tmp/coffee-test-add-registry-empty", nullptr };
+		run_command(rm_argv, RUN_CMD_QUIET);
+	}
+	remove("Coffee.toml");
+	chdir(old_cwd);
+	rmdir(tmpdir);
+	sdsfree(tmpdir);
+	PASS();
+}
+
+TEST(add_bare_name_offline_fails)
+{
+	char old_cwd[4'096];
+	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
+	sds tmpdir = sdsnew("/tmp/coffee-test-add-registry-offline");
+	mkdir(tmpdir, 0755);
+	ASSERT(chdir(tmpdir) == 0, "chdir failed");
+
+	FILE *fp = fopen("Coffee.toml", "w");
+	ASSERT(fp != nullptr, "fopen Coffee.toml failed");
+	fprintf_safe(fp, "[package]\nname = \"test\"\nversion = \"1.0.0\"\nedition = \"c23\"\n");
+	fclose(fp);
+
+	options opt = {
+		.inputs     = (char *[]){ "add", "alpha" },
+		.inputs_num = 2,
+		.offline    = true,
+	};
+	ASSERT(handle_add(&opt) == 1, "offline bare-name add should fail");
+
+	manifest_t *m = manifest_parse("Coffee.toml");
+	ASSERT(m != nullptr, "manifest should still parse");
+	ASSERT(m->dependencies.deps_count == 0, "no dependency should have been written");
+	manifest_free(m);
+
+	remove("Coffee.toml");
+	chdir(old_cwd);
+	rmdir(tmpdir);
+	sdsfree(tmpdir);
+	PASS();
+}
+
+/* ---------------------------------------------------------------
+ * add — a recipe that exists but has no usable source URL
+ * --------------------------------------------------------------- */
+TEST(add_recipe_without_source_fails)
+{
+	char old_cwd[4'096];
+	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
+	sds tmpdir = sdsnew("/tmp/coffee-test-add-nosource");
+	mkdir(tmpdir, 0755);
+	ASSERT(chdir(tmpdir) == 0, "chdir failed");
+
+	FILE *fp = fopen("Coffee.toml", "w");
+	ASSERT(fp != nullptr, "fopen Coffee.toml failed");
+	fprintf_safe(fp, "[package]\nname = \"test\"\nversion = \"1.0.0\"\nedition = \"c23\"\n");
+	fclose(fp);
+
+	/* Recipe present, but no recipe_url key. */
+	sds reg_dir = sdsnew("/tmp/coffee-test-add-nosource-dir");
+	mkdir(reg_dir, 0755);
+	write_recipe(reg_dir, "nosrc", nullptr);
+
+	const char *old_reg = getenv("COFFEE_REGISTRY_URL");
+	sds         reg_url = sdscatprintf(sdsempty(), "file://%s", reg_dir);
+	setenv("COFFEE_REGISTRY_URL", reg_url, 1);
+
+	options opt = {
+		.inputs     = (char *[]){ "add", "nosrc" },
+		.inputs_num = 2,
+	};
+	ASSERT(handle_add(&opt) == 1, "recipe without a source URL should fail");
+
+	manifest_t *m = manifest_parse("Coffee.toml");
+	ASSERT(m != nullptr, "manifest should still parse");
+	ASSERT(m->dependencies.deps_count == 0, "no dependency should have been written");
+	manifest_free(m);
+
+	if (old_reg != nullptr) {
+		setenv("COFFEE_REGISTRY_URL", old_reg, 1);
+	} else {
+		unsetenv("COFFEE_REGISTRY_URL");
+	}
+	sdsfree(reg_url);
+	sdsfree(reg_dir);
+	{
+		char *rm_argv[] = { "rm", "-rf", "/tmp/coffee-test-add-nosource-dir", nullptr };
+		run_command(rm_argv, RUN_CMD_QUIET);
+	}
+	remove("Coffee.toml");
+	chdir(old_cwd);
+	rmdir(tmpdir);
+	sdsfree(tmpdir);
+	PASS();
+}
+
+/* ---------------------------------------------------------------
  * fetch — a direct flat dep materializes from the registry
  * --------------------------------------------------------------- */
 TEST(fetch_direct_flat_dep_from_registry)
@@ -2204,6 +2401,10 @@ void coffee_register_security_tests(void)
 	TEST_REGISTER(add_accepts_valid_path_dep);
 	TEST_REGISTER(add_ignores_unemitted_values);
 	TEST_REGISTER(add_escapes_emitted_values);
+	TEST_REGISTER(add_bare_name_from_registry);
+	TEST_REGISTER(add_bare_name_unknown_fails);
+	TEST_REGISTER(add_bare_name_offline_fails);
+	TEST_REGISTER(add_recipe_without_source_fails);
 	TEST_REGISTER(manifest_rejects_traversal_name);
 	TEST_REGISTER(manifest_write_drops_invalid_flat_remnant);
 	TEST_REGISTER(add_remove_exact_name_match);
