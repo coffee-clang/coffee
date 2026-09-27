@@ -60,7 +60,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size)
 	/* Run the parser */
 	struct cli_args args;
 	cmdline_parser_init(&args);
-	cmdline_parser((i64)argc, argv, &args);
+	(void)cmdline_parser((i64)argc, argv, &args);
 	cmdline_parser_free(&args);
 
 	/* Cleanup */
