@@ -45,23 +45,27 @@ TEST(doc_generate_doxyfile_with_doc_section)
 	};
 	(void)handle_doc(&opt);
 
-	/* Check that Doxyfile was generated */
-	i64 has_doxyfile = (access("Doxyfile", F_OK) == 0);
-
-	/* Cleanup first, then assert */
-	fp = fopen("Doxyfile", "r");
+	/* Read the generated Doxyfile */
+	i64  has_doxyfile = 0;
+	char buf[4'096]   = { 0 };
+	fp                = fopen("Doxyfile", "r");
 	if (fp) {
-		char   buf[4'096];
 		size_t n = fread(buf, 1, sizeof(buf) - 1, fp);
 		buf[n]   = '\0';
 		fclose(fp);
-		remove("Doxyfile");
+		has_doxyfile = 1;
 	}
+
+	/* Cleanup first, then assert */
+	test_remove_tree("doc");
+	remove("Doxyfile");
 	remove("Coffee.toml");
 	chdir(old_cwd);
 	rmdir(test_dir);
 
 	ASSERT(has_doxyfile, "Doxyfile should exist");
+	ASSERT(strstr(buf, "OUTPUT_DIRECTORY       = doc") != nullptr, "Doxyfile should write output to doc/");
+	ASSERT(strstr(buf, "docs/api") == nullptr, "Doxyfile should ignore [doc] output-dir");
 	PASS();
 }
 
@@ -95,8 +99,63 @@ TEST(doc_no_doc_section)
 	PASS();
 }
 
+TEST(doc_warns_on_output_dir)
+{
+	const char *test_dir = "/tmp/coffee-doc-test-warn";
+	mkdir(test_dir, 0755);
+
+	FILE *fp = fopen("/tmp/coffee-doc-test-warn/Coffee.toml", "w");
+	ASSERT(fp != nullptr, "could not create Coffee.toml");
+	fprintf_safe(fp, "[package]\n");
+	fprintf_safe(fp, "name = \"warntest\"\n");
+	fprintf_safe(fp, "version = \"1.0.0\"\n");
+	fprintf_safe(fp, "\n[doc]\n");
+	fprintf_safe(fp, "output-dir = \"docs/api\"\n");
+	fprintf_safe(fp, "input-dirs = \"src\"\n");
+	fclose(fp);
+
+	char old_cwd[4'096];
+	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
+	ASSERT(chdir(test_dir) == 0, "chdir failed");
+
+	/* Capture stderr to check the deprecation warning */
+	FILE *old_stderr = stderr;
+	FILE *capture    = fopen("stderr.txt", "w");
+	ASSERT(capture != nullptr, "could not open stderr capture file");
+	stderr = capture;
+
+	options opt = {
+		.inputs     = (char *[]){ "doc" },
+		.inputs_num = 1,
+	};
+	(void)handle_doc(&opt);
+
+	fclose(capture);
+	stderr = old_stderr;
+
+	char buf[4'096] = { 0 };
+	fp              = fopen("stderr.txt", "r");
+	if (fp) {
+		size_t n = fread(buf, 1, sizeof(buf) - 1, fp);
+		buf[n]   = '\0';
+		fclose(fp);
+	}
+
+	/* Cleanup first, then assert */
+	test_remove_tree("doc");
+	remove("Doxyfile");
+	remove("stderr.txt");
+	remove("Coffee.toml");
+	chdir(old_cwd);
+	rmdir(test_dir);
+
+	ASSERT(strstr(buf, "output-dir is ignored") != nullptr, "should warn that [doc] output-dir is ignored");
+	PASS();
+}
+
 void coffee_register_doc_tests(void)
 {
 	TEST_REGISTER(doc_generate_doxyfile_with_doc_section);
 	TEST_REGISTER(doc_no_doc_section);
+	TEST_REGISTER(doc_warns_on_output_dir);
 }

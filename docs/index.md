@@ -37,7 +37,7 @@ root
 ├── src/                # Source files
 
 ├── tests/              # Unit & integration tests
-├── docs/               # Documentation
+├── doc/                # Documentation (generated, gitignored)
 ├── scripts/            # Utility scripts
 └── build/              # Build artifacts (gitignored)
 ```

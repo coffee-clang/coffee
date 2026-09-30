@@ -31,7 +31,7 @@ root
 ├── tests/ <-- Unit & Integration Tests
 │ ├── test_main_lib.c
 │ └── unity/ (or reference to external)
-├── docs/ <-- Doxygen/Markdown documentation
+├── doc/ <-- Documentation (generated, ignored by Git)
 ├── scripts/ <-- Utility scripts (bash/python)
 └── build/ <-- Artifacts (ignored by Git)
 ```

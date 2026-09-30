@@ -72,7 +72,7 @@ int64_t handle_init(options *opts)
 	char src_dir[]     = "src";
 	char deps_dir[]    = "deps";
 	char tests_dir[]   = "tests";
-	char docs_dir[]    = "docs";
+	char doc_dir[]     = "doc";
 	char scripts_dir[] = "scripts";
 	char build_dir[]   = "build";
 
@@ -100,8 +100,8 @@ int64_t handle_init(options *opts)
 		return 1;
 	}
 
-	if (create_dir(docs_dir) != 0) {
-		fprintf_safe(stderr, "Error: Could not create docs directory\n");
+	if (create_dir(doc_dir) != 0) {
+		fprintf_safe(stderr, "Error: Could not create doc directory\n");
 		sdsfree(name);
 		return 1;
 	}
@@ -186,13 +186,6 @@ int64_t handle_init(options *opts)
 	sdsfree(main_header_path);
 	sdsfree(header_content);
 
-	/* Create placeholder files */
-	if (create_file("docs/index.md", skeleton_index_md) != 0) {
-		fprintf_safe(stderr, "Error: Could not create docs/index.md\n");
-		sdsfree(name);
-		return 1;
-	}
-
 	/* Detect if any src file has main() — implies a binary target */
 	bool has_bin = false;
 	DIR *d       = opendir("src");
@@ -244,7 +237,6 @@ int64_t handle_init(options *opts)
 	printf_safe("  - src/main.c\n");
 	printf_safe("  - deps/\n");
 	printf_safe("  - tests/\n");
-	printf_safe("  - docs/index.md\n");
 	printf_safe("  - scripts/\n");
 	printf_safe("  - build/\n");
 

@@ -81,7 +81,7 @@
 
 ### `coffee doc` — manifest-driven doc generation
 
-✅ **DONE** — `doc generate` reads `[doc]` section from `Coffee.toml` (project-name, output-dir, input-dirs, exclude-patterns), generates a Doxyfile, then runs doxygen. Falls back to pre-existing Doxyfile if no `[doc]` section. `doc check` verifies doxygen is installed.
+✅ **DONE** — `doc generate` reads `[doc]` section from `Coffee.toml` (project-name, input-dirs, exclude-patterns), generates a Doxyfile, then runs doxygen. Output always goes to `doc/` (HTML in `doc/html/`). Falls back to pre-existing Doxyfile if no `[doc]` section. `doc check` verifies doxygen is installed.
 
 ### `coffee config` — subcommand support
 

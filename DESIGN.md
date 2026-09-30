@@ -60,10 +60,10 @@ Commands follow one of these patterns:
 coffee init [name]
 ```
 
-Creates the canonical project structure (`src/`, `include/<name>/`, `deps/`, `tests/`, `docs/`,
+Creates the canonical project structure (`src/`, `include/<name>/`, `deps/`, `tests/`, `doc/`,
 `scripts/`, `build/`) and generates boilerplate: `Coffee.toml`, `.gitignore`, `LICENSE` (MIT), `Makefile`,
-`README.md`, `src/main.c` (hello world), `include/<name>/<name>.h` (include guard), and
-`docs/index.md`. Uses `create_dir()` / `create_file()` helpers.
+`README.md`, `src/main.c` (hello world), and `include/<name>/<name>.h` (include guard).
+Uses `create_dir()` / `create_file()` helpers.
 The project name defaults to the current directory name (sanitizing `-` and `.` to `_`).
 
 #### `new` — Create a new project in a new directory
@@ -336,8 +336,9 @@ coffee doc [check|generate]
 ```
 
 **`check`**: verifies `doxygen` is installed. **`generate`** (default): reads `[doc]` settings
-from `Coffee.toml` (`project-name`, `output-dir`, `input-dirs`, `exclude-patterns`), generates
-a `Doxyfile`, and runs `doxygen`. Falls back to `doxygen -g` if no `[doc]` section exists.
+from `Coffee.toml` (`project-name`, `input-dirs`, `exclude-patterns`), generates
+a `Doxyfile`, and runs `doxygen`. Output always goes to `doc/` (HTML in `doc/html/`).
+Falls back to `doxygen -g` if no `[doc]` section exists.
 
 #### `fmt` — Format source code
 

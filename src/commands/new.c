@@ -62,7 +62,7 @@ int64_t handle_new(options *opts)
 	sds src_dir     = sdscatprintf(sdsempty(), "%s/src", path);
 	sds deps_dir    = sdscatprintf(sdsempty(), "%s/deps", path);
 	sds tests_dir   = sdscatprintf(sdsempty(), "%s/tests", path);
-	sds docs_dir    = sdscatprintf(sdsempty(), "%s/docs", path);
+	sds doc_dir     = sdscatprintf(sdsempty(), "%s/doc", path);
 	sds scripts_dir = sdscatprintf(sdsempty(), "%s/scripts", path);
 	sds build_dir   = sdscatprintf(sdsempty(), "%s/build", path);
 
@@ -90,8 +90,8 @@ int64_t handle_new(options *opts)
 		return 1;
 	}
 
-	if (create_dir(docs_dir) != 0) {
-		fprintf_safe(stderr, "Error: Could not create docs directory\n");
+	if (create_dir(doc_dir) != 0) {
+		fprintf_safe(stderr, "Error: Could not create doc directory\n");
 		sdsfree(name);
 		return 1;
 	}
@@ -258,7 +258,6 @@ int64_t handle_new(options *opts)
 		printf_safe("  - src/lib.c\n");
 		printf_safe("  - deps/\n");
 		printf_safe("  - tests/\n");
-		printf_safe("  - docs/index.md\n");
 		printf_safe("  - scripts/\n");
 		printf_safe("  - build/\n");
 
@@ -268,21 +267,11 @@ int64_t handle_new(options *opts)
 		sdsfree(src_dir);
 		sdsfree(deps_dir);
 		sdsfree(tests_dir);
-		sdsfree(docs_dir);
+		sdsfree(doc_dir);
 		sdsfree(scripts_dir);
 		sdsfree(build_dir);
 		return 0;
 	}
-
-	/* Create placeholder files */
-	sds docs_placeholder_path = sdscatprintf(sdsempty(), "%s/docs/index.md", path);
-	if (create_file(docs_placeholder_path, skeleton_index_md) != 0) {
-		sdsfree(docs_placeholder_path);
-		fprintf_safe(stderr, "Error: Could not create docs/index.md\n");
-		sdsfree(name);
-		return 1;
-	}
-	sdsfree(docs_placeholder_path);
 
 	printf_safe("Created new C project: %s\n", name);
 	printf_safe("  - Coffee.toml\n");
@@ -292,9 +281,7 @@ int64_t handle_new(options *opts)
 	printf_safe("  - Makefile\n");
 	printf_safe("  - include/%s/%s.h\n", name, name);
 	printf_safe("  - src/main.c\n");
-	printf_safe("  - deps/\n");
 	printf_safe("  - tests/\n");
-	printf_safe("  - docs/index.md\n");
 	printf_safe("  - scripts/\n");
 	printf_safe("  - build/\n");
 
@@ -304,8 +291,9 @@ int64_t handle_new(options *opts)
 	sdsfree(src_dir);
 	sdsfree(deps_dir);
 	sdsfree(tests_dir);
-	sdsfree(docs_dir);
+	sdsfree(doc_dir);
 	sdsfree(scripts_dir);
 	sdsfree(build_dir);
+
 	return 0;
 }

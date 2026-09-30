@@ -2,6 +2,7 @@
 #ifndef SKELETONS_H_
 #define SKELETONS_H_
 
+[[maybe_unused]]
 static const char skeleton_Coffee_toml[] = "[package]\n"
                                            "name = \"__NAME__\"\n"
                                            "version = \"0.1.0\"\n"
@@ -15,6 +16,7 @@ static const char skeleton_Coffee_toml[] = "[package]\n"
                                            "sources = [\"src/*.c\"]\n"
                                            "headers = [\"include/__NAME__/*.h\"]\n";
 
+[[maybe_unused]]
 static const char skeleton_Coffee_toml_bin[] = "[package]\n"
                                                "name = \"__NAME__\"\n"
                                                "version = \"0.1.0\"\n"
@@ -32,6 +34,7 @@ static const char skeleton_Coffee_toml_bin[] = "[package]\n"
                                                "name = \"__NAME__\"\n"
                                                "src = [\"src/*.c\"]\n";
 
+[[maybe_unused]]
 static const char skeleton_Coffee_toml_lib[] = "[package]\n"
                                                "name = \"__NAME__\"\n"
                                                "version = \"0.1.0\"\n"
@@ -44,13 +47,16 @@ static const char skeleton_Coffee_toml_lib[] = "[package]\n"
                                                "src = [\"src/lib.c\"]\n"
                                                "include = [\"include\"]\n";
 
+[[maybe_unused]]
 static const char skeleton_gitignore[] = "build/\n"
+                                         "doc/\n"
                                          "target/\n"
                                          "*.o\n"
                                          "*.a\n"
                                          "*.so\n"
                                          ".tidy_stamps/\n";
 
+[[maybe_unused]]
 static const char skeleton_header_h[] = "#ifndef __NAME_UPPER___H\n"
                                         "#define __NAME_UPPER___H\n"
                                         "\n"
@@ -58,8 +64,10 @@ static const char skeleton_header_h[] = "#ifndef __NAME_UPPER___H\n"
                                         "\n"
                                         "#endif // __NAME_UPPER___H\n";
 
+[[maybe_unused]]
 static const char skeleton_index_md[] = "# Documentation\n";
 
+[[maybe_unused]]
 static const char skeleton_lib_c[] = "#include \"__NAME__/__NAME__.h\"\n"
                                      "\n"
                                      "int add(int a, int b)\n"
@@ -67,6 +75,7 @@ static const char skeleton_lib_c[] = "#include \"__NAME__/__NAME__.h\"\n"
                                      "    return a + b;\n"
                                      "}\n";
 
+[[maybe_unused]]
 static const char skeleton_LICENSE[] =
     "MIT License\n"
     "\n"
@@ -90,6 +99,7 @@ static const char skeleton_LICENSE[] =
     "OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\n"
     "SOFTWARE.\n";
 
+[[maybe_unused]]
 static const char skeleton_main_c[] = "#include <stdio.h>\n"
                                       "\n"
                                       "int main(int argc, char **argv) {\n"
@@ -97,6 +107,7 @@ static const char skeleton_main_c[] = "#include <stdio.h>\n"
                                       "    return 0;\n"
                                       "}\n";
 
+[[maybe_unused]]
 static const char skeleton_Makefile[] = "CC ?= clang\n"
                                         "CFLAGS += -std=c23 -O3 -g\n"
                                         "CFLAGS += -Wall -Wextra -Wshadow -Wpedantic\n"
@@ -124,6 +135,7 @@ static const char skeleton_Makefile[] = "CC ?= clang\n"
                                         "tidy:\n"
                                         "	clang-tidy src/*.c -- $(CFLAGS)\n";
 
+[[maybe_unused]]
 static const char skeleton_Makefile_lib[] = "CC ?= clang\n"
                                             "CFLAGS += -std=c23 -O3 -g\n"
                                             "CFLAGS += -Wall -Wextra -Wshadow -Wpedantic\n"
@@ -157,6 +169,7 @@ static const char skeleton_Makefile_lib[] = "CC ?= clang\n"
                                             "tidy:\n"
                                             "	clang-tidy src/*.c -- $(CFLAGS)\n";
 
+[[maybe_unused]]
 static const char skeleton_README_md[] = "# __NAME__\n"
                                          "\n"
                                          "A modern C project.\n";

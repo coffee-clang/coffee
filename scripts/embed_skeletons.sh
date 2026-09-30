@@ -15,6 +15,7 @@ mkdir -p "$(dirname "$OUTPUT")"
 	for f in "$SKELETONS_DIR"/*; do
 		[[ -f "$f" ]] || continue
 		name=$(basename "$f" | sed 's/[^a-zA-Z0-9]/_/g')
+		echo "[[maybe_unused]]"
 		echo "static const char skeleton_${name}[] ="
 		awk '{
 			gsub(/\\/, "\\\\");
@@ -27,3 +28,9 @@ mkdir -p "$(dirname "$OUTPUT")"
 
 	echo "#endif // SKELETONS_H_"
 } > "$OUTPUT"
+
+# Format the generated header when clang-format is available.  The header is
+# valid C without it, so a missing formatter must not fail the build.
+if command -v clang-format >/dev/null 2>&1; then
+	clang-format -i "$OUTPUT"
+fi

@@ -91,11 +91,11 @@ them on every exploration.
 │   ├── fuzz_manifest.c
 │   ├── fuzz_registry.c
 │   └── fuzz_version.c
-├── skeletons/           # Project skeleton templates (12 files)
+├── skeletons/           # Project skeleton templates (11 files)
 │   ├── Coffee.toml, Coffee.toml.bin, Coffee.toml.lib
 │   ├── LICENSE, Makefile, Makefile.lib
 │   ├── README.md, gitignore, header.h
-│   ├── index.md, lib.c, main.c
+│   ├── lib.c, main.c
 ├── scripts/             # CI/utility scripts
 └── .github/             # CI workflows
 ```
@@ -248,8 +248,9 @@ handle_doc(&opt)
     → Dispatch: "doc generate" or bare "doc" → doc_generate()
       → Find and parse manifest
       → If Doxyfile exists, run doxygen
-      → If [doc] section exists without Doxyfile, read settings (project-name, output-dir,
+      → If [doc] section exists without Doxyfile, read settings (project-name,
         input-dirs, exclude-patterns) and generate Doxyfile, then run doxygen
+        (output always goes to doc/, HTML in doc/html)
       → Otherwise print tip
 ```
 

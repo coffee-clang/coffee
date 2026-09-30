@@ -321,7 +321,6 @@ The `[doc]` section configures documentation generation via `coffee doc`.
 ```toml
 [doc]
 project-name = "My Library"
-output-dir = "docs/api"
 input-dirs = ["src", "include"]
 exclude-patterns = ["*/build/*", "*/tests/*"]
 ```
@@ -331,9 +330,11 @@ exclude-patterns = ["*/build/*", "*/tests/*"]
 | Field | Type | Description |
 |-------|------|-------------|
 | `project-name` | String | Project name for Doxygen. Default: package name. |
-| `output-dir` | String | Output directory for generated docs. Default: `"docs/api"`. |
 | `input-dirs` | Array of strings | Directories to scan for documentation comments. Default: `["src", "include"]`. |
 | `exclude-patterns` | Array of strings | Glob patterns to exclude from scanning. |
+
+Documentation is always written to the `doc/` directory (Doxygen HTML output lands in
+`doc/html/`), so the generated `.gitignore` ignores `doc/`.
 
 If `[doc]` is not present and no `Doxyfile` exists, `coffee doc` prints a tip suggesting to run `doxygen -g` or add a `[doc]` section.
 
@@ -378,7 +379,6 @@ sources = ["tests/*.c"]
 
 [doc]
 project-name = "MyLib"
-output-dir = "docs/api"
 input-dirs = ["src", "include"]
 exclude-patterns = ["*/build/*"]
 ```

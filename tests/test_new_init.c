@@ -56,7 +56,7 @@ TEST(init_generates_compilable_main)
 	ASSERT(file_exists(".gitignore"), ".gitignore should exist");
 	ASSERT(file_exists("LICENSE"), "LICENSE should exist");
 	ASSERT(file_exists("README.md"), "README.md should exist");
-	ASSERT(file_exists("docs/index.md"), "docs/index.md should exist");
+	ASSERT(file_exists("doc"), "doc/ should exist");
 
 	/* Try to compile the generated source */
 	int rc = system("clang -std=c23 -fsyntax-only src/main.c 2>/dev/null");
@@ -93,6 +93,32 @@ TEST(init_has_bin_section_when_main_present)
 
 	popd();
 	test_remove_tree_glob("/tmp/coffee-init-bin-*");
+	PASS();
+}
+
+TEST(init_gitignore_ignores_doc_output)
+{
+	char tmpdir[] = "/tmp/coffee-init-gitignore-XXXXXX";
+	assert(mkdtemp(tmpdir) != nullptr);
+	pushd(tmpdir);
+
+	options opt = { .inputs_num = 0 };
+	i64     ret = handle_init(&opt);
+	ASSERT(ret == 0, "init should succeed");
+
+	/* .gitignore should ignore the generated doc/ directory */
+	FILE *fp = fopen(".gitignore", "r");
+	ASSERT(fp != nullptr, ".gitignore should be readable");
+	char   buf[4'096] = { 0 };
+	size_t total      = 0;
+	while (fgets(buf + total, (int)(sizeof(buf) - total - 1), fp) != nullptr) {
+		total += strlen(buf + total);
+	}
+	fclose(fp);
+	ASSERT(strstr(buf, "doc/") != nullptr, ".gitignore should ignore doc/");
+
+	popd();
+	test_remove_tree_glob("/tmp/coffee-init-gitignore-*");
 	PASS();
 }
 
@@ -243,6 +269,7 @@ void coffee_register_new_init_tests(void)
 {
 	TEST_REGISTER(init_generates_compilable_main);
 	TEST_REGISTER(init_has_bin_section_when_main_present);
+	TEST_REGISTER(init_gitignore_ignores_doc_output);
 	TEST_REGISTER(new_generates_compilable_main);
 	TEST_REGISTER(new_lib_generates_compilable_lib);
 	TEST_REGISTER(new_lib_template_uses_standard_c_types);

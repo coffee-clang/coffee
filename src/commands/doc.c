@@ -13,7 +13,6 @@
 /* State for toml_str_def — use sds for thread safety and no static buffer */
 typedef struct {
 	sds project_name;
-	sds output_dir;
 	sds input_dirs;
 	sds exclude_patterns;
 } doc_settings_t;
@@ -30,13 +29,11 @@ static i64 doc_check(void)
 	return 0;
 }
 
-static void doc_settings_read(doc_settings_t *cfg, toml_table_t *doc_tab, const char *def_name, const char *def_out,
-                              const char *def_input)
+static void doc_settings_read(doc_settings_t *cfg, toml_table_t *doc_tab, const char *def_name, const char *def_input)
 {
 	memset(cfg, 0, sizeof(*cfg));
 	if (doc_tab == nullptr) {
 		cfg->project_name     = sdsnew(def_name);
-		cfg->output_dir       = sdsnew(def_out);
 		cfg->input_dirs       = sdsnew(def_input);
 		cfg->exclude_patterns = sdsnew("");
 		return;
@@ -54,11 +51,8 @@ static void doc_settings_read(doc_settings_t *cfg, toml_table_t *doc_tab, const 
 	}
 
 	raw = toml_raw_in(doc_tab, "output-dir");
-	if (raw && toml_rtos(raw, &s) == 0 && s) {
-		cfg->output_dir = sdsnew(s);
-		safe_free(s);
-	} else {
-		cfg->output_dir = sdsnew(def_out);
+	if (raw) {
+		fprintf_safe(stderr, "Warning: [doc] output-dir is ignored; documentation always goes to doc/\n");
 	}
 
 	raw = toml_raw_in(doc_tab, "input-dirs");
@@ -81,7 +75,6 @@ static void doc_settings_read(doc_settings_t *cfg, toml_table_t *doc_tab, const 
 static void doc_settings_free(doc_settings_t *cfg)
 {
 	sdsfree(cfg->project_name);
-	sdsfree(cfg->output_dir);
 	sdsfree(cfg->input_dirs);
 	sdsfree(cfg->exclude_patterns);
 }
@@ -110,13 +103,13 @@ static i64 doc_generate_doxyfile(manifest_t *m, const sds project_dir)
 
 			if (conf) {
 				toml_table_t *doc_tab = toml_table_in(conf, "doc");
-				doc_settings_read(&cfg, doc_tab, def_name, "docs/api", def_input);
+				doc_settings_read(&cfg, doc_tab, def_name, def_input);
 				toml_free(conf);
 			} else {
-				doc_settings_read(&cfg, nullptr, def_name, "docs/api", def_input);
+				doc_settings_read(&cfg, nullptr, def_name, def_input);
 			}
 		} else {
-			doc_settings_read(&cfg, nullptr, def_name, "docs/api", def_input);
+			doc_settings_read(&cfg, nullptr, def_name, def_input);
 		}
 	}
 
@@ -136,7 +129,7 @@ static i64 doc_generate_doxyfile(manifest_t *m, const sds project_dir)
 	             "PROJECT_NAME           = \"%s\"\n"
 	             "PROJECT_NUMBER         = %s\n"
 	             "PROJECT_BRIEF          = \"%s\"\n"
-	             "OUTPUT_DIRECTORY       = %s\n"
+	             "OUTPUT_DIRECTORY       = doc\n"
 	             "INPUT                  = %s\n"
 	             "RECURSIVE              = YES\n"
 	             "GENERATE_LATEX         = NO\n"
@@ -156,7 +149,7 @@ static i64 doc_generate_doxyfile(manifest_t *m, const sds project_dir)
 	             "WARNINGS               = YES\n"
 	             "WARN_IF_UNDOCUMENTED   = NO\n"
 	             "WARN_FORMAT            = \"$file:$line: $text\"\n",
-	             cfg.project_name, version, desc, cfg.output_dir, cfg.input_dirs);
+	             cfg.project_name, version, desc, cfg.input_dirs);
 
 	if (cfg.exclude_patterns && cfg.exclude_patterns[0]) {
 		fprintf_safe(df, "EXCLUDE_PATTERNS       = %s\n", cfg.exclude_patterns);
