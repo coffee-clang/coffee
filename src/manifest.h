@@ -58,6 +58,10 @@ typedef struct {
 } test_section_t;
 
 typedef struct {
+	sds makefile; /* "legacy" = run only; any other value = generate */
+} compilation_t;
+
+typedef struct {
 	package_t        package;
 	dependencies_t   dependencies;
 	feature_def_t   *features;
@@ -65,6 +69,7 @@ typedef struct {
 	binary_target_t *bin;
 	size_t           bin_count;
 	test_section_t   test;
+	compilation_t    compilation;
 } manifest_t;
 
 manifest_t *manifest_parse(sds path);

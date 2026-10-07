@@ -1,4 +1,5 @@
 #include "../src/lockfile.h"
+#include "../src/safeio.h"
 #include "../src/strings.h"
 #include "safe.h"
 #include "test_framework.h"
@@ -10,6 +11,7 @@ void coffee_register_lockfile_tests(void);
 #include <stdlib.h>
 #include <string.h>
 
+#include <glob.h>
 #include <unistd.h>
 
 TEST(lockfile_parse_simple)
@@ -143,6 +145,13 @@ TEST(lockfile_write_and_reparse)
 	i64 ret = lockfile_write("/tmp/coffee-lockfile-write-test.toml", lf);
 	ASSERT(ret == 0, "lockfile_write returned nonzero");
 
+	/* The staging file must not survive the write. */
+	glob_t g;
+	memset(&g, 0, sizeof(g));
+	int gr = glob("/tmp/coffee-lockfile-write-test.toml.*.tmp", 0, nullptr, &g);
+	ASSERT(gr == GLOB_NOMATCH, "no staging .tmp file may survive lockfile_write");
+	globfree(&g);
+
 	lockfile_free(lf);
 
 	/* Re-parse and verify */
@@ -164,6 +173,55 @@ TEST(lockfile_write_and_reparse)
 	PASS();
 }
 
+/* A symlink planted at the staging path must not be followed: the
+ * writer refuses the open instead of truncating the link target. */
+TEST(lockfile_write_refuses_symlinked_staging)
+{
+	char tmpdir[] = "/tmp/coffee-lockfile-symlink-XXXXXX";
+	ASSERT(mkdtemp(tmpdir) != nullptr, "mkdtemp failed");
+
+	/* Victim file whose content must survive the attack. */
+	sds   victim_path = sdscatprintf(sdsempty(), "%s/victim.txt", tmpdir);
+	FILE *fp          = fopen(victim_path, "w");
+	ASSERT(fp != nullptr, "could not write victim");
+	fprintf_safe(fp, "precious\n");
+	fclose(fp);
+
+	/* Plant a symlink at the staging path, pointing at the victim. */
+	sds target_path = sdscatprintf(sdsempty(), "%s/Coffee.lock", tmpdir);
+	sds staging     = tmp_path_for(target_path);
+	ASSERT(symlink(victim_path, staging) == 0, "symlink should be planted");
+
+	lockfile_t *lf = safe_calloc(1, sizeof(lockfile_t));
+	ASSERT(lf != nullptr, "calloc failed");
+	lf->version         = 1;
+	lf->package_name    = sdsnew("testwrite");
+	lf->package_version = sdsnew("3.0.0");
+
+	i64 ret = lockfile_write(target_path, lf);
+
+	/* Capture the post-attack state, then clean up before asserting so
+	 * a failure cannot leak the staging symlink or the victim. */
+	char buf[64]           = { 0 };
+	int  victim_exists     = access(victim_path, F_OK) == 0;
+	int  victim_content_ok = test_read_first_line(victim_path, buf, sizeof(buf));
+	int  no_lockfile       = access(target_path, F_OK) != 0;
+
+	unlink(staging);
+	sdsfree(staging);
+	sdsfree(target_path);
+	sdsfree(victim_path);
+	lockfile_free(lf);
+	test_remove_tree(tmpdir);
+
+	ASSERT(ret != 0, "lockfile_write must refuse a symlinked staging file");
+	ASSERT(victim_exists, "victim should still exist");
+	ASSERT(victim_content_ok, "victim should be non-empty");
+	ASSERT(strcmp(buf, "precious\n") == 0, "victim content must be unchanged");
+	ASSERT(no_lockfile, "no lockfile may be produced");
+	PASS();
+}
+
 void coffee_register_lockfile_tests(void)
 {
 	TEST_REGISTER(lockfile_parse_simple);
@@ -171,4 +229,5 @@ void coffee_register_lockfile_tests(void)
 	TEST_REGISTER(lockfile_parse_multiple_deps);
 	TEST_REGISTER(lockfile_find_dep);
 	TEST_REGISTER(lockfile_write_and_reparse);
+	TEST_REGISTER(lockfile_write_refuses_symlinked_staging);
 }

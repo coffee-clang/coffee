@@ -1,5 +1,7 @@
 #include "build.h"
 
+#include "makefile.h"
+#include "project.h"
 #include "registry.h"
 #include "safe.h"
 #include "strings.h"
@@ -434,6 +436,21 @@ bool dep_name_is_valid(const char *name)
 	return true;
 }
 
+bool build_target_is_valid(const char *target)
+{
+	if (target == nullptr || target[0] == '\0' || target[0] == '-') {
+		return false;
+	}
+	for (const char *p = target; *p != '\0'; p++) {
+		char c = *p;
+		if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '.' ||
+		      c == '-')) {
+			return false;
+		}
+	}
+	return true;
+}
+
 /*
  * Validate a version string before it is used in a filesystem path.
  * Version strings can come from third-party content (a cloned
@@ -708,5 +725,202 @@ i64 compile_sources(sds *src_files, size_t n, sds output, char *cc, const char *
 	sdsfree(flags_copy);
 	safe_free((void *)argv);
 
+	return ret;
+}
+
+/*
+ * Build a project: generate (or reuse) the Makefile and run make on the
+ * requested target.  Shared by `coffee build` and `coffee run`.
+ *
+ * The Makefile is generated from the manifest, the resolved dependency
+ * graph and the resolved features, and is written only when its content
+ * changes.  A `[compilation] Makefile = "legacy"` manifest opts out of
+ * generation: the existing Makefile is run as-is, with RELEASE/DEBUG and
+ * CFLAGS_EXTRA passed through for Makefiles that key off them.
+ */
+/* Options the parser accepts but no handler acts on yet.  Rejecting them
+ * here is the honest alternative to silently building the default target
+ * and reporting success. */
+static bool build_has_unimplemented_flag(const options *opts)
+{
+	return opts->bin != nullptr || opts->example != nullptr || opts->profile != nullptr || opts->target != nullptr;
+}
+
+static const char *build_unimplemented_flag(const options *opts)
+{
+	if (opts->bin != nullptr) {
+		return "--bin";
+	}
+	if (opts->example != nullptr) {
+		return "--example";
+	}
+	if (opts->profile != nullptr) {
+		return "--profile";
+	}
+	return "--target";
+}
+
+i64 build_project(options *opts, const char *target, sds *exe_path_out)
+{
+	if (build_has_unimplemented_flag(opts)) {
+		fprintf_safe(stderr, "Error: %s is not yet implemented\n", build_unimplemented_flag(opts));
+		return 1;
+	}
+
+	/* Find the manifest */
+	char *manifest_path = nullptr;
+	if (opts->manifest_path) {
+		manifest_path = sdsnew(opts->manifest_path);
+	} else {
+		manifest_path = project_find_manifest(nullptr);
+	}
+	if (manifest_path == nullptr) {
+		fprintf_safe(stderr, "Error: Could not find Coffee.toml in current directory\n");
+		return 1;
+	}
+
+	/* Extract project directory from manifest path */
+	char *dir_end = strrchr(manifest_path, '/');
+	sds   project_dir;
+	if (dir_end) {
+		project_dir = sdsnewlen(manifest_path, (size_t)(dir_end - manifest_path));
+	} else {
+		project_dir = sdsnew(".");
+	}
+
+	manifest_t *manifest = manifest_parse(manifest_path);
+	sdsfree(manifest_path);
+	if (manifest == nullptr) {
+		fprintf_safe(stderr, "Error: Could not parse Coffee.toml\n");
+		sdsfree(project_dir);
+		return 1;
+	}
+
+	/* Resolve the executable path against the project directory, in both
+	 * generated and legacy mode, so `coffee run` can exec it after the
+	 * cwd has been restored.  The directory goes through the same
+	 * resolution the renderer uses, so a --target-dir the Makefile would
+	 * reject does not produce a phantom "Executable not found". */
+	if (exe_path_out != nullptr) {
+		*exe_path_out = sdscatprintf(sdsempty(), "%s/%s/%s", project_dir, makefile_resolve_target_dir(opts->target_dir),
+		                             manifest->package.name);
+	}
+
+	/* Dependency resolution and make both operate relative to the
+	 * project directory, so move there for the duration of the build. */
+	char old_cwd[4'096];
+	bool have_cwd = getcwd(old_cwd, sizeof(old_cwd)) != nullptr;
+	bool moved    = false;
+	if (have_cwd && strcmp(project_dir, ".") != 0 && chdir(project_dir) == 0) {
+		moved = true;
+	}
+
+	/* Resolve features once; used by both the generated Makefile and
+	 * the legacy CFLAGS_EXTRA overlay. */
+	sds   *requested       = nullptr;
+	size_t requested_count = 0;
+	if (opts->features) {
+		features_parse_cli(opts->features, &requested, &requested_count);
+	}
+	resolved_features_t *rf = nullptr;
+	if (requested_count > 0 || (i64)opts->all_features) {
+		rf = features_resolve(manifest, requested_count > 0 ? requested : nullptr, requested_count, opts->all_features,
+		                      opts->no_default_features);
+	}
+	for (size_t i = 0; i < requested_count; i++) {
+		sdsfree(requested[i]);
+	}
+	safe_free(requested);
+
+	bool legacy = manifest->compilation.makefile != nullptr && strcmp(manifest->compilation.makefile, "legacy") == 0;
+
+	/* Run make.  Worst case in legacy mode: make, -C, dir, -jN,
+	 * RELEASE=1, DEBUG=1, CFLAGS_EXTRA=..., target, then the nullptr
+	 * terminator — 9 slots; 10 leaves one slot of slack. */
+	char  *make_argv[10];
+	size_t make_argc    = 0;
+	sds    jflag        = nullptr;
+	sds    cflags_extra = nullptr;
+
+	i64 ret = 1;
+	if (legacy) {
+		/* Run the existing Makefile */
+		if (safe_access("Makefile", F_OK) != 0) {
+			fprintf_safe(stderr, "Error: No Makefile found. Coffee requires a Makefile for building.\n");
+			fprintf_safe(stderr, "Use 'coffee new <name>' to create a new project with a Makefile template.\n");
+			goto done;
+		}
+	} else {
+		/* Generate the Makefile.  `clean` uses none of the values an
+		 * unsafe-value warning is about, so stay quiet for it. */
+		bool warn = strcmp(target, "clean") != 0;
+		if (makefile_generate(manifest, project_dir, rf, opts, warn) != 0) {
+			fprintf_safe(stderr, "Error: Could not generate Makefile\n");
+			goto done;
+		}
+	}
+
+	make_argv[make_argc++] = "make";
+	make_argv[make_argc++] = "-C";
+	make_argv[make_argc++] = unconst(moved ? "." : project_dir);
+
+	if (opts->jobs > 0) {
+		jflag                  = sdscatprintf(sdsempty(), "-j%lld", (long long)opts->jobs);
+		make_argv[make_argc++] = jflag;
+	}
+
+	if (legacy) {
+		/* Legacy Makefiles may key off these variables */
+		if ((i64)opts->release) {
+			make_argv[make_argc++] = "RELEASE=1";
+		}
+		if ((i64)opts->debug) {
+			make_argv[make_argc++] = "DEBUG=1";
+		}
+		if (rf != nullptr) {
+			size_t dflags_count = 0;
+			sds   *dflags       = features_to_compiler_flags(rf, manifest->package.name, &dflags_count);
+			if (dflags_count > 0) {
+				cflags_extra = sdsnew("CFLAGS_EXTRA=");
+				for (size_t i = 0; i < dflags_count; i++) {
+					cflags_extra = sdscatprintf(cflags_extra, "%s%s", dflags[i], (i + 1 < dflags_count) ? " " : "");
+				}
+				make_argv[make_argc++] = cflags_extra;
+			}
+			for (size_t i = 0; i < dflags_count; i++) {
+				sdsfree(dflags[i]);
+			}
+			safe_free(dflags);
+		}
+	}
+
+	if (target != nullptr && target[0] != '\0') {
+		make_argv[make_argc++] = unconst(target);
+	}
+	make_argv[make_argc] = nullptr;
+
+	if (opts->verbose) {
+		printf_safe("Running:");
+		for (size_t i = 0; i < make_argc; i++) {
+			printf_safe(" %s", make_argv[i]);
+		}
+		printf_safe("\n");
+	}
+
+	ret = run_command(make_argv, 0);
+	sdsfree(jflag);
+	sdsfree(cflags_extra);
+
+	if (ret != 0) {
+		fprintf_safe(stderr, "Build failed (make exited with code %d)\n", (int)ret);
+	}
+
+done:
+	features_free(rf);
+	manifest_free(manifest);
+	if (moved) {
+		chdir(old_cwd);
+	}
+	sdsfree(project_dir);
 	return ret;
 }

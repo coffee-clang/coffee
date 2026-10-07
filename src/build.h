@@ -48,6 +48,19 @@ sds run_command_capture(char **argv, int flags);
 i64 compile_sources(sds *src_files, size_t n, sds output, char *cc, const char *flags_in, bool verbose);
 
 /*
+ * Build a project: generate (or reuse) the Makefile and run make on the
+ * requested target.  Shared by `coffee build` and `coffee run`.
+ * Returns make's exit code.
+ *
+ * When exe_path_out is non-null, stores the resolved executable path
+ * <project_dir>/<target_dir|build>/<package name> in it (caller frees
+ * with sdsfree).  Filled in both generated and legacy mode, before make
+ * runs, so `coffee run` can exec the binary relative to the project
+ * directory.
+ */
+i64 build_project(options *opts, const char *target, sds *exe_path_out);
+
+/*
  * Resolve a dependency directory: check local deps/<name>/, vendor/<name>/,
  * then global ~/.coffee/deps/<name>/.  Returns the path (caller frees) or
  * nullptr if not found.
@@ -84,6 +97,15 @@ sds dep_parse_name(const char *entry);
  * rejected.  Returns true if the name is safe in both roles.
  */
 bool dep_name_is_valid(const char *name);
+
+/*
+ * Validate a make target name before it is passed to make.  Targets
+ * legitimately contain '.' (e.g. hello.o), so this is deliberately looser
+ * than dep_name_is_valid(): non-empty, no leading '-' (make would parse it
+ * as an option), charset [A-Za-z0-9_.-].  '/' is rejected, so build/hello.o
+ * is not a valid target; '..' is accepted, as today.
+ */
+bool build_target_is_valid(const char *target);
 
 /*
  * Validate a version string for filesystem safety before it is used in

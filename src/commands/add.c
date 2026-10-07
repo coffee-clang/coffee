@@ -12,23 +12,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-static bool is_safe_package_name(const char *name)
-{
-	const char *p;
-
-	if (name == nullptr || !*name) {
-		return false;
-	}
-
-	for (p = name; *p; p++) {
-		if (!((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || (*p >= '0' && *p <= '9') || *p == '_' ||
-		      *p == '-')) {
-			return false;
-		}
-	}
-	return true;
-}
-
 int64_t handle_add(options *opts)
 {
 	if (opts->inputs_num < 2) {
@@ -46,11 +29,10 @@ int64_t handle_add(options *opts)
 	/* Validate everything that will be interpolated into Coffee.toml
 	 * before touching the manifest.  The name is emitted as a bare TOML
 	 * key, so it must be restricted to a charset that cannot terminate
-	 * the key or start a new one.  is_safe_package_name() is the check
-	 * that enforces that; dep_name_is_valid() is kept alongside it for
-	 * parity with the parse-side guard in manifest.c, so relaxing the
-	 * charset rule alone cannot reopen the hole. */
-	if (!dep_name_is_valid(package_name) || !is_safe_package_name(package_name)) {
+	 * the key or start a new one.  dep_name_is_valid() is the single
+	 * authority for that charset: it is the same rule the parse-side guard
+	 * in manifest.c applies, so a name that parses is a name that writes. */
+	if (!dep_name_is_valid(package_name)) {
 		fprintf_safe(stderr, "Error: invalid package name '%s'\n", package_name);
 		fprintf_safe(stderr, "  Names must match [A-Za-z0-9_-]+\n");
 		return 1;

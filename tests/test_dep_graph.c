@@ -26,6 +26,7 @@
 #include <string.h>
 
 #include <ctype.h>
+#include <dirent.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -1020,6 +1021,19 @@ TEST(dep_graph_cache_hit)
 
 	ASSERT(dep_graph_path(g2, "libFoo") != nullptr, "cached path resolved");
 
+	/* The staging file must not survive the cache write. */
+	DIR *d = opendir(".coffee/build-cache");
+	ASSERT(d != nullptr, "opendir build-cache");
+	struct dirent *ent;
+	int            leftovers = 0;
+	while ((ent = readdir(d)) != nullptr) {
+		if (strstr(ent->d_name, ".tmp") != nullptr) {
+			leftovers++;
+		}
+	}
+	closedir(d);
+	ASSERT(leftovers == 0, "no .tmp staging file may survive the cache write");
+
 	dep_graph_free(g2);
 	dep_graph_free(g1);
 	manifest_free(m);
@@ -1116,6 +1130,41 @@ TEST(dep_graph_cache_corrupt_recovery)
 	dep_graph_free(g2);
 	manifest_free(m);
 	teardown_tmpdir("cachecorrupt");
+	PASS();
+}
+
+TEST(dep_graph_cache_skips_non_table_node)
+{
+	setup_tmpdir("cachemixed");
+	mkdir("src", 0755);
+	mkdir("deps", 0755);
+	create_dep("libMixed", nullptr);
+	write_manifest("cachemixed", "dependencies = [\"libMixed\"]\n");
+
+	manifest_t *m = manifest_parse("Coffee.toml");
+	ASSERT(m != nullptr, "parse");
+
+	dep_graph_t *g1 = dep_graph_get(m, nullptr, true, ".");
+	ASSERT(g1 != nullptr, "first get succeeds");
+	dep_graph_free(g1);
+
+	/* Append a non-table entry to [[nodes]].  The reader must compact
+	 * rather than leave a half-populated node that the count includes. */
+	sds   cache_path = sdscatprintf(sdsempty(), ".coffee/build-cache/cachemixed.graph");
+	FILE *cfp        = fopen(cache_path, "a");
+	ASSERT(cfp != nullptr, "open cache for append");
+	fprintf_safe(cfp, "\\nnodes = 42\\n");
+	fclose(cfp);
+	sdsfree(cache_path);
+
+	dep_graph_t *g2 = dep_graph_get(m, nullptr, true, ".");
+	ASSERT(g2 != nullptr, "get succeeds");
+	for (size_t i = 0; i < dep_graph_count(g2); i++) {
+		ASSERT(dep_graph_node_name(g2, i) != nullptr, "no node may have a null name");
+	}
+	dep_graph_free(g2);
+	manifest_free(m);
+	teardown_tmpdir("cachemixed");
 	PASS();
 }
 
@@ -1783,6 +1832,7 @@ void coffee_register_dep_graph_tests(void)
 	TEST_REGISTER(dep_graph_cache_stale_toml);
 	TEST_REGISTER(dep_graph_get_null_project_dir);
 	TEST_REGISTER(dep_graph_cache_corrupt_recovery);
+	TEST_REGISTER(dep_graph_cache_skips_non_table_node);
 	TEST_REGISTER(dep_graph_cache_with_lockfile);
 	TEST_REGISTER(dep_graph_cache_lockfile_mtime_change);
 	TEST_REGISTER(dep_graph_growth_realloc);

@@ -2,6 +2,7 @@
 
 #include "build.h"
 #include "safe.h"
+#include "safeio.h"
 #include "strings.h"
 
 #include <stdio.h>
@@ -560,6 +561,13 @@ manifest_t *manifest_parse(sds path)
 		m->test.framework      = toml_datum_to_string(framework);
 	}
 
+	/* Parse [compilation] section */
+	toml_table_t *comp_tab = toml_table_in(conf, "compilation");
+	if (comp_tab) {
+		toml_datum_t makefile   = toml_string_in(comp_tab, "Makefile");
+		m->compilation.makefile = toml_datum_to_string(makefile);
+	}
+
 	toml_free(conf);
 	return m;
 }
@@ -644,6 +652,8 @@ void manifest_free(manifest_t *m)
 	sdsfree(m->test.harness);
 	sdsfree(m->test.framework);
 
+	sdsfree(m->compilation.makefile);
+
 	safe_free(m);
 }
 
@@ -655,8 +665,8 @@ i64 manifest_write(sds path, manifest_t *m)
 
 	/* Write to a temp file, fsync, then rename over the target so a crash
 	 * or ENOSPC mid-write cannot truncate the user's Coffee.toml. */
-	sds   tmp_path = sdscatprintf(sdsempty(), "%s.tmp", path);
-	FILE *fp       = safe_fopen(tmp_path, "w");
+	sds   tmp_path = tmp_path_for(path);
+	FILE *fp       = safe_fopen_nofollow(tmp_path);
 	if (fp == nullptr) {
 		sdsfree(tmp_path);
 		return -1;
@@ -841,6 +851,11 @@ i64 manifest_write(sds path, manifest_t *m)
 		if (m->test.framework) {
 			fprintf_toml_value(fp, "framework = \"%s\"\n", m->test.framework);
 		}
+	}
+
+	if (m->compilation.makefile) {
+		fprintf_safe(fp, "\n[compilation]\n");
+		fprintf_toml_value(fp, "Makefile = \"%s\"\n", m->compilation.makefile);
 	}
 
 	if (fflush(fp) != 0) {

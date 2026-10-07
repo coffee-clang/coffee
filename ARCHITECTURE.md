@@ -27,7 +27,8 @@ them on every exploration.
 │   ├── cmdline.c/.h     # Hand-written CLI parser (getopt_long)
 │   ├── manifest.c/.h    # Coffee.toml parser/writer (TOML → manifest_t)
 │   ├── project.c/.h     # Manifest discovery (walk up dirs for Coffee.toml)
-│   ├── build.c/.h       # Build orchestration via Makefile + make (compile_sources fork+exec $CC used by test)
+│   ├── build.c/.h       # Build orchestration: build_project() (generate/reuse Makefile + make), compile_sources fork+exec $CC used by test
+│   ├── makefile.c/.h    # Generated Makefile renderer (manifest + dep graph + features → Makefile text)
 │   ├── registry.c/.h    # Remote registry client (curl-based, secondary path)
 │   ├── coffee_features.c/.h  # Feature resolution: features → -DFLAGS
 │   ├── lockfile.c/.h    # Coffee.lock parser/writer (dependency pinning)
@@ -160,13 +161,21 @@ handle_xxx(options *opt):
     return 0
 ```
 
-**Build flow** (`src/commands/build.c`):
+**Build flow** (`src/build.c` `build_project()`, `src/commands/build.c`):
 
 handle_build(&opt)
-    → Find Coffee.toml and resolve features (features_resolve → -DFEATURE_* flags)
-    → Check for Makefile; if missing, error out with "Coffee requires a Makefile"
-    → If Makefile found: fork+exec make -C <project_dir> [RELEASE=1] [DEBUG=1] [-j<N>]
-      with CFLAGS_EXTRA="-DFEATURE_* ..."
+    → target = final positional arg, or "all"
+    → build_project(&opt, target, exe_path_out)
+        → Find Coffee.toml (or --manifest-path), parse manifest
+        → Resolve features (features_resolve → -DFEATURE_* flags)
+        → If [compilation] Makefile = "legacy": run the existing Makefile as-is
+          (with RELEASE=1/DEBUG=1/CFLAGS_EXTRA passed through); error if missing
+        → Else: makefile_generate() renders the Makefile from the manifest, the
+          dep graph (dep_graph_create) and the features, and writes it only when
+          the content differs from the existing file
+        → fork+exec make -C <project_dir> [-j<N>] <target>
+    → Return make's exit code; optionally fill exe_path_out with
+      <project_dir>/<target_dir|build>/<package name> (used by `coffee run`)
 
 **Test flow** (`src/commands/test.c`):
 
@@ -391,10 +400,16 @@ Resolved by `features_resolve()`, consumed by `features_to_compiler_flags()` for
 
 ## Design decisions and rationale
 
-- **Makefile-based build.** `coffee build`, `run`, and `compile` require a Makefile and invoke `make`.
-  `coffee init` and `coffee new` generate a Makefile template. `coffee test` bypasses this
-  and compiles directly via `compile_sources()` (fork+exec `$CC`).
-  See `src/build.c` and `src/commands/build.c`.
+- **Generated Makefile build.** `coffee build` renders a `Makefile` in the project root from the manifest,
+  the resolved dependency graph and the project sources (`src/makefile.c`), writes it only when its content
+  changes, and invokes `make` on the requested target (default `all`). The generated Makefile is
+  self-contained and static: project sources plus every dependency's sources compile into a single static
+  binary, with `-I` and `-DFEATURE_*` flags baked in. A `[compilation] Makefile = "legacy"` manifest opts
+  out of generation and runs the existing Makefile as-is. `coffee run` calls the same `build_project()`
+  routine, which also returns the resolved executable path (relative to the project directory), before
+  executing the binary. `coffee test` bypasses make entirely and compiles directly via
+  `compile_sources()` (fork+exec `$CC`). `coffee init`/`coffee new` still write a skeleton Makefile
+  template. See `src/build.c`, `src/makefile.c` and `src/commands/build.c`.
 
 - **External registry.** The list of available packages can be downloaded at
   https://coffee-clang.github.io/recipes/.well-known/packages.json.zstd. This registry is read-only, therefore there

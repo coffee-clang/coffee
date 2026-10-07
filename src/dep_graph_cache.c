@@ -1,5 +1,6 @@
 #include "dep_graph.h"
 #include "safe.h"
+#include "safeio.h"
 #include "strings.h"
 
 #include <stdio.h>
@@ -17,8 +18,8 @@ static i64 dep_graph_cache_write(const dep_graph_t *g, const char *cache_path, i
 {
 	/* Write to a temp file, fsync, then rename over the target so a crash
 	 * or ENOSPC mid-write cannot truncate a previously valid cache. */
-	sds   tmp_path = sdscatprintf(sdsempty(), "%s.tmp", cache_path);
-	FILE *fp       = safe_fopen(tmp_path, "w");
+	sds   tmp_path = tmp_path_for(cache_path);
+	FILE *fp       = safe_fopen_nofollow(tmp_path);
 	if (fp == nullptr) {
 		sdsfree(tmp_path);
 		return -1;
@@ -35,7 +36,7 @@ static i64 dep_graph_cache_write(const dep_graph_t *g, const char *cache_path, i
 	for (size_t i = 0; i < g->count; i++) {
 		dep_node_t *n = &g->nodes[i];
 		fprintf_safe(fp, "\n[[nodes]]\n");
-		fprintf_safe(fp, "name = \"%s\"\n", n->name != nullptr ? n->name : "");
+		fprintf_toml_value(fp, "name = \"%s\"\n", n->name != nullptr ? n->name : "");
 
 		if (n->path != nullptr) {
 			sds esc = toml_escape(n->path);
@@ -191,6 +192,10 @@ static dep_graph_t *dep_graph_load_cached(const char *cache_path, i64 toml_mtime
 		g->offline = false;
 	}
 
+	/* Compact: a non-table entry is skipped without leaving a hole, so a
+	 * truncated or hand-edited cache cannot produce a node whose fields
+	 * are all null while the count still includes it. */
+	size_t idx = 0;
 	for (i64 i = 0; i < ncount; i++) {
 		toml_table_t *ntbl = toml_table_at(nodes_arr, i);
 		if (ntbl == nullptr) {
@@ -199,62 +204,62 @@ static dep_graph_t *dep_graph_load_cached(const char *cache_path, i64 toml_mtime
 
 		toml_datum_t name_d = toml_string_in(ntbl, "name");
 		if (name_d.ok) {
-			g->nodes[i].name = sdsnew(name_d.u.s);
+			g->nodes[idx].name = sdsnew(name_d.u.s);
 			safe_free(name_d.u.s);
 		}
 
 		toml_datum_t path_d = toml_string_in(ntbl, "path");
 		if (path_d.ok) {
-			g->nodes[i].path = sdsnew(path_d.u.s);
+			g->nodes[idx].path = sdsnew(path_d.u.s);
 			safe_free(path_d.u.s);
 		}
 
 		toml_datum_t ver_d = toml_string_in(ntbl, "version");
 		if (ver_d.ok) {
-			g->nodes[i].version = sdsnew(ver_d.u.s);
+			g->nodes[idx].version = sdsnew(ver_d.u.s);
 			safe_free(ver_d.u.s);
 		}
 
 		toml_datum_t vc_d = toml_string_in(ntbl, "version_constraint");
 		if (vc_d.ok) {
-			g->nodes[i].version_constraint = sdsnew(vc_d.u.s);
+			g->nodes[idx].version_constraint = sdsnew(vc_d.u.s);
 			safe_free(vc_d.u.s);
 		}
 
 		toml_datum_t commit_d = toml_string_in(ntbl, "commit");
 		if (commit_d.ok) {
-			g->nodes[i].commit = sdsnew(commit_d.u.s);
+			g->nodes[idx].commit = sdsnew(commit_d.u.s);
 			safe_free(commit_d.u.s);
 		}
 
 		toml_datum_t git_d = toml_bool_in(ntbl, "is_git");
 		if (git_d.ok != 0) {
-			g->nodes[i].is_git = (git_d.u.b != 0);
+			g->nodes[idx].is_git = (git_d.u.b != 0);
 		} else {
-			g->nodes[i].is_git = false;
+			g->nodes[idx].is_git = false;
 		}
 
 		toml_datum_t ref_d = toml_string_in(ntbl, "git_ref");
 		if (ref_d.ok) {
-			g->nodes[i].git_ref = sdsnew(ref_d.u.s);
+			g->nodes[idx].git_ref = sdsnew(ref_d.u.s);
 			safe_free(ref_d.u.s);
 		}
 
 		toml_datum_t url_d = toml_string_in(ntbl, "git_url");
 		if (url_d.ok) {
-			g->nodes[i].git_url = sdsnew(url_d.u.s);
+			g->nodes[idx].git_url = sdsnew(url_d.u.s);
 			safe_free(url_d.u.s);
 		}
 
 		toml_datum_t sp_d = toml_string_in(ntbl, "source_path");
 		if (sp_d.ok) {
-			g->nodes[i].source_path = sdsnew(sp_d.u.s);
+			g->nodes[idx].source_path = sdsnew(sp_d.u.s);
 			safe_free(sp_d.u.s);
 		}
 
 		toml_datum_t flags_d = toml_string_in(ntbl, "flags");
 		if (flags_d.ok) {
-			g->nodes[i].flags = sdsnew(flags_d.u.s);
+			g->nodes[idx].flags = sdsnew(flags_d.u.s);
 			safe_free(flags_d.u.s);
 		}
 
@@ -262,23 +267,32 @@ static dep_graph_t *dep_graph_load_cached(const char *cache_path, i64 toml_mtime
 		if (src_arr != nullptr) {
 			i64 src_count = toml_array_nelem(src_arr);
 			if (src_count > 0) {
-				g->nodes[i].sources   = safe_calloc((size_t)src_count, sizeof(sds));
-				g->nodes[i].src_count = 0;
-				if (g->nodes[i].sources != nullptr) {
+				g->nodes[idx].sources   = safe_calloc((size_t)src_count, sizeof(sds));
+				g->nodes[idx].src_count = 0;
+				if (g->nodes[idx].sources != nullptr) {
 					for (i64 j = 0; j < src_count; j++) {
 						toml_datum_t s = toml_string_at(src_arr, j);
 						if (s.ok) {
-							g->nodes[i].sources[g->nodes[i].src_count] = sdsnew(s.u.s);
-							g->nodes[i].src_count++;
+							g->nodes[idx].sources[g->nodes[idx].src_count] = sdsnew(s.u.s);
+							g->nodes[idx].src_count++;
 							safe_free(s.u.s);
 						}
 					}
 				}
 			}
 		}
+		idx++;
 	}
 
-	g->count = (size_t)ncount;
+	/* No usable node means the cache is not usable either: treat it as a
+	 * miss so the caller rebuilds from the manifest. */
+	if (idx == 0) {
+		dep_graph_free(g);
+		toml_free(conf);
+		return nullptr;
+	}
+
+	g->count = idx;
 	toml_free(conf);
 	return g;
 }

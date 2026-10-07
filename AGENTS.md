@@ -313,6 +313,12 @@ WSASocketA
 WSASocketW
 ```
 
+Project-owned `safe_*` wrappers are the sanctioned home for a banned function *only when
+no non-banned alternative exists*: the ban targets direct calls, and the wrapper name
+marks the sanctioned use (e.g. `safe_fdopen` in `src/safeio.h` — there is no way to
+obtain a `FILE *` from an fd otherwise). Where a non-banned alternative exists, use it:
+the `strings.h` helpers for formatting/copying and the `safe.h` allocators for memory.
+
 Follow the indication of `make tidy`, the program must be clean of warnings.
 
 ### Configuration or convention

@@ -23,6 +23,7 @@ UNITY_CORE_SRCS := \
 	$(SRC_DIR)/project.c \
 	$(SRC_DIR)/coffee_features.c \
 	$(SRC_DIR)/build.c \
+	$(SRC_DIR)/makefile.c \
 	$(SRC_DIR)/lockfile.c \
 	$(SRC_DIR)/version.c \
 	$(SRC_DIR)/dep_graph.c \
@@ -289,17 +290,31 @@ NPROC := $(shell nproc)
 SANITIZE_ADDRESS_CFLAGS  := -g -O1 -fsanitize=address -fno-omit-frame-pointer
 SANITIZE_UNDEFINED_CFLAGS := -g -O1 -fsanitize=undefined -fno-sanitize-recover=all
 
-# Run one sanitizer: clean, build, test. $1 = sanitizer name, $2 = flags
+# Run one sanitizer: clean, build, test, plus an extra in-process test pass
+# when $3 is given.  Both phases share one banner, so a failure in either is
+# never reported after a "passed" line.  $1 = sanitizer name, $2 = flags,
+# $3 = extra make variables for the extra pass (empty for none)
 define sanitize_run
 	@echo "=== Sanitizer: $(1) ==="
 	$(MAKE) clean
-	$(MAKE) -j$(NPROC) CC=clang CFLAGS_SAN="$(2)" LDFLAGS="-g $(2)"
-	$(MAKE) test CC=clang CFLAGS_SAN="$(2)" LDFLAGS="-g $(2)"
+	$(MAKE) -j$(NPROC) CC=clang CFLAGS_SAN="$(2)" LDFLAGS="$(2)"
+	$(MAKE) test CC=clang CFLAGS_SAN="$(2)" LDFLAGS="$(2)"
+	$(if $(3),$(MAKE) test $(3) CC=clang CFLAGS_SAN="$(2)" LDFLAGS="$(2)")
 	@echo "=== Sanitizer: $(1) — passed ==="
 endef
 
+# AddressSanitizer only: the test runner forks a child per test, and the child
+# _exit()s, which skips LeakSanitizer's atexit check.  The no-fork pass runs the
+# tests in-process so leaks are actually reported.  It is a dedicated pass
+# because a crashing test kills the whole suite.  Address only, matching
+# sanitizers.yml: LeakSanitizer is ASan's atexit check and UBSan has no leak
+# pass.  COFFEE_TEST_NO_FORK=1 leads the command line, as in sanitizers.yml.
+#
+# This no-fork pass is also the only guard on render-helper ownership in
+# makefile.c: no unit test asserts that makefile_render releases its
+# fragments, so a leak here fails CI here and nowhere else.
 sanitize-address:
-	$(call sanitize_run,address,$(SANITIZE_ADDRESS_CFLAGS))
+	$(call sanitize_run,address,$(SANITIZE_ADDRESS_CFLAGS),COFFEE_TEST_NO_FORK=1)
 
 sanitize-undefined:
 	$(call sanitize_run,undefined,$(SANITIZE_UNDEFINED_CFLAGS))

@@ -277,6 +277,26 @@ TEST(add_rejects_injection_inputs)
 	ASSERT(handle_add(&opt3) == 1, "bare-key injection name should be rejected");
 	sdsfree(opt3.path);
 
+	/* dep_name_is_valid() is the single name guard in add; these charsets
+	 * must still be refused after the duplicate local check was removed.
+	 * The path is one url_is_valid() accepts, so the name is the only
+	 * thing that can reject the call: without the name guard the dep is
+	 * added and the call returns 0.
+	 *
+	 * A leading '-' is deliberately absent: it is a legal bare-key char
+	 * here, and a "-x" argument never reaches the handler because
+	 * getopt consumes it as an option. */
+	const char *bad_names[] = { "a.b", "a/b", "..", "a b", "a\tb", "a$b", "a\"b" };
+	for (size_t i = 0; i < sizeof(bad_names) / sizeof(bad_names[0]); i++) {
+		options bad = {
+			.inputs     = (char *[]){ "add", (char *)bad_names[i] },
+			.inputs_num = 2,
+			.path       = sdsnew("./lib"),
+		};
+		ASSERT(handle_add(&bad) == 1, "name outside the bare-key charset should be rejected");
+		sdsfree(bad.path);
+	}
+
 	/* Valid name, hostile source or version. */
 	options opt4 = {
 		.inputs     = (char *[]){ "add", "mylib" },
@@ -673,7 +693,9 @@ TEST(registry_search_parses_mock_index)
 	fprintf_safe(fp, "{\n\"name\": \"alpha\",\n\"version\": \"1.0.0\",\n\"description\": \"test pkg\"\n}\n");
 	fclose(fp);
 
-	recipe_list_t *list = registry_search(sdsnew("alpha"));
+	sds            query = sdsnew("alpha");
+	recipe_list_t *list  = registry_search(query);
+	sdsfree(query);
 	ASSERT(list != nullptr, "search should return a list");
 	ASSERT(list->count == 1, "one recipe should match");
 	if (list->count > 0) {

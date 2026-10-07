@@ -68,6 +68,10 @@ typedef int64_t  i64;
  * via fputs(3).  No `fprintf` / `vfprintf` family functions are
  * called, which keeps the codebase clear of banned functions.
  *
+ * A write error is ignored.  The common cause is a non-writable stream
+ * while a warning is being emitted, and aborting there would fail the
+ * very operation the warning is about.
+ *
  * @param stream  The output stream (e.g. stdout, stderr, a file).
  * @param fmt     printf(3)-style format string.
  * @param ...     Arguments for the format string.
@@ -82,9 +86,7 @@ static inline void fprintf_safe(FILE *stream, const char *fmt, ...)
 	va_start(ap, fmt);
 	sds str = sdscatvprintf(sdsempty(), fmt, ap);
 	va_end(ap);
-	if (fputs(str, stream) == EOF) {
-		exit(1);
-	}
+	(void)fputs(str, stream);
 	sdsfree(str);
 }
 

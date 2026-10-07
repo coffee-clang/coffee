@@ -153,3 +153,15 @@ void test_remove_tree_glob(const char *pattern)
 		globfree(&g);
 	}
 }
+
+int test_read_first_line(const char *path, char *buf, size_t bufsize)
+{
+	memset(buf, 0, bufsize);
+	FILE *fp = fopen(path, "r");
+	if (fp == nullptr) {
+		return 0;
+	}
+	int ok = fgets(buf, bufsize, fp) != nullptr;
+	fclose(fp);
+	return ok;
+}

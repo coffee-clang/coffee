@@ -14,6 +14,7 @@ This document is the complete reference for the file format.
 | `[[bin]]` | Array of tables | No | Binary targets |
 | `[test]` | Table | No | Test configuration |
 | `[doc]` | Table | No | Documentation generation settings |
+| `[compilation]` | Table | No | Makefile generation settings |
 
 ---
 
@@ -396,6 +397,42 @@ version = "0.1.0"
 ```
 
 ---
+
+## The `[compilation]` Section
+
+The `[compilation]` section controls how `coffee build` produces the Makefile. The section is optional.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `Makefile` | String | `"legacy"` runs the existing Makefile as-is; any other value enables Makefile generation. |
+
+```toml
+[compilation]
+Makefile = "legacy"
+```
+
+- **Section absent** (the default): `coffee build` generates a `Makefile` in the project root from the
+  manifest, the resolved dependency graph and the project sources, and overwrites it when its content
+  changes. The generated Makefile is self-contained and static: project sources plus every dependency's
+  sources are compiled into a single static binary, with `-I` and `-DFEATURE_*` flags baked in.
+- **`Makefile = "legacy"`**: the Makefile is not generated; `coffee build` only runs the existing
+  `Makefile` (with `RELEASE=1`/`DEBUG=1`/`CFLAGS_EXTRA` passed through for Makefiles that key off them).
+  A missing Makefile is an error.
+- **Any other value**: equivalent to the section being absent — the Makefile is generated and overwritten.
+
+The generated Makefile is always written to `Makefile` in the project root. It is rebuilt from scratch at
+each `coffee build` call, but only written when its content actually differs from the existing file, so an
+up-to-date build has no effect on disk.
+
+The generated build is fixed in the following ways, and `[compilation]` does not (yet) change them:
+
+- a static link (`-static`)
+- `clang` as the default compiler, overridable with `CC` in the environment or on the `make` command line
+- `-O3 -g` by default, `-O3` with `--release`, `-O0 -g -DDEBUG` with `--debug`
+- `-std=<edition>` from `[package] edition`, defaulting to `c23`
+
+For any other compiler, standard, optimization or link mode, opt into legacy mode with
+`Makefile = "legacy"` and provide your own Makefile.
 
 ## Lockfile
 

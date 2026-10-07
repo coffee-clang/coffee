@@ -54,6 +54,7 @@ static const char skeleton_gitignore[] = "build/\n"
                                          "*.o\n"
                                          "*.a\n"
                                          "*.so\n"
+                                         "*.tmp\n"
                                          ".tidy_stamps/\n";
 
 [[maybe_unused]]
@@ -63,9 +64,6 @@ static const char skeleton_header_h[] = "#ifndef __NAME_UPPER___H\n"
                                         "// Your declarations here\n"
                                         "\n"
                                         "#endif // __NAME_UPPER___H\n";
-
-[[maybe_unused]]
-static const char skeleton_index_md[] = "# Documentation\n";
 
 [[maybe_unused]]
 static const char skeleton_lib_c[] = "#include \"__NAME__/__NAME__.h\"\n"

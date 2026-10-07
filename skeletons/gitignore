@@ -4,4 +4,5 @@ target/
 *.o
 *.a
 *.so
+*.tmp
 .tidy_stamps/

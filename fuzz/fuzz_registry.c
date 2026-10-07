@@ -58,14 +58,22 @@ int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size)
 	unsetenv("no_proxy");
 	unsetenv("NO_PROXY");
 
-	/* Exercise the JSON parser via registry_search */
-	recipe_list_t *list = registry_search(sdsempty());
+	/* Exercise the JSON parser via registry_search.  The query is borrowed by
+	 * registry_search, so the harness owns it and frees it after the call. */
+	sds            query = sdsempty();
+	recipe_list_t *list  = registry_search(query);
+	sdsfree(query);
 	if (list != nullptr) {
 		registry_free_recipes(list);
 	}
 
 	/* Also exercise registry_get (lookup a single package) */
-	registry_get(sdsnew("test"));
+	sds       name   = sdsnew("test");
+	recipe_t *recipe = registry_get(name);
+	sdsfree(name);
+	if (recipe != nullptr) {
+		registry_free_recipe(recipe);
+	}
 
 	/* Cleanup */
 	unlink(indexpath);

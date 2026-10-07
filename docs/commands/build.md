@@ -4,26 +4,62 @@ Compile the project.
 
 ## Description
 
-Compiles the C project defined in `Coffee.toml`. Delegates to `make` for the actual compilation, passing the project directory and build flags.
+Compiles the C project defined in `Coffee.toml`. Unless the manifest opts into legacy mode, `coffee build`
+generates a `Makefile` in the project root from the manifest, the resolved dependency graph and the project
+sources, then runs `make` on the requested target.
+
+The generated Makefile is self-contained and static: project sources plus every dependency's sources are
+compiled into a single static binary, with `-I` and `-DFEATURE_*` flags baked in. Dependencies that ship no
+sources (prebuilt libraries) are linked via `-L`/`-l`, with the `-l` flags expanded after the objects on the
+link line. It is rebuilt from scratch at each call, but only written when its content differs from the
+existing file, so an up-to-date build has no effect on disk; the write is atomic (temp file + rename, fsynced).
 
 ## Usage
 
 ```
-coffee build [options]
+coffee build [options] [target]
 ```
+
+The final positional argument selects the make target; a bare `coffee build` builds the default target
+`all`. For example, `coffee build test` runs the `test` target.
 
 ## Options
 
-- `--release` - Build in release mode (passes `RELEASE=1` to make)
-- `--debug` - Build with debug symbols (passes `DEBUG=1` to make)
+- `--release` - Build in release mode (no debug symbols)
+- `--debug` - Build with debug symbols (`-O0 -g -DDEBUG`)
 - `-j, --jobs N` - Number of parallel jobs (passed as `-jN`)
-- `--target-dir DIR` - Output directory for artifacts
+- `--target-dir DIR` - Output directory for artifacts (default `build`)
+- `--features FEATURES` - Enable the given features (`-DFEATURE_*` flags)
+- `--all-features` - Enable all features
+- `--no-default-features` - Do not enable the `default` feature
 
+`--bin`, `--example`, `--profile` and `--target` are accepted by the parser but not implemented: `coffee build`
+rejects them instead of silently building the default target.
+
+## Legacy mode
+
+If `Coffee.toml` contains `[compilation] Makefile = "legacy"`, the Makefile is not generated: the existing
+`Makefile` is run as-is, with `RELEASE=1`/`DEBUG=1`/`CFLAGS_EXTRA` passed through. A missing Makefile is an
+error. See [the Coffee.toml specification](../coffee-toml.md) for details.
 
 ## Implementation Notes
 
 - Finds `Coffee.toml` in current directory or parent directories
-- Runs `make -C <project_dir>` with `RELEASE=1`/`DEBUG=1` flags and `-jN` for parallel jobs
-- Feature flags are passed as `CFLAGS_EXTRA=-DFEATURE_<NAME>` to make
-- Output directory is determined by the Makefile (typically `build/`); use `--target-dir` to override
-
+- Generates the Makefile (unless legacy) and runs `make -C <project_dir> [-jN] <target>`
+- The generated Makefile defines the targets `all`, `clean`, `test`, `bench`, `format` and `tidy`
+- Output directory is `build/` by default; use `--target-dir` to override
+- The default compiler is clang, but an explicit `CC` from the environment or the make command line wins
+- Values interpolated into the Makefile are validated: single-word values (`edition`, `--target-dir`, source
+  globs) against a strict allowlist, and path-class values (dependency flags, concrete dependency sources)
+  against a metacharacter deny-list, re-quoted when they contain a space so a dependency under a `$HOME`
+  with a space or non-ASCII bytes still builds. Unsafe values are skipped with a warning or fall back to a
+  safe default; `coffee build clean` renders silently, since it uses none of them
+- The generated build is always a static link (`-static`), always clang by default, with `-O3 -g` unless
+  `--release` or `--debug` says otherwise. These are not configurable from `Coffee.toml` today; use
+  `[compilation] Makefile = "legacy"` and your own Makefile if you need other settings
+- `bench` and `test` in the generated Makefile are placeholders: each depends on `all` and echoes a pointer
+  to `coffee bench` / `coffee test` without running anything. Use those commands directly — they compile and
+  run in one step and do not need the generated Makefile. Wiring `make test` to run the suite would mean
+  either duplicating the source discovery in `src/commands/test.c` inside a Makefile recipe, or making the
+  generated Makefile depend on `coffee` already being on `PATH`, which breaks a freshly generated project's
+  first build

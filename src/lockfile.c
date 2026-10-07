@@ -1,6 +1,7 @@
 #include "lockfile.h"
 
 #include "safe.h"
+#include "safeio.h"
 #include "strings.h"
 
 #include <stdio.h>
@@ -128,8 +129,8 @@ i64 lockfile_write(sds path, lockfile_t *lf)
 
 	/* Write to a temp file, fsync, then rename over the target so a crash
 	 * or ENOSPC mid-write cannot truncate the user's Coffee.lock. */
-	sds   tmp_path = sdscatprintf(sdsempty(), "%s.tmp", path);
-	FILE *fp       = safe_fopen(tmp_path, "w");
+	sds   tmp_path = tmp_path_for(path);
+	FILE *fp       = safe_fopen_nofollow(tmp_path);
 	if (fp == nullptr) {
 		sdsfree(tmp_path);
 		return -1;

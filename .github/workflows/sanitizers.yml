@@ -14,9 +14,9 @@ jobs:
         sanitizer: [address, undefined]
         include:
           - sanitizer: address
-            cflags: "-fsanitize=address -fno-omit-frame-pointer"
+            cflags: "-g -O1 -fsanitize=address -fno-omit-frame-pointer"
           - sanitizer: undefined
-            cflags: "-fsanitize=undefined -fno-sanitize-recover=all"
+            cflags: "-g -O1 -fsanitize=undefined -fno-sanitize-recover=all"
     steps:
       - uses: actions/checkout@v7
 

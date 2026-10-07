@@ -37,11 +37,23 @@ int64_t handle_bench(options *opts)
 
 	sdsfree(manifest_path);
 
-	sds inc_flags = sdsempty();
-	if (m) {
-		sdsfree(inc_flags);
-		inc_flags = build_include_flags(m);
+	if (m == nullptr) {
+		fprintf_safe(stderr, "Error: Could not parse Coffee.toml\n");
+		sdsfree(project_dir);
+		return 1;
 	}
+
+	/* The generated Makefile's bench target is a placeholder, so running it
+	 * would report success for work that never happened.  Say so instead. */
+	bool legacy = m->compilation.makefile != nullptr && strcmp(m->compilation.makefile, "legacy") == 0;
+	if (!legacy) {
+		printf_safe("The generated Makefile has no bench target yet; nothing was run.\n");
+		manifest_free(m);
+		sdsfree(project_dir);
+		return 0;
+	}
+
+	sds inc_flags = build_include_flags(m);
 
 	char  *make_argv[16];
 	size_t make_argc = 0;
@@ -72,10 +84,7 @@ int64_t handle_bench(options *opts)
 	sdsfree(inc_arg);
 	sdsfree(inc_flags);
 	sdsfree(project_dir);
-
-	if (m) {
-		manifest_free(m);
-	}
+	manifest_free(m);
 
 	if (ret != 0) {
 		fprintf_safe(stderr, "Error: bench failed\n");

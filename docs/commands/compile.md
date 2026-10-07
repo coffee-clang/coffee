@@ -1,13 +1,14 @@
 # compile
 
-Compile without linking.
+Compile the project.
 
 ## Description
 
-Compiles source files to object files without linking.
+Alias for `coffee build`: compiles the C project defined in `Coffee.toml`, generating the Makefile unless
+the manifest opts into legacy mode. See [build](build.md) for details.
 
 ## Usage
 
 ```
-coffee compile
+coffee compile [options] [target]
 ```

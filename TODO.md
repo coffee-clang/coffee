@@ -21,7 +21,12 @@
 
 ### `coffee build` incremental awareness
 
-✅ **DONE** — Runs `make` without arguments when a Makefile is present. Errors out if no Makefile is present (a Makefile is required). Supports `--release`, `--debug`, `-j`, and feature flags.
+✅ **DONE** — Generates a `Makefile` in the project root from the manifest, the resolved dependency graph
+and the project sources (`src/makefile.c`), writing it only when its content changes, then runs `make` on
+the requested target (default `all`; `coffee build test` runs the `test` target). The generated build is
+self-contained and static (sources + `-I` + `-DFEATURE_*` baked in). `[compilation] Makefile = "legacy"`
+runs the existing Makefile as-is with `RELEASE=1`/`DEBUG=1`/`CFLAGS_EXTRA` passed through. `coffee run`
+shares the same `build_project()` routine. Supports `--release`, `--debug`, `-j`, and feature flags.
 
 ### Transitive dependency resolution
 
@@ -90,6 +95,21 @@
 ### `coffee metadata` — add resolved features + transitive deps
 
 ✅ **DONE** — Outputs JSON with package name, version, edition, description, license, dependencies, resolved feature set, and full transitive dependency tree (via dep_graph, no registry).
+
+### `[compilation]` — configure the generated build
+
+⬜ **OPEN** — The generated Makefile hardcodes `-static`, `clang` and `-O3 -g`, none of which
+`Coffee.toml` can change. Add optional `cflags` / `ldflags` arrays and a `static` bool to the
+`[compilation]` section so a project that cannot be linked statically, or needs another standard,
+is buildable by coffee. Deferred on purpose: it is a `Coffee.toml` schema change and deserves its
+own plan; today the documented escape hatch is `[compilation] Makefile = "legacy"`.
+
+### `coffee build --bin` / `--example` / `--profile` / `--target`
+
+⬜ **OPEN** — The parser accepts these, and `coffee build` now rejects them with
+"not yet implemented" instead of silently building the default target. `--bin` needs
+multiple targets with per-target object rules and a different link recipe; `--target` needs
+cross-compilation support.
 
 ---
 

@@ -88,4 +88,10 @@ void test_remove_tree(const char *path);
 /* Remove every path matching a glob pattern (e.g. "/tmp/coffee-*-test-*"). */
 void test_remove_tree_glob(const char *pattern);
 
+/* --- File reading helpers --- */
+
+/* Read the first line of a file into buf (zeroed first). Returns 1 on
+ * success, 0 if the file cannot be opened or read. */
+int test_read_first_line(const char *path, char *buf, size_t bufsize);
+
 #endif /* TEST_FRAMEWORK_H_ */
