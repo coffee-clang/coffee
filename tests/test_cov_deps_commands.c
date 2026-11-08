@@ -1331,6 +1331,107 @@ TEST(cov_fetch_registry_failures)
 	PASS();
 }
 
+/* A recipe that ships install.sh is installed by running the script; deps/<name>
+ * then points at $COFFEE_HOME/<name>/<version>, so cflags and libs see its
+ * include/ and lib/ folders.  A completed install is not rerun. */
+TEST(cov_fetch_registry_install_script)
+{
+	sds root = tmp_new();
+	sandbox_on(root);
+	proj_enter(root, "instproj", "[dependencies]\nregdep = \"1.0\"\n");
+
+	sds   recipe_dir   = join(root, "registry/recipes/r/regdep");
+	char *mkdir_argv[] = { "mkdir", "-p", recipe_dir, nullptr };
+	run_command(mkdir_argv, RUN_CMD_QUIET);
+	sds recipe = join(recipe_dir, "library.toml");
+	write_text(recipe, "version = \"1.0.0\"\nrecipe_url = \"https://example.invalid/regdep-1.0.0.tar.gz\"\n");
+	sds script = join(recipe_dir, "install.sh");
+	write_text(script, "set -e\n"
+	                   "PREFIX=\"$COFFEE_HOME/regdep/1.0.0\"\n"
+	                   "mkdir -p \"$PREFIX/include\" \"$PREFIX/lib\"\n"
+	                   "echo '#define REGDEP 1' > \"$PREFIX/include/regdep.h\"\n"
+	                   "echo run >> \"$COFFEE_HOME/install-runs\"\n");
+
+	stdout_begin("out.txt");
+	i64 ret = run_cmd(handle_fetch, "fetch", nullptr, nullptr);
+	stdout_end();
+	ASSERT(ret == 0, "install.sh recipe is fetched");
+	ASSERT(safe_access("deps/regdep/include/regdep.h", F_OK) == 0, "deps/regdep points at the install prefix");
+	ASSERT(safe_access("deps/regdep/lib", F_OK) == 0, "installed lib/ is visible");
+	sds lock = lock_text();
+	ASSERT(strstr(lock, "regdep/1.0.0") != nullptr, "lockfile records the install prefix");
+	sdsfree(lock);
+
+	stdout_begin("cflags.txt");
+	ret = run_cmd(handle_cflags, "cflags", nullptr, nullptr);
+	stdout_end();
+	ASSERT(ret == 0, "cflags succeeds");
+	ASSERT(file_contains("cflags.txt", "-Ideps/regdep/include"), "cflags points at the installed include/");
+
+	stdout_begin("libs.txt");
+	ret = run_cmd(handle_libs, "libs", nullptr, nullptr);
+	stdout_end();
+	ASSERT(ret == 0, "libs succeeds");
+	ASSERT(file_contains("libs.txt", "-Ldeps/regdep/lib"), "libs points at the installed lib/");
+
+	/* A second fetch reuses the completed install. */
+	stdout_begin("out.txt");
+	ret = run_cmd(handle_fetch, "fetch", nullptr, nullptr);
+	stdout_end();
+	ASSERT(ret == 0, "re-fetch succeeds");
+	sds runs_path = join(root, "home/install-runs");
+	sds runs      = read_text(runs_path);
+	ASSERT(runs != nullptr && strcmp(runs, "run\n") == 0, "install.sh ran once");
+	sdsfree(runs);
+	sdsfree(runs_path);
+
+	sdsfree(script);
+	sdsfree(recipe);
+	sdsfree(recipe_dir);
+	sandbox_off();
+	leave_dir(root);
+	PASS();
+}
+
+/* A failing install.sh fails the fetch without falling back to recipe_url. */
+TEST(cov_fetch_registry_install_script_fails)
+{
+	sds root = tmp_new();
+	sandbox_on(root);
+	proj_enter(root, "failproj", "[dependencies]\nregdep = \"1.0\"\n");
+
+	sds   recipe_dir   = join(root, "registry/recipes/r/regdep");
+	char *mkdir_argv[] = { "mkdir", "-p", recipe_dir, nullptr };
+	run_command(mkdir_argv, RUN_CMD_QUIET);
+	sds recipe = join(recipe_dir, "library.toml");
+	write_text(recipe, "version = \"1.0.0\"\nrecipe_url = \"https://example.invalid/regdep.git\"\n");
+	sds script = join(recipe_dir, "install.sh");
+	write_text(script, "exit 3\n");
+
+	stderr_begin("err.txt");
+	i64 ret = run_cmd(handle_fetch, "fetch", nullptr, nullptr);
+	stderr_end();
+	ASSERT(ret == 1, "failing install.sh fails the fetch");
+	ASSERT(file_contains("err.txt", "install.sh for 'regdep' failed"), "failure is reported");
+	ASSERT(safe_access("deps/regdep", F_OK) != 0, "nothing is linked");
+
+	/* A version that is not a safe path component is refused. */
+	write_text(recipe, "version = \"../1.0.0\"\n");
+	write_text(script, "exit 0\n");
+	stderr_begin("err.txt");
+	ret = run_cmd(handle_fetch, "fetch", nullptr, nullptr);
+	stderr_end();
+	ASSERT(ret == 1, "invalid recipe version fails the fetch");
+	ASSERT(file_contains("err.txt", "invalid version"), "invalid version is reported");
+
+	sdsfree(script);
+	sdsfree(recipe);
+	sdsfree(recipe_dir);
+	sandbox_off();
+	leave_dir(root);
+	PASS();
+}
+
 TEST(cov_fetch_offline_git_deps)
 {
 	sds root   = tmp_new();
@@ -2721,6 +2822,8 @@ void coffee_register_cov_deps_commands_tests(void)
 	TEST_REGISTER(cov_fetch_path_dep_variants);
 	TEST_REGISTER(cov_fetch_transitive_path_dep);
 	TEST_REGISTER(cov_fetch_registry_failures);
+	TEST_REGISTER(cov_fetch_registry_install_script);
+	TEST_REGISTER(cov_fetch_registry_install_script_fails);
 	TEST_REGISTER(cov_fetch_offline_git_deps);
 	TEST_REGISTER(cov_fetch_head_commit_edge_cases);
 	TEST_REGISTER(cov_fetch_link_failure);
