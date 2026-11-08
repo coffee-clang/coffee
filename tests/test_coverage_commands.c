@@ -5,6 +5,7 @@
  * then cleans up.  Targets commands below ~50% coverage.
  */
 #include "../src/coffee.h"
+#include "../src/lockfile.h"
 #include "../src/manifest.h"
 #include "../src/project.h"
 #include "../src/registry.h"
@@ -31,7 +32,7 @@ static void setup_proj(const char *name, const char *deps_toml, bool with_main)
 	assert(getcwd(saved_cwd, sizeof(saved_cwd)) != nullptr);
 	assert(chdir(tmpdir) == 0);
 
-	FILE *fp = fopen("Coffee.toml", "w");
+	FILE *fp = safe_fopen("Coffee.toml", "w");
 	assert(fp);
 	/* Root-level deps first, then [package] section */
 	if (deps_toml) {
@@ -41,20 +42,20 @@ static void setup_proj(const char *name, const char *deps_toml, bool with_main)
 	fprintf_safe(fp, "name = \"%s\"\n", name);
 	fprintf_safe(fp, "version = \"1.0.0\"\n");
 	fprintf_safe(fp, "edition = \"c23\"\n");
-	fclose(fp);
+	safe_fclose(fp);
 
 	mkdir("src", 0755);
 	mkdir("tests", 0755);
 	if (with_main) {
-		FILE *mc = fopen("src/main.c", "w");
+		FILE *mc = safe_fopen("src/main.c", "w");
 		if (mc) {
 			fprintf_safe(mc, "int main(void) { return 0; }\n");
-			fclose(mc);
+			safe_fclose(mc);
 		}
 	}
 
 	/* Create a minimal Makefile so test/bench commands succeed */
-	FILE *mf = fopen("Makefile", "w");
+	FILE *mf = safe_fopen("Makefile", "w");
 	if (mf) {
 		fprintf_safe(mf, "CC = clang\n");
 		fprintf_safe(mf, "CFLAGS = -std=c23 -g -O0\n");
@@ -65,10 +66,31 @@ static void setup_proj(const char *name, const char *deps_toml, bool with_main)
 		fprintf_safe(mf, "\n");
 		fprintf_safe(mf, "bench:\n");
 		fprintf_safe(mf, "\t@echo \"bench complete\"\n");
-		fclose(mf);
+		safe_fclose(mf);
 	}
 
 	sdsfree(tmpdir);
+}
+
+/* Write a Coffee.lock in the format src/lockfile.c reads (`version = 1` and
+ * `[[dependencies]]`) and check that the parser really sees the dependency. */
+static bool write_lockfile(const char *dep, const char *version, const char *path)
+{
+	FILE *lf = safe_fopen("Coffee.lock", "w");
+	if (lf == nullptr) {
+		return false;
+	}
+	fprintf_safe(lf, "version = 1\n\n[[dependencies]]\n");
+	fprintf_safe(lf, "name = \"%s\"\nversion = \"%s\"\npath = \"%s\"\n", dep, version, path);
+	safe_fclose(lf);
+
+	sds         lock_path = sdsnew("Coffee.lock");
+	lockfile_t *parsed    = lockfile_parse(lock_path);
+	sdsfree(lock_path);
+	bool ok = parsed != nullptr && parsed->deps_count == 1 && strcmp(parsed->deps[0].name, dep) == 0 &&
+	          strcmp(parsed->deps[0].path, path) == 0;
+	lockfile_free(parsed);
+	return ok;
 }
 
 static void teardown_proj(const char *name)
@@ -109,9 +131,9 @@ TEST(cov_machete_with_deps)
 {
 	setup_proj("machete-deps", "dependencies = [\"used-dep\", \"unused-dep\"]", true);
 	/* Create a source file that uses "used-dep" by name */
-	FILE *fp = fopen("src/main.c", "w");
+	FILE *fp = safe_fopen("src/main.c", "w");
 	fprintf_safe(fp, "#include <stdio.h>\nint main(void) {\n  (void)\"used-dep\";\n  return 0;\n}\n");
-	fclose(fp);
+	safe_fclose(fp);
 
 	options opt = { .inputs = (char *[]){ "machete" }, .inputs_num = 1 };
 	i64     ret = handle_machete(&opt);
@@ -127,13 +149,7 @@ TEST(cov_tree_with_deps)
 {
 	setup_proj("tree-deps", "dependencies = [\"dep-a\"]", true);
 	/* Create a lockfile with dep-a */
-	FILE *lf = fopen("Coffee.lock", "w");
-	ASSERT(lf != nullptr, "create lockfile");
-	fprintf_safe(lf, "[[dependency]]\n");
-	fprintf_safe(lf, "name = \"dep-a\"\n");
-	fprintf_safe(lf, "version = \"1.0.0\"\n");
-	fprintf_safe(lf, "path = \"/tmp/dep-a\"\n");
-	fclose(lf);
+	ASSERT(write_lockfile("dep-a", "1.0.0", "/tmp/dep-a"), "lockfile with one dependency");
 
 	options opt = { .inputs = (char *[]){ "tree" }, .inputs_num = 1 };
 	i64     ret = handle_tree(&opt);
@@ -177,14 +193,7 @@ TEST(cov_update_with_deps)
 {
 	setup_proj("update-deps", "dependencies = [\"update-dep\"]", true);
 	/* Needs a lockfile to update */
-	FILE *lf = fopen("Coffee.lock", "w");
-	if (lf) {
-		fprintf_safe(lf, "[[dependency]]\n");
-		fprintf_safe(lf, "name = \"update-dep\"\n");
-		fprintf_safe(lf, "version = \"1.0.0\"\n");
-		fprintf_safe(lf, "path = \"/tmp/update-dep\"\n");
-		fclose(lf);
-	}
+	ASSERT(write_lockfile("update-dep", "1.0.0", "/tmp/update-dep"), "lockfile with one dependency");
 
 	options opt = { .inputs = (char *[]){ "update" }, .inputs_num = 1 };
 	i64     ret = handle_update(&opt);
@@ -273,14 +282,7 @@ TEST(cov_outdated_with_deps)
 {
 	setup_proj("outdated-deps", "dependencies = [\"out-dep\"]", true);
 	/* Create a lockfile */
-	FILE *lf = fopen("Coffee.lock", "w");
-	if (lf) {
-		fprintf_safe(lf, "[[dependency]]\n");
-		fprintf_safe(lf, "name = \"out-dep\"\n");
-		fprintf_safe(lf, "version = \"0.1.0\"\n");
-		fprintf_safe(lf, "path = \"/tmp/out-dep\"\n");
-		fclose(lf);
-	}
+	ASSERT(write_lockfile("out-dep", "0.1.0", "/tmp/out-dep"), "lockfile with one dependency");
 
 	options opt = { .inputs = (char *[]){ "outdated" }, .inputs_num = 1 };
 	i64     ret = handle_outdated(&opt);
@@ -315,10 +317,10 @@ TEST(cov_build_locked)
 {
 	setup_proj("build-locked", nullptr, true);
 	/* Create lockfile needed for --locked */
-	FILE *lf = fopen("Coffee.lock", "w");
+	FILE *lf = safe_fopen("Coffee.lock", "w");
 	if (lf) {
-		fprintf_safe(lf, "version = \"1\"\n");
-		fclose(lf);
+		fprintf_safe(lf, "version = 1\n");
+		safe_fclose(lf);
 	}
 
 	options opt = {
@@ -339,10 +341,10 @@ TEST(cov_check_valid)
 	setup_proj("check-valid", nullptr, true);
 
 	/* Add license to [package] section manually */
-	FILE *fp = fopen("Coffee.toml", "a");
+	FILE *fp = safe_fopen("Coffee.toml", "a");
 	if (fp) {
 		fprintf_safe(fp, "license = \"MIT\"\n");
-		fclose(fp);
+		safe_fclose(fp);
 	}
 
 	options opt = { .inputs = (char *[]){ "check" }, .inputs_num = 1 };
@@ -491,10 +493,10 @@ TEST(cov_cflags_with_dep_dir)
 	mkdir("deps/cflagsdep", 0755);
 	mkdir("deps/cflagsdep/include", 0755);
 
-	FILE *fp = fopen("deps/cflagsdep/include/test.h", "w");
+	FILE *fp = safe_fopen("deps/cflagsdep/include/test.h", "w");
 	if (fp) {
 		fprintf_safe(fp, "/* test */\n");
-		fclose(fp);
+		safe_fclose(fp);
 	}
 
 	options opt = {
@@ -820,12 +822,12 @@ TEST(cov_check_no_name)
 	ASSERT(chdir(tmpdir) == 0, "chdir");
 
 	/* Create a malformed manifest with no name */
-	FILE *fp = fopen("Coffee.toml", "w");
+	FILE *fp = safe_fopen("Coffee.toml", "w");
 	assert(fp);
 	fprintf_safe(fp, "[package]\n");
 	fprintf_safe(fp, "version = \"1.0.0\"\n");
 	fprintf_safe(fp, "edition = \"c23\"\n");
-	fclose(fp);
+	safe_fclose(fp);
 
 	options opt = { .inputs = (char *[]){ "check" }, .inputs_num = 1 };
 	i64     ret = handle_check(&opt);
@@ -878,23 +880,23 @@ TEST(cov_check_sources_headers)
 {
 	setup_proj("check-sh", nullptr, false);
 	mkdir("include", 0755);
-	FILE *hf = fopen("include/mylib.h", "w");
+	FILE *hf = safe_fopen("include/mylib.h", "w");
 	if (hf) {
 		fprintf_safe(hf, "#ifndef MYLIB_H\n#define MYLIB_H\nvoid foo(void);\n#endif\n");
-		fclose(hf);
+		safe_fclose(hf);
 	}
 	/* Write a source file */
-	FILE *sf = fopen("src/lib.c", "w");
+	FILE *sf = safe_fopen("src/lib.c", "w");
 	if (sf) {
 		fprintf_safe(sf, "#include \"mylib.h\"\nvoid foo(void) {}\n");
-		fclose(sf);
+		safe_fclose(sf);
 	}
 	/* Append sources/headers to manifest */
-	FILE *mf = fopen("Coffee.toml", "a");
+	FILE *mf = safe_fopen("Coffee.toml", "a");
 	if (mf) {
 		fprintf_safe(mf, "sources = [\"src/lib.c\"]\n");
 		fprintf_safe(mf, "headers = [\"include/mylib.h\"]\n");
-		fclose(mf);
+		safe_fclose(mf);
 	}
 
 	options opt = { .inputs = (char *[]){ "check" }, .inputs_num = 1 };
@@ -910,13 +912,7 @@ TEST(cov_tree_with_lockfile_deps)
 {
 	setup_proj("tree-lock", "dependencies = [\"tldep\"]", true);
 	/* Create a lockfile with properly formatted dep */
-	FILE *lf = fopen("Coffee.lock", "w");
-	ASSERT(lf != nullptr, "create lockfile");
-	fprintf_safe(lf, "[[dependency]]\n");
-	fprintf_safe(lf, "name = \"tldep\"\n");
-	fprintf_safe(lf, "version = \"2.0.0\"\n");
-	fprintf_safe(lf, "path = \"/tmp/tldep\"\n");
-	fclose(lf);
+	ASSERT(write_lockfile("tldep", "2.0.0", "/tmp/tldep"), "lockfile with one dependency");
 	mkdir("/tmp/tldep", 0755);
 
 	options opt = { .inputs = (char *[]){ "tree" }, .inputs_num = 1 };
@@ -945,14 +941,7 @@ TEST(cov_metadata_no_deps_v2)
 TEST(cov_update_specific_dep_v2)
 {
 	setup_proj("upd-spec", "dependencies = [\"specdep\"]", true);
-	FILE *lf = fopen("Coffee.lock", "w");
-	if (lf) {
-		fprintf_safe(lf, "[[dependency]]\n");
-		fprintf_safe(lf, "name = \"specdep\"\n");
-		fprintf_safe(lf, "version = \"1.0.0\"\n");
-		fprintf_safe(lf, "path = \"/tmp/specdep\"\n");
-		fclose(lf);
-	}
+	ASSERT(write_lockfile("specdep", "1.0.0", "/tmp/specdep"), "lockfile with one dependency");
 
 	options opt = {
 		.inputs     = (char *[]){ "update", "specdep" },
@@ -988,10 +977,10 @@ TEST(cov_cflags_with_include)
 	mkdir("deps", 0755);
 	mkdir("deps/incdep", 0755);
 	mkdir("deps/incdep/include", 0755);
-	FILE *hf = fopen("deps/incdep/include/test.h", "w");
+	FILE *hf = safe_fopen("deps/incdep/include/test.h", "w");
 	if (hf) {
 		fprintf_safe(hf, "/* test */\n");
-		fclose(hf);
+		safe_fclose(hf);
 	}
 
 	options opt = {
@@ -1048,14 +1037,7 @@ TEST(cov_generate_lockfile_deps_v2)
 TEST(cov_outdated_lockfile_with_deps)
 {
 	setup_proj("out-lock", "dependencies = [\"out2-dep\"]", true);
-	FILE *lf = fopen("Coffee.lock", "w");
-	if (lf) {
-		fprintf_safe(lf, "[[dependency]]\n");
-		fprintf_safe(lf, "name = \"out2-dep\"\n");
-		fprintf_safe(lf, "version = \"0.0.1\"\n");
-		fprintf_safe(lf, "path = \"/tmp/out2-dep\"\n");
-		fclose(lf);
-	}
+	ASSERT(write_lockfile("out2-dep", "0.0.1", "/tmp/out2-dep"), "lockfile with one dependency");
 
 	options opt = { .inputs = (char *[]){ "outdated" }, .inputs_num = 1 };
 	i64     ret = handle_outdated(&opt);
@@ -1074,10 +1056,10 @@ TEST(cov_init_existing_project)
 	mkdir(tmpdir, 0755);
 	ASSERT(chdir(tmpdir) == 0, "chdir");
 	/* Create an existing Coffee.toml */
-	FILE *fp = fopen("Coffee.toml", "w");
+	FILE *fp = safe_fopen("Coffee.toml", "w");
 	assert(fp);
 	fprintf_safe(fp, "[package]\nname = \"existing\"\nversion = \"1.0.0\"\n");
-	fclose(fp);
+	safe_fclose(fp);
 
 	options opt = { .inputs = (char *[]){ "init" }, .inputs_num = 1 };
 	i64     ret = handle_init(&opt);
@@ -1248,18 +1230,14 @@ TEST(cov_tree_with_library_toml)
 	/* Create a library.toml in deps/libdep */
 	mkdir("deps", 0755);
 	mkdir("deps/libdep", 0755);
-	FILE *lt = fopen("deps/libdep/library.toml", "w");
+	FILE *lt = safe_fopen("deps/libdep/library.toml", "w");
 	if (lt) {
 		fprintf_safe(lt, "[package]\nname = \"libdep\"\nversion = \"1.0.0\"\n");
 		fprintf_safe(lt, "dependencies = [\"subdep\"]\n");
-		fclose(lt);
+		safe_fclose(lt);
 	}
 	/* Also need a lockfile referring to the dep */
-	FILE *lf = fopen("Coffee.lock", "w");
-	if (lf) {
-		fprintf_safe(lf, "[[dependency]]\nname = \"libdep\"\nversion = \"1.0.0\"\npath = \"deps/libdep\"\n");
-		fclose(lf);
-	}
+	ASSERT(write_lockfile("libdep", "1.0.0", "deps/libdep"), "lockfile with one dependency");
 
 	options opt = { .inputs = (char *[]){ "tree" }, .inputs_num = 1 };
 	i64     ret = handle_tree(&opt);
@@ -1275,11 +1253,11 @@ TEST(cov_cflags_with_library_toml)
 	setup_proj("cflags-libt", nullptr, true);
 	mkdir("deps", 0755);
 	mkdir("deps/cflibdep", 0755);
-	FILE *lt = fopen("deps/cflibdep/library.toml", "w");
+	FILE *lt = safe_fopen("deps/cflibdep/library.toml", "w");
 	if (lt) {
 		fprintf_safe(lt, "[package]\nname = \"cflibdep\"\nversion = \"1.0.0\"\n");
 		fprintf_safe(lt, "include = [\"include\", \"src\"]\n");
-		fclose(lt);
+		safe_fclose(lt);
 	}
 	mkdir("deps/cflibdep/include", 0755);
 	mkdir("deps/cflibdep/src", 0755);
@@ -1305,11 +1283,11 @@ TEST(cov_libs_with_library_toml)
 	setup_proj("libs-libt", nullptr, true);
 	mkdir("deps", 0755);
 	mkdir("deps/liblibdep", 0755);
-	FILE *lt = fopen("deps/liblibdep/library.toml", "w");
+	FILE *lt = safe_fopen("deps/liblibdep/library.toml", "w");
 	if (lt) {
 		fprintf_safe(lt, "[package]\nname = \"liblibdep\"\nversion = \"1.0.0\"\n");
 		fprintf_safe(lt, "libname = \"mylib\"\n");
-		fclose(lt);
+		safe_fclose(lt);
 	}
 
 	options opt = {
@@ -1331,10 +1309,10 @@ TEST(cov_generate_lockfile_with_lib)
 	setup_proj("genlock-lib", "dependencies = [\"glibdep\"]", true);
 	mkdir("deps", 0755);
 	mkdir("deps/glibdep", 0755);
-	FILE *lt = fopen("deps/glibdep/library.toml", "w");
+	FILE *lt = safe_fopen("deps/glibdep/library.toml", "w");
 	if (lt) {
 		fprintf_safe(lt, "[package]\nname = \"glibdep\"\nversion = \"2.0.0\"\n");
-		fclose(lt);
+		safe_fclose(lt);
 	}
 
 	options opt = { .inputs = (char *[]){ "generate-lockfile" }, .inputs_num = 1 };
@@ -1351,17 +1329,13 @@ TEST(cov_update_with_library_toml)
 {
 	setup_proj("upd-lib", "dependencies = [\"updlibdep\"]", true);
 	/* Need existing lockfile */
-	FILE *lf = fopen("Coffee.lock", "w");
-	if (lf) {
-		fprintf_safe(lf, "[[dependency]]\nname = \"updlibdep\"\nversion = \"1.0.0\"\npath = \"deps/updlibdep\"\n");
-		fclose(lf);
-	}
+	ASSERT(write_lockfile("updlibdep", "1.0.0", "deps/updlibdep"), "lockfile with one dependency");
 	mkdir("deps", 0755);
 	mkdir("deps/updlibdep", 0755);
-	FILE *lt = fopen("deps/updlibdep/library.toml", "w");
+	FILE *lt = safe_fopen("deps/updlibdep/library.toml", "w");
 	if (lt) {
 		fprintf_safe(lt, "[package]\nname = \"updlibdep\"\nversion = \"1.0.0\"\n");
-		fclose(lt);
+		safe_fclose(lt);
 	}
 
 	options opt = {
@@ -1400,10 +1374,10 @@ TEST(cov_list_installed_with_files)
 	sds bin_dir    = sdscatprintf(sdsempty(), "%s/bin", coffee_dir);
 	mkdir(bin_dir, 0755);
 	sds   bin_path = sdscatprintf(sdsempty(), "%s/coffee-test-bin", bin_dir);
-	FILE *bf       = fopen(bin_path, "w");
+	FILE *bf       = safe_fopen(bin_path, "w");
 	if (bf) {
 		fprintf_safe(bf, "#!/bin/sh\necho test\n");
-		fclose(bf);
+		safe_fclose(bf);
 	}
 	chmod(bin_path, 0755);
 
@@ -1478,11 +1452,7 @@ TEST(cov_report_audit_deps)
 TEST(cov_outdated_with_library_toml)
 {
 	setup_proj("out-libtoml", "dependencies = [\"outlibdep\"]", true);
-	FILE *lf = fopen("Coffee.lock", "w");
-	if (lf) {
-		fprintf_safe(lf, "[[dependency]]\nname = \"outlibdep\"\nversion = \"0.1.0\"\npath = \"deps/outlibdep\"\n");
-		fclose(lf);
-	}
+	ASSERT(write_lockfile("outlibdep", "0.1.0", "deps/outlibdep"), "lockfile with one dependency");
 
 	options opt = { .inputs = (char *[]){ "outdated" }, .inputs_num = 1 };
 	i64     ret = handle_outdated(&opt);
@@ -1626,12 +1596,12 @@ TEST(cov_check_missing_version)
 	mkdir(tmpdir, 0755);
 	ASSERT(chdir(tmpdir) == 0, "chdir");
 
-	FILE *fp = fopen("Coffee.toml", "w");
+	FILE *fp = safe_fopen("Coffee.toml", "w");
 	assert(fp);
 	fprintf_safe(fp, "[package]\n");
 	fprintf_safe(fp, "name = \"noversion\"\n");
 	fprintf_safe(fp, "edition = \"c23\"\n");
-	fclose(fp);
+	safe_fclose(fp);
 	mkdir("src", 0755);
 
 	options opt = { .inputs = (char *[]){ "check" }, .inputs_num = 1 };
@@ -1653,10 +1623,10 @@ TEST(cov_check_parse_error)
 	mkdir(tmpdir, 0755);
 	ASSERT(chdir(tmpdir) == 0, "chdir");
 
-	FILE *fp = fopen("Coffee.toml", "w");
+	FILE *fp = safe_fopen("Coffee.toml", "w");
 	assert(fp);
 	fprintf_safe(fp, "[[[\n");
-	fclose(fp);
+	safe_fclose(fp);
 
 	options opt = { .inputs = (char *[]){ "check" }, .inputs_num = 1 };
 	i64     ret = handle_check(&opt);
@@ -1677,10 +1647,10 @@ TEST(cov_fetch_parse_error)
 	mkdir(tmpdir, 0755);
 	ASSERT(chdir(tmpdir) == 0, "chdir");
 
-	FILE *fp = fopen("Coffee.toml", "w");
+	FILE *fp = safe_fopen("Coffee.toml", "w");
 	assert(fp);
 	fprintf_safe(fp, "[[[\n");
-	fclose(fp);
+	safe_fclose(fp);
 
 	options opt = { .inputs = (char *[]){ "fetch" }, .inputs_num = 1 };
 	i64     ret = handle_fetch(&opt);
@@ -1701,10 +1671,10 @@ TEST(cov_vendor_parse_error)
 	mkdir(tmpdir, 0755);
 	ASSERT(chdir(tmpdir) == 0, "chdir");
 
-	FILE *fp = fopen("Coffee.toml", "w");
+	FILE *fp = safe_fopen("Coffee.toml", "w");
 	assert(fp);
 	fprintf_safe(fp, "[[[\n");
-	fclose(fp);
+	safe_fclose(fp);
 
 	options opt = { .inputs = (char *[]){ "vendor" }, .inputs_num = 1 };
 	i64     ret = handle_vendor(&opt);
@@ -1795,14 +1765,7 @@ TEST(cov_new_existing_dir)
 TEST(cov_outdated_with_lockfile_deps)
 {
 	setup_proj("out-lockdeps", "dependencies = [\"oldep\"]", true);
-	FILE *lf = fopen("Coffee.lock", "w");
-	if (lf) {
-		fprintf_safe(lf, "[[dependency]]\n");
-		fprintf_safe(lf, "name = \"oldep\"\n");
-		fprintf_safe(lf, "version = \"0.0.1\"\n");
-		fprintf_safe(lf, "path = \"/tmp/oldep-path\"\n");
-		fclose(lf);
-	}
+	ASSERT(write_lockfile("oldep", "0.0.1", "/tmp/oldep-path"), "lockfile with one dependency");
 	mkdir("/tmp/oldep-path", 0755);
 
 	options opt = { .inputs = (char *[]){ "outdated" }, .inputs_num = 1 };
@@ -1820,22 +1783,15 @@ TEST(cov_tree_transitive_deps)
 	setup_proj("tree-trans", "dependencies = [\"transdep-tree\"]", true);
 	mkdir("deps", 0755);
 	mkdir("deps/transdep-tree", 0755);
-	FILE *lt = fopen("deps/transdep-tree/library.toml", "w");
+	FILE *lt = safe_fopen("deps/transdep-tree/library.toml", "w");
 	if (lt) {
 		fprintf_safe(lt, "[package]\n");
 		fprintf_safe(lt, "name = \"transdep-tree\"\n");
 		fprintf_safe(lt, "version = \"1.0.0\"\n");
 		fprintf_safe(lt, "dependencies = [\"subdep\"]\n");
-		fclose(lt);
+		safe_fclose(lt);
 	}
-	FILE *lf = fopen("Coffee.lock", "w");
-	if (lf) {
-		fprintf_safe(lf, "[[dependency]]\n");
-		fprintf_safe(lf, "name = \"transdep-tree\"\n");
-		fprintf_safe(lf, "version = \"1.0.0\"\n");
-		fprintf_safe(lf, "path = \"deps/transdep-tree\"\n");
-		fclose(lf);
-	}
+	ASSERT(write_lockfile("transdep-tree", "1.0.0", "deps/transdep-tree"), "lockfile with one dependency");
 
 	options opt = { .inputs = (char *[]){ "tree" }, .inputs_num = 1 };
 	i64     ret = handle_tree(&opt);
@@ -1870,11 +1826,11 @@ TEST(cov_cflags_include_toml)
 	setup_proj("cflags-inctoml", nullptr, true);
 	mkdir("deps", 0755);
 	mkdir("deps/cfginctoml", 0755);
-	FILE *lt = fopen("deps/cfginctoml/library.toml", "w");
+	FILE *lt = safe_fopen("deps/cfginctoml/library.toml", "w");
 	if (lt) {
 		fprintf_safe(lt, "[package]\nname = \"cfginctoml\"\n");
 		fprintf_safe(lt, "include = [\"mydir\"]\n");
-		fclose(lt);
+		safe_fclose(lt);
 	}
 	mkdir("deps/cfginctoml/mydir", 0755);
 
@@ -1898,11 +1854,11 @@ TEST(cov_libs_lib_toml)
 	setup_proj("libs-libtoml", nullptr, true);
 	mkdir("deps", 0755);
 	mkdir("deps/libtomldep", 0755);
-	FILE *lt = fopen("deps/libtomldep/library.toml", "w");
+	FILE *lt = safe_fopen("deps/libtomldep/library.toml", "w");
 	if (lt) {
 		fprintf_safe(lt, "[package]\nname = \"libtomldep\"\n");
 		fprintf_safe(lt, "lib = [\"lib\"]\n");
-		fclose(lt);
+		safe_fclose(lt);
 	}
 	mkdir("deps/libtomldep/lib", 0755);
 
@@ -1927,12 +1883,12 @@ TEST(cov_remove_makefile_cleanup)
 	mkdir("deps", 0755);
 	mkdir("deps/mkclean-dep", 0755);
 
-	FILE *mf = fopen("Makefile", "w");
+	FILE *mf = safe_fopen("Makefile", "w");
 	if (mf) {
 		fprintf_safe(mf, "# Dep: mkclean-dep\n");
 		fprintf_safe(mf, "\t$(shell coffee cflags mkclean-dep)\n");
 		fprintf_safe(mf, "\t$(shell coffee libs mkclean-dep)\n");
-		fclose(mf);
+		safe_fclose(mf);
 	}
 
 	options opt = {

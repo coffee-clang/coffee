@@ -31,7 +31,7 @@ typedef struct {
 	test_func_t func;
 } test_entry_t;
 
-#define TEST_FRAMEWORK_MAX_TESTS 512
+#define TEST_FRAMEWORK_MAX_TESTS 2'048
 
 extern test_entry_t test_framework_tests[TEST_FRAMEWORK_MAX_TESTS];
 extern u64          test_framework_count;

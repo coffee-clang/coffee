@@ -201,10 +201,6 @@ manifest_t *manifest_parse(sds path)
 	}
 
 	manifest_t *m = safe_calloc(1, sizeof(manifest_t));
-	if (m == nullptr) {
-		toml_free(conf);
-		return nullptr;
-	}
 
 	toml_table_t *pkg = toml_table_in(conf, "package");
 	if (pkg) {
@@ -236,12 +232,7 @@ manifest_t *manifest_parse(sds path)
 		 * Table elements are parsed into structured deps below. */
 		size_t n                = array_nelem_safe(deps_arr);
 		m->package.dependencies = safe_calloc(n, sizeof(sds));
-		if (m->package.dependencies == nullptr && n > 0) {
-			manifest_free(m);
-			toml_free(conf);
-			return nullptr;
-		}
-		size_t idx = 0;
+		size_t idx              = 0;
 		for (size_t i = 0; i < n; i++) {
 			toml_datum_t dep = toml_string_at(deps_arr, (i64)i);
 			if (!dep.ok) {
@@ -264,12 +255,7 @@ manifest_t *manifest_parse(sds path)
 				count++;
 			}
 			m->package.dependencies = safe_calloc(count, sizeof(sds));
-			if (m->package.dependencies == nullptr && count > 0) {
-				manifest_free(m);
-				toml_free(conf);
-				return nullptr;
-			}
-			size_t idx = 0;
+			size_t idx              = 0;
 			/* Build "name = value" strings matching array format.
 			 * Inline tables are parsed into structured deps below; any
 			 * other non-string value is dropped with a warning (a bare
@@ -305,11 +291,6 @@ manifest_t *manifest_parse(sds path)
 	if (sources_arr) {
 		m->package.sources_count = array_nelem_safe(sources_arr);
 		m->package.sources       = safe_calloc(m->package.sources_count, sizeof(sds));
-		if (m->package.sources == nullptr && m->package.sources_count > 0) {
-			manifest_free(m);
-			toml_free(conf);
-			return nullptr;
-		}
 		for (size_t i = 0; i < m->package.sources_count; i++) {
 			toml_datum_t src      = toml_string_at(sources_arr, (i64)i);
 			m->package.sources[i] = toml_datum_to_string(src);
@@ -323,11 +304,6 @@ manifest_t *manifest_parse(sds path)
 	if (headers_arr) {
 		m->package.headers_count = array_nelem_safe(headers_arr);
 		m->package.headers       = safe_calloc(m->package.headers_count, sizeof(sds));
-		if (m->package.headers == nullptr && m->package.headers_count > 0) {
-			manifest_free(m);
-			toml_free(conf);
-			return nullptr;
-		}
 		for (size_t i = 0; i < m->package.headers_count; i++) {
 			toml_datum_t hdr      = toml_string_at(headers_arr, (i64)i);
 			m->package.headers[i] = toml_datum_to_string(hdr);
@@ -351,12 +327,7 @@ manifest_t *manifest_parse(sds path)
 
 		if (m->features_count > 0) {
 			m->features = safe_calloc(m->features_count, sizeof(feature_def_t));
-			if (m->features == nullptr) {
-				manifest_free(m);
-				toml_free(conf);
-				return nullptr;
-			}
-			size_t idx = 0;
+			size_t idx  = 0;
 			for (i64 i = 0;; i++) {
 				const char *key = toml_key_in(features_table, i);
 				if (key == nullptr) {
@@ -373,11 +344,6 @@ manifest_t *manifest_parse(sds path)
 				m->features[idx].deps_count = array_nelem_safe(arr);
 				if (m->features[idx].deps_count > 0) {
 					m->features[idx].deps = safe_calloc(m->features[idx].deps_count, sizeof(sds));
-					if (m->features[idx].deps == nullptr) {
-						manifest_free(m);
-						toml_free(conf);
-						return nullptr;
-					}
 					for (size_t j = 0; j < m->features[idx].deps_count; j++) {
 						toml_datum_t dep         = toml_string_at(arr, (i64)j);
 						m->features[idx].deps[j] = toml_datum_to_string(dep);
@@ -419,11 +385,6 @@ manifest_t *manifest_parse(sds path)
 		m->bin_count = array_nelem_safe(bin_arr);
 		if (m->bin_count > 0) {
 			m->bin = safe_calloc(m->bin_count, sizeof(binary_target_t));
-			if (m->bin == nullptr) {
-				manifest_free(m);
-				toml_free(conf);
-				return nullptr;
-			}
 			for (size_t i = 0; i < m->bin_count; i++) {
 				toml_table_t *bt = toml_table_at(bin_arr, (i64)i);
 				if (bt == nullptr) {
@@ -436,11 +397,6 @@ manifest_t *manifest_parse(sds path)
 					m->bin[i].src_count = array_nelem_safe(src_arr);
 					if (m->bin[i].src_count > 0) {
 						m->bin[i].src = safe_calloc(m->bin[i].src_count, sizeof(sds));
-						if (m->bin[i].src == nullptr) {
-							manifest_free(m);
-							toml_free(conf);
-							return nullptr;
-						}
 						for (size_t j = 0; j < m->bin[i].src_count; j++) {
 							toml_datum_t src = toml_string_at(src_arr, (i64)j);
 							m->bin[i].src[j] = toml_datum_to_string(src);
@@ -486,12 +442,7 @@ manifest_t *manifest_parse(sds path)
 
 		if (count > 0) {
 			m->dependencies.deps = safe_calloc(count, sizeof(dependency_t));
-			if (m->dependencies.deps == nullptr) {
-				manifest_free(m);
-				toml_free(conf);
-				return nullptr;
-			}
-			size_t idx = 0;
+			size_t idx           = 0;
 			if (dt) {
 				for (i64 ii = 0; idx < count; ii++) {
 					const char *key = toml_key_in(dt, ii);
@@ -545,11 +496,6 @@ manifest_t *manifest_parse(sds path)
 		if (src_arr) {
 			m->test.sources_count = array_nelem_safe(src_arr);
 			m->test.sources       = safe_calloc(m->test.sources_count, sizeof(sds));
-			if (m->test.sources == nullptr && m->test.sources_count > 0) {
-				manifest_free(m);
-				toml_free(conf);
-				return nullptr;
-			}
 			for (size_t i = 0; i < m->test.sources_count; i++) {
 				toml_datum_t src   = toml_string_at(src_arr, (i64)i);
 				m->test.sources[i] = toml_datum_to_string(src);

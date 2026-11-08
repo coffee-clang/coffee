@@ -30,6 +30,15 @@ static sds get_name_from_path(const char *path)
 	return result;
 }
 
+/* Create the directory path/sub. */
+static i64 create_subdir(const char *path, const char *sub)
+{
+	sds dir = sdscatprintf(sdsempty(), "%s/%s", path, sub);
+	i64 ret = create_dir(dir);
+	sdsfree(dir);
+	return ret;
+}
+
 int64_t handle_new(options *opts)
 {
 	char *path = nullptr;
@@ -58,53 +67,52 @@ int64_t handle_new(options *opts)
 	sds name = get_name_from_path(path);
 
 	/* Create canonical directory structure */
-	sds include_dir = sdscatprintf(sdsempty(), "%s/include", path);
-	sds src_dir     = sdscatprintf(sdsempty(), "%s/src", path);
-	sds deps_dir    = sdscatprintf(sdsempty(), "%s/deps", path);
-	sds tests_dir   = sdscatprintf(sdsempty(), "%s/tests", path);
-	sds doc_dir     = sdscatprintf(sdsempty(), "%s/doc", path);
-	sds scripts_dir = sdscatprintf(sdsempty(), "%s/scripts", path);
-	sds build_dir   = sdscatprintf(sdsempty(), "%s/build", path);
-
-	if (create_dir(include_dir) != 0) {
+	if (create_subdir(path, "include") != 0) {
 		fprintf_safe(stderr, "Error: Could not create include directory\n");
 		sdsfree(name);
+		sdsfree(manifest_path);
 		return 1;
 	}
 
-	if (create_dir(src_dir) != 0) {
+	if (create_subdir(path, "src") != 0) {
 		fprintf_safe(stderr, "Error: Could not create src directory\n");
 		sdsfree(name);
+		sdsfree(manifest_path);
 		return 1;
 	}
 
-	if (create_dir(deps_dir) != 0) {
+	if (create_subdir(path, "deps") != 0) {
 		fprintf_safe(stderr, "Error: Could not create deps directory\n");
 		sdsfree(name);
+		sdsfree(manifest_path);
 		return 1;
 	}
 
-	if (create_dir(tests_dir) != 0) {
+	if (create_subdir(path, "tests") != 0) {
 		fprintf_safe(stderr, "Error: Could not create tests directory\n");
 		sdsfree(name);
+		sdsfree(manifest_path);
 		return 1;
 	}
 
-	if (create_dir(doc_dir) != 0) {
+	if (create_subdir(path, "doc") != 0) {
 		fprintf_safe(stderr, "Error: Could not create doc directory\n");
 		sdsfree(name);
+		sdsfree(manifest_path);
 		return 1;
 	}
 
-	if (create_dir(scripts_dir) != 0) {
+	if (create_subdir(path, "scripts") != 0) {
 		fprintf_safe(stderr, "Error: Could not create scripts directory\n");
 		sdsfree(name);
+		sdsfree(manifest_path);
 		return 1;
 	}
 
-	if (create_dir(build_dir) != 0) {
+	if (create_subdir(path, "build") != 0) {
 		fprintf_safe(stderr, "Error: Could not create build directory\n");
 		sdsfree(name);
+		sdsfree(manifest_path);
 		return 1;
 	}
 
@@ -114,6 +122,7 @@ int64_t handle_new(options *opts)
 		sdsfree(include_project_dir);
 		fprintf_safe(stderr, "Error: Could not create include/%s directory\n", name);
 		sdsfree(name);
+		sdsfree(manifest_path);
 		return 1;
 	}
 	sdsfree(include_project_dir);
@@ -126,6 +135,7 @@ int64_t handle_new(options *opts)
 		sdsfree(gitignore_content);
 		fprintf_safe(stderr, "Error: Could not create .gitignore\n");
 		sdsfree(name);
+		sdsfree(manifest_path);
 		return 1;
 	}
 	sdsfree(gitignore_path);
@@ -139,6 +149,7 @@ int64_t handle_new(options *opts)
 		sdsfree(license_content);
 		fprintf_safe(stderr, "Error: Could not create LICENSE\n");
 		sdsfree(name);
+		sdsfree(manifest_path);
 		return 1;
 	}
 	sdsfree(license_path);
@@ -152,6 +163,7 @@ int64_t handle_new(options *opts)
 		sdsfree(readme_content);
 		fprintf_safe(stderr, "Error: Could not create README.md\n");
 		sdsfree(name);
+		sdsfree(manifest_path);
 		return 1;
 	}
 	sdsfree(readme_path);
@@ -165,6 +177,7 @@ int64_t handle_new(options *opts)
 		sdsfree(makefile_content);
 		fprintf_safe(stderr, "Error: Could not create Makefile\n");
 		sdsfree(name);
+		sdsfree(manifest_path);
 		return 1;
 	}
 	sdsfree(makefile_path);
@@ -177,12 +190,13 @@ int64_t handle_new(options *opts)
 		sdsfree(manifest_content);
 		fprintf_safe(stderr, "Error: Could not create Coffee.toml\n");
 		sdsfree(name);
+		sdsfree(manifest_path);
 		return 1;
 	}
 	sdsfree(manifest_content);
 
 	/* Create main.c */
-	sds src_main     = sdscatprintf(sdsempty(), "%s/main.c", src_dir);
+	sds src_main     = sdscatprintf(sdsempty(), "%s/src/main.c", path);
 	sds main_content = sdsnew(skeleton_main_c);
 
 	if (create_file(src_main, main_content) != 0) {
@@ -190,6 +204,7 @@ int64_t handle_new(options *opts)
 		sdsfree(main_content);
 		fprintf_safe(stderr, "Error: Could not create main.c\n");
 		sdsfree(name);
+		sdsfree(manifest_path);
 		return 1;
 	}
 	sdsfree(src_main);
@@ -203,6 +218,7 @@ int64_t handle_new(options *opts)
 		sdsfree(header_content);
 		fprintf_safe(stderr, "Error: Could not create include/%s/%s.h\n", name, name);
 		sdsfree(name);
+		sdsfree(manifest_path);
 		return 1;
 	}
 	sdsfree(main_header_path);
@@ -210,7 +226,7 @@ int64_t handle_new(options *opts)
 
 	if (opts->lib) {
 		/* Library mode: lib.c, library Makefile, [lib] manifest */
-		sds src_lib     = sdscatprintf(sdsempty(), "%s/lib.c", src_dir);
+		sds src_lib     = sdscatprintf(sdsempty(), "%s/src/lib.c", path);
 		sds lib_content = skeleton_substitute(skeleton_lib_c, name);
 
 		if (create_file(src_lib, lib_content) != 0) {
@@ -218,6 +234,7 @@ int64_t handle_new(options *opts)
 			sdsfree(lib_content);
 			fprintf_safe(stderr, "Error: Could not create lib.c\n");
 			sdsfree(name);
+			sdsfree(manifest_path);
 			return 1;
 		}
 		sdsfree(src_lib);
@@ -232,6 +249,7 @@ int64_t handle_new(options *opts)
 			sdsfree(makefile_content);
 			fprintf_safe(stderr, "Error: Could not create Makefile\n");
 			sdsfree(name);
+			sdsfree(manifest_path);
 			return 1;
 		}
 		sdsfree(makefile_path);
@@ -244,6 +262,7 @@ int64_t handle_new(options *opts)
 			sdsfree(manifest_content);
 			fprintf_safe(stderr, "Error: Could not create Coffee.toml\n");
 			sdsfree(name);
+			sdsfree(manifest_path);
 			return 1;
 		}
 		sdsfree(manifest_content);
@@ -263,13 +282,6 @@ int64_t handle_new(options *opts)
 
 		sdsfree(name);
 		sdsfree(manifest_path);
-		sdsfree(include_dir);
-		sdsfree(src_dir);
-		sdsfree(deps_dir);
-		sdsfree(tests_dir);
-		sdsfree(doc_dir);
-		sdsfree(scripts_dir);
-		sdsfree(build_dir);
 		return 0;
 	}
 
@@ -287,13 +299,6 @@ int64_t handle_new(options *opts)
 
 	sdsfree(name);
 	sdsfree(manifest_path);
-	sdsfree(include_dir);
-	sdsfree(src_dir);
-	sdsfree(deps_dir);
-	sdsfree(tests_dir);
-	sdsfree(doc_dir);
-	sdsfree(scripts_dir);
-	sdsfree(build_dir);
 
 	return 0;
 }

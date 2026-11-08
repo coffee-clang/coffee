@@ -283,6 +283,25 @@ $(FUZZ_DIR)/fuzz_%: fuzz/fuzz_%.c $(FUZZ_SUPPORT_OBJ)
 fuzz: $(FUZZ_BINS)
 
 # --------------------------------------------------------------------
+# Coverage — gcov instrumented test run, per-function report
+# --------------------------------------------------------------------
+# gcc is used because clang's gcov data is not readable by the system gcov
+# and llvm-cov is not always installed.  The tests run in-process
+# (COFFEE_TEST_NO_FORK=1): a forked child _exit()s and would lose its counters.
+# The report lists project functions below COVERAGE_THRESHOLD percent.
+COVERAGE_DIR := $(BIN_DIR)/cov
+COVERAGE_THRESHOLD ?= 95
+
+coverage:
+	rm -rf $(COVERAGE_DIR)
+	$(MAKE) CC=gcc BIN_DIR=$(COVERAGE_DIR) \
+		CFLAGS_COMMON="-g -O0 -std=$(CSTD) --coverage -w -D_GNU_SOURCE -include $(SRC_DIR)/compat_limits.h -iquote$(SRC_DIR) -isysteminclude -iquoteinclude/sds" \
+		LDFLAGS="-static --coverage" $(COVERAGE_DIR)/tests/runner
+	COFFEE_TEST_NO_FORK=1 $(COVERAGE_DIR)/tests/runner > $(COVERAGE_DIR)/test.log
+	@tail -1 $(COVERAGE_DIR)/test.log
+	COVERAGE_DIR=$(COVERAGE_DIR) ./scripts/coverage-report.sh $(COVERAGE_THRESHOLD)
+
+# --------------------------------------------------------------------
 # Sanitizer builds — replicate .github/workflows/sanitizers.yml locally
 # --------------------------------------------------------------------
 NPROC := $(shell nproc)
@@ -323,4 +342,4 @@ sanitize: sanitize-address sanitize-undefined
 	@echo "=== All sanitizer builds passed ==="
 
 .PHONY: all bootstrap clean format test tidy install docs docs-assets serve release fuzz \
-	sanitize sanitize-address sanitize-undefined
+	sanitize sanitize-address sanitize-undefined coverage

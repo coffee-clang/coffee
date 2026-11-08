@@ -106,6 +106,81 @@ static bool section_exists_in_lines(sds *lines, size_t nlines, const char *secti
 }
 
 /*
+ * Net number of array brackets opened by a raw config line, ignoring
+ * quoted strings and comments.
+ */
+static i64 bracket_delta(const char *line)
+{
+	i64  delta = 0;
+	char quote = '\0';
+
+	for (const char *p = line; *p != '\0'; p++) {
+		if (quote != '\0') {
+			if (*p == quote) {
+				quote = '\0';
+			}
+		} else if (*p == '"' || *p == '\'') {
+			quote = *p;
+		} else if (*p == '#') {
+			break;
+		} else if (*p == '[') {
+			delta++;
+		} else if (*p == ']') {
+			delta--;
+		}
+	}
+	return delta;
+}
+
+/*
+ * Index of the first [section] header at or after `from`, or nlines when
+ * there is none.  `from` must be outside any multi-line array.  A line
+ * starting with '[' inside a multi-line array is a nested array, not a header.
+ */
+static size_t next_header_index(sds *lines, size_t nlines, size_t from)
+{
+	i64 depth = 0;
+
+	for (size_t i = from; i < nlines; i++) {
+		const char *p = lines[i];
+		while (*p == ' ' || *p == '\t') {
+			p++;
+		}
+		if (depth == 0 && *p == '[') {
+			return i;
+		}
+		depth += bracket_delta(p);
+		if (depth < 0) {
+			depth = 0;
+		}
+	}
+	return nlines;
+}
+
+/*
+ * Insert line at position insert_at, shifting the following lines down.
+ */
+static void insert_line(sds **lines_out, size_t *nlines, size_t *cap, size_t insert_at, sds line)
+{
+	if (*nlines >= *cap) {
+		*cap       = *cap ? *cap * 2 : 64;
+		*lines_out = (sds *)safe_realloc(*lines_out, sizeof(sds) * *cap);
+	}
+	/* A last line without a newline would swallow the inserted one */
+	if (insert_at > 0 && insert_at == *nlines) {
+		sds prev = (*lines_out)[insert_at - 1];
+		if (sdslen(prev) > 0 && prev[sdslen(prev) - 1] != '\n') {
+			(*lines_out)[insert_at - 1] = sdscat(prev, "\n");
+		}
+	}
+	for (size_t i = *nlines; i > insert_at; i--) {
+		(*lines_out)[i] = (*lines_out)[i - 1];
+	}
+	(*lines_out)[insert_at] = line;
+	(*nlines)++;
+}
+
+/*
  * Append a key=value line inside [section] to the lines array.
  * Adds the section header if it doesn't exist yet.
  */
@@ -115,13 +190,10 @@ static void append_key(sds **lines_out, size_t *nlines, size_t *cap, const char 
 	sds new_line = sdscatprintf(sdsempty(), "%s = \"%s\"\n", key, value);
 
 	if (section == nullptr) {
-		/* Top-level key: append at end */
-		if (*nlines >= *cap) {
-			*cap       = *cap ? *cap * 2 : 64;
-			*lines_out = (sds *)safe_realloc(*lines_out, sizeof(sds) * *cap);
-		}
-		(*lines_out)[*nlines] = new_line;
-		(*nlines)++;
+		/* Top-level key: must precede the first section header, otherwise
+		 * TOML would place it inside that section. */
+		size_t insert_at = next_header_index(*lines_out, *nlines, 0);
+		insert_line(lines_out, nlines, cap, insert_at, new_line);
 		return;
 	}
 
@@ -148,37 +220,22 @@ static void append_key(sds **lines_out, size_t *nlines, size_t *cap, const char 
 
 	/* Section exists, insert key after section header */
 	sds    target_header = sdscatprintf(sdsempty(), "[%s]", section);
-	bool   in_section    = false;
 	size_t insert_at     = *nlines;
 
-	for (size_t i = 0; i < *nlines; i++) {
-		sds trimmed = sdsnew((*lines_out)[i]);
+	for (size_t h = next_header_index(*lines_out, *nlines, 0); h < *nlines;
+	     h        = next_header_index(*lines_out, *nlines, h + 1)) {
+		sds trimmed = sdsnew((*lines_out)[h]);
 		sdstrim(trimmed, " \t\r\n");
-		if (trimmed[0] == '[') {
-			if (in_section) {
-				/* We left the section without finding a spot - insert before this line */
-				insert_at = i;
-				sdsfree(trimmed);
-				break;
-			}
-			if (sdscmp(trimmed, target_header) == 0) {
-				in_section = true;
-			}
-		}
+		bool is_target = sdscmp(trimmed, target_header) == 0;
 		sdsfree(trimmed);
+		if (is_target) {
+			/* Insert before the next header, or at the end */
+			insert_at = next_header_index(*lines_out, *nlines, h + 1);
+			break;
+		}
 	}
 
-	/* Shift lines down and insert */
-	if (*nlines >= *cap) {
-		*cap       = *cap ? *cap * 2 : 64;
-		*lines_out = (sds *)safe_realloc(*lines_out, sizeof(sds) * *cap);
-	}
-	for (size_t i = *nlines; i > insert_at; i--) {
-		(*lines_out)[i] = (*lines_out)[i - 1];
-	}
-	(*lines_out)[insert_at] = new_line;
-	(*nlines)++;
-
+	insert_line(lines_out, nlines, cap, insert_at, new_line);
 	sdsfree(target_header);
 }
 

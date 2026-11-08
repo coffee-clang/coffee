@@ -387,33 +387,18 @@ i64 cmdline_parser(i64 argc, char **argv, struct cli_args *args_info)
 			args_info->package_given = true;
 			sdsfree(args_info->package_arg);
 			args_info->package_arg = sdsnew(optarg);
-			if (!args_info->package_arg) {
-				fprintf_safe(stderr, "coffee: out of memory\n");
-				cmdline_parser_free(args_info);
-				return 1;
-			}
 			break;
 
 		case 'Z':
 			args_info->unstable_flags_given = true;
 			sdsfree(args_info->unstable_flags_arg);
 			args_info->unstable_flags_arg = sdsnew(optarg);
-			if (!args_info->unstable_flags_arg) {
-				fprintf_safe(stderr, "coffee: out of memory\n");
-				cmdline_parser_free(args_info);
-				return 1;
-			}
 			break;
 
 		case 'V':
 			args_info->pkg_version_given = true;
 			sdsfree(args_info->pkg_version_arg);
 			args_info->pkg_version_arg = sdsnew(optarg);
-			if (!args_info->pkg_version_arg) {
-				fprintf_safe(stderr, "coffee: out of memory\n");
-				cmdline_parser_free(args_info);
-				return 1;
-			}
 			break;
 
 		/* --- Long options without short form --- */
@@ -421,44 +406,24 @@ i64 cmdline_parser(i64 argc, char **argv, struct cli_args *args_info)
 			args_info->color_given = true;
 			sdsfree(args_info->color_arg);
 			args_info->color_arg = sdsnew(optarg);
-			if (!args_info->color_arg) {
-				fprintf_safe(stderr, "coffee: out of memory\n");
-				cmdline_parser_free(args_info);
-				return 1;
-			}
 			break;
 
 		case LOPT_MESSAGE_FORMAT:
 			args_info->message_format_given = true;
 			sdsfree(args_info->message_format_arg);
 			args_info->message_format_arg = sdsnew(optarg);
-			if (!args_info->message_format_arg) {
-				fprintf_safe(stderr, "coffee: out of memory\n");
-				cmdline_parser_free(args_info);
-				return 1;
-			}
 			break;
 
 		case LOPT_MANIFEST_PATH:
 			args_info->manifest_path_given = true;
 			sdsfree(args_info->manifest_path_arg);
 			args_info->manifest_path_arg = sdsnew(optarg);
-			if (!args_info->manifest_path_arg) {
-				fprintf_safe(stderr, "coffee: out of memory\n");
-				cmdline_parser_free(args_info);
-				return 1;
-			}
 			break;
 
 		case LOPT_TARGET:
 			args_info->target_given = true;
 			sdsfree(args_info->target_arg);
 			args_info->target_arg = sdsnew(optarg);
-			if (!args_info->target_arg) {
-				fprintf_safe(stderr, "coffee: out of memory\n");
-				cmdline_parser_free(args_info);
-				return 1;
-			}
 			break;
 
 		case LOPT_DEBUG:
@@ -475,33 +440,18 @@ i64 cmdline_parser(i64 argc, char **argv, struct cli_args *args_info)
 			args_info->bin_given = true;
 			sdsfree(args_info->bin_arg);
 			args_info->bin_arg = sdsnew(optarg);
-			if (!args_info->bin_arg) {
-				fprintf_safe(stderr, "coffee: out of memory\n");
-				cmdline_parser_free(args_info);
-				return 1;
-			}
 			break;
 
 		case LOPT_EXAMPLE:
 			args_info->example_given = true;
 			sdsfree(args_info->example_arg);
 			args_info->example_arg = sdsnew(optarg);
-			if (!args_info->example_arg) {
-				fprintf_safe(stderr, "coffee: out of memory\n");
-				cmdline_parser_free(args_info);
-				return 1;
-			}
 			break;
 
 		case LOPT_FEATURES:
 			args_info->features_given = true;
 			sdsfree(args_info->features_arg);
 			args_info->features_arg = sdsnew(optarg);
-			if (!args_info->features_arg) {
-				fprintf_safe(stderr, "coffee: out of memory\n");
-				cmdline_parser_free(args_info);
-				return 1;
-			}
 			break;
 
 		case LOPT_ALL_FEATURES:
@@ -518,22 +468,12 @@ i64 cmdline_parser(i64 argc, char **argv, struct cli_args *args_info)
 			args_info->profile_given = true;
 			sdsfree(args_info->profile_arg);
 			args_info->profile_arg = sdsnew(optarg);
-			if (!args_info->profile_arg) {
-				fprintf_safe(stderr, "coffee: out of memory\n");
-				cmdline_parser_free(args_info);
-				return 1;
-			}
 			break;
 
 		case LOPT_TARGET_DIR:
 			args_info->target_dir_given = true;
 			sdsfree(args_info->target_dir_arg);
 			args_info->target_dir_arg = sdsnew(optarg);
-			if (!args_info->target_dir_arg) {
-				fprintf_safe(stderr, "coffee: out of memory\n");
-				cmdline_parser_free(args_info);
-				return 1;
-			}
 			break;
 
 		case LOPT_UNIT_GRAPH:
@@ -545,11 +485,6 @@ i64 cmdline_parser(i64 argc, char **argv, struct cli_args *args_info)
 			args_info->timings_given = true;
 			sdsfree(args_info->timings_arg);
 			args_info->timings_arg = sdsnew(optarg);
-			if (!args_info->timings_arg) {
-				fprintf_safe(stderr, "coffee: out of memory\n");
-				cmdline_parser_free(args_info);
-				return 1;
-			}
 			break;
 
 		case LOPT_FUTURE_INCOMPAT_REPORT:
@@ -566,22 +501,12 @@ i64 cmdline_parser(i64 argc, char **argv, struct cli_args *args_info)
 			args_info->exclude_given = true;
 			sdsfree(args_info->exclude_arg);
 			args_info->exclude_arg = sdsnew(optarg);
-			if (!args_info->exclude_arg) {
-				fprintf_safe(stderr, "coffee: out of memory\n");
-				cmdline_parser_free(args_info);
-				return 1;
-			}
 			break;
 
 		case LOPT_INCLUDE:
 			args_info->include_given = true;
 			sdsfree(args_info->include_arg);
 			args_info->include_arg = sdsnew(optarg);
-			if (!args_info->include_arg) {
-				fprintf_safe(stderr, "coffee: out of memory\n");
-				cmdline_parser_free(args_info);
-				return 1;
-			}
 			break;
 
 		case LOPT_LIB:
@@ -608,11 +533,6 @@ i64 cmdline_parser(i64 argc, char **argv, struct cli_args *args_info)
 			args_info->config_given = true;
 			sdsfree(args_info->config_arg);
 			args_info->config_arg = sdsnew(optarg);
-			if (!args_info->config_arg) {
-				fprintf_safe(stderr, "coffee: out of memory\n");
-				cmdline_parser_free(args_info);
-				return 1;
-			}
 			break;
 
 		case LOPT_DEV:
@@ -639,77 +559,42 @@ i64 cmdline_parser(i64 argc, char **argv, struct cli_args *args_info)
 			args_info->rename_given = true;
 			sdsfree(args_info->rename_arg);
 			args_info->rename_arg = sdsnew(optarg);
-			if (!args_info->rename_arg) {
-				fprintf_safe(stderr, "coffee: out of memory\n");
-				cmdline_parser_free(args_info);
-				return 1;
-			}
 			break;
 
 		case LOPT_PATH:
 			args_info->path_given = true;
 			sdsfree(args_info->path_arg);
 			args_info->path_arg = sdsnew(optarg);
-			if (!args_info->path_arg) {
-				fprintf_safe(stderr, "coffee: out of memory\n");
-				cmdline_parser_free(args_info);
-				return 1;
-			}
 			break;
 
 		case LOPT_GIT:
 			args_info->git_given = true;
 			sdsfree(args_info->git_arg);
 			args_info->git_arg = sdsnew(optarg);
-			if (!args_info->git_arg) {
-				fprintf_safe(stderr, "coffee: out of memory\n");
-				cmdline_parser_free(args_info);
-				return 1;
-			}
 			break;
 
 		case LOPT_BRANCH:
 			args_info->branch_given = true;
 			sdsfree(args_info->branch_arg);
 			args_info->branch_arg = sdsnew(optarg);
-			if (!args_info->branch_arg) {
-				fprintf_safe(stderr, "coffee: out of memory\n");
-				cmdline_parser_free(args_info);
-				return 1;
-			}
 			break;
 
 		case LOPT_TAG:
 			args_info->tag_given = true;
 			sdsfree(args_info->tag_arg);
 			args_info->tag_arg = sdsnew(optarg);
-			if (!args_info->tag_arg) {
-				fprintf_safe(stderr, "coffee: out of memory\n");
-				cmdline_parser_free(args_info);
-				return 1;
-			}
 			break;
 
 		case LOPT_REV:
 			args_info->rev_given = true;
 			sdsfree(args_info->rev_arg);
 			args_info->rev_arg = sdsnew(optarg);
-			if (!args_info->rev_arg) {
-				fprintf_safe(stderr, "coffee: out of memory\n");
-				cmdline_parser_free(args_info);
-				return 1;
-			}
 			break;
 
 		case LOPT_REGISTRY:
 			args_info->registry_given = true;
 			sdsfree(args_info->registry_arg);
 			args_info->registry_arg = sdsnew(optarg);
-			if (!args_info->registry_arg) {
-				fprintf_safe(stderr, "coffee: out of memory\n");
-				cmdline_parser_free(args_info);
-				return 1;
-			}
 			break;
 
 		case LOPT_DRY_RUN:
@@ -721,11 +606,6 @@ i64 cmdline_parser(i64 argc, char **argv, struct cli_args *args_info)
 			args_info->out_dir_given = true;
 			sdsfree(args_info->out_dir_arg);
 			args_info->out_dir_arg = sdsnew(optarg);
-			if (!args_info->out_dir_arg) {
-				fprintf_safe(stderr, "coffee: out of memory\n");
-				cmdline_parser_free(args_info);
-				return 1;
-			}
 			break;
 
 		case LOPT_BUILD_PLAN:
@@ -801,11 +681,6 @@ i64 cmdline_parser(i64 argc, char **argv, struct cli_args *args_info)
 			args_info->command_given = true;
 			sdsfree(args_info->command_arg);
 			args_info->command_arg = sdsnew(optarg);
-			if (!args_info->command_arg) {
-				fprintf_safe(stderr, "coffee: out of memory\n");
-				cmdline_parser_free(args_info);
-				return 1;
-			}
 			break;
 
 		case '?':
@@ -824,18 +699,8 @@ i64 cmdline_parser(i64 argc, char **argv, struct cli_args *args_info)
 	if (optind < argc) {
 		unsigned remaining = (unsigned)(argc - optind);
 		args_info->inputs  = (sds *)safe_malloc((size_t)remaining * sizeof(sds));
-		if (!args_info->inputs) {
-			fprintf_safe(stderr, "coffee: out of memory\n");
-			cmdline_parser_free(args_info);
-			return 1;
-		}
 		for (unsigned i = 0; i < remaining; i++) {
 			args_info->inputs[i] = sdsnew(argv[optind + (i64)i]);
-			if (!args_info->inputs[i]) {
-				fprintf_safe(stderr, "coffee: out of memory\n");
-				cmdline_parser_free(args_info);
-				return 1;
-			}
 		}
 		args_info->inputs_num = remaining;
 	}

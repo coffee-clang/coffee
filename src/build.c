@@ -694,6 +694,23 @@ sds split_flags_to_argv(const char *flags, char **argv, size_t start_idx, size_t
 	return copy;
 }
 
+size_t append_clang_tidy_extra_args(const char *flags, char **argv, size_t start_idx)
+{
+	size_t tokens_cnt = count_flag_tokens(flags);
+	char **tokens     = (char **)safe_malloc(sizeof(char *) * (tokens_cnt + 1));
+
+	size_t end_idx;
+	sds    flags_copy = split_flags_to_argv(flags, tokens, 0, &end_idx);
+
+	for (size_t i = 0; i < end_idx; i++) {
+		argv[start_idx++] = sdscatprintf(sdsnew("--extra-arg="), "%s", tokens[i]);
+	}
+
+	sdsfree(flags_copy);
+	safe_free((void *)tokens);
+	return start_idx;
+}
+
 i64 compile_sources(sds *src_files, size_t n, sds output, char *cc, const char *flags_in, bool verbose)
 {
 	if (n == 0) {

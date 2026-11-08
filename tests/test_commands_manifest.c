@@ -85,6 +85,47 @@ static void teardown_project(const char *test_name)
 	sdsfree(tmpdir);
 }
 
+/* Put a no-op 'clang-tidy' first on PATH so fix/lint don't run the real tool
+ * (which is slow and floods the log with its usage message). */
+static sds saved_path;
+
+static void stub_clang_tidy_on(void)
+{
+	const char *old = getenv("PATH");
+	saved_path      = old != nullptr ? sdsnew(old) : nullptr;
+
+	/* Inside the project dir, so teardown_project() removes it. */
+	char cwd[4'096];
+	if (getcwd(cwd, sizeof(cwd)) == nullptr) {
+		cwd[0] = '.';
+		cwd[1] = '\0';
+	}
+	sds dir = sdscatprintf(sdsempty(), "%s/stub-bin", cwd);
+	mkdir(dir, 0755);
+	sds   script = sdscatprintf(sdsempty(), "%s/clang-tidy", dir);
+	FILE *fp     = fopen(script, "w");
+	if (fp != nullptr) {
+		fprintf_safe(fp, "#!/bin/sh\nexit 0\n");
+		fclose(fp);
+	}
+	chmod(script, 0755);
+
+	sds path = sdscatprintf(sdsempty(), "%s:%s", dir, old != nullptr ? old : "/usr/bin:/bin");
+	setenv("PATH", path, 1);
+	sdsfree(path);
+	sdsfree(script);
+	sdsfree(dir);
+}
+
+static void stub_clang_tidy_off(void)
+{
+	if (saved_path != nullptr) {
+		setenv("PATH", saved_path, 1);
+		sdsfree(saved_path);
+		saved_path = nullptr;
+	}
+}
+
 /* ---------------------------------------------------------------
  * bench
  * --------------------------------------------------------------- */
@@ -231,15 +272,15 @@ TEST(fix_no_manifest)
 TEST(fix_with_manifest)
 {
 	setup_project("fix", nullptr);
+	stub_clang_tidy_on();
 	options opt = {
 		.inputs     = (char *[]){ "fix" },
 		.inputs_num = 1,
 	};
 	i64 ret = handle_fix(&opt);
-	(void)ret;
+	stub_clang_tidy_off();
 	teardown_project("fix");
-	/* fix runs clang-tidy, might fail if clang-tidy not installed */
-	/* accept any result (external tool) */
+	ASSERT(ret == 0, "fix with manifest should return 0");
 	PASS();
 }
 
@@ -309,15 +350,15 @@ TEST(lint_no_manifest)
 TEST(lint_with_manifest)
 {
 	setup_project("lint", nullptr);
+	stub_clang_tidy_on();
 	options opt = {
 		.inputs     = (char *[]){ "lint" },
 		.inputs_num = 1,
 	};
 	i64 ret = handle_lint(&opt);
-	(void)ret;
+	stub_clang_tidy_off();
 	teardown_project("lint");
-	/* lint runs clang-tidy, may fail if clang-tidy not installed */
-	/* accept any result (external tool) */
+	ASSERT(ret == 0, "lint with manifest should return 0");
 	PASS();
 }
 

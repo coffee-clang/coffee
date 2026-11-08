@@ -26,7 +26,7 @@ coffee install --git https://github.com/user/cjson.git cjson 1.2.0
 - Requires `--git <url>` to specify the source repository
 - The URL must use an allow-listed scheme (`https`, `git`, `ssh`, `git+ssh`, `git+https`), a local
   path, or scp-style ssh; `http` is rejected
-- Clones into `~/.coffee/deps/<package>` (shallow clone)
+- Shallow-clones into a temporary `~/.coffee/deps/.<package>.clone`, then moves it to `~/.coffee/deps/<package>/<version>`
 - Reads the cloned repository's `library.toml` for `[[bin]]` definitions
 - Compiles each `[[bin]]` target using `$CC` (default: clang) with `-O0 -g`
 - Places compiled binaries in `~/.coffee/bin/`

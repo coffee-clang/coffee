@@ -158,4 +158,12 @@ size_t count_flag_tokens(const char *flags);
 
 sds split_flags_to_argv(const char *flags, char **argv, size_t start_idx, size_t *end_idx);
 
+/*
+ * Append each token of `flags` to argv, starting at start_idx, as a
+ * "--extra-arg=<token>" element, the form clang-tidy accepts before the
+ * file list.  Returns the index after the last element; the appended
+ * elements are sds strings that the caller must sdsfree().
+ */
+size_t append_clang_tidy_extra_args(const char *flags, char **argv, size_t start_idx);
+
 #endif

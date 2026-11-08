@@ -46,10 +46,6 @@ static i64 compile_binary(char *cc, sds name, sds *srcs, size_t src_cnt, sds fla
 	sdsfree(outpath);
 	sdsfree(flags_copy);
 	safe_free(argv);
-	for (size_t i = 0; i < src_cnt; i++) {
-		sdsfree(srcs[i]);
-	}
-	safe_free(srcs);
 
 	return ret;
 }
@@ -130,8 +126,10 @@ int64_t handle_install(options *opts)
 	sds global_deps = sdscatprintf(sdsempty(), "%s/deps", coffee_home);
 	mkdir(global_deps, 0755);
 
-	/* Clone to temporary location first */
-	sds clone_path = sdscatprintf(sdsempty(), "%s/%s", global_deps, package);
+	/* Clone to a temporary sibling of ~/.coffee/deps/<package>: the clone is
+	 * later moved into the versioned directory deps/<package>/<version>,
+	 * which must not be inside the clone itself. */
+	sds clone_path = sdscatprintf(sdsempty(), "%s/.%s.clone", global_deps, package);
 	sdsfree(global_deps);
 
 	/* If clone already exists, remove it */
@@ -204,6 +202,9 @@ int64_t handle_install(options *opts)
 
 		/* Move cloned files into versioned directory */
 		if (safe_rename(clone_path, cache_path) != 0) {
+			/* mv would move the clone *into* an existing cache_path */
+			char *rm_cache_argv[] = { "rm", "-rf", cache_path, nullptr };
+			run_command(rm_cache_argv, RUN_CMD_QUIET);
 			char *mv_argv[] = { "mv", clone_path, cache_path, nullptr };
 			i64   mv_ret    = run_command(mv_argv, RUN_CMD_QUIET);
 			if (mv_ret == 0) {

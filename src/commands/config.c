@@ -121,9 +121,11 @@ static i64 config_list(void)
 	}
 
 	/* Tables */
-	i64 nt = toml_table_ntab(conf);
+	/* toml_key_in() indexes key-values first, then arrays, then tables */
+	i64 first_tab = n + toml_table_narr(conf);
+	i64 nt        = toml_table_ntab(conf);
 	for (i64 i = 0; i < nt; i++) {
-		const char   *tabname = toml_key_in(conf, i);
+		const char   *tabname = toml_key_in(conf, first_tab + i);
 		toml_table_t *tab     = toml_table_in(conf, tabname);
 		if (tab == nullptr) {
 			continue;
@@ -286,6 +288,7 @@ static i64 config_unset_raw(const char *section, const char *key)
 	FILE *fp   = safe_fopen(path, "r");
 
 	if (fp == nullptr) {
+		sdsfree(path);
 		return 0;
 	}
 

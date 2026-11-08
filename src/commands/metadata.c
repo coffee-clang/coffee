@@ -9,6 +9,43 @@
 #include <stdlib.h>
 #include <string.h>
 
+/*
+ * Return s as an escaped JSON string body (without the surrounding quotes).
+ * A nullptr input yields an empty string.  The caller frees the result.
+ */
+static sds json_escape(const char *s)
+{
+	sds out = sdsempty();
+	if (s == nullptr) {
+		return out;
+	}
+	for (const char *p = s; *p != '\0'; p++) {
+		unsigned char c = (unsigned char)*p;
+		if (c == '"' || c == '\\') {
+			out = sdscatprintf(out, "\\%c", c);
+		} else if (c == '\n') {
+			out = sdscat(out, "\\n");
+		} else if (c == '\t') {
+			out = sdscat(out, "\\t");
+		} else if (c == '\r') {
+			out = sdscat(out, "\\r");
+		} else if (c < 0x20) {
+			out = sdscatprintf(out, "\\u%04x", c);
+		} else {
+			out = sdscatlen(out, p, 1);
+		}
+	}
+	return out;
+}
+
+/* Print value as a quoted, escaped JSON string. */
+static void print_json_quoted(const char *value)
+{
+	sds escaped = json_escape(value);
+	printf_safe("\"%s\"", escaped);
+	sdsfree(escaped);
+}
+
 int64_t handle_metadata(options *opts)
 {
 	(void)opts;
@@ -39,11 +76,21 @@ int64_t handle_metadata(options *opts)
 
 	printf_safe("{\n");
 	printf_safe("  \"package\": {\n");
-	printf_safe("    \"name\": \"%s\",\n", m->package.name != nullptr ? m->package.name : "");
-	printf_safe("    \"version\": \"%s\",\n", m->package.version != nullptr ? m->package.version : "");
-	printf_safe("    \"edition\": \"%s\",\n", m->package.edition != nullptr ? m->package.edition : "");
-	printf_safe("    \"description\": \"%s\",\n", m->package.description != nullptr ? m->package.description : "");
-	printf_safe("    \"license\": \"%s\"\n", m->package.license != nullptr ? m->package.license : "");
+	printf_safe("    \"name\": ");
+	print_json_quoted(m->package.name);
+	printf_safe(",\n");
+	printf_safe("    \"version\": ");
+	print_json_quoted(m->package.version);
+	printf_safe(",\n");
+	printf_safe("    \"edition\": ");
+	print_json_quoted(m->package.edition);
+	printf_safe(",\n");
+	printf_safe("    \"description\": ");
+	print_json_quoted(m->package.description);
+	printf_safe(",\n");
+	printf_safe("    \"license\": ");
+	print_json_quoted(m->package.license);
+	printf_safe("\n");
 	printf_safe("  },\n");
 
 	/* Resolved features */
@@ -57,10 +104,13 @@ int64_t handle_metadata(options *opts)
 			if (rf->package_names[i] == nullptr) {
 				continue;
 			}
-			printf_safe("    \"%s\": [", rf->package_names[i]);
+			printf_safe("    ");
+			print_json_quoted(rf->package_names[i]);
+			printf_safe(": [");
 			for (size_t j = 0; j < rf->packages[i].count; j++) {
 				if (rf->packages[i].names[j]) {
-					printf_safe("\"%s\"%s", rf->packages[i].names[j], (j < rf->packages[i].count - 1) ? ", " : "");
+					print_json_quoted(rf->packages[i].names[j]);
+					printf_safe("%s", (j < rf->packages[i].count - 1) ? ", " : "");
 				}
 			}
 			printf_safe("]%s\n", (i < rf->package_count - 1) ? "," : "");
@@ -72,7 +122,9 @@ int64_t handle_metadata(options *opts)
 	/* Dependencies from manifest */
 	printf_safe("  \"dependencies\": [\n");
 	for (size_t i = 0; i < m->package.dependencies_count; i++) {
-		printf_safe("    \"%s\"%s\n", m->package.dependencies[i], (i < m->package.dependencies_count - 1) ? "," : "");
+		printf_safe("    ");
+		print_json_quoted(m->package.dependencies[i]);
+		printf_safe("%s\n", (i < m->package.dependencies_count - 1) ? "," : "");
 	}
 	printf_safe("  ]");
 
@@ -101,15 +153,20 @@ int64_t handle_metadata(options *opts)
 			first = false;
 
 			printf_safe("    {\n");
-			printf_safe("      \"name\": \"%s\",\n", dep_name);
+			printf_safe("      \"name\": ");
+			print_json_quoted(dep_name);
+			printf_safe(",\n");
 			const char *path = dep_graph_path(g, dep_name);
 			if (path != nullptr) {
-				printf_safe("      \"path\": \"%s\",\n", path);
+				printf_safe("      \"path\": ");
+				print_json_quoted(path);
+				printf_safe(",\n");
 			}
 			printf_safe("      \"git\": %s", !!(dep_graph_is_git(g, dep_name)) ? "true" : "false");
 			const char *ref = dep_graph_git_ref(g, dep_name);
 			if (ref != nullptr) {
-				printf_safe(",\n      \"ref\": \"%s\"", ref);
+				printf_safe(",\n      \"ref\": ");
+				print_json_quoted(ref);
 			}
 			printf_safe("\n    }");
 		}

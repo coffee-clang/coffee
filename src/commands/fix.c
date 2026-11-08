@@ -28,9 +28,9 @@ int64_t handle_fix(options *opts)
 		}
 	}
 
-	/* Build argv: find src tests -name *.c -exec clang-tidy --fix --quiet {} -- <flags> + */
+	/* Build argv: find src tests -name *.c -exec clang-tidy --fix --quiet --extra-arg=<flag>... {} + */
 	size_t fl_toks = count_flag_tokens(inc_flags);
-	size_t argc    = 12 + fl_toks + 1;
+	size_t argc    = 11 + fl_toks + 1;
 	char **argv    = (char **)safe_malloc(sizeof(char *) * argc);
 	size_t idx     = 0;
 
@@ -43,13 +43,12 @@ int64_t handle_fix(options *opts)
 	argv[idx++] = "clang-tidy";
 	argv[idx++] = "--fix";
 	argv[idx++] = "--quiet";
+
+	size_t extra_start = idx;
+	idx                = append_clang_tidy_extra_args(inc_flags, argv, idx);
+	size_t extra_end   = idx;
+
 	argv[idx++] = "{}";
-	argv[idx++] = "--";
-
-	size_t end_idx;
-	sds    flags_copy = split_flags_to_argv(inc_flags, argv, idx, &end_idx);
-	idx               = end_idx;
-
 	argv[idx++] = "+";
 	argv[idx]   = nullptr;
 
@@ -63,7 +62,9 @@ int64_t handle_fix(options *opts)
 
 	i64 ret = run_command(argv, 0);
 
-	sdsfree(flags_copy);
+	for (size_t i = extra_start; i < extra_end; i++) {
+		sdsfree(argv[i]);
+	}
 	safe_free(argv);
 	sdsfree(inc_flags);
 

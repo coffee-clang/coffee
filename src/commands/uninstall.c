@@ -27,9 +27,9 @@ int64_t handle_uninstall(options *opts)
 		return 1;
 	}
 
-	sdsfree(pkg_dir);
 	char *rm_argv[] = { "rm", "-rf", pkg_dir, nullptr };
 	i64   ret       = run_command(rm_argv, 0);
+	sdsfree(pkg_dir);
 
 	if (ret != 0) {
 		fprintf_safe(stderr, "Error: Failed to remove %s\n", package);

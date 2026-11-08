@@ -29,7 +29,7 @@ int64_t handle_lint(options *opts)
 	}
 
 	size_t fl_toks = count_flag_tokens(inc_flags);
-	size_t argc    = 13 + fl_toks + 1; /* extra slot for --fix */
+	size_t argc    = 12 + fl_toks + 1; /* extra slot for --fix */
 	char **argv    = (char **)safe_malloc(sizeof(char *) * argc);
 	size_t idx     = 0;
 
@@ -46,13 +46,12 @@ int64_t handle_lint(options *opts)
 	}
 
 	argv[idx++] = "--quiet";
+
+	size_t extra_start = idx;
+	idx                = append_clang_tidy_extra_args(inc_flags, argv, idx);
+	size_t extra_end   = idx;
+
 	argv[idx++] = "{}";
-	argv[idx++] = "--";
-
-	size_t end_idx;
-	sds    flags_copy = split_flags_to_argv(inc_flags, argv, idx, &end_idx);
-	idx               = end_idx;
-
 	argv[idx++] = "+";
 	argv[idx]   = nullptr;
 
@@ -66,7 +65,9 @@ int64_t handle_lint(options *opts)
 
 	i64 ret = run_command(argv, 0);
 
-	sdsfree(flags_copy);
+	for (size_t i = extra_start; i < extra_end; i++) {
+		sdsfree(argv[i]);
+	}
 	safe_free(argv);
 	sdsfree(inc_flags);
 

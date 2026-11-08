@@ -10,7 +10,6 @@
 
 #include <glob.h>
 #include <sys/stat.h>
-#include <sys/wait.h>
 #include <unistd.h>
 
 int64_t handle_test(options *opts)
@@ -215,8 +214,6 @@ int64_t handle_test(options *opts)
 	sdsfree(project_dir);
 	sdsfree(output);
 
-	if (WIFEXITED(ret)) {
-		return (int64_t)WEXITSTATUS(ret);
-	}
-	return 1;
+	/* run_command() already reduced the wait status to an exit status */
+	return ret;
 }

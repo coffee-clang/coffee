@@ -111,10 +111,6 @@ static void apply_dep_source(dep_node_t *node, const dependency_t *sd, const cha
  */
 static sds dep_extract_constraint(const char *entry)
 {
-	if (entry == nullptr) {
-		return nullptr;
-	}
-
 	const char *eq = strchr(entry, '=');
 	if (eq == nullptr) {
 		/* No '=' — try to find inline constraint operator after the name */
@@ -184,10 +180,7 @@ static i64 add_node(dep_graph_t *g, const char *name)
 	if (g->count >= g->capacity) {
 		size_t new_cap = g->capacity == 0 ? 32 : g->capacity * 2;
 		g->nodes       = safe_realloc(g->nodes, new_cap * sizeof(dep_node_t));
-		if (g->nodes == nullptr) {
-			return -1;
-		}
-		g->capacity = new_cap;
+		g->capacity    = new_cap;
 	}
 	size_t idx = g->count;
 	memset(&g->nodes[idx], 0, sizeof(dep_node_t));
@@ -201,10 +194,10 @@ static i64 add_node(dep_graph_t *g, const char *name)
  * adds the node, records its version constraint, and copies its git/path
  * source (sd may be nullptr for a flat version string).  parent_dir is
  * nullptr for the root manifest and the declaring dep's directory for a
- * transitive dependency.  Returns 0 on success, -1 on allocation failure.
+ * transitive dependency.
  */
-static i64 register_dep(dep_graph_t *g, const char *requester, const char *name, const char *constraint,
-                        const dependency_t *sd, const char *parent_dir)
+static void register_dep(dep_graph_t *g, const char *requester, const char *name, const char *constraint,
+                         const dependency_t *sd, const char *parent_dir)
 {
 	i64 existing = dep_graph_find_node(g, name);
 	if (existing >= 0) {
@@ -213,23 +206,19 @@ static i64 register_dep(dep_graph_t *g, const char *requester, const char *name,
 			fprintf_safe(stderr, "Warning: %s requires %s %s but %s is resolved\n", requester, name, constraint,
 			             g->nodes[existing].version);
 		}
-		return 0;
+		return;
 	}
 	if (!dep_name_is_valid(name)) {
 		fprintf_safe(stderr, "Warning: skipping invalid dependency name '%s'\n", name);
-		return 0;
+		return;
 	}
 	i64 child_idx = add_node(g, name);
-	if (child_idx < 0) {
-		return -1;
-	}
 	if (constraint != nullptr) {
 		g->nodes[child_idx].version_constraint = sdsnew(constraint);
 	}
 	if (sd != nullptr) {
 		apply_dep_source(&g->nodes[child_idx], sd, name, parent_dir);
 	}
-	return 0;
 }
 
 /*
@@ -311,10 +300,7 @@ dep_graph_t *dep_graph_create(manifest_t *m, lockfile_t *lf, bool offline)
 	}
 
 	dep_graph_t *g = safe_calloc(1, sizeof(dep_graph_t));
-	if (g == nullptr) {
-		return nullptr;
-	}
-	g->offline = offline;
+	g->offline     = offline;
 
 	/* Add root node */
 	const char *root_name = m->package.name != nullptr ? m->package.name : "root";
@@ -323,11 +309,7 @@ dep_graph_t *dep_graph_create(manifest_t *m, lockfile_t *lf, bool offline)
 		dep_graph_free(g);
 		return nullptr;
 	}
-	i64 root_idx = add_node(g, root_name);
-	if (root_idx < 0) {
-		dep_graph_free(g);
-		return nullptr;
-	}
+	i64 root_idx               = add_node(g, root_name);
 	g->nodes[root_idx].path    = sdsnew(".");
 	g->nodes[root_idx].version = m->package.version ? sdsnew(m->package.version) : sdsnew("*");
 	g->nodes[root_idx].visited = true;
@@ -412,15 +394,9 @@ dep_graph_t *dep_graph_create(manifest_t *m, lockfile_t *lf, bool offline)
 					sds                 constraint = sd != nullptr && sd->version != nullptr ?
 					                                     sdsnew(sd->version) :
 					                                     dep_extract_constraint(dm->package.dependencies[i]);
-					i64                 bad        = register_dep(g, requester, dep_name, constraint, sd, dep_dir);
+					register_dep(g, requester, dep_name, constraint, sd, dep_dir);
 					sdsfree(constraint);
 					sdsfree(dep_name);
-					if (bad != 0) {
-						manifest_free(dm);
-						sdsfree(dep_dir);
-						dep_graph_free(g);
-						return nullptr;
-					}
 				}
 				/* Structured entries (inline tables and [[dependencies]]). */
 				for (size_t j = 0; j < dm->dependencies.deps_count; j++) {
@@ -431,12 +407,7 @@ dep_graph_t *dep_graph_create(manifest_t *m, lockfile_t *lf, bool offline)
 					if (cur_name != nullptr && strcmp(sd->name, cur_name) == 0) {
 						continue;
 					}
-					if (register_dep(g, requester, sd->name, sd->version, sd, dep_dir) != 0) {
-						manifest_free(dm);
-						sdsfree(dep_dir);
-						dep_graph_free(g);
-						return nullptr;
-					}
+					register_dep(g, requester, sd->name, sd->version, sd, dep_dir);
 				}
 				manifest_free(dm);
 			}
@@ -458,13 +429,9 @@ dep_graph_t *dep_graph_create(manifest_t *m, lockfile_t *lf, bool offline)
 				sds                 constraint = sd != nullptr && sd->version != nullptr ?
 				                                     sdsnew(sd->version) :
 				                                     dep_extract_constraint(m->package.dependencies[i]);
-				i64                 bad        = register_dep(g, requester, dep_name, constraint, sd, nullptr);
+				register_dep(g, requester, dep_name, constraint, sd, nullptr);
 				sdsfree(constraint);
 				sdsfree(dep_name);
-				if (bad != 0) {
-					dep_graph_free(g);
-					return nullptr;
-				}
 			}
 
 			/* Structured entries with no flat remnant ([[dependencies]]). */
@@ -473,10 +440,7 @@ dep_graph_t *dep_graph_create(manifest_t *m, lockfile_t *lf, bool offline)
 				if (sd->name == nullptr) {
 					continue;
 				}
-				if (register_dep(g, requester, sd->name, sd->version, sd, nullptr) != 0) {
-					dep_graph_free(g);
-					return nullptr;
-				}
+				register_dep(g, requester, sd->name, sd->version, sd, nullptr);
 			}
 		}
 
@@ -530,10 +494,6 @@ sds *dep_graph_names(const dep_graph_t *g, size_t *count)
 	}
 	/* Build a flat array of name sds pointers */
 	sds *names = safe_calloc(g->count, sizeof(sds));
-	if (names == nullptr) {
-		*count = 0;
-		return nullptr;
-	}
 	for (size_t i = 0; i < g->count; i++) {
 		names[i] = g->nodes[i].name;
 	}

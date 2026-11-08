@@ -38,6 +38,10 @@ void coffee_register_dep_graph_tests(void);
 void coffee_register_new_init_tests(void);
 void coffee_register_security_tests(void);
 void coffee_register_manifest_deps_tests(void);
+void coffee_register_cov_build_registry_tests(void);
+void coffee_register_cov_parsers_tests(void);
+void coffee_register_cov_deps_commands_tests(void);
+void coffee_register_cov_misc_commands_tests(void);
 
 /* Remove a file/dir tree (used to clean up the per-run COFFEE_HOME). */
 static int remove_tree_entry(const char *path, const struct stat *st, int type, struct FTW *ftw)
@@ -67,6 +71,15 @@ int main(int argc, char **argv)
 		atexit(cleanup_test_home);
 	}
 	sdsfree(test_home);
+
+	/* Disable git's background auto-gc/maintenance.  It detaches and keeps
+	 * writing into a freshly-cloned .git while a test removes that tree,
+	 * which makes the removal fail intermittently with ENOTEMPTY. */
+	setenv("GIT_CONFIG_COUNT", "2", 1);
+	setenv("GIT_CONFIG_KEY_0", "gc.auto", 1);
+	setenv("GIT_CONFIG_VALUE_0", "0", 1);
+	setenv("GIT_CONFIG_KEY_1", "maintenance.auto", 1);
+	setenv("GIT_CONFIG_VALUE_1", "false", 1);
 
 	const char *filter = nullptr;
 
@@ -110,6 +123,10 @@ int main(int argc, char **argv)
 	coffee_register_new_init_tests();
 	coffee_register_security_tests();
 	coffee_register_manifest_deps_tests();
+	coffee_register_cov_build_registry_tests();
+	coffee_register_cov_parsers_tests();
+	coffee_register_cov_deps_commands_tests();
+	coffee_register_cov_misc_commands_tests();
 
 	if (verbose) {
 		printf("Registered %lu tests\n", (unsigned long)test_framework_count);
