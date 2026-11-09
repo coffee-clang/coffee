@@ -334,6 +334,11 @@ int64_t handle_fetch(options *opts)
 	}
 
 	lockfile_t *old_lf = lockfile_parse("Coffee.lock");
+	if (opts->locked && old_lf == nullptr) {
+		fprintf_safe(stderr, "Error: --locked requires an existing Coffee.lock\n");
+		manifest_free(m);
+		return 1;
+	}
 
 	const char *coffee_home = coffee_home_dir();
 	sds         global_deps = sdscatprintf(sdsempty(), "%s/deps", coffee_home);
@@ -472,7 +477,8 @@ int64_t handle_fetch(options *opts)
 			} else {
 				/* A dep with no git or path source is declared as a plain
 				 * version string; resolve it through the registry. */
-				ret = fetch_registry_dep(dep_name, g->nodes[gi].version_constraint, nullptr, global_deps, &lf_deps,
+				const lockfile_dep_t *locked = opts->locked ? lockfile_find_dep(old_lf, dep_name) : nullptr;
+				ret = fetch_registry_dep(dep_name, g->nodes[gi].version_constraint, locked, global_deps, &lf_deps,
 				                         &lf_count, &lf_cap, opts->verbose, opts->offline);
 			}
 
@@ -497,6 +503,11 @@ int64_t handle_fetch(options *opts)
 	}
 	lf.deps       = lf_deps;
 	lf.deps_count = lf_count;
+
+	if (overall == 0 && opts->locked && !lockfile_same_deps(old_lf, &lf)) {
+		fprintf_safe(stderr, "Error: Coffee.lock is out of date, and --locked prevents updating it\n");
+		overall = 1;
+	}
 
 	/* A partial lockfile would silently omit the deps that failed to
 	 * materialize and could later be consumed by a --locked build, so

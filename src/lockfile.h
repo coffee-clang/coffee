@@ -43,4 +43,10 @@ i64 lockfile_write(sds path, lockfile_t *lf);
  */
 lockfile_dep_t *lockfile_find_dep(lockfile_t *lf, const char *name);
 
+/**
+ * True when both lockfiles record the same dependencies with the same
+ * version, path, commit and checksum, in any order.
+ */
+bool lockfile_same_deps(const lockfile_t *a, const lockfile_t *b);
+
 #endif /* LOCKFILE_H_ */

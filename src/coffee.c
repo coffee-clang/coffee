@@ -138,8 +138,8 @@ int main(int argc, char **argv)
 	 * Since cmdline_parser_free is only called on error paths (exit on success),
 	 * this is safe. */
 	options opt = {
-		.offline    = args_info.offline_given,
-		.locked     = args_info.locked_given,
+		.offline    = args_info.offline_given || args_info.frozen_given,
+		.locked     = args_info.locked_given || args_info.frozen_given,
 		.verbose    = args_info.verbose_given,
 		.verbose2   = args_info.verbose_given,
 		.quiet      = args_info.quiet_given,

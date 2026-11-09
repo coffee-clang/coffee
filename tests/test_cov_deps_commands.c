@@ -1549,6 +1549,58 @@ TEST(cov_fetch_registry_version_mismatch)
 	PASS();
 }
 
+/* --locked refuses any fetch that would change Coffee.lock; --offline
+ * reuses a completed install. */
+TEST(cov_fetch_registry_locked_and_offline)
+{
+	sds root = tmp_new();
+	sandbox_on(root);
+	proj_enter(root, "lockproj", "[dependencies]\nregdep = \">= 1.0\"\n");
+	sds script = recipe_script("regdep", "1.0.0", nullptr);
+	recipe_fixture(root, "regdep", "1.0.0", nullptr, script);
+
+	ASSERT(fetch_with(false, true) == 1, "--locked without Coffee.lock fails");
+	ASSERT(file_contains("err.txt", "requires an existing Coffee.lock"), "the missing lockfile is reported");
+
+	ASSERT(fetch_with(false, false) == 0, "fetch writes Coffee.lock");
+	sds locked = lock_text();
+	ASSERT(fetch_with(false, true) == 0, "--locked accepts an unchanged lock");
+	ASSERT(fetch_with(true, false) == 0, "--offline reuses the completed install");
+	sds after = lock_text();
+	ASSERT(strcmp(locked, after) == 0, "the offline fetch records the same lock");
+	sdsfree(after);
+
+	/* The recipe's install.sh changes: --locked refuses to run it. */
+	sds changed = recipe_script("regdep", "1.0.0", "# revised");
+	recipe_fixture(root, "regdep", "1.0.0", nullptr, changed);
+	ASSERT(fetch_with(false, true) == 1, "--locked refuses a changed install.sh");
+	ASSERT(file_contains("err.txt", "changed since Coffee.lock was written"), "the change is reported");
+
+	/* The registry moves to a new version: --locked refuses it. */
+	sds bumped = recipe_script("regdep", "1.0.1", nullptr);
+	recipe_fixture(root, "regdep", "1.0.1", nullptr, bumped);
+	ASSERT(fetch_with(false, true) == 1, "--locked refuses a new recipe version");
+	ASSERT(file_contains("err.txt", "Coffee.lock pins 'regdep' 1.0.0"), "the pin is reported");
+	after = lock_text();
+	ASSERT(strcmp(locked, after) == 0, "a refused fetch leaves Coffee.lock unchanged");
+	sdsfree(after);
+
+	/* With the original recipe back, a new dependency would change the lock. */
+	recipe_fixture(root, "regdep", "1.0.0", nullptr, script);
+	write_project("lockproj", nullptr, "[dependencies]\nregdep = \">= 1.0\"\nother = { path = \"./other\" }\n");
+	mkdir("other", 0755);
+	ASSERT(fetch_with(false, true) == 1, "--locked refuses a dependency missing from the lock");
+	ASSERT(file_contains("err.txt", "Coffee.lock is out of date"), "the stale lock is reported");
+
+	sdsfree(bumped);
+	sdsfree(changed);
+	sdsfree(locked);
+	sdsfree(script);
+	sandbox_off();
+	leave_dir(root);
+	PASS();
+}
+
 /* outdated compares an installed recipe with the registry, update
  * installs the new version, and generate-lockfile records the install. */
 TEST(cov_registry_outdated_update_generate)
@@ -3019,6 +3071,7 @@ void coffee_register_cov_deps_commands_tests(void)
 	TEST_REGISTER(cov_fetch_registry_install_script_fails);
 	TEST_REGISTER(cov_fetch_registry_recipe_deps_first);
 	TEST_REGISTER(cov_fetch_registry_version_mismatch);
+	TEST_REGISTER(cov_fetch_registry_locked_and_offline);
 	TEST_REGISTER(cov_registry_outdated_update_generate);
 	TEST_REGISTER(cov_run_command_noout);
 	TEST_REGISTER(cov_fetch_offline_git_deps);

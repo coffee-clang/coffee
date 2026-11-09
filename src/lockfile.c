@@ -212,3 +212,38 @@ lockfile_dep_t *lockfile_find_dep(lockfile_t *lf, const char *name)
 	}
 	return nullptr;
 }
+
+/* Two nullable strings are equal when both are null or both match. */
+static bool lockfile_str_equal(const char *a, const char *b)
+{
+	if (a == nullptr || b == nullptr) {
+		return a == b;
+	}
+	return strcmp(a, b) == 0;
+}
+
+/* True when lf holds an entry identical to dep. */
+static bool lockfile_has_dep(const lockfile_t *lf, const lockfile_dep_t *dep)
+{
+	for (size_t i = 0; i < lf->deps_count; i++) {
+		const lockfile_dep_t *d = &lf->deps[i];
+		if (lockfile_str_equal(d->name, dep->name)) {
+			return lockfile_str_equal(d->version, dep->version) && lockfile_str_equal(d->path, dep->path) &&
+			       lockfile_str_equal(d->commit, dep->commit) && lockfile_str_equal(d->checksum, dep->checksum);
+		}
+	}
+	return false;
+}
+
+bool lockfile_same_deps(const lockfile_t *a, const lockfile_t *b)
+{
+	if (a == nullptr || b == nullptr || a->deps_count != b->deps_count) {
+		return false;
+	}
+	for (size_t i = 0; i < a->deps_count; i++) {
+		if (!lockfile_has_dep(b, &a->deps[i])) {
+			return false;
+		}
+	}
+	return true;
+}

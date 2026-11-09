@@ -40,4 +40,8 @@ coffee fetch
   Coffee.lock unchanged
 - `--offline` never touches the network: git deps and registry deps are recorded only if already on
   disk (a registry dep needs a completed install)
+- `--locked` requires an existing Coffee.lock and fails when the fetch would change it: a registry dep
+  whose recipe version or `install.sh` checksum differs from the lock is refused before its script
+  runs, and any other difference (a new dependency, a moved git commit) fails the fetch and leaves
+  Coffee.lock unchanged. `--frozen` is `--locked` plus `--offline`
 - Does not invoke compiler
