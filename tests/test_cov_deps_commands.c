@@ -17,6 +17,7 @@
 #include "../src/lockfile.h"
 #include "../src/manifest.h"
 #include "../src/project.h"
+#include "../src/recipe_install.h"
 #include "../src/strings.h"
 #include "safe.h"
 #include "test_framework.h"
@@ -3113,6 +3114,1240 @@ TEST(cov_uninstall_removes_installed_package)
 }
 
 /* ------------------------------------------------------------------ */
+/* Stub tools                                                           */
+/* ------------------------------------------------------------------ */
+
+/* Write the executable shell script dir/tool with the given body. */
+static void stub_tool(const char *dir, const char *tool, const char *body)
+{
+	mkdir(dir, 0755);
+	sds script = join(dir, tool);
+	sds text   = sdscatprintf(sdsempty(), "#!/bin/sh\n%s", body);
+	write_text(script, text);
+	chmod(script, 0755);
+	sdsfree(text);
+	sdsfree(script);
+}
+
+/* Put dir first on PATH until stub_off(). */
+static void stub_path_on(const char *dir)
+{
+	saved_path = env_save("PATH");
+	sds path   = sdscatprintf(sdsempty(), "%s:%s", dir, saved_path != nullptr ? saved_path : "/usr/bin:/bin");
+	setenv("PATH", path, 1);
+	sdsfree(path);
+}
+
+/*
+ * A stub git in dir: fetch exits with fetch_status, rev-parse and rev-list
+ * run the shell commands in rev_cmd, every other subcommand succeeds.
+ */
+static void git_stub(const char *dir, int fetch_status, const char *rev_cmd)
+{
+	sds body = sdscatprintf(sdsempty(),
+	                        "for a in \"$@\"; do\n"
+	                        "  case \"$a\" in\n"
+	                        "  fetch) exit %d ;;\n"
+	                        "  rev-parse|rev-list) %s ;;\n"
+	                        "  esac\n"
+	                        "done\n"
+	                        "exit 0\n",
+	                        fetch_status, rev_cmd);
+	stub_tool(dir, "git", body);
+	sdsfree(body);
+}
+
+/* A graph holding a root and one git node "lib" at path with ref (both nullable). */
+static dep_graph_t *git_graph(const char *path, const char *ref)
+{
+	dep_graph_t *g      = safe_calloc(1, sizeof(dep_graph_t));
+	g->nodes            = safe_calloc(2, sizeof(dep_node_t));
+	g->capacity         = 2;
+	g->count            = 2;
+	g->nodes[0].name    = sdsnew("root");
+	g->nodes[1].name    = sdsnew("lib");
+	g->nodes[1].is_git  = true;
+	g->nodes[1].path    = path != nullptr ? sdsnew(path) : nullptr;
+	g->nodes[1].git_ref = ref != nullptr ? sdsnew(ref) : nullptr;
+	return g;
+}
+
+/* ------------------------------------------------------------------ */
+/* dep_graph.c: more resolution corners                                 */
+/* ------------------------------------------------------------------ */
+
+TEST(cov_dg_constraint_whitespace_variants)
+{
+	sds root = tmp_new();
+	sandbox_on(root);
+	enter_dir(root);
+	write_project("wsconstraints",
+	              "dependencies = [\"lia\\t< 2\", \"lib ! 1\", \"lic =\\t\\\"1.0\\\"\", \"lid = \\\"1.0\", \"lie =\", "
+	              "\"lif = 1.0\\t\"]",
+	              nullptr);
+
+	manifest_t *m = parse_cwd_manifest();
+	ASSERT(m != nullptr, "manifest parses");
+	stderr_begin("warn.txt");
+	dep_graph_t *g = dep_graph_create(m, nullptr, true);
+	stderr_end();
+	ASSERT(g != nullptr, "graph builds");
+	ASSERT(dep_graph_count(g) == 5, "names holding a constraint are refused");
+	i64 c = dep_graph_find_node(g, "lic");
+	i64 d = dep_graph_find_node(g, "lid");
+	i64 e = dep_graph_find_node(g, "lie");
+	i64 f = dep_graph_find_node(g, "lif");
+	ASSERT(c > 0 && d > 0 && e > 0 && f > 0, "valid names become nodes");
+	ASSERT(strcmp(g->nodes[c].version_constraint, "1.0") == 0, "tab after '=' is skipped");
+	ASSERT(strcmp(g->nodes[d].version_constraint, "1.0") == 0, "unterminated quote keeps the rest");
+	ASSERT(strcmp(g->nodes[e].version_constraint, "") == 0, "empty value gives an empty constraint");
+	ASSERT(strcmp(g->nodes[f].version_constraint, "1.0") == 0, "trailing tab is trimmed");
+
+	dep_graph_free(g);
+	manifest_free(m);
+	sandbox_off();
+	leave_dir(root);
+	PASS();
+}
+
+TEST(cov_dg_transitive_path_containment)
+{
+	sds root = tmp_new();
+	sandbox_on(root);
+	enter_dir(root);
+	make_local_dep("par", "1.0.0", "\n[dependencies]\nhere = { path = \".\" }\nsib = { path = \"../par2\" }\n");
+	make_local_dep("par2", "1.0.0", nullptr);
+	write_project("contain", "dependencies = [\"par\"]", nullptr);
+
+	manifest_t *m = parse_cwd_manifest();
+	ASSERT(m != nullptr, "manifest parses");
+	stderr_begin("warn.txt");
+	dep_graph_t *g = dep_graph_create(m, nullptr, true);
+	stderr_end();
+	ASSERT(g != nullptr, "graph builds");
+	i64 here = dep_graph_find_node(g, "here");
+	i64 sib  = dep_graph_find_node(g, "sib");
+	ASSERT(here > 0 && sib > 0, "both transitive deps are nodes");
+	const char *sp = g->nodes[here].source_path;
+	ASSERT(sp != nullptr && strlen(sp) > 9 && strcmp(sp + strlen(sp) - 9, "/deps/par") == 0,
+	       "the parent directory itself is inside the parent");
+	ASSERT(g->nodes[sib].source_path == nullptr, "a sibling sharing the prefix is outside the parent");
+	ASSERT(file_contains("warn.txt", "transitive path '../par2' for 'sib' escapes its parent"), "escape reported");
+
+	dep_graph_free(g);
+	manifest_free(m);
+	sandbox_off();
+	leave_dir(root);
+	PASS();
+}
+
+TEST(cov_dg_lockfile_paths)
+{
+	sds root = tmp_new();
+	sandbox_on(root);
+	enter_dir(root);
+	make_local_dep("lockc", "1.0.0", nullptr);
+	write_project("lockpaths", "dependencies = [\"locka\", \"lockb\", \"lockc\"]", nullptr);
+
+	lockfile_dep_t locked[3];
+	memset(locked, 0, sizeof(locked));
+	locked[0].name = sdsnew("locka");
+	locked[0].path = sdsnew("");
+	locked[1].name = sdsnew("lockb");
+	locked[2].name = sdsnew("lockc");
+	locked[2].path = sdsnew("deps/lockc");
+	lockfile_t lf;
+	memset(&lf, 0, sizeof(lf));
+	lf.version    = 1;
+	lf.deps       = locked;
+	lf.deps_count = 3;
+
+	manifest_t *m = parse_cwd_manifest();
+	ASSERT(m != nullptr, "manifest parses");
+	dep_graph_t *g = dep_graph_create(m, &lf, true);
+	ASSERT(g != nullptr, "graph builds");
+	i64 a = dep_graph_find_node(g, "locka");
+	i64 b = dep_graph_find_node(g, "lockb");
+	i64 c = dep_graph_find_node(g, "lockc");
+	ASSERT(a > 0 && b > 0 && c > 0, "all deps are nodes");
+	ASSERT(g->nodes[a].path == nullptr, "an empty locked path falls back to resolution");
+	ASSERT(g->nodes[b].path == nullptr, "a missing locked path falls back to resolution");
+	ASSERT(g->nodes[c].path != nullptr && strcmp(g->nodes[c].path, "deps/lockc") == 0, "a locked path is used");
+
+	dep_graph_free(g);
+	manifest_free(m);
+	for (size_t i = 0; i < 3; i++) {
+		sdsfree(locked[i].name);
+		sdsfree(locked[i].path);
+	}
+	sandbox_off();
+	leave_dir(root);
+	PASS();
+}
+
+TEST(cov_dg_null_names_and_accessors)
+{
+	sds root = tmp_new();
+	sandbox_on(root);
+	enter_dir(root);
+
+	dependency_t deps[2];
+	memset(deps, 0, sizeof(deps));
+	deps[1].name    = sdsnew("libs");
+	deps[1].version = sdsnew("1.0");
+	sds        flat[1];
+	manifest_t m;
+	memset(&m, 0, sizeof(m));
+	flat[0]                      = sdsnew("libs");
+	m.package.name               = sdsnew("nullnames");
+	m.package.dependencies       = flat;
+	m.package.dependencies_count = 1;
+	m.dependencies.deps          = deps;
+	m.dependencies.deps_count    = 2;
+	dep_graph_t *g               = dep_graph_create(&m, nullptr, true);
+	ASSERT(g != nullptr, "graph builds");
+	ASSERT(dep_graph_find_node(g, "libs") == 1, "flat entry is registered");
+	ASSERT(strcmp(g->nodes[1].version_constraint, "1.0") == 0, "the structured version is the constraint");
+
+	/* A node without a name is skipped by lookups. */
+	sds saved        = g->nodes[0].name;
+	g->nodes[0].name = nullptr;
+	ASSERT(dep_graph_find_node(g, "libs") == 1, "nameless node skipped");
+	g->nodes[0].name = saved;
+
+	size_t n = 7;
+	ASSERT(dep_graph_sources(g, "absent", &n) == nullptr && n == 0, "unknown node has no sources");
+	ASSERT(dep_graph_sources(nullptr, "libs", &n) == nullptr, "null graph");
+	ASSERT(dep_graph_sources(g, nullptr, &n) == nullptr, "null name");
+	ASSERT(dep_graph_sources(g, "libs", nullptr) == nullptr, "null count");
+	ASSERT(dep_graph_commit(nullptr, "libs") == nullptr && dep_graph_commit(g, nullptr) == nullptr, "commit nulls");
+	ASSERT(dep_graph_commit(g, "absent") == nullptr, "commit of unknown node");
+	ASSERT(!dep_graph_is_git(nullptr, "libs") && !dep_graph_is_git(g, nullptr), "is_git nulls");
+	ASSERT(!dep_graph_is_git(g, "absent"), "is_git of unknown node");
+	ASSERT(dep_graph_git_ref(nullptr, "libs") == nullptr && dep_graph_git_ref(g, nullptr) == nullptr, "ref nulls");
+	ASSERT(dep_graph_git_ref(g, "absent") == nullptr, "ref of unknown node");
+
+	dep_graph_free(g);
+	sdsfree(flat[0]);
+	sdsfree(deps[1].name);
+	sdsfree(deps[1].version);
+	sdsfree(m.package.name);
+	sandbox_off();
+	leave_dir(root);
+	PASS();
+}
+
+/* ------------------------------------------------------------------ */
+/* dep_graph_cache.c: more cache shapes                                 */
+/* ------------------------------------------------------------------ */
+
+TEST(cov_cache_more_variants)
+{
+	sds root = tmp_new();
+	sandbox_on(root);
+	enter_dir(root);
+	ASSERT(dep_graph_get(nullptr, nullptr, true, ".") == nullptr, "null manifest");
+
+	/* A cache without the Coffee.toml mtime is a miss. */
+	write_project("notoml", nullptr, nullptr);
+	mkdir(".coffee", 0755);
+	mkdir(".coffee/build-cache", 0755);
+	write_text(".coffee/build-cache/notoml.graph",
+	           "[metadata]\ncoffee_lock_mtime = 0\ncache_version = 3\n[[nodes]]\nname = \"x\"\n");
+	manifest_t *m = parse_cwd_manifest();
+	ASSERT(m != nullptr, "manifest parses");
+	dep_graph_t *g = dep_graph_get(m, nullptr, true, ".");
+	ASSERT(g != nullptr && strcmp(dep_graph_node_name(g, 0), "notoml") == 0, "missing toml mtime is a miss");
+	dep_graph_free(g);
+	manifest_free(m);
+
+	/* Nodes without a name, with an empty or a non-string sources array. */
+	write_project("odd", nullptr, nullptr);
+	write_cache("odd", "", "cache_version = 3",
+	            "[[nodes]]\nversion = \"1.0.0\"\nsources = []\n\n[[nodes]]\nname = \"b\"\nsources = [1, 2]\n");
+	m = parse_cwd_manifest();
+	ASSERT(m != nullptr, "manifest parses");
+	g = dep_graph_get(m, nullptr, true, ".");
+	ASSERT(g != nullptr && dep_graph_count(g) == 2, "both nodes loaded");
+	ASSERT(g->nodes[0].name == nullptr, "nameless node loaded");
+	ASSERT(g->nodes[0].src_count == 0 && g->nodes[1].src_count == 0, "no usable sources");
+	dep_graph_free(g);
+	manifest_free(m);
+
+	/* A nameless manifest in a directory without Coffee.toml. */
+	mkdir("bare", 0755);
+	manifest_t bare;
+	memset(&bare, 0, sizeof(bare));
+	g = dep_graph_get(&bare, nullptr, true, "bare");
+	ASSERT(g != nullptr && strcmp(dep_graph_node_name(g, 0), "root") == 0, "nameless root");
+	ASSERT(safe_access("bare/.coffee/build-cache/unnamed.graph", F_OK) == 0, "cache named 'unnamed'");
+	dep_graph_free(g);
+
+	/* A node with several sources is written as a list. */
+	make_local_dep("two", "1.0.0", nullptr);
+	write_text("deps/two/src/second.c", "int second(void) { return 2; }\n");
+	write_project("multisrc", "dependencies = [\"two\"]", nullptr);
+	m = parse_cwd_manifest();
+	ASSERT(m != nullptr, "manifest parses");
+	g = dep_graph_get(m, nullptr, true, ".");
+	ASSERT(g != nullptr, "graph builds");
+	ASSERT(file_contains(".coffee/build-cache/multisrc.graph", "\"deps/two/src/second.c\", \"deps/two/src/two.c\""),
+	       "sources are comma separated");
+	dep_graph_free(g);
+	manifest_free(m);
+
+	sandbox_off();
+	leave_dir(root);
+	PASS();
+}
+
+/* ------------------------------------------------------------------ */
+/* dep_graph_git.c with a stub git                                      */
+/* ------------------------------------------------------------------ */
+
+TEST(cov_git_stubbed_outputs)
+{
+	sds root = tmp_new();
+	enter_dir(root);
+	sds stub = join(root, "stubgit");
+	git_stub(stub, 0, "printf 7; exit 0");
+	stub_path_on(stub);
+	dep_graph_t *g = git_graph("repo", nullptr);
+
+	sds behind = nullptr;
+	ASSERT(dep_graph_compare_remote(g, "lib", &behind) == 7, "count without newline");
+	ASSERT(behind != nullptr && strcmp(behind, "7 commits behind") == 0, "plural message");
+	sdsfree(behind);
+
+	git_stub(stub, 0, "exit 0");
+	behind = nullptr;
+	ASSERT(dep_graph_compare_remote(g, "lib", &behind) == 0, "empty count is zero");
+	ASSERT(behind != nullptr && strcmp(behind, "up-to-date") == 0, "up-to-date message");
+	sdsfree(behind);
+
+	git_stub(stub, 0, "printf many; exit 0");
+	ASSERT(dep_graph_compare_remote(g, "lib", nullptr) == 0, "non-numeric count is zero");
+
+	/* fetch_git: rev-parse prints nothing, prints no newline, or fails. */
+	git_stub(stub, 0, "exit 0");
+	ASSERT(dep_graph_fetch_git(g, "lib", false) == 0, "fetch succeeds");
+	ASSERT(dep_graph_commit(g, "lib") == nullptr, "empty rev-parse records no commit");
+	git_stub(stub, 0, "printf abc; exit 0");
+	ASSERT(dep_graph_fetch_git(g, "lib", false) == 0, "fetch succeeds");
+	ASSERT(strcmp(dep_graph_commit(g, "lib"), "abc") == 0, "commit without newline");
+	git_stub(stub, 0, "exit 1");
+	ASSERT(dep_graph_fetch_git(g, "lib", false) == 0, "fetch succeeds");
+	ASSERT(strcmp(dep_graph_commit(g, "lib"), "abc") == 0, "failed rev-parse keeps the commit");
+
+	/* A rev whose fetch fails. */
+	git_stub(stub, 1, "exit 0");
+	sdsfree(g->nodes[1].git_ref);
+	g->nodes[1].git_ref = sdsnew("abcdef1");
+	ASSERT(dep_graph_fetch_git(g, "lib", false) != 0, "failed fetch of a rev");
+
+	/* Refused arguments. */
+	ASSERT(dep_graph_compare_remote(nullptr, "lib", nullptr) == -1, "null graph");
+	ASSERT(dep_graph_compare_remote(g, nullptr, nullptr) == -1, "null name");
+	sdsfree(g->nodes[1].path);
+	g->nodes[1].path = nullptr;
+	ASSERT(dep_graph_compare_remote(g, "lib", nullptr) == -1, "node without path");
+
+	stub_off();
+	dep_graph_free(g);
+	sdsfree(stub);
+	leave_dir(root);
+	PASS();
+}
+
+/* A git dep whose rev-parse output is empty, unterminated or missing,
+ * seen by generate-lockfile, update and an offline fetch, in a project
+ * whose manifest has no [package] table. */
+TEST(cov_stubbed_git_commit_edge_cases)
+{
+	sds root = tmp_new();
+	sandbox_on(root);
+	enter_dir(root);
+	write_text("Coffee.toml", "[dependencies]\nlib = { git = \"/nonexistent/coffee-covdeps-repo\" }\n");
+	mkdir("deps", 0755);
+	mkdir("deps/lib", 0755);
+	mkdir("deps/lib/.git", 0755);
+	sds stub = join(root, "stubgit");
+	git_stub(stub, 0, "exit 1");
+	stub_path_on(stub);
+
+	stdout_begin("out.txt");
+	i64 ret = run_cmd(handle_generate_lockfile, "generate-lockfile", nullptr, nullptr);
+	stdout_end();
+	ASSERT(ret == 0, "generate-lockfile with a failing rev-parse");
+	sds lock = lock_text();
+	ASSERT(strstr(lock, "name = \"lib\"") != nullptr && strstr(lock, "commit") == nullptr, "no commit recorded");
+	sdsfree(lock);
+
+	git_stub(stub, 0, "printf abc; exit 0");
+	stdout_begin("out.txt");
+	ret = run_cmd(handle_generate_lockfile, "generate-lockfile", nullptr, nullptr);
+	stdout_end();
+	ASSERT(ret == 0, "generate-lockfile with an unterminated rev-parse");
+	ASSERT(file_contains("Coffee.lock", "commit = \"abc\""), "unterminated commit recorded");
+
+	git_stub(stub, 0, "exit 0");
+	stdout_begin("out.txt");
+	ret = run_cmd(handle_generate_lockfile, "generate-lockfile", nullptr, nullptr);
+	stdout_end();
+	ASSERT(ret == 0, "generate-lockfile with an empty rev-parse");
+	ASSERT(!file_contains("Coffee.lock", "commit"), "empty commit not recorded");
+
+	stdout_begin("out.txt");
+	ret = run_cmd(handle_update, "update", nullptr, nullptr);
+	stdout_end();
+	ASSERT(ret == 0, "update with an empty rev-parse");
+	ASSERT(!file_contains("Coffee.lock", "commit"), "update records no commit");
+
+	git_stub(stub, 0, "printf def; exit 0");
+	ASSERT(fetch_with(true, false) == 0, "offline fetch of an on-disk git dep");
+	ASSERT(file_contains("Coffee.lock", "commit = \"def\""), "offline fetch records the unterminated commit");
+
+	stub_off();
+	sdsfree(stub);
+	sandbox_off();
+	leave_dir(root);
+	PASS();
+}
+
+/* ------------------------------------------------------------------ */
+/* update: more lockfile shapes                                         */
+/* ------------------------------------------------------------------ */
+
+TEST(cov_update_lock_entry_variants)
+{
+	sds root = tmp_new();
+	sandbox_on(root);
+	enter_dir(root);
+	make_local_dep("libp", "1.0.0", nullptr);
+	make_local_dep("libq", "1.0.0", nullptr);
+	make_local_dep("libr", "1.0.0", nullptr);
+	mkdir("vend", 0755);
+	mkdir("vend/pd", 0755);
+	write_text("Coffee.toml", "[dependencies]\nlibp = \"*\"\nlibq = \"*\"\nlibr = \"*\"\nabsent = \"*\"\n"
+	                          "pd = { path = \"./vend/pd\" }\n");
+
+	/* A targeted update without a lockfile records only the target. */
+	stdout_begin("out.txt");
+	i64 ret = run_cmd(handle_update, "update", "libp", nullptr);
+	stdout_end();
+	ASSERT(ret == 0, "targeted update without a lockfile");
+	sds lock = lock_text();
+	ASSERT(strstr(lock, "name = \"libp\"") != nullptr, "target recorded");
+	ASSERT(strstr(lock, "libq") == nullptr, "others skipped");
+	sdsfree(lock);
+
+	/* Locked entries with and without optional fields are preserved. */
+	write_text("Coffee.lock", "version = 1\n\n[[dependencies]]\nname = \"libq\"\n\n"
+	                          "[[dependencies]]\nname = \"libr\"\nversion = \"2.0\"\npath = \"deps/libr\"\n"
+	                          "commit = \"abc\"\nchecksum = \"sum\"\n");
+	stdout_begin("out.txt");
+	ret = run_cmd(handle_update, "update", "libp", nullptr);
+	stdout_end();
+	ASSERT(ret == 0, "targeted update with a lockfile");
+	lock = lock_text();
+	ASSERT(strstr(lock, "name = \"libq\"") != nullptr, "bare entry preserved");
+	ASSERT(strstr(lock, "checksum = \"sum\"") != nullptr, "checksum preserved");
+	sdsfree(lock);
+
+	/* A full update records unresolved deps with an empty path. */
+	stdout_begin("out.txt");
+	ret = run_cmd(handle_update, "update", nullptr, nullptr);
+	stdout_end();
+	ASSERT(ret == 0, "full update");
+	lock = lock_text();
+	ASSERT(strstr(lock, "name = \"absent\"") != nullptr, "unresolved dep recorded");
+	ASSERT(strstr(lock, "name = \"pd\"") != nullptr, "unlinked path dep recorded");
+	sdsfree(lock);
+
+	sandbox_off();
+	leave_dir(root);
+	PASS();
+}
+
+TEST(cov_update_registry_failures)
+{
+	if (geteuid() == 0) {
+		PASS();
+	}
+	sds root = tmp_new();
+	sandbox_on(root);
+	proj_enter(root, "updfail", "[dependencies]\nregdep = \">= 1.0\"\n");
+	sds script = recipe_script("regdep", "1.0.0", nullptr);
+	recipe_fixture(root, "regdep", "1.0.0", nullptr, script);
+	ASSERT(fetch_with(false, false) == 0, "fetch succeeds");
+
+	/* A new version installs but cannot be linked into a read-only deps/. */
+	sds bumped = recipe_script("regdep", "1.0.1", nullptr);
+	recipe_fixture(root, "regdep", "1.0.1", nullptr, bumped);
+	chmod("deps", 0555);
+	stdout_begin("out.txt");
+	stderr_begin("err.txt");
+	i64 ret = run_cmd(handle_update, "update", nullptr, nullptr);
+	stderr_end();
+	stdout_end();
+	chmod("deps", 0755);
+	ASSERT(ret == 0, "update survives a failed link");
+	ASSERT(file_contains("err.txt", "Failed to update registry dep 'regdep'"), "failed link reported");
+	ASSERT(file_contains("Coffee.lock", "regdep/1.0.0\""), "lock keeps the linked install");
+
+	/* A failing install.sh. */
+	recipe_fixture(root, "regdep", "1.0.0", nullptr, "exit 1\n");
+	stdout_begin("out.txt");
+	stderr_begin("err.txt");
+	ret = run_cmd(handle_update, "update", nullptr, nullptr);
+	stderr_end();
+	stdout_end();
+	ASSERT(ret == 0, "update survives a failed install");
+	ASSERT(file_contains("err.txt", "Failed to update registry dep 'regdep'"), "failed install reported");
+
+	sdsfree(bumped);
+	sdsfree(script);
+	sandbox_off();
+	leave_dir(root);
+	PASS();
+}
+
+/* ------------------------------------------------------------------ */
+/* outdated: more rows                                                  */
+/* ------------------------------------------------------------------ */
+
+static i64 outdated_with(bool offline)
+{
+	char   *inputs[] = { "outdated", nullptr };
+	options opt;
+	memset(&opt, 0, sizeof(opt));
+	opt.inputs     = inputs;
+	opt.inputs_num = 1;
+	opt.offline    = offline;
+	stdout_begin("out.txt");
+	i64 ret = handle_outdated(&opt);
+	stdout_end();
+	return ret;
+}
+
+TEST(cov_outdated_registry_variants)
+{
+	sds root = tmp_new();
+	sandbox_on(root);
+	proj_enter(root, "outreg", "[dependencies]\nregdep = \"*\"\n");
+	sds script = recipe_script("regdep", "alpha", nullptr);
+	recipe_fixture(root, "regdep", "alpha", nullptr, script);
+	ASSERT(fetch_with(false, false) == 0, "fetch succeeds");
+
+	ASSERT(outdated_with(true) == 0, "offline outdated");
+	ASSERT(file_contains("out.txt", "(offline)"), "offline status shown");
+
+	/* Versions that do not parse are compared as strings. */
+	recipe_fixture(root, "regdep", "beta", nullptr, script);
+	ASSERT(outdated_with(false) == 1, "a different version is outdated");
+	ASSERT(file_contains("out.txt", "Outdated (registry has beta)"), "new version shown");
+
+	/* A recipe without a version, then no recipe at all. */
+	sds recipe = join(root, "registry/recipes/r/regdep/library.toml");
+	write_text(recipe, "recipe_url = \"https://example.invalid/regdep.tar.gz\"\n");
+	ASSERT(outdated_with(false) == 0, "version-less recipe");
+	ASSERT(file_contains("out.txt", "? (registry unreachable)"), "version-less recipe shown as unreachable");
+	remove(recipe);
+	ASSERT(outdated_with(false) == 0, "missing recipe");
+	ASSERT(file_contains("out.txt", "? (registry unreachable)"), "missing recipe shown as unreachable");
+
+	/* An installed version that parses against a registry one that does not. */
+	sds release = recipe_script("regdep", "1.0.0", nullptr);
+	recipe_fixture(root, "regdep", "1.0.0", nullptr, release);
+	ASSERT(fetch_with(false, false) == 0, "fetch installs 1.0.0");
+	recipe_fixture(root, "regdep", "beta", nullptr, release);
+	ASSERT(outdated_with(false) == 1, "a non-semver registry version is outdated");
+	ASSERT(file_contains("out.txt", "1.0.0"), "installed version shown");
+	ASSERT(file_contains("out.txt", "Outdated (registry has beta)"), "registry version shown");
+
+	sdsfree(release);
+	sdsfree(recipe);
+	sdsfree(script);
+	sandbox_off();
+	leave_dir(root);
+	PASS();
+}
+
+TEST(cov_outdated_lock_entry_variants)
+{
+	sds root = tmp_new();
+	sandbox_on(root);
+	enter_dir(root);
+	write_project("outlock", nullptr, nullptr);
+	write_text("Coffee.lock", "version = 1\n\n[[dependencies]]\nversion = \"1\"\n\n"
+	                          "[[dependencies]]\nname = \"sumnopath\"\nchecksum = \"abc\"\n\n"
+	                          "[[dependencies]]\nname = \"sumbadpath\"\nchecksum = \"abc\"\n"
+	                          "path = \"/nonexistent/coffee-covdeps-x\"\n\n"
+	                          "[[dependencies]]\nname = \"nover\"\n");
+	ASSERT(outdated_with(false) == 0, "nothing is outdated");
+	ASSERT(file_contains("out.txt", "(unknown)"), "nameless entry shown");
+	ASSERT(file_contains("out.txt", "sumbadpath"), "uninstalled recipe entry shown");
+	ASSERT(file_contains("out.txt", "nover                *"), "missing version shown as wildcard");
+	sandbox_off();
+	leave_dir(root);
+	PASS();
+}
+
+TEST(cov_outdated_plural_summary)
+{
+	sds root   = tmp_new();
+	sds origin = join(root, "origin");
+	origin_make(origin);
+	sandbox_on(root);
+	proj_enter(root, "plural", nullptr);
+	write_project("plural", "dependencies = [\"lib1\", \"lib2\"]", nullptr);
+	mkdir("deps", 0755);
+	clone_into(origin, "deps/lib1");
+	clone_into(origin, "deps/lib2");
+	sds old_head = git_head(origin);
+	origin_advance(origin, "int later(void) { return 2; }\n");
+
+	const char *names[]    = { "lib1", "lib2" };
+	const char *versions[] = { "*", "*" };
+	const char *commits[]  = { old_head, old_head };
+	write_lock(2, names, versions, commits);
+	ASSERT(outdated_with(false) == 1, "outdated deps fail the command");
+	ASSERT(file_contains("out.txt", "2 dependencies are outdated."), "plural summary shown");
+
+	sdsfree(old_head);
+	sdsfree(origin);
+	sandbox_off();
+	leave_dir(root);
+	PASS();
+}
+
+/* ------------------------------------------------------------------ */
+/* fetch: more failure paths                                            */
+/* ------------------------------------------------------------------ */
+
+TEST(cov_fetch_existing_clone_failures)
+{
+	sds root   = tmp_new();
+	sds origin = join(root, "origin");
+	origin_make(origin);
+	sds head = git_head(origin);
+	sandbox_on(root);
+	sds tail = sdscatprintf(sdsempty(),
+	                        "[dependencies]\nrevdep = { git = \"%s\", rev = \"%s\" }\n"
+	                        "brdep = { git = \"%s\", branch = \"main\" }\nplain = { git = \"%s\" }\n",
+	                        origin, head, origin, origin);
+	proj_enter(root, "deadclones", tail);
+	sdsfree(tail);
+	ASSERT(fetch_with(false, false) == 0, "initial clones succeed");
+
+	const char *names[] = { "revdep", "brdep", "plain" };
+	for (size_t i = 0; i < 3; i++) {
+		sds clone = sdscatprintf(sdsempty(), "%s/home/deps/%s", root, names[i]);
+		git_in(clone, "remote", "set-url", "origin", "/nonexistent/coffee-covdeps-remote", nullptr);
+		sdsfree(clone);
+	}
+	ASSERT(fetch_with(false, false) == 1, "dead remotes fail the update");
+	ASSERT(file_contains("err.txt", "Failed to clone git dependency 'revdep'"), "rev update failure reported");
+	ASSERT(file_contains("err.txt", "Failed to clone git dependency 'brdep'"), "branch update failure reported");
+	ASSERT(file_contains("err.txt", "Failed to clone git dependency 'plain'"), "plain update failure reported");
+
+	write_project("deadclones", nullptr,
+	              "[dependencies]\ndeadrev = { git = \"/nonexistent/coffee-covdeps-repo\", rev = \"abcdef1\" }\n");
+	ASSERT(fetch_with(false, false) == 1, "unclonable rev fails");
+	ASSERT(file_contains("err.txt", "Failed to clone git dependency 'deadrev'"), "rev clone failure reported");
+
+	sdsfree(head);
+	sdsfree(origin);
+	sandbox_off();
+	leave_dir(root);
+	PASS();
+}
+
+TEST(cov_fetch_many_path_deps)
+{
+	sds root = tmp_new();
+	sandbox_on(root);
+	proj_enter(root, "manypaths", nullptr);
+	mkdir("vend", 0755);
+	sds tail = sdsnew("[dependencies]\n");
+	for (size_t i = 0; i < 17; i++) {
+		sds dir = sdscatprintf(sdsempty(), "vend/p%02zu", i);
+		mkdir(dir, 0755);
+		tail = sdscatprintf(tail, "p%02zu = { path = \"./%s\" }\n", i, dir);
+		sdsfree(dir);
+	}
+	write_project("manypaths", nullptr, tail);
+	sdsfree(tail);
+	ASSERT(fetch_with(false, false) == 0, "seventeen path deps are fetched");
+	ASSERT(file_contains("Coffee.lock", "name = \"p16\""), "the last one is recorded");
+	sandbox_off();
+	leave_dir(root);
+	PASS();
+}
+
+TEST(cov_fetch_registry_edge_cases)
+{
+	sds root = tmp_new();
+	sandbox_on(root);
+	proj_enter(root, "regedge", "[dependencies]\nregdep = \"1.0\"\n");
+
+	/* Offline, deps/regdep exists but is no recipe install. */
+	mkdir("deps", 0755);
+	mkdir("deps/regdep", 0755);
+	ASSERT(fetch_with(true, false) == 1, "offline fetch of a non-install fails");
+	ASSERT(file_contains("err.txt", "cannot resolve 'regdep' from the registry in offline mode"), "reported");
+	rmdir("deps/regdep");
+
+	/* A version-only inline table resolves through the registry. */
+	write_project("regedge", nullptr, "[dependencies]\nghost = { version = \"1.0\" }\n");
+	ASSERT(fetch_with(false, false) == 1, "unknown registry dep fails");
+	ASSERT(file_contains("err.txt", "cannot resolve 'ghost' from the registry"), "unknown dep reported");
+
+	/* An installed recipe that cannot be linked. */
+	if (geteuid() != 0) {
+		write_project("regedge", nullptr, "[dependencies]\nregdep = \"1.0\"\n");
+		sds script = recipe_script("regdep", "1.0.0", nullptr);
+		recipe_fixture(root, "regdep", "1.0.0", nullptr, script);
+		chmod("deps", 0555);
+		i64 ret = fetch_with(false, false);
+		chmod("deps", 0755);
+		ASSERT(ret == 1, "unlinkable install fails");
+		ASSERT(file_contains("err.txt", "cannot create symlink"), "link failure reported");
+		sdsfree(script);
+	}
+
+	sandbox_off();
+	leave_dir(root);
+	PASS();
+}
+
+/*
+ * An absolute path dep that runs through its own deps/<name> link: the old
+ * link is replaced by one pointing at itself, so the dep cannot be resolved
+ * afterwards and is recorded with an empty path.
+ */
+TEST(cov_fetch_path_dep_through_own_link)
+{
+	sds root = tmp_new();
+	sandbox_on(root);
+	proj_enter(root, "selflink", nullptr);
+	mkdir("vend", 0755);
+	mkdir("vend/real", 0755);
+	mkdir("vend/real/sub", 0755);
+	mkdir("deps", 0755);
+	sds real = join(root, "proj/vend/real");
+	ASSERT(symlink(real, "deps/self") == 0, "deps/self links to vend/real");
+	sds tail = sdscatprintf(sdsempty(), "[dependencies]\nself = { path = \"%s/proj/deps/self/sub\" }\n", root);
+	write_project("selflink", nullptr, tail);
+	sdsfree(tail);
+
+	ASSERT(fetch_with(false, false) == 0, "fetch succeeds");
+	ASSERT(file_contains("Coffee.lock", "name = \"self\"\nversion = \"*\"\npath = \"\"\n"),
+	       "unresolvable link recorded without path");
+	ASSERT(safe_access("vend/real/sub", F_OK) == 0, "the linked directory survives");
+
+	sdsfree(real);
+	sandbox_off();
+	leave_dir(root);
+	PASS();
+}
+
+TEST(cov_fetch_offline_plain_dir_and_transitive_git)
+{
+	sds root   = tmp_new();
+	sds origin = join(root, "origin");
+	origin_make(origin);
+	sandbox_on(root);
+	proj_enter(root, "offplain", "[dependencies]\nplaindir = { git = \"/nonexistent/coffee-covdeps-repo\" }\n");
+	mkdir("deps", 0755);
+	mkdir("deps/plaindir", 0755);
+	ASSERT(fetch_with(true, false) == 0, "an on-disk non-repository passes the offline fetch");
+	ASSERT(file_contains("Coffee.lock", "name = \"plaindir\""), "dep recorded");
+	ASSERT(!file_contains("Coffee.lock", "commit"), "no commit for a non-repository");
+
+	/* A transitive dep already on disk as a git checkout. */
+	mkdir("vend", 0755);
+	mkdir("vend/par", 0755);
+	write_text("vend/par/Coffee.toml",
+	           "dependencies = [\"child\", \"plainchild\"]\n[package]\nname = \"par\"\nversion = \"1.0.0\"\n");
+	clone_into(origin, "deps/child");
+	mkdir("deps/plainchild", 0755);
+	write_project("offplain", nullptr, "[dependencies]\npar = { path = \"./vend/par\" }\n");
+	ASSERT(fetch_with(false, false) == 0, "fetch records the transitive checkout");
+	sds head = git_head(origin);
+	ASSERT(file_contains("Coffee.lock", "name = \"child\""), "child recorded");
+	ASSERT(file_contains("Coffee.lock", head), "child commit recorded");
+	ASSERT(file_contains("Coffee.lock", "name = \"plainchild\""), "non-repository child recorded");
+
+	sdsfree(head);
+	sdsfree(origin);
+	sandbox_off();
+	leave_dir(root);
+	PASS();
+}
+
+/* ------------------------------------------------------------------ */
+/* recipe_install.c directly                                            */
+/* ------------------------------------------------------------------ */
+
+TEST(cov_recipe_install_edge_cases)
+{
+	sds root = tmp_new();
+	sandbox_on(root);
+	enter_dir(root);
+	struct recipe_info info;
+
+	ASSERT(recipe_install("ghost", nullptr, nullptr, false, &info) == RECIPE_NOT_FOUND, "unknown recipe");
+	recipe_fixture(root, "noscript", "1.0.0", nullptr, nullptr);
+	ASSERT(recipe_install("noscript", nullptr, nullptr, false, &info) == RECIPE_NO_SCRIPT, "no install.sh");
+
+	/* Verbose, against a lock entry without version or checksum. */
+	sds script = recipe_script("vrb", "1.0.0", nullptr);
+	recipe_fixture(root, "vrb", "1.0.0", nullptr, script);
+	lockfile_dep_t locked;
+	memset(&locked, 0, sizeof(locked));
+	locked.name = sdsnew("vrb");
+	stdout_begin("out.txt");
+	enum recipe_status st = recipe_install("vrb", nullptr, &locked, true, &info);
+	stdout_end();
+	ASSERT(st == RECIPE_INSTALLED, "verbose install");
+	ASSERT(file_contains("out.txt", "Installing vrb into"), "verbose progress shown");
+	recipe_info_free(&info);
+	sdsfree(locked.name);
+
+	/* A verbose failure shows no log tail. */
+	recipe_fixture(root, "vfail", "1.0.0", nullptr, "exit 2\n");
+	stdout_begin("out.txt");
+	stderr_begin("err.txt");
+	st = recipe_install("vfail", nullptr, nullptr, true, &info);
+	stderr_end();
+	stdout_end();
+	ASSERT(st == RECIPE_FAILED, "verbose failure");
+	ASSERT(!file_contains("err.txt", "Last lines"), "no log tail when verbose");
+
+	/* A failing script that deletes its own log. */
+	recipe_fixture(root, "nolog", "1.0.0", nullptr, "rm -f \"$(dirname \"$0\")/install.log\"\nexit 2\n");
+	stderr_begin("err.txt");
+	st = recipe_install("nolog", nullptr, nullptr, false, &info);
+	stderr_end();
+	ASSERT(st == RECIPE_FAILED, "failure without a log");
+	ASSERT(!file_contains("err.txt", "Last lines"), "no log tail without a log");
+
+	/* A recipe dependency whose constraint is not a string. */
+	sds intdep = recipe_script("intdep", "1.0.0", nullptr);
+	recipe_fixture(root, "intdep", "1.0.0", "vrb = 1\n", intdep);
+	ASSERT(recipe_install("intdep", nullptr, nullptr, false, &info) == RECIPE_INSTALLED, "non-string constraint");
+	recipe_info_free(&info);
+
+	/* A recipe dependency with an invalid name. */
+	recipe_fixture(root, "badname", "1.0.0", "\"bad.name\" = \"1\"\n", intdep);
+	stderr_begin("err.txt");
+	st = recipe_install("badname", nullptr, nullptr, false, &info);
+	stderr_end();
+	ASSERT(st == RECIPE_FAILED, "invalid dependency name fails");
+	ASSERT(file_contains("err.txt", "invalid dependency name 'bad.name'"), "invalid name reported");
+
+	/* A dependency cycle. */
+	recipe_fixture(root, "cyca", "1.0.0", "cycb = \"*\"\n", "exit 0\n");
+	recipe_fixture(root, "cycb", "1.0.0", "cyca = \"*\"\n", "exit 0\n");
+	stderr_begin("err.txt");
+	st = recipe_install("cyca", nullptr, nullptr, false, &info);
+	stderr_end();
+	ASSERT(st == RECIPE_FAILED, "a cycle fails");
+	ASSERT(file_contains("err.txt", "nested too deeply"), "cycle reported");
+
+	/* The prefix is a file: the recipe cannot be copied into it. */
+	recipe_fixture(root, "filepfx", "1.0.0", nullptr,
+	               "mkdir -p \"$COFFEE_HOME/filepfx\"\ntouch \"$COFFEE_HOME/filepfx/1.0.0\"\n");
+	stderr_begin("err.txt");
+	st = recipe_install("filepfx", nullptr, nullptr, false, &info);
+	stderr_end();
+	ASSERT(st == RECIPE_FAILED, "copy failure");
+	ASSERT(file_contains("err.txt", "cannot copy the recipe for 'filepfx'"), "copy failure reported");
+
+	/* The stamp path is a directory: the stamp cannot be written. */
+	recipe_fixture(root, "nostamp", "1.0.0", nullptr, "mkdir -p \"$COFFEE_HOME/nostamp/1.0.0/.coffee-installed\"\n");
+	stderr_begin("err.txt");
+	st = recipe_install("nostamp", nullptr, nullptr, false, &info);
+	stderr_end();
+	ASSERT(st == RECIPE_FAILED, "stamp failure");
+	ASSERT(file_contains("err.txt", "cannot write"), "stamp failure reported");
+
+	/* sha256sum fails, or prints too little. */
+	sds stub = join(root, "stubsha");
+	stub_tool(stub, "sha256sum", "exit 1\n");
+	stub_path_on(stub);
+	stderr_begin("err.txt");
+	st = recipe_install("vrb", nullptr, nullptr, false, &info);
+	stderr_end();
+	ASSERT(st == RECIPE_FAILED, "failing sha256sum");
+	ASSERT(file_contains("err.txt", "cannot compute the checksum"), "checksum failure reported");
+	stub_tool(stub, "sha256sum", "echo short\n");
+	ASSERT(recipe_install("vrb", nullptr, nullptr, false, &info) == RECIPE_FAILED, "short sha256sum output");
+	stub_off();
+
+	/* A stale write-only library.toml that rm cannot clear: the
+	 * recipe's dependencies cannot be read, and its copy fails. */
+	if (geteuid() != 0) {
+		sds wo_script = recipe_script("wo", "1.0.0", nullptr);
+		recipe_fixture(root, "wo", "1.0.0", nullptr, wo_script);
+		sds   wo_dir       = join(root, "home/recipes/wo");
+		char *mkdir_argv[] = { "mkdir", "-p", wo_dir, nullptr };
+		run_command(mkdir_argv, RUN_CMD_QUIET);
+		sds wo_toml = join(wo_dir, "library.toml");
+		write_text(wo_toml, "\n");
+		chmod(wo_toml, 0200);
+		stub_rm_on(root);
+		stderr_begin("err.txt");
+		st = recipe_install("wo", nullptr, nullptr, false, &info);
+		stderr_end();
+		stub_off();
+		ASSERT(st == RECIPE_FAILED, "unreadable recipe fails");
+		ASSERT(file_contains("err.txt", "cannot copy the recipe for 'wo'"), "copy failure reported");
+		sdsfree(wo_toml);
+		sdsfree(wo_dir);
+		sdsfree(wo_script);
+	}
+
+	/* $COFFEE_HOME/recipes is a file: the recipe cannot be downloaded. */
+	sds recipes = join(root, "home/recipes");
+	test_remove_tree(recipes);
+	write_text(recipes, "not a directory\n");
+	stderr_begin("err.txt");
+	st = recipe_install("vrb", nullptr, nullptr, false, &info);
+	stderr_end();
+	ASSERT(st == RECIPE_NOT_FOUND, "undownloadable recipe");
+	sdsfree(recipes);
+
+	sdsfree(stub);
+	sdsfree(intdep);
+	sdsfree(script);
+	sandbox_off();
+	leave_dir(root);
+	PASS();
+}
+
+TEST(cov_recipe_read_installed_variants)
+{
+	sds root = tmp_new();
+	enter_dir(root);
+	struct recipe_info info;
+	mkdir("inst", 0755);
+	write_text("inst/.coffee-installed", "checksum = \"abc\"\n");
+	ASSERT(!recipe_read_installed("inst", &info), "no library.toml");
+	write_text("inst/library.toml", "version = \"1.0\"\n");
+	ASSERT(recipe_read_installed("inst", &info), "complete install");
+	recipe_info_free(&info);
+	write_text("inst/.coffee-installed", "[broken\n");
+	ASSERT(!recipe_read_installed("inst", &info), "unparsable stamp");
+	remove("inst/.coffee-installed");
+	ASSERT(!recipe_read_installed("inst", &info), "no stamp");
+	leave_dir(root);
+	PASS();
+}
+
+/* ------------------------------------------------------------------ */
+/* install: more link and move corners                                  */
+/* ------------------------------------------------------------------ */
+
+TEST(cov_install_link_variants)
+{
+	sds root = tmp_new();
+	sandbox_on(root);
+	sds repo = package_repo(root, "[package]\nname = \"tool\"\n", false);
+	proj_enter(root, "linkvar", nullptr);
+
+	/* A real directory in the link's place is replaced. */
+	mkdir("deps", 0755);
+	mkdir("deps/tool", 0755);
+	stdout_begin("out.txt");
+	i64 ret = install_pkg(repo, "tool", nullptr, false);
+	stdout_end();
+	ASSERT(ret == 0, "install succeeds");
+	struct stat st;
+	ASSERT(lstat("deps/tool", &st) == 0 && S_ISLNK(st.st_mode), "directory replaced by a link");
+	sds home   = sdsnew(getenv("COFFEE_HOME"));
+	sds cached = join(home, "deps/tool/*");
+	ASSERT(safe_access(cached, F_OK) == 0, "version-less manifest installs as '*'");
+	sdsfree(cached);
+
+	/* A FIFO in the link's place is left alone and the link fails. */
+	remove("deps/tool");
+	ASSERT(mkfifo("deps/tool", 0600) == 0, "mkfifo");
+	stdout_begin("out.txt");
+	stderr_begin("err.txt");
+	ret = install_pkg(repo, "tool", nullptr, false);
+	stderr_end();
+	stdout_end();
+	remove("deps/tool");
+	ASSERT(ret == 0, "install still succeeds");
+	ASSERT(file_contains("err.txt", "Failed to create project symlink"), "link failure reported");
+
+	/* rm and mv both fail: the clone stays where it is. */
+	sds stub = join(root, "stubrmmv");
+	stub_tool(stub, "rm", "exit 1\n");
+	stub_tool(stub, "mv", "exit 1\n");
+	stub_path_on(stub);
+	stdout_begin("out.txt");
+	ret = install_pkg(repo, "tool", nullptr, false);
+	stdout_end();
+	stub_off();
+	ASSERT(ret == 0, "install completes without moving");
+	sds clone = join(home, "deps/.tool.clone/library.toml");
+	ASSERT(safe_access(clone, F_OK) == 0, "the clone was not moved");
+	sdsfree(clone);
+
+	/* Outside a project no link is made. */
+	ASSERT(chdir("..") == 0, "leave the project");
+	stdout_begin("out.txt");
+	ret = install_pkg(repo, "tool", nullptr, false);
+	stdout_end();
+	ASSERT(ret == 0, "install outside a project");
+	ASSERT(!file_contains("out.txt", "Linked to project"), "no project link");
+
+	sdsfree(stub);
+	sdsfree(home);
+	sdsfree(repo);
+	sandbox_off();
+	leave_dir(root);
+	PASS();
+}
+
+/* ------------------------------------------------------------------ */
+/* install-update-config: line scanning                                 */
+/* ------------------------------------------------------------------ */
+
+TEST(cov_install_update_config_line_scanning)
+{
+	sds root = tmp_new();
+	sandbox_on(root);
+	enter_dir(root);
+	sds home = sdsnew(getenv("COFFEE_HOME"));
+	sds cfg  = join(home, "config.toml");
+
+	/* A [build] line inside a multi-line array is no header: the key goes at the end. */
+	write_text(cfg, "arr = [\n  [build]\n]\n");
+	ASSERT(run_cmd(handle_install_update_config, "install-update-config", nullptr, nullptr) == 0, "merge succeeds");
+	ASSERT(file_contains(cfg, "jobs = \"0\"\n"), "key appended");
+	ASSERT(!file_contains(cfg, "\n[build]"), "no second [build] header added");
+
+	/* A long file, a single-quoted bracket and a tab-indented header. */
+	sds text = sdsempty();
+	for (size_t i = 0; i < 70; i++) {
+		text = sdscatprintf(text, "# comment line %zu\n", i);
+	}
+	text = sdscat(text, "quoted = 'a [ b'\n\t[build]\njobs = \"2\"\n");
+	write_text(cfg, text);
+	sdsfree(text);
+
+	ASSERT(run_cmd(handle_install_update_config, "install-update-config", nullptr, nullptr) == 0, "merge succeeds");
+	ASSERT(config_has_top_level_defaults(cfg), "keys parse as top-level");
+	text = read_text(cfg);
+	ASSERT(strstr(text, "default-target") < strstr(text, "\t[build]"), "keys precede the tab-indented header");
+	ASSERT(strstr(text, "# comment line 69\n") != nullptr, "long file kept");
+	sdsfree(text);
+
+	/* A file holding only a NUL byte reads as one empty line. */
+	char *nul_argv[] = { "sh", "-c", "printf '\\000' > \"$0\"", cfg, nullptr };
+	ASSERT(run_command(nul_argv, RUN_CMD_QUIET) == 0, "NUL file written");
+	ASSERT(run_cmd(handle_install_update_config, "install-update-config", nullptr, nullptr) == 0, "merge succeeds");
+	ASSERT(file_contains(cfg, "default-target = "), "defaults added after the empty line");
+
+	sdsfree(cfg);
+	sdsfree(home);
+	sandbox_off();
+	leave_dir(root);
+	PASS();
+}
+
+/* ------------------------------------------------------------------ */
+/* add / remove / machete / vendor / tree                               */
+/* ------------------------------------------------------------------ */
+
+TEST(cov_add_registry_and_makefile_edge_cases)
+{
+	sds root = tmp_new();
+	sandbox_on(root);
+	enter_dir(root);
+	write_text("Coffee.toml", "[package]\nname = \"addreg\"\nversion = \"1.0.0\"\n\n"
+	                          "[[dependencies]]\nname = \"other\"\ngit = \"https://example.com/o.git\"\n");
+
+	sds   dir          = join(root, "registry/recipes/n/nover");
+	char *mkdir_argv[] = { "mkdir", "-p", dir, nullptr };
+	run_command(mkdir_argv, RUN_CMD_QUIET);
+	sds toml = join(dir, "library.toml");
+	write_text(toml, "recipe_url = \"https://example.invalid/nover.tar.gz\"\n");
+	stderr_begin("err.txt");
+	i64 ret = run_cmd(handle_add, "add", "nover", nullptr);
+	stderr_end();
+	ASSERT(ret == 1, "version-less recipe refused");
+	ASSERT(file_contains("err.txt", "recipe for 'nover' has no valid version"), "refusal reported");
+
+	recipe_fixture(root, "badver", "../1", nullptr, nullptr);
+	stderr_begin("err.txt");
+	ret = run_cmd(handle_add, "add", "badver", nullptr);
+	stderr_end();
+	ASSERT(ret == 1, "invalid recipe version refused");
+	ASSERT(file_contains("err.txt", "recipe for 'badver' has no valid version"), "refusal reported");
+
+	if (geteuid() != 0) {
+		write_text("Makefile", "all:\n");
+		chmod("Makefile", 0444);
+		options opt;
+		memset(&opt, 0, sizeof(opt));
+		char *inputs[] = { "add", "newdep", nullptr };
+		opt.inputs     = inputs;
+		opt.inputs_num = 2;
+		opt.git        = sdsnew("https://example.com/n.git");
+		stdout_begin("out.txt");
+		ret = handle_add(&opt);
+		stdout_end();
+		chmod("Makefile", 0644);
+		sdsfree(opt.git);
+		ASSERT(ret == 0, "dependency added");
+		ASSERT(!file_contains("Makefile", "# Dep: newdep"), "read-only Makefile untouched");
+	}
+
+	/* A Makefile on a full device: the append fails when the file is closed. */
+	remove("Makefile");
+	ASSERT(symlink("/dev/full", "Makefile") == 0, "Makefile linked to /dev/full");
+	options full;
+	memset(&full, 0, sizeof(full));
+	char *full_inputs[] = { "add", "fulldep", nullptr };
+	full.inputs         = full_inputs;
+	full.inputs_num     = 2;
+	full.git            = sdsnew("https://example.com/f.git");
+	stdout_begin("out.txt");
+	stderr_begin("err.txt");
+	ret = handle_add(&full);
+	stderr_end();
+	stdout_end();
+	sdsfree(full.git);
+	ASSERT(ret == 0, "dependency added");
+	ASSERT(file_contains("err.txt", "failed to write to Makefile"), "Makefile write failure reported");
+
+	sdsfree(toml);
+	sdsfree(dir);
+	sandbox_off();
+	leave_dir(root);
+	PASS();
+}
+
+TEST(cov_remove_makefile_variants)
+{
+	sds root = tmp_new();
+	enter_dir(root);
+	write_project("rmmk", nullptr, "[dependencies]\nd1 = \"1.0\"\nd2 = \"1.0\"\nd3 = \"1.0\"\n");
+
+	stdout_begin("out.txt");
+	i64 ret = run_cmd(handle_remove, "remove", "d1", nullptr);
+	stdout_end();
+	ASSERT(ret == 0, "removal without a Makefile");
+
+	write_text("Makefile", "all:\n\n# Dep: d2");
+	stdout_begin("out.txt");
+	ret = run_cmd(handle_remove, "remove", "d2", nullptr);
+	stdout_end();
+	ASSERT(ret == 0, "removal of a trailing section");
+	sds mk = read_text("Makefile");
+	ASSERT(strcmp(mk, "all:\n\n") == 0, "unterminated section removed");
+	sdsfree(mk);
+
+	if (geteuid() != 0) {
+		write_text("Makefile", "# Dep: d3\nCFLAGS += x\nLDFLAGS += y\n");
+		chmod("Makefile", 0444);
+		stdout_begin("out.txt");
+		ret = run_cmd(handle_remove, "remove", "d3", nullptr);
+		stdout_end();
+		chmod("Makefile", 0644);
+		ASSERT(ret == 0, "removal with a read-only Makefile");
+		ASSERT(file_contains("Makefile", "# Dep: d3"), "read-only Makefile untouched");
+	}
+
+	leave_dir(root);
+	PASS();
+}
+
+TEST(cov_machete_scan_variants)
+{
+	sds root = tmp_new();
+	enter_dir(root);
+	write_project("mach", "dependencies = [\"hdr\", \"tabbed\", \"zq= \\\"1\\\"\", \"y= \\\"1\\\"\"]", nullptr);
+	write_text("src/a.h", "#include <hdr.h>\n");
+	write_text("src/b.c", "\t#include <tabbed.h>\n");
+	write_text("src/ab", "#include <zq.h>\n");
+	ASSERT(mkfifo("src/pipe.c", 0600) == 0, "mkfifo");
+
+	stdout_begin("out.txt");
+	i64 ret = run_cmd(handle_machete, "machete", nullptr, nullptr);
+	stdout_end();
+	ASSERT(ret == 0, "machete succeeds");
+	ASSERT(file_contains("out.txt", "Unused dependencies:\n  zq\n"), "only zq is unused");
+
+	remove("src/pipe.c");
+	leave_dir(root);
+	PASS();
+}
+
+TEST(cov_vendor_short_flat_name)
+{
+	sds root = tmp_new();
+	enter_dir(root);
+	write_project("vend", "dependencies = [\"v= \\\"1.0\\\"\"]", nullptr);
+	stdout_begin("out.txt");
+	stderr_begin("err.txt");
+	i64 ret = run_cmd(handle_vendor, "vendor", nullptr, nullptr);
+	stderr_end();
+	stdout_end();
+	ASSERT(ret == 0, "vendor completes");
+	ASSERT(file_contains("err.txt", "v has no structured dep info"), "one-letter name parsed");
+	leave_dir(root);
+	PASS();
+}
+
+TEST(cov_tree_variants)
+{
+	sds root = tmp_new();
+	sandbox_on(root);
+	enter_dir(root);
+	write_text("Coffee.toml", "dependencies = [\"ta\", \"tb = \\\"*\\\"\", \"tc = \\\"2.0\\\"\", \"tmiss\", \"tbad\", "
+	                          "\"tnodeps\"]\n");
+	const char *names[] = { "ta", "tb", "tc", "td", "inl", "tbad", "tnodeps" };
+	for (size_t i = 0; i < 7; i++) {
+		make_local_dep(names[i], "1.0.0", nullptr);
+	}
+	write_text("deps/ta/library.toml", "[dependencies]\ntb = \"1.0\"\ninl = { path = \"x\" }\nnowhere = \"1.0\"\n");
+	write_text("deps/tb/library.toml", "[dependencies]\ntc = \"1.0\"\n");
+	write_text("deps/tc/library.toml", "[dependencies]\ntd = \"1.0\"\n");
+	write_text("deps/td/library.toml", "[dependencies]\nte = \"1.0\"\n");
+	remove("deps/inl/library.toml");
+	write_text("deps/tbad/library.toml", "[broken\n");
+	write_text("Coffee.lock", "version = 1\n\n[[dependencies]]\nname = \"ta\"\npath = \"\"\n\n"
+	                          "[[dependencies]]\nname = \"tb\"\npath = \"deps/tb\"\n\n"
+	                          "[[dependencies]]\nname = \"tc\"\n");
+
+	stdout_begin("out.txt");
+	i64 ret = run_cmd(handle_tree, "tree", nullptr, nullptr);
+	stdout_end();
+	ASSERT(ret == 0, "tree succeeds");
+	ASSERT(file_contains("out.txt", "project v0.1.0"), "nameless project shown with defaults");
+	ASSERT(file_contains("out.txt", "tc v2.0"), "requested version shown");
+	ASSERT(file_contains("out.txt", "nowhere"), "unresolved child shown");
+	ASSERT(file_contains("out.txt", "td v1.0"), "deep child shown");
+
+	remove("Coffee.lock");
+	stdout_begin("out.txt");
+	ret = run_cmd(handle_tree, "tree", nullptr, nullptr);
+	stdout_end();
+	ASSERT(ret == 0, "tree without a lockfile");
+	ASSERT(file_contains("out.txt", "tmiss"), "unresolved root dep shown");
+
+	sandbox_off();
+	leave_dir(root);
+	PASS();
+}
+
+/* ------------------------------------------------------------------ */
 /* Registration                                                         */
 /* ------------------------------------------------------------------ */
 
@@ -3179,4 +4414,30 @@ void coffee_register_cov_deps_commands_tests(void)
 	TEST_REGISTER(cov_add_manifest_failures);
 	TEST_REGISTER(cov_remove_failures);
 	TEST_REGISTER(cov_uninstall_removal_failure);
+	TEST_REGISTER(cov_dg_constraint_whitespace_variants);
+	TEST_REGISTER(cov_dg_transitive_path_containment);
+	TEST_REGISTER(cov_dg_lockfile_paths);
+	TEST_REGISTER(cov_dg_null_names_and_accessors);
+	TEST_REGISTER(cov_cache_more_variants);
+	TEST_REGISTER(cov_git_stubbed_outputs);
+	TEST_REGISTER(cov_stubbed_git_commit_edge_cases);
+	TEST_REGISTER(cov_update_lock_entry_variants);
+	TEST_REGISTER(cov_update_registry_failures);
+	TEST_REGISTER(cov_outdated_registry_variants);
+	TEST_REGISTER(cov_outdated_lock_entry_variants);
+	TEST_REGISTER(cov_outdated_plural_summary);
+	TEST_REGISTER(cov_fetch_existing_clone_failures);
+	TEST_REGISTER(cov_fetch_many_path_deps);
+	TEST_REGISTER(cov_fetch_registry_edge_cases);
+	TEST_REGISTER(cov_fetch_path_dep_through_own_link);
+	TEST_REGISTER(cov_fetch_offline_plain_dir_and_transitive_git);
+	TEST_REGISTER(cov_recipe_install_edge_cases);
+	TEST_REGISTER(cov_recipe_read_installed_variants);
+	TEST_REGISTER(cov_install_link_variants);
+	TEST_REGISTER(cov_install_update_config_line_scanning);
+	TEST_REGISTER(cov_add_registry_and_makefile_edge_cases);
+	TEST_REGISTER(cov_remove_makefile_variants);
+	TEST_REGISTER(cov_machete_scan_variants);
+	TEST_REGISTER(cov_vendor_short_flat_name);
+	TEST_REGISTER(cov_tree_variants);
 }
