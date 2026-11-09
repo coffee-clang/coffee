@@ -2640,6 +2640,657 @@ TEST(cov_misc_new_lib_manifest_creation_failure)
 	PASS();
 }
 
+/* ------------------------------------------------------------------ */
+/* config: unusual values and in-place edits                           */
+/* ------------------------------------------------------------------ */
+
+TEST(cov_misc_config_get_unusual_lookups)
+{
+	struct fixture fx;
+	ASSERT(fixture_enter(&fx), "fixture");
+	ASSERT(write_config("top = \"tv\"\n[sec]\nb = false\n"), "config");
+
+	sds top_out  = nullptr;
+	i64 top_ret  = run_config("get", "top", nullptr, &top_out);
+	sds sect_out = nullptr;
+	i64 sect_ret = run_config("get", "nosec.k", nullptr, &sect_out);
+	sds bool_out = nullptr;
+	i64 bool_ret = run_config("get", "sec.b", nullptr, &bool_out);
+	ASSERT(write_config("[broken\n= nope\n"), "unparseable config");
+	sds bad_out = nullptr;
+	i64 bad_ret = run_config("get", "top", nullptr, &bad_out);
+	fixture_leave(&fx);
+
+	ASSERT(top_ret == 0 && strcmp(top_out, "tv\n") == 0, "top-level key without a section");
+	ASSERT(sect_ret == 1 && has(sect_out, "key 'nosec.k' not found"), "missing section");
+	ASSERT(bool_ret == 1 && has(bool_out, "key 'sec.b' not found"), "boolean is neither string nor integer");
+	ASSERT(bad_ret == 1 && has(bad_out, "key 'top' not found"), "unparseable config");
+	sdsfree(top_out);
+	sdsfree(sect_out);
+	sdsfree(bool_out);
+	sdsfree(bad_out);
+	PASS();
+}
+
+TEST(cov_misc_config_list_skips_non_string_section_values)
+{
+	struct fixture fx;
+	ASSERT(fixture_enter(&fx), "fixture");
+	ASSERT(write_config("[sec]\nn = 1\ns = \"v\"\n"), "config");
+
+	sds out = nullptr;
+	i64 ret = run_config("list", nullptr, nullptr, &out);
+	fixture_leave(&fx);
+
+	ASSERT(ret == 0, "list succeeds");
+	ASSERT(has(out, "sec.s = \"v\"\n"), "string value listed");
+	ASSERT(!has(out, "sec.n"), "integer value skipped");
+	sdsfree(out);
+	PASS();
+}
+
+/* Each section spells its key differently: `x=`, `x =` and a bare `x`. */
+TEST(cov_misc_config_set_replaces_existing_keys)
+{
+	struct fixture fx;
+	ASSERT(fixture_enter(&fx), "fixture");
+	ASSERT(write_config("[a]\nxy = \"0\"\nx=\"1\"\n[b]\nx = \"2\"\n[c]\nx\n"), "config");
+
+	sds a_out = nullptr;
+	sds b_out = nullptr;
+	sds c_out = nullptr;
+	i64 a_ret = run_config("set", "a.x", "7", &a_out);
+	i64 b_ret = run_config("set", "b.x", "8", &b_out);
+	i64 c_ret = run_config("set", "c.x", "9", &c_out);
+	sds cfg   = read_config();
+	fixture_leave(&fx);
+
+	ASSERT(a_ret == 0 && b_ret == 0 && c_ret == 0, "every set succeeds");
+	ASSERT(strcmp(cfg, "[a]\nxy = \"0\"\nx = \"7\"\n[b]\nx = \"8\"\n[c]\nx = \"9\"\n") == 0,
+	       "keys replaced in place, prefixes untouched");
+	sdsfree(a_out);
+	sdsfree(b_out);
+	sdsfree(c_out);
+	sdsfree(cfg);
+	PASS();
+}
+
+TEST(cov_misc_config_set_and_unset_read_only_file)
+{
+	struct fixture fx;
+	ASSERT(fixture_enter(&fx), "fixture");
+	ASSERT(write_config("k = \"v\"\n"), "config");
+	sds path = config_file_path();
+	ASSERT(chmod(path, 0444) == 0, "read-only config");
+
+	sds set_out   = nullptr;
+	sds unset_out = nullptr;
+	i64 set_ret   = run_config("set", "k", "w", &set_out);
+	i64 unset_ret = run_config("unset", "k", nullptr, &unset_out);
+	sds cfg       = read_config();
+	chmod(path, 0644);
+	sdsfree(path);
+	fixture_leave(&fx);
+
+	ASSERT(set_ret == 1 && has(set_out, "Could not write"), "set cannot rewrite a read-only file");
+	ASSERT(unset_ret == 1, "unset cannot rewrite a read-only file");
+	ASSERT(strcmp(cfg, "k = \"v\"\n") == 0, "file left untouched");
+	sdsfree(set_out);
+	sdsfree(unset_out);
+	sdsfree(cfg);
+	PASS();
+}
+
+TEST(cov_misc_config_unset_long_file_keeps_similar_keys)
+{
+	struct fixture fx;
+	ASSERT(fixture_enter(&fx), "fixture");
+	sds text = sdsempty();
+	for (int i = 0; i < 70; i++) {
+		text = sdscatprintf(text, "key%d = \"%d\"\n", i, i);
+	}
+	text = sdscat(text, "k=\"1\"\nkx = \"2\"\n");
+	ASSERT(write_config(text), "config");
+
+	sds out = nullptr;
+	i64 ret = run_config("unset", "k", nullptr, &out);
+	sds cfg = read_config();
+	fixture_leave(&fx);
+
+	ASSERT(ret == 0, "unset succeeds");
+	ASSERT(!has(cfg, "k=\"1\""), "key removed");
+	ASSERT(has(cfg, "kx = \"2\"\n"), "key with the same prefix kept");
+	ASSERT(has(cfg, "key0 = \"0\"\n") && has(cfg, "key69 = \"69\"\n"), "all other lines kept");
+	sdsfree(text);
+	sdsfree(out);
+	sdsfree(cfg);
+	PASS();
+}
+
+/* ------------------------------------------------------------------ */
+/* doc: non-string settings and an existing Doxyfile                   */
+/* ------------------------------------------------------------------ */
+
+TEST(cov_misc_doc_generate_ignores_non_string_settings)
+{
+	struct fixture fx;
+	ASSERT(fixture_enter(&fx), "fixture");
+	ASSERT(write_file("Coffee.toml", "[package]\nlicense = \"MIT\"\n\n"
+	                                 "[doc]\nproject-name = 1\ninput-dirs = 2\nexclude-patterns = true\n"),
+	       "manifest");
+	ASSERT(fake_tool(&fx, "doxygen", "exit 0"), "fake doxygen");
+
+	sds out      = nullptr;
+	i64 ret      = run_doc("generate", &out);
+	sds doxyfile = read_file("Doxyfile");
+	fixture_leave(&fx);
+
+	ASSERT(ret == 0, "generate should succeed");
+	ASSERT(has(doxyfile, "PROJECT_NAME           = \"Project\""), "default name without [package] name");
+	ASSERT(has(doxyfile, "PROJECT_NUMBER         = \n"), "empty version");
+	ASSERT(has(doxyfile, "INPUT                  = src include"), "default input dirs");
+	ASSERT(!has(doxyfile, "EXCLUDE_PATTERNS"), "non-string exclude patterns ignored");
+	sdsfree(out);
+	sdsfree(doxyfile);
+	PASS();
+}
+
+TEST(cov_misc_doc_generate_keeps_existing_doxyfile)
+{
+	struct fixture fx;
+	ASSERT(fixture_enter(&fx), "fixture");
+	ASSERT(write_manifest(nullptr, "docpkg", "\n[doc]\nproject-name = \"Shown\"\n"), "manifest");
+	ASSERT(write_file("Doxyfile", "# hand written\n"), "Doxyfile");
+	ASSERT(fake_tool(&fx, "doxygen", "exit 0"), "fake doxygen");
+
+	sds out      = nullptr;
+	i64 ret      = run_doc(nullptr, &out);
+	sds doxyfile = read_file("Doxyfile");
+	sds log      = tool_log(&fx);
+	fixture_leave(&fx);
+
+	ASSERT(ret == 0, "doc should succeed");
+	ASSERT(!has(out, "Generated Doxyfile"), "existing Doxyfile not regenerated");
+	ASSERT(strcmp(doxyfile, "# hand written\n") == 0, "Doxyfile untouched");
+	ASSERT(has(out, "Documentation complete."), "doxygen ran");
+	ASSERT(has(log, "doxygen"), "doxygen invoked");
+	sdsfree(out);
+	sdsfree(doxyfile);
+	sdsfree(log);
+	PASS();
+}
+
+/* ------------------------------------------------------------------ */
+/* test: [test] sources on the error paths, default compiler, filters  */
+/* ------------------------------------------------------------------ */
+
+static const char *test_sources_tail = "\n[test]\nsources = [\"tests/t1.c\"]\n";
+
+TEST(cov_misc_test_manifest_sources_without_project_sources)
+{
+	struct fixture fx;
+	ASSERT(fixture_enter(&fx), "fixture");
+	ASSERT(write_manifest(nullptr, "tproj", test_sources_tail), "manifest");
+	make_dirs("tests", nullptr, nullptr);
+	ASSERT(write_file("tests/t1.c", "int t1;\n"), "test source");
+
+	sds out = nullptr;
+	i64 ret = run_test_cmd(nullptr, false, &out);
+	fixture_leave(&fx);
+
+	ASSERT(ret == 1, "no project sources returns 1");
+	ASSERT(has(out, "No project sources found in src/*.c"), "error message");
+	sdsfree(out);
+	PASS();
+}
+
+TEST(cov_misc_test_manifest_sources_output_directory_failure)
+{
+	struct fixture fx;
+	ASSERT(fixture_enter(&fx), "fixture");
+	ASSERT(write_test_project(&fx, nullptr, "tproj", test_sources_tail), "project");
+	ASSERT(write_file("blocker", "a file\n"), "blocker");
+
+	options opt = { .inputs = (char *[]){ "test" }, .inputs_num = 1, .target_dir = "blocker/sub" };
+	sds     out = nullptr;
+	i64     ret = run_captured(handle_test, &opt, &out);
+	fixture_leave(&fx);
+
+	ASSERT(ret == 1, "unusable output directory returns 1");
+	ASSERT(has(out, "Could not create output directory blocker/sub"), "error message");
+	sdsfree(out);
+	PASS();
+}
+
+TEST(cov_misc_test_manifest_sources_compile_failure)
+{
+	struct fixture fx;
+	ASSERT(fixture_enter(&fx), "fixture");
+	ASSERT(write_test_project(&fx, nullptr, "tproj", test_sources_tail), "project");
+	ASSERT(fake_tool(&fx, "fakecc", "exit 1"), "failing compiler");
+
+	sds out = nullptr;
+	i64 ret = run_test_cmd(nullptr, false, &out);
+	fixture_leave(&fx);
+
+	ASSERT(ret == 1, "compile failure returns 1");
+	ASSERT(has(out, "Failed to compile test runner"), "error message");
+	sdsfree(out);
+	PASS();
+}
+
+/* Without $CC the runner is built with `clang`, here a fake one on PATH. */
+TEST(cov_misc_test_default_compiler_with_verbose2)
+{
+	struct fixture fx;
+	ASSERT(fixture_enter(&fx), "fixture");
+	sds saved_filter = env_save("TEST_FILTER");
+	unsetenv("TEST_FILTER");
+	ASSERT(write_test_project(&fx, nullptr, "tproj", nullptr), "project");
+	ASSERT(fake_tool(&fx, "clang", fake_cc_body), "fake clang");
+	unsetenv("CC");
+
+	options opt = { .inputs = (char *[]){ "test" }, .inputs_num = 1, .verbose2 = true };
+	sds     out = nullptr;
+	i64     ret = run_captured(handle_test, &opt, &out);
+	sds     log = tool_log(&fx);
+	bool    ran = file_exists("runner.args");
+	env_restore("TEST_FILTER", saved_filter);
+	fixture_leave(&fx);
+
+	ASSERT(ret == 0, "test run should succeed");
+	ASSERT(has(log, "clang ") && !has(log, "fakecc"), "default compiler used");
+	ASSERT(ran, "runner executed");
+	sdsfree(out);
+	sdsfree(log);
+	PASS();
+}
+
+TEST(cov_misc_test_verbose_without_filter)
+{
+	struct fixture fx;
+	ASSERT(fixture_enter(&fx), "fixture");
+	sds saved_filter = env_save("TEST_FILTER");
+	unsetenv("TEST_FILTER");
+	ASSERT(write_test_project(&fx, nullptr, "tproj", nullptr), "project");
+
+	sds none_out = nullptr;
+	i64 none_ret = run_test_cmd(nullptr, true, &none_out);
+	setenv("TEST_FILTER", "", 1);
+	sds empty_out  = nullptr;
+	i64 empty_ret  = run_test_cmd("ignored", true, &empty_out);
+	sds empty_args = read_file("runner.args");
+	env_restore("TEST_FILTER", saved_filter);
+	fixture_leave(&fx);
+
+	ASSERT(none_ret == 0 && has(none_out, "Running: build/debug/tproj-tests\n"), "no filter shown");
+	ASSERT(empty_ret == 0 && has(empty_out, "Running: build/debug/tproj-tests\n"), "empty TEST_FILTER not shown");
+	ASSERT(empty_args != nullptr && strcmp(empty_args, "\n") == 0, "empty TEST_FILTER is not passed on");
+	sdsfree(none_out);
+	sdsfree(empty_out);
+	sdsfree(empty_args);
+	PASS();
+}
+
+/* ------------------------------------------------------------------ */
+/* cflags / libs: odd library.toml files                               */
+/* ------------------------------------------------------------------ */
+
+static const char *odd_deps_head = "dependencies = [\"=1.0\", \"broken\", \"odd\"]\n";
+
+static bool write_odd_flag_deps(void)
+{
+	make_dirs("deps", "deps/broken", "deps/odd");
+	make_dirs("deps/broken/include", "deps/broken/lib", nullptr);
+	return write_file("deps/broken/library.toml", "[[[ not toml\n") &&
+	       write_file("deps/odd/library.toml", "include = [1]\nlib = [2]\nlibname = 3\n");
+}
+
+TEST(cov_misc_cflags_odd_library_toml)
+{
+	struct fixture fx;
+	ASSERT(fixture_enter(&fx), "fixture");
+	ASSERT(write_manifest(odd_deps_head, "flagpkg", nullptr), "manifest");
+	ASSERT(write_odd_flag_deps(), "deps");
+
+	sds out = nullptr;
+	i64 ret = run_plain(handle_cflags, "cflags", &out);
+	fixture_leave(&fx);
+
+	ASSERT(ret == 0, "cflags should succeed");
+	ASSERT(strcmp(out, "-Ideps/broken/include\n") == 0, "convention fallback for unusable library.toml");
+	sdsfree(out);
+	PASS();
+}
+
+TEST(cov_misc_libs_odd_library_toml)
+{
+	struct fixture fx;
+	ASSERT(fixture_enter(&fx), "fixture");
+	ASSERT(write_manifest(odd_deps_head, "flagpkg", nullptr), "manifest");
+	ASSERT(write_odd_flag_deps(), "deps");
+
+	sds out = nullptr;
+	i64 ret = run_plain(handle_libs, "libs", &out);
+	fixture_leave(&fx);
+
+	ASSERT(ret == 0, "libs should succeed");
+	ASSERT(has(out, "-Ldeps/broken/lib -lbroken -lodd\n"), "convention fallback for unusable library.toml");
+	sdsfree(out);
+	PASS();
+}
+
+/* ------------------------------------------------------------------ */
+/* metadata: several features and packages, unnamed root               */
+/* ------------------------------------------------------------------ */
+
+TEST(cov_misc_metadata_lists_several_features_and_packages)
+{
+	struct fixture fx;
+	ASSERT(fixture_enter(&fx), "fixture");
+	ASSERT(write_manifest(nullptr, "metapkg",
+	                      "\n[features]\ndefault = [\"json\", \"xml\"]\njson = [\"liba/fast\"]\nxml = []\n"
+	                      "\n[dependencies]\nliba = \"1.0\"\n"),
+	       "manifest");
+	make_dirs("deps", "deps/liba", nullptr);
+
+	sds out = nullptr;
+	i64 ret = run_plain(handle_metadata, "metadata", &out);
+	fixture_leave(&fx);
+
+	ASSERT(ret == 0, "metadata should succeed");
+	ASSERT(has(out, "    \"metapkg\": [\"json\", \"xml\"],\n"), "root features comma separated");
+	ASSERT(has(out, "    \"liba\": [\"fast\"]\n  },"), "dependency feature set");
+	sdsfree(out);
+	PASS();
+}
+
+TEST(cov_misc_metadata_unnamed_package_with_dependency)
+{
+	struct fixture fx;
+	ASSERT(fixture_enter(&fx), "fixture");
+	ASSERT(write_file("Coffee.toml", "dependencies = [\"liba\"]\n[package]\nversion = \"1.0\"\n"), "manifest");
+	make_dirs("deps", "deps/liba", nullptr);
+
+	sds out = nullptr;
+	i64 ret = run_plain(handle_metadata, "metadata", &out);
+	fixture_leave(&fx);
+
+	ASSERT(ret == 0, "metadata should succeed");
+	ASSERT(has(out, "    \"name\": \"\",\n"), "missing name is an empty string");
+	ASSERT(has(out, "\"name\": \"liba\""), "dependency listed");
+	sdsfree(out);
+	PASS();
+}
+
+/* ------------------------------------------------------------------ */
+/* init: directory name with dots, no detectable main()                */
+/* ------------------------------------------------------------------ */
+
+/*
+ * src/main.c is write-only: init can overwrite it but not scan it, and the
+ * other entries in src/ are not C sources with a main(), so no [[bin]].
+ */
+TEST(cov_misc_init_without_detectable_main)
+{
+	struct fixture fx;
+	ASSERT(fixture_enter(&fx), "fixture");
+	ASSERT(mkdir("my.proj", 0755) == 0 && chdir("my.proj") == 0, "enter my.proj");
+	make_dirs("src", nullptr, nullptr);
+	ASSERT(write_file("src/main.c", "") && chmod("src/main.c", 0222) == 0, "write-only main.c");
+	ASSERT(write_file("src/util.c", "int util;\n"), "source without main");
+	ASSERT(write_file("src/notes.h", "int main(void);\n"), "header");
+	ASSERT(write_file("src/abc", "int main(void);\n"), "file without extension");
+
+	sds  out    = nullptr;
+	i64  ret    = run_plain(handle_init, "init", &out);
+	bool no_bin = !file_has("Coffee.toml", "[[bin]]");
+	bool header = file_exists("include/my_proj/my_proj.h");
+	fixture_leave(&fx);
+
+	ASSERT(ret == 0, "init succeeds");
+	ASSERT(has(out, "Initialized C project: my_proj"), "dots replaced in the default name");
+	ASSERT(header, "header named after the sanitized directory");
+	ASSERT(no_bin, "no binary target without a readable main()");
+	sdsfree(out);
+	PASS();
+}
+
+/* An unlistable src/ still accepts main.c, but cannot be scanned for main(). */
+TEST(cov_misc_init_with_unlistable_src_directory)
+{
+	struct fixture fx;
+	ASSERT(fixture_enter(&fx), "fixture");
+	ASSERT(mkdir("src", 0300) == 0, "write-only src directory");
+
+	char *inputs[] = { "init", "blind" };
+	sds   out      = nullptr;
+	i64   ret      = run_with(handle_init, inputs, 2, &out);
+	chmod("src", 0755);
+	bool main_c = file_exists("src/main.c");
+	bool no_bin = !file_has("Coffee.toml", "[[bin]]");
+	fixture_leave(&fx);
+
+	ASSERT(ret == 0, "init succeeds");
+	ASSERT(main_c, "main.c written into src/");
+	ASSERT(no_bin, "no binary target when src/ cannot be listed");
+	sdsfree(out);
+	PASS();
+}
+
+/* ------------------------------------------------------------------ */
+/* search: incomplete index entries                                    */
+/* ------------------------------------------------------------------ */
+
+TEST(cov_misc_search_entries_with_missing_fields)
+{
+	struct fixture fx;
+	ASSERT(fixture_enter(&fx), "fixture");
+	ASSERT(write_package_index("[\n {\n  \"name\": \"solo\"\n },\n {\n  \"name\": 1,\n  \"version\": \"2.0\",\n"
+	                           "  \"description\": \"Unnamed lib\"\n }\n]\n"),
+	       "index");
+
+	char *inputs[] = { "search", nullptr };
+	sds   out      = nullptr;
+	i64   ret      = run_with(handle_search, inputs, 2, &out);
+	fixture_leave(&fx);
+
+	sds solo    = sdscatprintf(sdsempty(), "%-30s %-12s \n", "solo", "");
+	sds unnamed = sdscatprintf(sdsempty(), "%-30s %-12s Unnamed lib\n", "", "2.0");
+	ASSERT(ret == 0, "search succeeds");
+	ASSERT(has(out, solo), "missing version and description");
+	ASSERT(has(out, unnamed), "missing name");
+	sdsfree(solo);
+	sdsfree(unnamed);
+	sdsfree(out);
+	PASS();
+}
+
+/* ------------------------------------------------------------------ */
+/* report / check: empty dependency names, default git ref             */
+/* ------------------------------------------------------------------ */
+
+TEST(cov_misc_report_deps_empty_dependency_name)
+{
+	struct fixture fx;
+	ASSERT(fixture_enter(&fx), "fixture");
+	ASSERT(write_manifest("dependencies = [\"=1.0\"]\n", "reppkg", nullptr), "manifest");
+
+	sds out = nullptr;
+	i64 ret = run_report("deps", &out);
+	fixture_leave(&fx);
+
+	ASSERT(ret == 0, "report should succeed");
+	ASSERT(has(out, "\n                     unknown\n"), "empty name reported as unknown");
+	ASSERT(has(out, "Total: 1 dependencies"), "total");
+	sdsfree(out);
+	PASS();
+}
+
+TEST(cov_misc_report_audit_default_ref)
+{
+	struct fixture fx;
+	ASSERT(fixture_enter(&fx), "fixture");
+	ASSERT(write_manifest(nullptr, "reppkg",
+	                      "\n[dependencies]\ngitdep = { git = \"https://example.invalid/gitdep.git\" }\n"),
+	       "manifest");
+	make_dirs("deps", "deps/gitdep", "deps/gitdep/.git");
+	ASSERT(write_file("git-behind.txt", "0\n"), "rev-list output");
+	ASSERT(install_fake_git(&fx, "0"), "fake git");
+
+	sds out = nullptr;
+	i64 ret = run_report("audit", &out);
+	fixture_leave(&fx);
+
+	ASSERT(ret == 0, "audit should succeed");
+	ASSERT(has(out, "gitdep               OK (origin/HEAD up-to-date)"), "default ref displayed");
+	sdsfree(out);
+	PASS();
+}
+
+TEST(cov_misc_check_without_sources_and_dependency_includes)
+{
+	struct fixture fx;
+	ASSERT(fixture_enter(&fx), "fixture");
+	ASSERT(write_manifest("dependencies = [\"=1.0\", \"plain\", \"ghost\"]\n", "chk", nullptr), "manifest");
+	make_dirs("deps", "deps/plain", nullptr);
+	ASSERT(fake_tool(&fx, "fakecc", "exit 0"), "fake compiler");
+	sds cc = sdscatprintf(sdsempty(), "%s/fakecc", fx.bin);
+	setenv("CC", cc, 1);
+	sdsfree(cc);
+
+	sds out = nullptr;
+	i64 ret = run_plain(handle_check, "check", &out);
+	sds log = tool_log(&fx);
+	fixture_leave(&fx);
+
+	ASSERT(ret == 0, "check should succeed");
+	ASSERT(has(log, "-Ideps/plain"), "dependency directory included");
+	ASSERT(!has(log, "-Ideps/plain/include"), "no include dir to add");
+	ASSERT(!has(log, "ghost"), "missing dependency directory skipped");
+	ASSERT(!has(log, "src/"), "no sources to check");
+	sdsfree(out);
+	sdsfree(log);
+	PASS();
+}
+
+/* ------------------------------------------------------------------ */
+/* list / info / pkgid / package / bench: manifests without identity   */
+/* ------------------------------------------------------------------ */
+
+static bool write_anonymous_manifest(const char *tail)
+{
+	sds  text = sdscatprintf(sdsempty(), "[package]\nlicense = \"MIT\"\n%s", tail != nullptr ? tail : "");
+	bool ok   = write_file("Coffee.toml", text);
+	sdsfree(text);
+	return ok;
+}
+
+TEST(cov_misc_list_unnamed_package_and_binaries)
+{
+	struct fixture fx;
+	ASSERT(fixture_enter(&fx), "fixture");
+	ASSERT(write_anonymous_manifest("\n[[bin]]\nname = \"tool\"\n\n[[bin]]\nsrc = [\"src/x.c\"]\n"), "manifest");
+
+	char *inputs[] = { "list", "everything" };
+	sds   out      = nullptr;
+	i64   ret      = run_with(handle_list, inputs, 2, &out);
+	fixture_leave(&fx);
+
+	ASSERT(ret == 0, "list should succeed");
+	ASSERT(strcmp(out, "Package: (unnamed)\nDependencies:\nBinaries:\n  tool\n") == 0, "unnamed binary skipped");
+	sdsfree(out);
+	PASS();
+}
+
+TEST(cov_misc_info_prints_only_present_fields)
+{
+	struct fixture fx;
+	ASSERT(fixture_enter(&fx), "fixture");
+	ASSERT(write_anonymous_manifest(nullptr), "manifest");
+
+	sds out = nullptr;
+	i64 ret = run_plain(handle_info, "info", &out);
+	fixture_leave(&fx);
+
+	ASSERT(ret == 0, "info should succeed");
+	ASSERT(strcmp(out, "Package Information:\n  License:     MIT\n") == 0, "only the license is printed");
+	sdsfree(out);
+	PASS();
+}
+
+TEST(cov_misc_pkgid_defaults_name_and_version)
+{
+	struct fixture fx;
+	ASSERT(fixture_enter(&fx), "fixture");
+	ASSERT(write_anonymous_manifest(nullptr), "manifest");
+
+	sds out = nullptr;
+	i64 ret = run_plain(handle_pkgid, "pkgid", &out);
+	fixture_leave(&fx);
+
+	ASSERT(ret == 0, "pkgid should succeed");
+	ASSERT(strcmp(out, "project:0.1.0\n") == 0, "documented defaults");
+	sdsfree(out);
+	PASS();
+}
+
+TEST(cov_misc_package_defaults_name_and_version)
+{
+	struct fixture fx;
+	ASSERT(fixture_enter(&fx), "fixture");
+	ASSERT(write_anonymous_manifest(nullptr), "manifest");
+	ASSERT(fake_tool(&fx, "tar", "touch \"$2\""), "fake tar");
+
+	sds  out  = nullptr;
+	i64  ret  = run_plain(handle_package, "package", &out);
+	bool made = file_exists("build/package/project-0.1.0.tar.gz");
+	fixture_leave(&fx);
+
+	ASSERT(ret == 0, "package should succeed");
+	ASSERT(has(out, "Package created: build/package/project-0.1.0.tar.gz"), "default tarball name");
+	ASSERT(made, "tarball written");
+	sdsfree(out);
+	PASS();
+}
+
+TEST(cov_misc_bench_unnamed_legacy_package)
+{
+	struct fixture fx;
+	ASSERT(fixture_enter(&fx), "fixture");
+	ASSERT(write_anonymous_manifest(legacy_tail), "manifest");
+	ASSERT(write_file("Makefile", "bench:\n\t@true\n"), "Makefile");
+
+	options opt = { .inputs = (char *[]){ "bench" }, .inputs_num = 1, .verbose = true };
+	sds     out = nullptr;
+	i64     ret = run_captured(handle_bench, &opt, &out);
+	fixture_leave(&fx);
+
+	ASSERT(ret == 0, "bench should succeed");
+	ASSERT(has(out, "INC_FLAGS=-Isrc -Iinclude -I. -Ideps VERBOSE=1\n"), "no package include dir");
+	sdsfree(out);
+	PASS();
+}
+
+TEST(cov_misc_bench_generated_makefile_runs_nothing)
+{
+	struct fixture fx;
+	ASSERT(fixture_enter(&fx), "fixture");
+	ASSERT(write_manifest(nullptr, "benchpkg", "\n[compilation]\nMakefile = \"generated\"\n"), "manifest");
+	ASSERT(write_file("Makefile", "bench:\n\t@echo ran > bench.out\n"), "Makefile");
+
+	sds  out = nullptr;
+	i64  ret = run_plain(handle_bench, "bench", &out);
+	bool ran = file_exists("bench.out");
+	fixture_leave(&fx);
+
+	ASSERT(ret == 0, "bench returns 0");
+	ASSERT(has(out, "has no bench target yet; nothing was run."), "placeholder message");
+	ASSERT(!ran, "make was not run");
+	sdsfree(out);
+	PASS();
+}
+
 void coffee_register_cov_misc_commands_tests(void)
 {
 	TEST_REGISTER(cov_misc_bench_legacy_runs_make_target);
@@ -2740,4 +3391,32 @@ void coffee_register_cov_misc_commands_tests(void)
 	TEST_REGISTER(cov_misc_new_reports_each_creation_failure);
 	TEST_REGISTER(cov_misc_new_lib_makefile_creation_failure);
 	TEST_REGISTER(cov_misc_new_lib_manifest_creation_failure);
+	TEST_REGISTER(cov_misc_config_get_unusual_lookups);
+	TEST_REGISTER(cov_misc_config_list_skips_non_string_section_values);
+	TEST_REGISTER(cov_misc_config_set_replaces_existing_keys);
+	TEST_REGISTER(cov_misc_config_set_and_unset_read_only_file);
+	TEST_REGISTER(cov_misc_config_unset_long_file_keeps_similar_keys);
+	TEST_REGISTER(cov_misc_doc_generate_ignores_non_string_settings);
+	TEST_REGISTER(cov_misc_doc_generate_keeps_existing_doxyfile);
+	TEST_REGISTER(cov_misc_test_manifest_sources_without_project_sources);
+	TEST_REGISTER(cov_misc_test_manifest_sources_output_directory_failure);
+	TEST_REGISTER(cov_misc_test_manifest_sources_compile_failure);
+	TEST_REGISTER(cov_misc_test_default_compiler_with_verbose2);
+	TEST_REGISTER(cov_misc_test_verbose_without_filter);
+	TEST_REGISTER(cov_misc_cflags_odd_library_toml);
+	TEST_REGISTER(cov_misc_libs_odd_library_toml);
+	TEST_REGISTER(cov_misc_metadata_lists_several_features_and_packages);
+	TEST_REGISTER(cov_misc_metadata_unnamed_package_with_dependency);
+	TEST_REGISTER(cov_misc_init_without_detectable_main);
+	TEST_REGISTER(cov_misc_init_with_unlistable_src_directory);
+	TEST_REGISTER(cov_misc_search_entries_with_missing_fields);
+	TEST_REGISTER(cov_misc_report_deps_empty_dependency_name);
+	TEST_REGISTER(cov_misc_report_audit_default_ref);
+	TEST_REGISTER(cov_misc_check_without_sources_and_dependency_includes);
+	TEST_REGISTER(cov_misc_list_unnamed_package_and_binaries);
+	TEST_REGISTER(cov_misc_info_prints_only_present_fields);
+	TEST_REGISTER(cov_misc_pkgid_defaults_name_and_version);
+	TEST_REGISTER(cov_misc_package_defaults_name_and_version);
+	TEST_REGISTER(cov_misc_bench_unnamed_legacy_package);
+	TEST_REGISTER(cov_misc_bench_generated_makefile_runs_nothing);
 }
