@@ -36,6 +36,29 @@ shares the same `build_project()` routine. Supports `--release`, `--debug`, `-j`
 
 ✅ **DONE** — `coffee fetch` now checks out the configured `branch`/`tag`/`rev` from `Coffee.toml` instead of always using `origin/HEAD`.
 
+### Registry dependencies installed from recipes
+
+✅ **DONE** — A dependency declared as a plain version (`argparse = "1.1.0"`) is installed by running its
+recipe's `install.sh` (`src/recipe_install.c`), which fetches the source (git or archive), builds it and
+installs it into `~/.coffee/<name>/<version>/`; `deps/<name>` links there, so `cflags`, `libs` and the
+generated Makefile pick up its `include/` and `lib/`. The recipe version must satisfy the version in
+`Coffee.toml`. A recipe's own `[dependencies]` are installed first and become graph nodes. The script's
+output goes to `~/.coffee/recipes/<name>/install.log` (last lines shown on failure, `--verbose` streams
+it). A stamp holding the sha256 of `install.sh` makes later fetches reuse the install until the script
+changes. Recipes without `install.sh` still clone `recipe_url`.
+
+### `coffee build` / `run` / `test` fetch missing dependencies
+
+✅ **DONE** — A declared dependency (direct or transitive) that is not on disk is fetched before
+building, so a fresh checkout builds in one step. With `--offline` it is an error instead.
+
+### `--locked` / `--frozen`
+
+✅ **DONE** — Both flags were parsed but ignored. `--locked` now requires `Coffee.lock` and fails a fetch
+that would change it; a registry dep whose recipe version or `install.sh` checksum differs from the lock
+is refused before its script runs. `--frozen` is `--locked` plus `--offline`. `Coffee.lock` records the
+recipe version and `checksum` (sha256 of `install.sh`) for registry deps.
+
 ---
 
 ## P1 — Major Usability Gaps
@@ -50,7 +73,7 @@ shares the same `build_project()` routine. Supports `--release`, `--debug`, `-j`
 
 ### `coffee add` — support version, features, optional
 
-✅ **DONE** — Supports `--version` (via `opts->pkg_version`), `--features`, `--optional`, `--dev`, `--build`. Appends dependency flags to Makefile. Removed registry fallback — `--git` or `--path` is required.
+✅ **DONE** — Supports `--version` (via `opts->pkg_version`), `--features`, `--optional`, `--dev`, `--build`. Appends dependency flags to Makefile. A bare package name is looked up in the registry and recorded with the recipe version (`name = "<version>"`), which `fetch` installs from the recipe; `--git` / `--path` add git and path deps.
 
 ### `coffee remove` — clean up Makefile
 
@@ -58,11 +81,11 @@ shares the same `build_project()` routine. Supports `--release`, `--debug`, `-j`
 
 ### `coffee update` — git-aware resolution
 
-✅ **DONE** — Uses `dep_graph` to resolve all transitive deps. For git deps, runs `git fetch` + checkout ref, records new commit SHA in lockfile. Supports selective update of a single dep.
+✅ **DONE** — Uses `dep_graph` to resolve all transitive deps. For git deps, runs `git fetch` + checkout ref, records new commit SHA in lockfile. Registry deps are reinstalled from the current recipe (the new version must satisfy `Coffee.toml`). Supports selective update of a single dep.
 
 ### `coffee outdated` — git-aware comparison
 
-✅ **DONE** — Compares pinned commit SHA against remote tracking ref for git deps. Reports commits behind. Non-git deps shown as informational.
+✅ **DONE** — Compares pinned commit SHA against remote tracking ref for git deps. Reports commits behind. Registry deps are compared with the registry's current recipe version. Other non-git deps shown as informational.
 
 ### `coffee tree` — show transitive dependencies
 
@@ -78,7 +101,7 @@ shares the same `build_project()` routine. Supports `--release`, `--debug`, `-j`
 
 ### Remove registry dependency
 
-✅ **DONE** — `search` queries the remote registry index; `info` reads project metadata from `Coffee.toml`. `vendor` uses git clone. `add` requires `--git`/`--path`. `install` uses `--git`. `metadata` and `report audit` use `dep_graph` instead of registry lookups.
+✅ **DONE** — `search` queries the remote registry index; `info` reads project metadata from `Coffee.toml`. `vendor` uses git clone. `install` uses `--git`. `metadata` and `report audit` use `dep_graph` instead of registry lookups. The registry is used where it is the source of a dependency: `add <name>`, and `fetch` / `update` / `outdated` for plain-version deps.
 
 ---
 
@@ -143,6 +166,12 @@ cross-compilation support.
 - [x] Only re-resolve when `Coffee.toml` or `Coffee.lock` changes
 - [x] Used by `build`, `metadata`, `generate-lockfile` commands
 
+### Quiet tool checks
+
+✅ **DONE** — The startup tool checks ran `clang/git/make/curl/zstd --version` with only stderr silenced,
+so every `build`, `fetch` and `outdated` printed version banners. They now discard stdout as well
+(`RUN_CMD_NOOUT`).
+
 ---
 
 ## Completion Targets by Milestone
@@ -153,7 +182,7 @@ cross-compilation support.
 | **v0.3** — "Testable"          | 65%      | P1: test/bench improvements, semver update, tree with transitive |
 | **v0.4** — "Publishable"       | 78%      | P2: metadata features+deps, fix/lint --fix, bench Makefile       |
 | **v0.5** — "Dep management"    | 85%      | Transitive deps, git ref checkout, git-aware outdated/update     |
-| **v1.0** — "Coffee-competitive" | 94%+     | All P0–P3 done. 368 tests (1 pre-existing flaky).                |
+| **v1.0** — "Coffee-competitive" | 94%+     | All P0–P3 done. 682 tests.                                       |
 
 ---
 
@@ -161,7 +190,10 @@ cross-compilation support.
 
 | Issue                          | Severity | Detail                                                           |
 | ------------------------------ | -------- | ---------------------------------------------------------------- |
-| `cov_new_lib_mode` flaky       | Low      | Passes individually, fails in full suite ("Could not create Makefile"). Likely a test-order / tmpdir cleanup race. |
+| `cov_new_lib_mode` flaky       | Low      | Not reproduced in 13 consecutive full-suite runs (2026-11-08), after the test runner disabled git auto-gc. Reopen if it fails again. |
+| Recipes only unpack sources    | Medium   | Most recipes' `install.sh` only extract the source into `~/.coffee/<name>/<version>/` without building, so there is no `include/` or `lib/` for `cflags`/`libs`. To be fixed in the recipes repository. |
+| Bare versions are exact        | Low      | `name = "1.1.0"` (what `coffee add` writes) is an exact match, so `update` cannot move past it when the registry bumps the recipe; `outdated` still reports it. Use `">= 1.1"` to allow updates. |
+| Recipe scripts are trusted     | Info     | `fetch` runs `install.sh` from the registry as the user. Needs `bash`, `sha256sum`, `tail`, plus whatever the scripts call (`wget`, `git`, `cmake`, ...). |
 | `doc_generate` test            | Low      | Emits "doxygen not installed" error when doxygen is absent; test handles gracefully but user experience could be smoother. |
 
 ---
