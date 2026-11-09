@@ -12,6 +12,7 @@
 #include "../src/registry.h"
 #include "../src/safeio.h"
 #include "../src/strings.h"
+#include "../src/toolcheck.h"
 #include "test_framework.h"
 
 #include <stdio.h>
@@ -1459,6 +1460,554 @@ TEST(cov_br_registry_source_url_cases)
 	PASS();
 }
 
+/* ===================================================================== */
+/* build.c: validators                                                    */
+/* ===================================================================== */
+
+#define ALNUM "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+/* Feed every non-zero byte, wrapped in `prefix` and `suffix`, to `check`
+ * and compare each verdict with membership in `allowed`.  Returns the
+ * first byte that disagrees, or 0 when all of them agree. */
+static int first_mismatch(bool (*check)(const char *), const char *prefix, const char *suffix, const char *allowed)
+{
+	for (int c = 1; c < 256; c++) {
+		char one[2] = { (char)c, '\0' };
+		sds  input  = sdscatprintf(sdsempty(), "%s%s%s", prefix, one, suffix);
+		bool want   = strchr(allowed, c) != nullptr;
+		bool got    = check(input);
+		sdsfree(input);
+		if (got != want) {
+			return c;
+		}
+	}
+	return 0;
+}
+
+TEST(cov_br_validators_every_byte)
+{
+	ASSERT(first_mismatch(dep_name_is_valid, "a", "", ALNUM "_-") == 0, "dep name charset");
+	ASSERT(first_mismatch(build_target_is_valid, "a", "", ALNUM "_.-") == 0, "build target charset");
+	ASSERT(first_mismatch(version_is_valid, "1", "", ALNUM "._+~*-") == 0, "version charset");
+	ASSERT(first_mismatch(ref_is_valid, "a", "", ALNUM "._/-") == 0, "git ref charset");
+	ASSERT(first_mismatch(ref_is_rev, "abcdef0", "", "0123456789abcdefABCDEF") == 0, "revision charset");
+	ASSERT(first_mismatch(url_is_valid, "u", "@h:p", ALNUM "._-") == 0, "scp user charset");
+	ASSERT(first_mismatch(url_is_valid, "u@h", ":p", ALNUM "._-") == 0, "scp host charset");
+	ASSERT(first_mismatch(url_is_valid, "u@h:p", "", ALNUM "./_-~+") == 0, "scp path charset");
+	PASS();
+}
+
+TEST(cov_br_validators_edges)
+{
+	ASSERT(!dep_name_is_valid(nullptr) && !dep_name_is_valid(""), "empty dep name");
+	ASSERT(!build_target_is_valid(nullptr) && !build_target_is_valid(""), "empty target");
+	ASSERT(!build_target_is_valid("-all"), "target looking like an option");
+	ASSERT(!version_is_valid(nullptr) && !version_is_valid(""), "empty version");
+	ASSERT(!version_is_valid(".1") && !version_is_valid("-1"), "leading dot or dash");
+	ASSERT(!ref_is_valid(nullptr) && !ref_is_valid(""), "empty ref");
+	ASSERT(!ref_is_valid("-main"), "ref looking like an option");
+	ASSERT(!ref_is_rev(nullptr) && !ref_is_rev("abcdef"), "nullptr or short ref is no revision");
+	ASSERT(ref_lowercase(nullptr) == nullptr, "nullptr ref lowercases to nullptr");
+	sds lower = ref_lowercase("ABCdef0");
+	ASSERT(strcmp(lower, "abcdef0") == 0, "ref lowercased");
+	sdsfree(lower);
+
+	sds name = dep_parse_name("zlib   = \"1.0\"");
+	ASSERT(strcmp(name, "zlib") == 0, "blanks before '=' are trimmed");
+	sdsfree(name);
+	name = dep_parse_name("= \"1.0\"");
+	ASSERT(sdslen(name) == 0, "nothing before '=' gives an empty name");
+	sdsfree(name);
+	name = dep_parse_name("plain");
+	ASSERT(strcmp(name, "plain") == 0, "bare name");
+	sdsfree(name);
+	PASS();
+}
+
+TEST(cov_br_url_is_valid_forms)
+{
+	ASSERT(!url_is_valid(nullptr), "nullptr url");
+	ASSERT(url_is_valid("git://host/x") && url_is_valid("ssh://host/x"), "git and ssh schemes");
+	ASSERT(url_is_valid("git+ssh://host/x") && url_is_valid("git+https://host/x"), "git+ schemes");
+	ASSERT(url_is_valid("/srv/x") && url_is_valid("./x") && url_is_valid("../x"), "local paths");
+	ASSERT(!url_is_valid("ftp://host/x"), "unknown scheme");
+	ASSERT(!url_is_valid("hostpath"), "no '@'");
+	ASSERT(!url_is_valid("@host:path"), "empty user");
+	ASSERT(!url_is_valid("user@"), "nothing after '@'");
+	ASSERT(!url_is_valid("user@host"), "no ':'");
+	ASSERT(!url_is_valid("user@host:"), "empty path");
+	ASSERT(!url_is_valid("user@host:-path"), "path looking like an option");
+
+	ASSERT(!url_is_valid_remote(nullptr), "nullptr remote");
+	ASSERT(!url_is_valid_remote("ftp://host/x"), "invalid remote");
+	ASSERT(!url_is_valid_remote("/srv/x") && !url_is_valid_remote("./x") && !url_is_valid_remote("../x"),
+	       "local paths are not remote");
+	ASSERT(url_is_valid_remote("https://host/x") && url_is_valid_remote("git@host:x"), "remote urls");
+	PASS();
+}
+
+/* ===================================================================== */
+/* build.c: more process, resolution and flag paths                      */
+/* ===================================================================== */
+
+TEST(cov_br_run_command_exec_failure_redirects)
+{
+	char *argv[] = { "/nonexistent/coffee-no-such-tool", nullptr };
+	ASSERT(run_command(argv, RUN_CMD_QUIET) == 1, "quiet exec failure");
+	ASSERT(run_command(argv, RUN_CMD_NOOUT) == 1, "no-output exec failure");
+	ASSERT(run_command(argv, RUN_CMD_QUIET | RUN_CMD_NOOUT) == 1, "silenced exec failure");
+	PASS();
+}
+
+TEST(cov_br_dep_constraint_empty_means_flat)
+{
+	sds root = new_tmpdir();
+	ASSERT(root != nullptr, "tmpdir");
+	sds home = join_path(root, "home");
+	make_dirs(home);
+	sds old_home = env_save("COFFEE_HOME");
+	setenv("COFFEE_HOME", home, 1);
+	ASSERT(enter_dir(root), "enter");
+
+	ASSERT(dep_resolve_dir_constraint("ghost", nullptr) == nullptr, "nullptr constraint, unknown dep");
+	ASSERT(dep_resolve_dir_constraint("ghost", "") == nullptr, "empty constraint, unknown dep");
+
+	make_dirs("deps/ghost");
+	sds dir = dep_resolve_dir_constraint("ghost", nullptr);
+	ASSERT(dir != nullptr && strcmp(dir, "deps/ghost") == 0, "nullptr constraint resolves flat");
+	sdsfree(dir);
+	dir = dep_resolve_dir_constraint("ghost", "");
+	ASSERT(dir != nullptr && strcmp(dir, "deps/ghost") == 0, "empty constraint resolves flat");
+	sdsfree(dir);
+
+	env_restore("COFFEE_HOME", old_home);
+	sdsfree(home);
+	leave_dir(root);
+	PASS();
+}
+
+TEST(cov_br_dep_add_flags_non_string_entries)
+{
+	sds root = new_tmpdir();
+	ASSERT(root != nullptr, "tmpdir");
+	sds one = join_path(root, "one");
+	sds two = join_path(root, "two");
+	make_dirs(one);
+	make_dirs(two);
+	sds one_toml = join_path(one, "library.toml");
+	sds two_toml = join_path(two, "library.toml");
+	ASSERT(write_file(one_toml, "include = [[\"nested\"]]\nlib = [1, 2]\n"), "toml one");
+	ASSERT(write_file(two_toml, "include = [3]\nlib = [[\"nested\"]]\n"), "toml two");
+
+	sds    flags = sdsempty();
+	size_t count = 0;
+	ASSERT(dep_add_flags(one, "one", &flags, nullptr, &count) == 0, "no usable include or lib entry");
+	ASSERT(strcmp(flags, " -l\"one\"") == 0, "only the -l flag");
+	ASSERT(count == 0, "no source list, nothing collected");
+
+	sdsfree(flags);
+	flags       = sdsempty();
+	sds list[1] = { nullptr };
+	ASSERT(dep_add_flags(two, "two", &flags, list, nullptr) == 0, "no usable entry either");
+	ASSERT(dep_add_flags(two, "two", &flags, list, &count) == 0, "sources searched");
+	ASSERT(count == 0 && list[0] == nullptr, "no src/ directory, no sources");
+	ASSERT(strcmp(flags, " -l\"two\" -l\"two\"") == 0, "only -l flags");
+
+	sdsfree(flags);
+	sdsfree(one_toml);
+	sdsfree(two_toml);
+	sdsfree(one);
+	sdsfree(two);
+	test_remove_tree(root);
+	sdsfree(root);
+	PASS();
+}
+
+/* ===================================================================== */
+/* build.c: more build_project paths                                      */
+/* ===================================================================== */
+
+static const char *flags_makefile = "all:\n\t@echo '$(CFLAGS_EXTRA)' > flags.txt\n";
+
+TEST(cov_br_build_project_legacy_feature_flags)
+{
+	sds root = new_tmpdir();
+	ASSERT(root != nullptr, "tmpdir");
+	ASSERT(enter_dir(root), "enter");
+	sds saved_makeflags = env_save("MAKEFLAGS");
+	unsetenv("MAKEFLAGS");
+	ASSERT(write_file("Coffee.toml", "[package]\nname = \"feat\"\nversion = \"1.0.0\"\nedition = \"c23\"\n"
+	                                 "\n[features]\nfast-mode = []\nlog = []\n"
+	                                 "\n[compilation]\nMakefile = \"legacy\"\n"),
+	       "manifest");
+	ASSERT(write_file("Makefile", flags_makefile), "Makefile");
+
+	options opts;
+	memset(&opts, 0, sizeof(opts));
+	opts.manifest_path = sdsnew("Coffee.toml");
+	opts.features      = sdsnew("fast-mode,log");
+
+	ASSERT(build_project(&opts, "all", nullptr) == 0, "legacy build with features succeeds");
+	sds text = read_file_text("flags.txt");
+	ASSERT(text != nullptr, "flags recorded");
+	ASSERT(strcmp(text, "-DFEATURE_FAST_MODE -DFEATURE_LOG\n") == 0 ||
+	           strcmp(text, "-DFEATURE_LOG -DFEATURE_FAST_MODE\n") == 0,
+	       "both feature defines, blank-separated");
+	sdsfree(text);
+
+	sdsfree(opts.features);
+	sdsfree(opts.manifest_path);
+	env_restore("MAKEFLAGS", saved_makeflags);
+	leave_dir(root);
+	PASS();
+}
+
+TEST(cov_br_build_project_legacy_no_features_default_target)
+{
+	sds root = new_tmpdir();
+	ASSERT(root != nullptr, "tmpdir");
+	ASSERT(enter_dir(root), "enter");
+	sds saved_makeflags = env_save("MAKEFLAGS");
+	unsetenv("MAKEFLAGS");
+	ASSERT(write_file("Coffee.toml", legacy_manifest), "manifest");
+	ASSERT(write_file("Makefile", flags_makefile), "Makefile");
+
+	options opts;
+	memset(&opts, 0, sizeof(opts));
+	opts.manifest_path = sdsnew("Coffee.toml");
+	opts.all_features  = true;
+
+	ASSERT(build_project(&opts, "", nullptr) == 0, "empty target runs the default goal");
+	sds text = read_file_text("flags.txt");
+	ASSERT(text != nullptr && strcmp(text, "\n") == 0, "no feature defines passed");
+	sdsfree(text);
+
+	sdsfree(opts.manifest_path);
+	env_restore("MAKEFLAGS", saved_makeflags);
+	leave_dir(root);
+	PASS();
+}
+
+TEST(cov_br_build_project_non_legacy_makefile_value)
+{
+	sds root = new_tmpdir();
+	ASSERT(root != nullptr, "tmpdir");
+	ASSERT(enter_dir(root), "enter");
+	sds saved_makeflags = env_save("MAKEFLAGS");
+	unsetenv("MAKEFLAGS");
+	ASSERT(write_file("Coffee.toml", "[package]\nname = \"gen\"\nversion = \"1.0.0\"\nedition = \"c23\"\n"
+	                                 "\n[compilation]\nMakefile = \"custom\"\n"),
+	       "manifest");
+	make_dirs("src");
+	ASSERT(write_file("src/main.c", "int main(void) { return 0; }\n"), "main.c");
+
+	options opts;
+	memset(&opts, 0, sizeof(opts));
+	opts.manifest_path = sdsnew("Coffee.toml");
+
+	ASSERT(build_project(&opts, "clean", nullptr) == 0, "clean succeeds");
+	ASSERT(path_exists("Makefile"), "a value other than legacy generates the Makefile");
+
+	sdsfree(opts.manifest_path);
+	env_restore("MAKEFLAGS", saved_makeflags);
+	leave_dir(root);
+	PASS();
+}
+
+TEST(cov_br_build_project_offline_missing_locked_dep)
+{
+	sds root = new_tmpdir();
+	ASSERT(root != nullptr, "tmpdir");
+	sds home = join_path(root, "home");
+	make_dirs(home);
+	sds old_home = env_save("COFFEE_HOME");
+	setenv("COFFEE_HOME", home, 1);
+	ASSERT(enter_dir(root), "enter");
+	ASSERT(write_file("Coffee.toml", "[package]\nname = \"proj\"\nversion = \"1.0.0\"\nedition = \"c23\"\n"
+	                                 "\n[dependencies]\nfoo = \"*\"\nbar = \"*\"\n"
+	                                 "\n[compilation]\nMakefile = \"legacy\"\n"),
+	       "manifest");
+	ASSERT(write_file("Makefile", "all:\n\t@echo built > built.txt\n"), "Makefile");
+
+	lockfile_dep_t deps[2];
+	memset(deps, 0, sizeof(deps));
+	deps[0].name    = sdsnew("foo");
+	deps[0].version = sdsnew("1.0.0");
+	deps[0].path    = join_path(root, "gone/foo");
+	deps[1].name    = sdsnew("bar");
+	deps[1].version = sdsnew("1.0.0");
+	deps[1].path    = join_path(root, "gone/bar");
+	lockfile_t lf   = { 0 };
+	lf.version      = 1;
+	lf.deps         = deps;
+	lf.deps_count   = 2;
+	sds lock_path   = sdsnew("Coffee.lock");
+	ASSERT(lockfile_write(lock_path, &lf) == 0, "lockfile written");
+
+	options opts;
+	memset(&opts, 0, sizeof(opts));
+	opts.manifest_path = sdsnew("Coffee.toml");
+	opts.offline       = true;
+
+	ASSERT(build_project(&opts, "all", nullptr) == 1, "a missing locked dependency fails offline");
+	ASSERT(!path_exists("built.txt"), "make did not run");
+
+	for (size_t i = 0; i < 2; i++) {
+		sdsfree(deps[i].name);
+		sdsfree(deps[i].version);
+		sdsfree(deps[i].path);
+	}
+	sdsfree(lock_path);
+	sdsfree(opts.manifest_path);
+	env_restore("COFFEE_HOME", old_home);
+	sdsfree(home);
+	leave_dir(root);
+	PASS();
+}
+
+/* ===================================================================== */
+/* registry.c, toolcheck.c, strings.h: more paths                         */
+/* ===================================================================== */
+
+static const char *odd_index = "[\n"
+                               "{\n"
+                               "\t\"name\": \"gamma\",\n"
+                               "  \"versionx\": \"9.9.9\",\n"
+                               "  \"other\": \"x\",\n"
+                               "\n"
+                               "  junk: 1,\n"
+                               "  \"version\"\t : \"3.1.0\",\n"
+                               "  \"description\" \"no separator\",\n"
+                               "  \"description\":\t\"\",\n"
+                               "  \"description\": 42,\n"
+                               "  \"description\": \"unterminated\n"
+                               "  \"description\" = \"Gamma tool\"\n"
+                               "},\n"
+                               "{\t\"name\": \"first-line\",\n"
+                               "  \"version\": \"0.1.0\"\n"
+                               "},\n"
+                               "{\t\"name\": \"hidden\",\n"
+                               "  \"description\": \"Gadget maker\"\n"
+                               "},\n"
+                               "{\n"
+                               "  \"name\": \"epsilon\",\n"
+                               "  \"description\": \"cut off}\n"
+                               "]\n";
+
+TEST(cov_br_registry_index_odd_entries)
+{
+	sds root = new_tmpdir();
+	ASSERT(root != nullptr, "tmpdir");
+	sds old_home = nullptr;
+	sds home     = setup_index_home(root, odd_index, &old_home);
+
+	recipe_list_t *all = registry_search(nullptr);
+	ASSERT(all != nullptr && all->count == 4, "four objects found");
+	recipe_t *r = &all->recipes[0];
+	ASSERT(r->name != nullptr && strcmp(r->name, "gamma") == 0, "tab-indented name");
+	ASSERT(r->version != nullptr && strcmp(r->version, "3.1.0") == 0, "near-miss keys skipped");
+	ASSERT(r->description != nullptr && strcmp(r->description, "Gamma tool") == 0, "malformed values skipped");
+	r = &all->recipes[1];
+	ASSERT(r->name == nullptr, "a key on the brace line is not seen");
+	ASSERT(r->version != nullptr && strcmp(r->version, "0.1.0") == 0, "version of the second object");
+	ASSERT(r->description == nullptr, "no description");
+	r = &all->recipes[3];
+	ASSERT(r->name != nullptr && strcmp(r->name, "epsilon") == 0, "name of the cut object");
+	ASSERT(r->version == nullptr && r->description == nullptr, "string cut by the closing brace");
+	registry_free_recipes(all);
+
+	sds            query = sdsnew("gadget");
+	recipe_list_t *hit   = registry_search(query);
+	ASSERT(hit != nullptr && hit->count == 1, "description match without a name");
+	ASSERT(hit->recipes[0].name == nullptr && hit->recipes[0].version == nullptr, "missing fields stay nullptr");
+	ASSERT(strcmp(hit->recipes[0].description, "Gadget maker") == 0, "description copied");
+	registry_free_recipes(hit);
+	sdsfree(query);
+
+	query = sdsnew("EPSIL");
+	hit   = registry_search(query);
+	ASSERT(hit != nullptr && hit->count == 1, "name match without description");
+	ASSERT(hit->recipes[0].description == nullptr, "no description copied");
+	registry_free_recipes(hit);
+	sdsfree(query);
+
+	env_restore("COFFEE_HOME", old_home);
+	sdsfree(home);
+	test_remove_tree(root);
+	sdsfree(root);
+	PASS();
+}
+
+TEST(cov_br_registry_search_oversized_cached_index)
+{
+	sds root = new_tmpdir();
+	ASSERT(root != nullptr, "tmpdir");
+	sds old_home = nullptr;
+	sds home     = setup_index_home(root, "[]\n", &old_home);
+	sds index    = join_path(home, "packages.json");
+	ASSERT(truncate(index, 70L * 1'024 * 1'024) == 0, "sparse 70 MiB index");
+
+	recipe_list_t *list = registry_search(nullptr);
+	ASSERT(list != nullptr && list->count == 0, "oversized fresh index is ignored");
+	registry_free_recipes(list);
+
+	sdsfree(index);
+	env_restore("COFFEE_HOME", old_home);
+	sdsfree(home);
+	test_remove_tree(root);
+	sdsfree(root);
+	PASS();
+}
+
+TEST(cov_br_registry_search_decompressor_failures)
+{
+	sds root = new_tmpdir();
+	ASSERT(root != nullptr, "tmpdir");
+	sds old_home = nullptr;
+	sds home     = setup_index_home(root, nullptr, &old_home);
+	sds old_path = install_fake_index_tools(root, true, fixture_index);
+	sds zstd     = join_path(root, "bin/zstd");
+	sds index    = join_path(home, "packages.json");
+
+	ASSERT(write_script(zstd, "#!/bin/sh\nexit 1\n"), "failing zstd");
+	recipe_list_t *list = registry_search(nullptr);
+	ASSERT(list != nullptr && list->count == 0, "decompression failure yields an empty list");
+	registry_free_recipes(list);
+
+	ASSERT(write_script(zstd, "#!/bin/sh\nexit 0\n"), "zstd that writes nothing");
+	list = registry_search(nullptr);
+	ASSERT(list != nullptr && list->count == 0, "missing decompressed index yields an empty list");
+	registry_free_recipes(list);
+	ASSERT(!path_exists(index), "no index left behind");
+
+	sdsfree(index);
+	sdsfree(zstd);
+	env_restore("PATH", old_path);
+	env_restore("COFFEE_HOME", old_home);
+	sdsfree(home);
+	test_remove_tree(root);
+	sdsfree(root);
+	PASS();
+}
+
+TEST(cov_br_registry_default_url_and_broken_recipe)
+{
+	sds root = new_tmpdir();
+	ASSERT(root != nullptr, "tmpdir");
+	sds old_url = nullptr;
+	sds reg     = setup_registry(root, "broken", "library.toml", "= = [[ not toml\n", &old_url);
+
+	sds       name = sdsnew("broken");
+	recipe_t *r    = registry_get(name);
+	ASSERT(r != nullptr && strcmp(r->name, "broken") == 0, "recipe found");
+	ASSERT(r->version == nullptr && r->description == nullptr, "unparseable recipe has no fields");
+	registry_free_recipe(r);
+
+	/* An empty override selects the built-in registry; a failing fake
+	 * curl keeps the request off the network. */
+	sds old_path = install_fake_index_tools(root, false, "[]\n");
+	setenv("COFFEE_REGISTRY_URL", "", 1);
+	ASSERT(registry_get(name) == nullptr, "default registry unreachable");
+	ASSERT(registry_get_versions(name) == nullptr, "no versions either");
+	env_restore("PATH", old_path);
+
+	sdsfree(name);
+	env_restore("COFFEE_REGISTRY_URL", old_url);
+	sdsfree(reg);
+	test_remove_tree(root);
+	sdsfree(root);
+	PASS();
+}
+
+TEST(cov_br_registry_local_path_registries)
+{
+	sds old_url = env_save("COFFEE_REGISTRY_URL");
+
+	setenv("COFFEE_REGISTRY_URL", "/srv/registry", 1);
+	ASSERT(registry_recipe_url_is_valid("/srv/git/x.git"), "absolute registry path");
+	setenv("COFFEE_REGISTRY_URL", "./registry", 1);
+	ASSERT(registry_recipe_url_is_valid("./x.git"), "relative registry path");
+	setenv("COFFEE_REGISTRY_URL", "../registry", 1);
+	ASSERT(registry_recipe_url_is_valid("../x.git"), "parent registry path");
+	setenv("COFFEE_REGISTRY_URL", "registry", 1);
+	ASSERT(!registry_recipe_url_is_valid("/srv/git/x.git"), "bare word is no local registry");
+	ASSERT(!registry_recipe_url_is_valid("http://example.com/x.git"), "invalid url");
+
+	env_restore("COFFEE_REGISTRY_URL", old_url);
+	PASS();
+}
+
+TEST(cov_br_registry_source_url_without_flag)
+{
+	sds root = new_tmpdir();
+	ASSERT(root != nullptr, "tmpdir");
+	sds old_url = nullptr;
+	sds reg     = setup_registry(root, "fine", "library.toml", full_recipe, &old_url);
+
+	bool found = true;
+	ASSERT(registry_source_url("", &found) == nullptr && !found, "empty name rejected");
+	sds url = registry_source_url("fine", nullptr);
+	ASSERT(url != nullptr && strcmp(url, "https://example.com/fine.git") == 0, "url without found flag");
+	sdsfree(url);
+
+	env_restore("COFFEE_REGISTRY_URL", old_url);
+	sdsfree(reg);
+	test_remove_tree(root);
+	sdsfree(root);
+	PASS();
+}
+
+TEST(cov_br_registry_free_sparse_records)
+{
+	registry_free_recipe(nullptr);
+	recipe_t *r = safe_calloc(1, sizeof(recipe_t));
+	registry_free_recipe(r);
+
+	version_list_t *v = safe_calloc(1, sizeof(version_list_t));
+	v->versions       = safe_calloc(1, sizeof(char *));
+	v->count          = 1;
+	registry_free_versions(v);
+	PASS();
+}
+
+TEST(cov_br_coffee_home_dir_empty)
+{
+	sds old_home = env_save("COFFEE_HOME");
+	setenv("COFFEE_HOME", "", 1);
+	ASSERT(strcmp(coffee_home_dir(), "") == 0, "empty COFFEE_HOME is used verbatim");
+	env_restore("COFFEE_HOME", old_home);
+	PASS();
+}
+
+TEST(cov_br_toolcheck_all_tools_present)
+{
+	ASSERT(toolcheck_run(nullptr) == 0, "nullptr command needs nothing");
+
+	sds root = new_tmpdir();
+	ASSERT(root != nullptr, "tmpdir");
+	sds         bin     = join_path(root, "bin");
+	const char *tools[] = { "clang", "git", "make", "curl", "zstd", "doxygen" };
+	make_dirs(bin);
+	for (size_t i = 0; i < sizeof(tools) / sizeof(tools[0]); i++) {
+		sds tool = join_path(bin, tools[i]);
+		ASSERT(write_script(tool, "#!/bin/sh\nexit 0\n"), "fake tool");
+		sdsfree(tool);
+	}
+	sds old_path = env_save("PATH");
+	setenv("PATH", bin, 1);
+
+	i64 build = toolcheck_run("build");
+	i64 fetch = toolcheck_run("fetch");
+
+	env_restore("PATH", old_path);
+	ASSERT(build == 0 && fetch == 0, "every tool found");
+
+	sdsfree(bin);
+	test_remove_tree(root);
+	sdsfree(root);
+	PASS();
+}
+
 void coffee_register_cov_build_registry_tests(void)
 {
 	TEST_REGISTER(cov_br_toml_escape_specials);
@@ -1503,4 +2052,23 @@ void coffee_register_cov_build_registry_tests(void)
 	TEST_REGISTER(cov_br_registry_fetch_downloads_recipe);
 	TEST_REGISTER(cov_br_registry_fetch_failures);
 	TEST_REGISTER(cov_br_registry_source_url_cases);
+	TEST_REGISTER(cov_br_validators_every_byte);
+	TEST_REGISTER(cov_br_validators_edges);
+	TEST_REGISTER(cov_br_url_is_valid_forms);
+	TEST_REGISTER(cov_br_run_command_exec_failure_redirects);
+	TEST_REGISTER(cov_br_dep_constraint_empty_means_flat);
+	TEST_REGISTER(cov_br_dep_add_flags_non_string_entries);
+	TEST_REGISTER(cov_br_build_project_legacy_feature_flags);
+	TEST_REGISTER(cov_br_build_project_legacy_no_features_default_target);
+	TEST_REGISTER(cov_br_build_project_non_legacy_makefile_value);
+	TEST_REGISTER(cov_br_build_project_offline_missing_locked_dep);
+	TEST_REGISTER(cov_br_registry_index_odd_entries);
+	TEST_REGISTER(cov_br_registry_search_oversized_cached_index);
+	TEST_REGISTER(cov_br_registry_search_decompressor_failures);
+	TEST_REGISTER(cov_br_registry_default_url_and_broken_recipe);
+	TEST_REGISTER(cov_br_registry_local_path_registries);
+	TEST_REGISTER(cov_br_registry_source_url_without_flag);
+	TEST_REGISTER(cov_br_registry_free_sparse_records);
+	TEST_REGISTER(cov_br_coffee_home_dir_empty);
+	TEST_REGISTER(cov_br_toolcheck_all_tools_present);
 }
