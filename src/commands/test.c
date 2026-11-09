@@ -38,6 +38,13 @@ int64_t handle_test(options *opts)
 	}
 	sdsfree(manifest_path);
 
+	/* Fetch declared dependencies that are not on disk yet. */
+	if (deps_fetch_missing(m, opts) != 0) {
+		manifest_free(m);
+		sdsfree(project_dir);
+		return 1;
+	}
+
 	/* Determine test sources: from [test] or default glob */
 	sds   *test_srcs  = nullptr;
 	size_t test_count = 0;

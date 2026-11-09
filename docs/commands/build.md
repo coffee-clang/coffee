@@ -45,6 +45,9 @@ error. See [the Coffee.toml specification](../coffee-toml.md) for details.
 ## Implementation Notes
 
 - Finds `Coffee.toml` in current directory or parent directories
+- Before generating the Makefile, runs `coffee fetch` when a declared dependency (direct or
+  transitive) is not on disk, so a fresh checkout builds in one step. With `--offline` a missing
+  dependency is an error instead. `coffee build clean` never fetches. `coffee run` builds the same way
 - Generates the Makefile (unless legacy) and runs `make -C <project_dir> [-jN] <target>`
 - The generated Makefile defines the targets `all`, `clean`, `test`, `bench`, `format` and `tidy`
 - Output directory is `build/` by default; use `--target-dir` to override

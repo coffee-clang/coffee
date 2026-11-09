@@ -75,6 +75,14 @@ sds dep_resolve_dir(const char *name);
 i64 dep_link(const char *name, const char *target);
 
 /*
+ * Fetch the dependencies that the manifest declares but that are not on
+ * disk yet (relative to the current directory), so that a fresh checkout
+ * builds in one step.  With --offline a missing dependency is an error.
+ * Returns 0 when every dependency is on disk.
+ */
+i64 deps_fetch_missing(manifest_t *m, options *opts);
+
+/*
  * Resolve a dependency directory with version constraint.
  * When constraint is non-null, searches ~/.coffee/deps/<name>/ for
  * versioned subdirectories and returns the highest satisfying version.

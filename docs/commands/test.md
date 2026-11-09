@@ -15,6 +15,8 @@ coffee test
 ## Implementation Notes
 
 - Finds `Coffee.toml` in current or parent directories
+- Runs `coffee fetch` first when a declared dependency is not on disk, like `coffee build`; with
+  `--offline` a missing dependency is an error
 - Test sources: from `[test]` section sources if defined, else globs `tests/*.c`
 - Compiles project sources (`src/*.c`) + test sources into a test runner binary
 - Injects `-DCOFFEE_TEST_RUNNER` to activate the test framework entry point

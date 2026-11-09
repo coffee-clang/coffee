@@ -1662,6 +1662,80 @@ TEST(cov_registry_outdated_update_generate)
 	PASS();
 }
 
+/* build fetches a dependency that is declared but not on disk yet. */
+TEST(cov_build_fetches_missing_registry_dep)
+{
+	sds root = tmp_new();
+	sandbox_on(root);
+	fake_cc_on(root);
+	/* An outer `make test CC=... LDFLAGS=...` (the sanitizer targets)
+	 * passes its variables to the build's make through MAKEFLAGS, which
+	 * would override the fake compiler. */
+	sds saved_makeflags = env_save("MAKEFLAGS");
+	unsetenv("MAKEFLAGS");
+	proj_enter(root, "buildproj", "[dependencies]\nregdep = \"1.0\"\n");
+	write_text("src/main.c", "#include <regdep.h>\nint main(void) { return REGDEP_H - 1; }\n");
+	sds script = recipe_script("regdep", "1.0.0", nullptr);
+	recipe_fixture(root, "regdep", "1.0.0", nullptr, script);
+
+	char   *inputs[] = { "build", nullptr };
+	options opt;
+	memset(&opt, 0, sizeof(opt));
+	opt.inputs     = inputs;
+	opt.inputs_num = 1;
+	opt.offline    = true;
+	stdout_begin("out.txt");
+	stderr_begin("err.txt");
+	i64 ret = handle_build(&opt);
+	stderr_end();
+	stdout_end();
+	ASSERT(ret == 1, "an offline build with a missing dependency fails");
+	ASSERT(file_contains("err.txt", "dependency 'regdep' is not fetched"), "the missing dependency is reported");
+
+	opt.offline = false;
+	stdout_begin("out.txt");
+	stderr_begin("err.txt");
+	ret = handle_build(&opt);
+	stderr_end();
+	stdout_end();
+	ASSERT(ret == 0, "build fetches the missing dependency and builds");
+	ASSERT(safe_access("deps/regdep/include/regdep.h", F_OK) == 0, "the dependency is installed");
+	ASSERT(file_contains("Makefile", "regdep/1.0.0/include"), "the Makefile includes the installed headers");
+
+	sdsfree(script);
+	env_restore("MAKEFLAGS", saved_makeflags);
+	fake_cc_off();
+	sandbox_off();
+	leave_dir(root);
+	PASS();
+}
+
+/* test also checks for missing dependencies before compiling. */
+TEST(cov_test_reports_missing_dep_offline)
+{
+	sds root = tmp_new();
+	sandbox_on(root);
+	proj_enter(root, "testproj", "[dependencies]\nregdep = \"1.0\"\n");
+	mkdir("tests", 0755);
+	write_text("tests/test_x.c", "int main(void) { return 0; }\n");
+
+	char   *inputs[] = { "test", nullptr };
+	options opt;
+	memset(&opt, 0, sizeof(opt));
+	opt.inputs     = inputs;
+	opt.inputs_num = 1;
+	opt.offline    = true;
+	stderr_begin("err.txt");
+	i64 ret = handle_test(&opt);
+	stderr_end();
+	ASSERT(ret == 1, "an offline test run with a missing dependency fails");
+	ASSERT(file_contains("err.txt", "dependency 'regdep' is not fetched"), "the missing dependency is reported");
+
+	sandbox_off();
+	leave_dir(root);
+	PASS();
+}
+
 /* RUN_CMD_NOOUT discards the child's stdout. */
 TEST(cov_run_command_noout)
 {
@@ -3073,6 +3147,8 @@ void coffee_register_cov_deps_commands_tests(void)
 	TEST_REGISTER(cov_fetch_registry_version_mismatch);
 	TEST_REGISTER(cov_fetch_registry_locked_and_offline);
 	TEST_REGISTER(cov_registry_outdated_update_generate);
+	TEST_REGISTER(cov_build_fetches_missing_registry_dep);
+	TEST_REGISTER(cov_test_reports_missing_dep_offline);
 	TEST_REGISTER(cov_run_command_noout);
 	TEST_REGISTER(cov_fetch_offline_git_deps);
 	TEST_REGISTER(cov_fetch_head_commit_edge_cases);

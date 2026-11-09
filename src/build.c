@@ -1,5 +1,7 @@
 #include "build.h"
 
+#include "dep_graph.h"
+#include "lockfile.h"
 #include "makefile.h"
 #include "project.h"
 #include "registry.h"
@@ -799,6 +801,35 @@ static const char *build_unimplemented_flag(const options *opts)
 	return "--target";
 }
 
+i64 deps_fetch_missing(manifest_t *m, options *opts)
+{
+	lockfile_t  *lf = lockfile_parse("Coffee.lock");
+	dep_graph_t *g  = dep_graph_create(m, lf, true);
+	lockfile_free(lf);
+	if (g == nullptr) {
+		/* makefile_generate reports the graph error. */
+		return 0;
+	}
+	sds missing = nullptr;
+	for (size_t i = 1; i < g->count && missing == nullptr; i++) {
+		if (g->nodes[i].path == nullptr || safe_access(g->nodes[i].path, F_OK) != 0) {
+			missing = sdsnew(g->nodes[i].name);
+		}
+	}
+	dep_graph_free(g);
+	if (missing == nullptr) {
+		return 0;
+	}
+	i64 ret = 1;
+	if (opts->offline) {
+		fprintf_safe(stderr, "Error: dependency '%s' is not fetched, and --offline prevents fetching it\n", missing);
+	} else {
+		ret = handle_fetch(opts);
+	}
+	sdsfree(missing);
+	return ret;
+}
+
 i64 build_project(options *opts, const char *target, sds *exe_path_out)
 {
 	if (build_has_unimplemented_flag(opts)) {
@@ -882,6 +913,9 @@ i64 build_project(options *opts, const char *target, sds *exe_path_out)
 	sds    cflags_extra = nullptr;
 
 	i64 ret = 1;
+	if (strcmp(target, "clean") != 0 && deps_fetch_missing(manifest, opts) != 0) {
+		goto done;
+	}
 	if (legacy) {
 		/* Run the existing Makefile */
 		if (safe_access("Makefile", F_OK) != 0) {
