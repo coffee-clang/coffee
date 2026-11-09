@@ -54,18 +54,21 @@ static void resolve_cross_package_refs(manifest_t *manifest, resolved_features_t
 	if (pkg == nullptr) {
 		return;
 	}
-	feature_set_t *set = nullptr;
+	/* An index, not a pointer: get_or_create_set below reallocates
+	 * rf->packages. */
+	size_t set_idx = rf->package_count;
 	for (size_t k = 0; k < rf->package_count; k++) {
 		if (rf->package_names[k] != nullptr && strcmp(rf->package_names[k], pkg) == 0) {
-			set = &rf->packages[k];
+			set_idx = k;
 			break;
 		}
 	}
-	if (set == nullptr) {
+	if (set_idx == rf->package_count) {
 		return;
 	}
 	for (size_t i = 0; i < manifest->features_count; i++) {
-		if (manifest->features[i].name == nullptr || !feature_in_set(set, manifest->features[i].name)) {
+		if (manifest->features[i].name == nullptr ||
+		    !feature_in_set(&rf->packages[set_idx], manifest->features[i].name)) {
 			continue;
 		}
 		for (size_t j = 0; j < manifest->features[i].deps_count; j++) {
