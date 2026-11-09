@@ -70,6 +70,11 @@ i64 build_project(options *opts, const char *target, sds *exe_path_out);
 sds dep_resolve_dir(const char *name);
 
 /*
+ * Replace deps/<name> with a symlink to target.  Returns 0 on success.
+ */
+i64 dep_link(const char *name, const char *target);
+
+/*
  * Resolve a dependency directory with version constraint.
  * When constraint is non-null, searches ~/.coffee/deps/<name>/ for
  * versioned subdirectories and returns the highest satisfying version.

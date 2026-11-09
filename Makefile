@@ -25,6 +25,7 @@ UNITY_CORE_SRCS := \
 	$(SRC_DIR)/build.c \
 	$(SRC_DIR)/makefile.c \
 	$(SRC_DIR)/lockfile.c \
+	$(SRC_DIR)/recipe_install.c \
 	$(SRC_DIR)/version.c \
 	$(SRC_DIR)/dep_graph.c \
 	$(SRC_DIR)/dep_graph_git.c \

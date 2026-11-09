@@ -18,3 +18,5 @@ coffee generate-lockfile
 - Records version 1 format
 - Resolves each dependency's actual version from its library.toml
 - Stores resolved paths for local deps (deps/, vendor/, global cache)
+- A registry dep installed from a recipe is recorded with its install directory, recipe version and
+  `install.sh` checksum, as `fetch` records it

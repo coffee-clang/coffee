@@ -1331,43 +1331,109 @@ TEST(cov_fetch_registry_failures)
 	PASS();
 }
 
+/* ------------------------------------------------------------------ */
+/* registry dependencies installed through a recipe's install.sh       */
+/* ------------------------------------------------------------------ */
+
+/*
+ * Write the registry recipe root/registry/recipes/<l>/<name>: library.toml
+ * with the version and an optional [dependencies] body, and install.sh
+ * when script is non-null.
+ */
+static void recipe_fixture(const char *root, const char *name, const char *version, const char *deps,
+                           const char *script)
+{
+	sds   dir          = sdscatprintf(sdsempty(), "%s/registry/recipes/%c/%s", root, name[0], name);
+	char *mkdir_argv[] = { "mkdir", "-p", dir, nullptr };
+	run_command(mkdir_argv, RUN_CMD_QUIET);
+	sds toml = join(dir, "library.toml");
+	sds text = sdscatprintf(sdsempty(), "version = \"%s\"\nrecipe_url = \"https://example.invalid/%s.tar.gz\"\n",
+	                        version, name);
+	if (deps != nullptr) {
+		text = sdscatprintf(text, "[dependencies]\n%s", deps);
+	}
+	write_text(toml, text);
+	if (script != nullptr) {
+		sds path = join(dir, "install.sh");
+		write_text(path, script);
+		sdsfree(path);
+	}
+	sdsfree(text);
+	sdsfree(toml);
+	sdsfree(dir);
+}
+
+/*
+ * An install.sh that installs include/<name>.h and an empty
+ * lib/lib<name>.a into $COFFEE_HOME/<name>/<version>, after running the
+ * shell commands in pre, and appends <name> to $COFFEE_HOME/install-runs.
+ */
+static sds recipe_script(const char *name, const char *version, const char *pre)
+{
+	return sdscatprintf(sdsempty(),
+	                    "set -e\n"
+	                    "%s\n"
+	                    "PREFIX=\"$COFFEE_HOME/%s/%s\"\n"
+	                    "mkdir -p \"$PREFIX/include\" \"$PREFIX/lib\"\n"
+	                    "echo '#define %s_H 1' > \"$PREFIX/include/%s.h\"\n"
+	                    "ar rc \"$PREFIX/lib/lib%s.a\"\n"
+	                    "echo %s >> \"$COFFEE_HOME/install-runs\"\n",
+	                    pre != nullptr ? pre : "", name, version, name, name, name, name);
+}
+
+/* A fetch with the given flags, its stdout and stderr captured. */
+static i64 fetch_with(bool offline, bool locked)
+{
+	char   *inputs[] = { "fetch", nullptr };
+	options opt;
+	memset(&opt, 0, sizeof(opt));
+	opt.inputs     = inputs;
+	opt.inputs_num = 1;
+	opt.offline    = offline;
+	opt.locked     = locked;
+	stdout_begin("out.txt");
+	stderr_begin("err.txt");
+	i64 ret = handle_fetch(&opt);
+	stderr_end();
+	stdout_end();
+	return ret;
+}
+
+/* The contents of root/home/install-runs, or nullptr. */
+static sds install_runs(const char *root)
+{
+	sds path = join(root, "home/install-runs");
+	sds runs = read_text(path);
+	sdsfree(path);
+	return runs;
+}
+
 /* A recipe that ships install.sh is installed by running the script; deps/<name>
  * then points at $COFFEE_HOME/<name>/<version>, so cflags and libs see its
- * include/ and lib/ folders.  A completed install is not rerun. */
+ * include/ and lib/ folders.  A completed install is rerun only when the
+ * script changes. */
 TEST(cov_fetch_registry_install_script)
 {
 	sds root = tmp_new();
 	sandbox_on(root);
 	proj_enter(root, "instproj", "[dependencies]\nregdep = \"1.0\"\n");
+	sds script = recipe_script("regdep", "1.0.0", nullptr);
+	recipe_fixture(root, "regdep", "1.0.0", nullptr, script);
 
-	sds   recipe_dir   = join(root, "registry/recipes/r/regdep");
-	char *mkdir_argv[] = { "mkdir", "-p", recipe_dir, nullptr };
-	run_command(mkdir_argv, RUN_CMD_QUIET);
-	sds recipe = join(recipe_dir, "library.toml");
-	write_text(recipe, "version = \"1.0.0\"\nrecipe_url = \"https://example.invalid/regdep-1.0.0.tar.gz\"\n");
-	sds script = join(recipe_dir, "install.sh");
-	write_text(script, "set -e\n"
-	                   "PREFIX=\"$COFFEE_HOME/regdep/1.0.0\"\n"
-	                   "mkdir -p \"$PREFIX/include\" \"$PREFIX/lib\"\n"
-	                   "echo '#define REGDEP 1' > \"$PREFIX/include/regdep.h\"\n"
-	                   "echo run >> \"$COFFEE_HOME/install-runs\"\n");
-
-	stdout_begin("out.txt");
-	i64 ret = run_cmd(handle_fetch, "fetch", nullptr, nullptr);
-	stdout_end();
-	ASSERT(ret == 0, "install.sh recipe is fetched");
+	ASSERT(fetch_with(false, false) == 0, "install.sh recipe is fetched");
 	ASSERT(safe_access("deps/regdep/include/regdep.h", F_OK) == 0, "deps/regdep points at the install prefix");
-	ASSERT(safe_access("deps/regdep/lib", F_OK) == 0, "installed lib/ is visible");
+	ASSERT(safe_access("deps/regdep/library.toml", F_OK) == 0, "the recipe is copied into the prefix");
 	sds lock = lock_text();
-	ASSERT(strstr(lock, "regdep/1.0.0") != nullptr, "lockfile records the install prefix");
+	ASSERT(strstr(lock, "regdep/1.0.0\"") != nullptr, "lockfile records the install prefix");
+	ASSERT(strstr(lock, "version = \"1.0.0\"") != nullptr, "lockfile records the recipe version");
+	ASSERT(strstr(lock, "checksum = \"") != nullptr, "lockfile records the install.sh checksum");
 	sdsfree(lock);
 
 	stdout_begin("cflags.txt");
-	ret = run_cmd(handle_cflags, "cflags", nullptr, nullptr);
+	i64 ret = run_cmd(handle_cflags, "cflags", nullptr, nullptr);
 	stdout_end();
 	ASSERT(ret == 0, "cflags succeeds");
 	ASSERT(file_contains("cflags.txt", "-Ideps/regdep/include"), "cflags points at the installed include/");
-
 	stdout_begin("libs.txt");
 	ret = run_cmd(handle_libs, "libs", nullptr, nullptr);
 	stdout_end();
@@ -1375,58 +1441,170 @@ TEST(cov_fetch_registry_install_script)
 	ASSERT(file_contains("libs.txt", "-Ldeps/regdep/lib"), "libs points at the installed lib/");
 
 	/* A second fetch reuses the completed install. */
-	stdout_begin("out.txt");
-	ret = run_cmd(handle_fetch, "fetch", nullptr, nullptr);
-	stdout_end();
-	ASSERT(ret == 0, "re-fetch succeeds");
-	sds runs_path = join(root, "home/install-runs");
-	sds runs      = read_text(runs_path);
-	ASSERT(runs != nullptr && strcmp(runs, "run\n") == 0, "install.sh ran once");
+	ASSERT(fetch_with(false, false) == 0, "re-fetch succeeds");
+	sds runs = install_runs(root);
+	ASSERT(runs != nullptr && strcmp(runs, "regdep\n") == 0, "install.sh ran once");
 	sdsfree(runs);
-	sdsfree(runs_path);
 
+	/* A changed install.sh is rerun. */
+	sds changed = recipe_script("regdep", "1.0.0", "# revised");
+	recipe_fixture(root, "regdep", "1.0.0", nullptr, changed);
+	ASSERT(fetch_with(false, false) == 0, "fetch with a revised script succeeds");
+	runs = install_runs(root);
+	ASSERT(runs != nullptr && strcmp(runs, "regdep\nregdep\n") == 0, "the revised install.sh ran");
+	sdsfree(runs);
+
+	sdsfree(changed);
 	sdsfree(script);
-	sdsfree(recipe);
-	sdsfree(recipe_dir);
 	sandbox_off();
 	leave_dir(root);
 	PASS();
 }
 
-/* A failing install.sh fails the fetch without falling back to recipe_url. */
+/* A failing install.sh fails the fetch without falling back to recipe_url,
+ * and shows the end of its log. */
 TEST(cov_fetch_registry_install_script_fails)
 {
 	sds root = tmp_new();
 	sandbox_on(root);
 	proj_enter(root, "failproj", "[dependencies]\nregdep = \"1.0\"\n");
+	recipe_fixture(root, "regdep", "1.0.0", nullptr, "echo boom-marker\nexit 3\n");
 
-	sds   recipe_dir   = join(root, "registry/recipes/r/regdep");
-	char *mkdir_argv[] = { "mkdir", "-p", recipe_dir, nullptr };
-	run_command(mkdir_argv, RUN_CMD_QUIET);
-	sds recipe = join(recipe_dir, "library.toml");
-	write_text(recipe, "version = \"1.0.0\"\nrecipe_url = \"https://example.invalid/regdep.git\"\n");
-	sds script = join(recipe_dir, "install.sh");
-	write_text(script, "exit 3\n");
-
-	stderr_begin("err.txt");
-	i64 ret = run_cmd(handle_fetch, "fetch", nullptr, nullptr);
-	stderr_end();
-	ASSERT(ret == 1, "failing install.sh fails the fetch");
+	ASSERT(fetch_with(false, false) == 1, "failing install.sh fails the fetch");
 	ASSERT(file_contains("err.txt", "install.sh for 'regdep' failed"), "failure is reported");
+	ASSERT(file_contains("err.txt", "boom-marker"), "the end of install.log is shown");
+	ASSERT(!file_contains("out.txt", "boom-marker"), "the script output is not echoed");
 	ASSERT(safe_access("deps/regdep", F_OK) != 0, "nothing is linked");
 
 	/* A version that is not a safe path component is refused. */
-	write_text(recipe, "version = \"../1.0.0\"\n");
-	write_text(script, "exit 0\n");
-	stderr_begin("err.txt");
-	ret = run_cmd(handle_fetch, "fetch", nullptr, nullptr);
-	stderr_end();
-	ASSERT(ret == 1, "invalid recipe version fails the fetch");
+	recipe_fixture(root, "regdep", "../1.0.0", nullptr, "exit 0\n");
+	ASSERT(fetch_with(false, false) == 1, "invalid recipe version fails the fetch");
 	ASSERT(file_contains("err.txt", "invalid version"), "invalid version is reported");
 
+	/* An install.sh that installs nothing is refused. */
+	recipe_fixture(root, "regdep", "1.0.0", nullptr, "exit 0\n");
+	ASSERT(fetch_with(false, false) == 1, "an empty install fails the fetch");
+	ASSERT(file_contains("err.txt", "did not create"), "the missing prefix is reported");
+
+	sandbox_off();
+	leave_dir(root);
+	PASS();
+}
+
+/* A recipe's own dependencies are installed before it, and become graph
+ * nodes through the library.toml copied into the prefix. */
+TEST(cov_fetch_registry_recipe_deps_first)
+{
+	sds root = tmp_new();
+	sandbox_on(root);
+	proj_enter(root, "depsproj", "[dependencies]\nliba = \"1.0\"\n");
+	sds script_b = recipe_script("libb", "2.0.0", nullptr);
+	sds script_a = recipe_script("liba", "1.0.0", "test -f \"$COFFEE_HOME/libb/2.0.0/include/libb.h\"");
+	recipe_fixture(root, "libb", "2.0.0", nullptr, script_b);
+	recipe_fixture(root, "liba", "1.0.0", "libb = \">= 2.0\"\n", script_a);
+
+	ASSERT(fetch_with(false, false) == 0, "fetch installs liba and its dependency");
+	sds runs = install_runs(root);
+	ASSERT(runs != nullptr && strcmp(runs, "libb\nliba\n") == 0, "libb is installed before liba, once each");
+	sdsfree(runs);
+	ASSERT(safe_access("deps/libb/include/libb.h", F_OK) == 0, "the transitive dependency is linked");
+	sds lock = lock_text();
+	ASSERT(strstr(lock, "name = \"libb\"") != nullptr, "libb is in the lockfile");
+	ASSERT(strstr(lock, "version = \"2.0.0\"") != nullptr, "libb's version is recorded");
+	sdsfree(lock);
+
+	/* An unsatisfiable dependency constraint fails liba's install. */
+	recipe_fixture(root, "liba", "1.0.0", "libb = \">= 3.0\"\n", script_a);
+	ASSERT(fetch_with(false, false) == 1, "an unsatisfiable recipe dependency fails");
+	ASSERT(file_contains("err.txt", "'libb' >= 3.0 is required"), "the constraint is reported");
+
+	/* A dependency missing from the registry fails liba's install. */
+	recipe_fixture(root, "liba", "1.0.0", "nowhere = \"\"\n", script_a);
+	ASSERT(fetch_with(false, false) == 1, "a recipe dependency missing from the registry fails");
+	ASSERT(file_contains("err.txt", "depends on 'nowhere'"), "the missing dependency is reported");
+
+	sdsfree(script_a);
+	sdsfree(script_b);
+	sandbox_off();
+	leave_dir(root);
+	PASS();
+}
+
+/* The version in Coffee.toml must be satisfied by the recipe. */
+TEST(cov_fetch_registry_version_mismatch)
+{
+	sds root = tmp_new();
+	sandbox_on(root);
+	proj_enter(root, "verproj", "[dependencies]\nregdep = \"2.0\"\n");
+	sds script = recipe_script("regdep", "1.0.0", nullptr);
+	recipe_fixture(root, "regdep", "1.0.0", nullptr, script);
+
+	ASSERT(fetch_with(false, false) == 1, "a version the registry does not have fails");
+	ASSERT(file_contains("err.txt", "the registry has version 1.0.0"), "the mismatch is reported");
+	ASSERT(safe_access("deps/regdep", F_OK) != 0, "nothing is linked");
+
 	sdsfree(script);
-	sdsfree(recipe);
-	sdsfree(recipe_dir);
+	sandbox_off();
+	leave_dir(root);
+	PASS();
+}
+
+/* outdated compares an installed recipe with the registry, update
+ * installs the new version, and generate-lockfile records the install. */
+TEST(cov_registry_outdated_update_generate)
+{
+	sds root = tmp_new();
+	sandbox_on(root);
+	proj_enter(root, "updproj", "[dependencies]\nregdep = \">= 1.0\"\n");
+	sds script = recipe_script("regdep", "1.0.0", nullptr);
+	recipe_fixture(root, "regdep", "1.0.0", nullptr, script);
+	ASSERT(fetch_with(false, false) == 0, "fetch succeeds");
+
+	stdout_begin("out.txt");
+	i64 ret = run_cmd(handle_outdated, "outdated", nullptr, nullptr);
+	stdout_end();
+	ASSERT(ret == 0, "an up-to-date recipe is not outdated");
+	ASSERT(file_contains("out.txt", "1.0.0"), "the installed version is shown");
+
+	/* Remove the lock: generate-lockfile reads the install back. */
+	sds first_lock = lock_text();
+	remove("Coffee.lock");
+	stdout_begin("out.txt");
+	ret = run_cmd(handle_generate_lockfile, "generate-lockfile", nullptr, nullptr);
+	stdout_end();
+	ASSERT(ret == 0, "generate-lockfile succeeds");
+	sds regen = lock_text();
+	ASSERT(strcmp(first_lock, regen) == 0, "generate-lockfile records the same install as fetch");
+	sdsfree(regen);
+	sdsfree(first_lock);
+
+	sds bumped = recipe_script("regdep", "1.0.1", nullptr);
+	recipe_fixture(root, "regdep", "1.0.1", nullptr, bumped);
+	stdout_begin("out.txt");
+	ret = run_cmd(handle_outdated, "outdated", nullptr, nullptr);
+	stdout_end();
+	ASSERT(ret == 1, "a newer recipe is reported as outdated");
+	ASSERT(file_contains("out.txt", "Outdated (registry has 1.0.1)"), "the new version is shown");
+
+	stdout_begin("out.txt");
+	ret = run_cmd(handle_update, "update", nullptr, nullptr);
+	stdout_end();
+	ASSERT(ret == 0, "update succeeds");
+	ASSERT(safe_access("deps/regdep/library.toml", F_OK) == 0, "deps/regdep is linked");
+	char *target = realpath("deps/regdep", nullptr);
+	ASSERT(target != nullptr && strstr(target, "regdep/1.0.1") != nullptr, "deps/regdep points at 1.0.1");
+	safe_free(target);
+	sds lock = lock_text();
+	ASSERT(strstr(lock, "version = \"1.0.1\"") != nullptr, "the lock records 1.0.1");
+	sdsfree(lock);
+
+	stdout_begin("out.txt");
+	ret = run_cmd(handle_outdated, "outdated", nullptr, nullptr);
+	stdout_end();
+	ASSERT(ret == 0, "nothing is outdated after update");
+
+	sdsfree(bumped);
+	sdsfree(script);
 	sandbox_off();
 	leave_dir(root);
 	PASS();
@@ -2839,6 +3017,9 @@ void coffee_register_cov_deps_commands_tests(void)
 	TEST_REGISTER(cov_fetch_registry_failures);
 	TEST_REGISTER(cov_fetch_registry_install_script);
 	TEST_REGISTER(cov_fetch_registry_install_script_fails);
+	TEST_REGISTER(cov_fetch_registry_recipe_deps_first);
+	TEST_REGISTER(cov_fetch_registry_version_mismatch);
+	TEST_REGISTER(cov_registry_outdated_update_generate);
 	TEST_REGISTER(cov_run_command_noout);
 	TEST_REGISTER(cov_fetch_offline_git_deps);
 	TEST_REGISTER(cov_fetch_head_commit_edge_cases);

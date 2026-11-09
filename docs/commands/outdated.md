@@ -22,7 +22,9 @@ coffee outdated
 - Requires a `Coffee.lock` file (generate with `coffee generate-lockfile`)
 - For each git dependency, compares pinned commit SHA against the remote tracking ref
 - Uses `dep_graph_compare_remote()` to detect outdated git deps
-- Non-git deps are shown as `(not a git dep)` without remote comparison
+- Registry deps installed from a recipe are compared with the registry's current recipe version:
+  `Outdated (registry has X)` when the registry is newer, `(offline)` with `--offline`
+- Other non-git deps are shown as `(not a git dep)` without remote comparison
 - Exit code 0 means all up-to-date, 1 means at least one outdated
 - Prints columns: PACKAGE, PINNED, STATUS
 

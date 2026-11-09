@@ -94,6 +94,11 @@ lockfile_t *lockfile_parse(sds path)
 					lf->deps[idx].commit = sdsnew(dep_commit.u.s);
 					safe_free(dep_commit.u.s);
 				}
+				toml_datum_t dep_checksum = toml_string_in(dep_tbl, "checksum");
+				if (dep_checksum.ok) {
+					lf->deps[idx].checksum = sdsnew(dep_checksum.u.s);
+					safe_free(dep_checksum.u.s);
+				}
 				idx++;
 			}
 			lf->deps_count = idx;
@@ -116,6 +121,7 @@ void lockfile_free(lockfile_t *lf)
 		sdsfree(lf->deps[i].version);
 		sdsfree(lf->deps[i].path);
 		sdsfree(lf->deps[i].commit);
+		sdsfree(lf->deps[i].checksum);
 	}
 	safe_free(lf->deps);
 	safe_free(lf);
@@ -161,6 +167,9 @@ i64 lockfile_write(sds path, lockfile_t *lf)
 		}
 		if (lf->deps[i].commit) {
 			fprintf_toml_value(fp, "commit = \"%s\"\n", lf->deps[i].commit);
+		}
+		if (lf->deps[i].checksum) {
+			fprintf_toml_value(fp, "checksum = \"%s\"\n", lf->deps[i].checksum);
 		}
 	}
 

@@ -171,6 +171,23 @@ sds dep_resolve_dir(const char *name)
 	return nullptr;
 }
 
+i64 dep_link(const char *name, const char *target)
+{
+	sds         dep_dir = sdscatprintf(sdsempty(), "deps/%s", name);
+	struct stat st;
+	if (lstat(dep_dir, &st) == 0) {
+		char *rm_argv[] = { "rm", "-rf", dep_dir, nullptr };
+		run_command(rm_argv, 0);
+	}
+	i64 ret = 0;
+	if (symlink(target, dep_dir) != 0) {
+		fprintf_safe(stderr, "  Error: cannot create symlink '%s' -> '%s'\n", dep_dir, target);
+		ret = 1;
+	}
+	sdsfree(dep_dir);
+	return ret;
+}
+
 /*
  * Resolve a dependency directory with version constraint.
  * If constraint is null, empty, or "*", behaves like dep_resolve_dir().

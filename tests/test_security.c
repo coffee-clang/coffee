@@ -898,16 +898,13 @@ TEST(add_bare_name_from_registry)
 	};
 	ASSERT(handle_add(&opt) == 0, "add with a bare name from the catalog should succeed");
 
+	/* The dep is recorded with the recipe version, so fetch installs it
+	 * from the recipe instead of cloning recipe_url. */
 	manifest_t *m = manifest_parse("Coffee.toml");
 	ASSERT(m != nullptr, "manifest should parse after add");
-	ASSERT(m->dependencies.deps_count == 1, "one structured dep should be written");
-	bool found = false;
-	if (m->dependencies.deps_count == 1) {
-		dependency_t *d = &m->dependencies.deps[0];
-		found           = d->name != nullptr && strcmp(d->name, "alpha") == 0 && d->git != nullptr &&
-		                  strcmp(d->git, "https://example.com/alpha.git") == 0;
-	}
-	ASSERT(found, "alpha should carry the recipe_url as its git source");
+	ASSERT(m->dependencies.deps_count == 0, "no structured dep should be written");
+	ASSERT(m->package.dependencies_count == 1, "one flat dep should be written");
+	ASSERT(strcmp(m->package.dependencies[0], "alpha = \"1.0\"") == 0, "alpha should carry the recipe version");
 	manifest_free(m);
 
 	if (old_reg != nullptr) {
@@ -1011,9 +1008,9 @@ TEST(add_bare_name_offline_fails)
 }
 
 /* ---------------------------------------------------------------
- * add — a recipe that exists but has no usable source URL
+ * add — a recipe that exists but has no version
  * --------------------------------------------------------------- */
-TEST(add_recipe_without_source_fails)
+TEST(add_recipe_without_version_fails)
 {
 	char old_cwd[4'096];
 	ASSERT(getcwd(old_cwd, sizeof(old_cwd)) != nullptr, "getcwd failed");
@@ -1026,10 +1023,14 @@ TEST(add_recipe_without_source_fails)
 	fprintf_safe(fp, "[package]\nname = \"test\"\nversion = \"1.0.0\"\nedition = \"c23\"\n");
 	fclose(fp);
 
-	/* Recipe present, but no recipe_url key. */
+	/* Recipe present, but no version key. */
 	sds reg_dir = sdsnew("/tmp/coffee-test-add-nosource-dir");
 	mkdir(reg_dir, 0755);
 	write_recipe(reg_dir, "nosrc", nullptr);
+	fp = fopen("/tmp/coffee-test-add-nosource-dir/recipes/n/nosrc/library.toml", "w");
+	ASSERT(fp != nullptr, "fopen recipe failed");
+	fprintf_safe(fp, "recipe_url = \"https://example.com/nosrc.git\"\n");
+	fclose(fp);
 
 	const char *old_reg = getenv("COFFEE_REGISTRY_URL");
 	sds         reg_url = sdscatprintf(sdsempty(), "file://%s", reg_dir);
@@ -1039,7 +1040,7 @@ TEST(add_recipe_without_source_fails)
 		.inputs     = (char *[]){ "add", "nosrc" },
 		.inputs_num = 2,
 	};
-	ASSERT(handle_add(&opt) == 1, "recipe without a source URL should fail");
+	ASSERT(handle_add(&opt) == 1, "recipe without a version should fail");
 
 	manifest_t *m = manifest_parse("Coffee.toml");
 	ASSERT(m != nullptr, "manifest should still parse");
@@ -2426,7 +2427,7 @@ void coffee_register_security_tests(void)
 	TEST_REGISTER(add_bare_name_from_registry);
 	TEST_REGISTER(add_bare_name_unknown_fails);
 	TEST_REGISTER(add_bare_name_offline_fails);
-	TEST_REGISTER(add_recipe_without_source_fails);
+	TEST_REGISTER(add_recipe_without_version_fails);
 	TEST_REGISTER(manifest_rejects_traversal_name);
 	TEST_REGISTER(manifest_write_drops_invalid_flat_remnant);
 	TEST_REGISTER(add_remove_exact_name_match);

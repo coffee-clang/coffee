@@ -4,6 +4,7 @@
 #include "../lockfile.h"
 #include "../manifest.h"
 #include "../project.h"
+#include "../recipe_install.h"
 #include "../registry.h"
 #include "safe.h"
 
@@ -217,30 +218,12 @@ static sds git_head_commit(const char *dep_dir)
 	return output;
 }
 
-/* Replace deps/<name> with a symlink to target.  Returns 0 on success. */
-static i64 link_dep(const char *name, const char *target)
-{
-	sds         dep_dir = sdscatprintf(sdsempty(), "deps/%s", name);
-	struct stat st;
-	if (lstat(dep_dir, &st) == 0) {
-		char *rm_argv[] = { "rm", "-rf", dep_dir, nullptr };
-		run_command(rm_argv, 0);
-	}
-	i64 ret = 0;
-	if (symlink(target, dep_dir) != 0) {
-		fprintf_safe(stderr, "  Error: cannot create symlink '%s' -> '%s'\n", dep_dir, target);
-		ret = 1;
-	}
-	sdsfree(dep_dir);
-	return ret;
-}
-
 /* Symlink deps/<name> to the global cache and record the dep in the
  * lockfile entry list.  Returns 0 on success. */
 static i64 link_git_dep(const char *name, const char *global_dir, lockfile_dep_t **deps, size_t *count, size_t *cap)
 {
 	sds cache_path = sdscatprintf(sdsempty(), "%s/%s", global_dir, name);
-	i64 ret        = link_dep(name, cache_path);
+	i64 ret        = dep_link(name, cache_path);
 	if (ret == 0) {
 		sds dep_dir = sdscatprintf(sdsempty(), "deps/%s", name);
 		sds commit  = git_head_commit(dep_dir);
@@ -252,144 +235,66 @@ static i64 link_git_dep(const char *name, const char *global_dir, lockfile_dep_t
 	return ret;
 }
 
-/*
- * True when a recipe version is safe to use as a path component: it starts
- * with a letter or digit (so it is never '.' or '..') and contains only
- * [A-Za-z0-9._+-].
- */
-static bool recipe_version_is_valid(const char *version)
+/* Record an installed recipe in the lockfile entry list. */
+static void lf_record_recipe(lockfile_dep_t **deps, size_t *count, size_t *cap, const char *name,
+                             const struct recipe_info *info)
 {
-	if (version == nullptr) {
-		return false;
-	}
-	char first = version[0];
-	if (!((first >= 'a' && first <= 'z') || (first >= 'A' && first <= 'Z') || (first >= '0' && first <= '9'))) {
-		return false;
-	}
-	for (const char *p = version; *p != '\0'; p++) {
-		bool ok = (*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || (*p >= '0' && *p <= '9') || *p == '.' ||
-		          *p == '_' || *p == '+' || *p == '-';
-		if (!ok) {
-			return false;
-		}
-	}
-	return true;
+	lf_record(deps, count, cap, name, info->prefix, nullptr);
+	lockfile_dep_t *d = &(*deps)[*count - 1];
+	sdsfree(d->version);
+	d->version  = sdsnew(info->version);
+	d->checksum = sdsnew(info->checksum);
 }
 
 /*
- * Run a downloaded install.sh.  The script fetches the upstream source (git
- * or archive), builds it and installs it under prefix, the directory
- * $COFFEE_HOME/<name>/<version> it computes itself.  A stamp file marks a
- * completed install, so later fetches do not rebuild the package.
- *
- * Returns 0 on success, non-zero on failure.
+ * Offline: record a registry dependency only when deps/<name> already
+ * holds a completed recipe install.  Returns 0 on success.
  */
-static i64 run_install_script(const char *name, const char *script, const char *prefix, bool verbose)
+static i64 record_installed_recipe(const char *name, lockfile_dep_t **deps, size_t *count, size_t *cap)
 {
-	sds stamp = sdscatprintf(sdsempty(), "%s/.coffee-installed", prefix);
-	if (safe_access(stamp, F_OK) == 0) {
-		sdsfree(stamp);
-		return 0;
+	struct recipe_info info;
+	sds                dir = dep_resolve_dir(name);
+	bool               ok  = dir != nullptr && recipe_read_installed(dir, &info);
+	sdsfree(dir);
+	if (!ok) {
+		fprintf_safe(stderr, "  Error: cannot resolve '%s' from the registry in offline mode\n", name);
+		return 1;
 	}
-	if (verbose) {
-		printf_safe("    Installing %s into %s...\n", name, prefix);
-	}
-	/* A prefix without a stamp is left over from a failed install. */
-	char *rm_argv[] = { "rm", "-rf", unconst(prefix), nullptr };
-	run_command(rm_argv, 0);
-	sds   home_env = sdscatprintf(sdsempty(), "COFFEE_HOME=%s", coffee_home_dir());
-	char *argv[]   = { "env", home_env, "bash", unconst(script), nullptr };
-	/* Keep our progress lines ahead of the script's build output. */
-	fflush(stdout);
-	i64 ret = run_command(argv, 0);
-	sdsfree(home_env);
-	if (ret != 0) {
-		fprintf_safe(stderr, "  Error: install.sh for '%s' failed\n", name);
-	} else if (safe_access(prefix, F_OK) != 0) {
-		fprintf_safe(stderr, "  Error: install.sh for '%s' did not create '%s'\n", name, prefix);
-		ret = 1;
-	} else if (create_file(stamp, "") != 0) {
-		fprintf_safe(stderr, "  Error: cannot write '%s'\n", stamp);
-		ret = 1;
-	}
-	sdsfree(stamp);
-	return ret;
-}
-
-/*
- * Install a registry package through its recipe's install.sh, downloaded
- * with library.toml into $COFFEE_HOME/recipes/<name>.  Returns the install
- * prefix (caller frees), or nullptr when the recipe cannot be downloaded,
- * ships no install.sh, or the install fails; *failed is true only in the
- * last case, so the caller can fall back to cloning recipe_url otherwise.
- */
-static sds install_registry_dep(const char *name, bool verbose, bool *failed)
-{
-	*failed       = false;
-	sds       key = sdsnew(name);
-	recipe_t *r   = registry_get(key);
-	if (r == nullptr) {
-		sdsfree(key);
-		return nullptr;
-	}
-
-	const char *home       = coffee_home_dir();
-	sds         recipe_dir = sdscatprintf(sdsempty(), "%s/recipes/%s", home, name);
-	/* Drop a stale install.sh from an earlier recipe revision. */
-	char       *rm_argv[] = { "rm", "-rf", recipe_dir, nullptr };
-	run_command(rm_argv, 0);
-
-	sds prefix = nullptr;
-	sds script = sdscatprintf(sdsempty(), "%s/install.sh", recipe_dir);
-	if (registry_fetch(key, r->version, recipe_dir) == 0 && safe_access(script, F_OK) == 0) {
-		if (!recipe_version_is_valid(r->version)) {
-			fprintf_safe(stderr, "  Error: recipe for '%s' has an invalid version\n", name);
-			*failed = true;
-		} else {
-			prefix = sdscatprintf(sdsempty(), "%s/%s/%s", home, name, r->version);
-			if (run_install_script(name, script, prefix, verbose) != 0) {
-				sdsfree(prefix);
-				prefix  = nullptr;
-				*failed = true;
-			}
-		}
-	}
-
-	sdsfree(script);
-	sdsfree(recipe_dir);
-	registry_free_recipe(r);
-	sdsfree(key);
-	return prefix;
+	lf_record_recipe(deps, count, cap, name, &info);
+	recipe_info_free(&info);
+	return 0;
 }
 
 /*
  * Materialize a dependency declared as a plain version string (no git or
  * path source) by resolving it through the registry.  When the recipe ships
- * an install.sh, run it and symlink deps/<name> to the install prefix, so
- * that cflags and libs find its include/ and lib/ folders.  Otherwise clone
- * the recipe's recipe_url into the global deps cache and symlink deps/<name>
- * to the cache.  Records the dep in the lockfile entry list.
+ * an install.sh, install it (see recipe_install.h) and symlink deps/<name>
+ * to the install prefix, so that cflags and libs find its include/ and lib/
+ * folders.  Otherwise clone the recipe's recipe_url into the global deps
+ * cache and symlink deps/<name> to the cache.  Records the dep in the
+ * lockfile entry list.  constraint (nullable) is the version required by
+ * the manifest; locked (nullable) is the entry the install must match.
  *
  * Returns 0 on success, non-zero on failure.
  */
-static i64 fetch_registry_dep(const char *name, const char *global_dir, lockfile_dep_t **deps, size_t *count,
-                              size_t *cap, bool verbose, bool offline)
+static i64 fetch_registry_dep(const char *name, const char *constraint, const lockfile_dep_t *locked,
+                              const char *global_dir, lockfile_dep_t **deps, size_t *count, size_t *cap, bool verbose,
+                              bool offline)
 {
 	if (offline) {
-		fprintf_safe(stderr, "  Error: cannot resolve '%s' from the registry in offline mode\n", name);
+		return record_installed_recipe(name, deps, count, cap);
+	}
+	struct recipe_info info;
+	enum recipe_status st = recipe_install(name, constraint, locked, verbose, &info);
+	if (st == RECIPE_FAILED) {
 		return 1;
 	}
-	bool install_failed = false;
-	sds  prefix         = install_registry_dep(name, verbose, &install_failed);
-	if (install_failed) {
-		return 1;
-	}
-	if (prefix != nullptr) {
-		i64 ret = link_dep(name, prefix);
+	if (st == RECIPE_INSTALLED) {
+		i64 ret = dep_link(name, info.prefix);
 		if (ret == 0) {
-			lf_record(deps, count, cap, name, prefix, nullptr);
+			lf_record_recipe(deps, count, cap, name, &info);
 		}
-		sdsfree(prefix);
+		recipe_info_free(&info);
 		return ret;
 	}
 	bool recipe_found = false;
@@ -488,7 +393,14 @@ int64_t handle_fetch(options *opts)
 			 * re-fetching; direct deps are always (re)fetched so they
 			 * track their configured ref. */
 			if (!direct) {
-				sds existing = dep_resolve_dir(dep_name);
+				sds                existing = dep_resolve_dir(dep_name);
+				struct recipe_info info;
+				if (existing != nullptr && recipe_read_installed(existing, &info)) {
+					lf_record_recipe(&lf_deps, &lf_count, &lf_cap, dep_name, &info);
+					recipe_info_free(&info);
+					sdsfree(existing);
+					continue;
+				}
 				if (existing != nullptr) {
 					sds commit = g->nodes[gi].is_git ? git_head_commit(existing) : nullptr;
 					lf_record(&lf_deps, &lf_count, &lf_cap, dep_name, existing, commit);
@@ -560,8 +472,8 @@ int64_t handle_fetch(options *opts)
 			} else {
 				/* A dep with no git or path source is declared as a plain
 				 * version string; resolve it through the registry. */
-				ret = fetch_registry_dep(dep_name, global_deps, &lf_deps, &lf_count, &lf_cap, opts->verbose,
-				                         opts->offline);
+				ret = fetch_registry_dep(dep_name, g->nodes[gi].version_constraint, nullptr, global_deps, &lf_deps,
+				                         &lf_count, &lf_cap, opts->verbose, opts->offline);
 			}
 
 			if (ret != 0) {
@@ -602,6 +514,7 @@ int64_t handle_fetch(options *opts)
 		sdsfree(lf.deps[i].version);
 		sdsfree(lf.deps[i].path);
 		sdsfree(lf.deps[i].commit);
+		sdsfree(lf.deps[i].checksum);
 	}
 	safe_free(lf.deps);
 

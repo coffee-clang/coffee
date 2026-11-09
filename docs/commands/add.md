@@ -17,9 +17,9 @@ coffee add <package> [--git <url> | --path <path>]
 ## Implementation Notes
 
 - Modifies Coffee.toml to add the dependency
-- A bare package name is resolved from the recipes catalog: the recipe's `recipe_url` is recorded
-  as the dependency source (`name = { git = "<recipe_url>" }`). The lookup fails in offline mode
-  and when the package is unknown or its recipe has no usable source URL
+- A bare package name is resolved from the recipes catalog and recorded with the recipe version
+  (`name = "<version>"`); `coffee fetch` then installs it through the recipe's `install.sh`. The
+  lookup fails in offline mode and when the package is unknown or its recipe has no valid version
 - `--git <url>` adds a git dependency; `--path <path>` adds a local path dependency
 - Validates the values it writes before touching the manifest: the package name must match
   `[A-Za-z0-9_-]+`, and the emitted source (`--path`, or `--git` when no `--path` is given) and

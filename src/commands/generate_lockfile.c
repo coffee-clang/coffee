@@ -4,6 +4,7 @@
 #include "../lockfile.h"
 #include "../manifest.h"
 #include "../project.h"
+#include "../recipe_install.h"
 #include "safe.h"
 
 #include <stdio.h>
@@ -83,6 +84,20 @@ int64_t handle_generate_lockfile(options *opts)
 
 			lf.deps[dep_idx].name = sdsnew(dep_name);
 
+			/* A registry dep installed from a recipe: record the install
+			 * prefix, the recipe version and the install.sh checksum. */
+			struct recipe_info installed;
+			const char        *dir = dep_graph_path(g, dep_name);
+			if (dir != nullptr && recipe_read_installed(dir, &installed)) {
+				lf.deps[dep_idx].path     = sdsnew(installed.prefix);
+				lf.deps[dep_idx].version  = sdsnew(installed.version);
+				lf.deps[dep_idx].checksum = sdsnew(installed.checksum);
+				recipe_info_free(&installed);
+				lf.deps_count = dep_idx + 1;
+				dep_idx++;
+				continue;
+			}
+
 			/* Path */
 			const char *p = dep_graph_path(g, dep_name);
 			if (p != nullptr) {
@@ -127,6 +142,7 @@ int64_t handle_generate_lockfile(options *opts)
 		sdsfree(lf.deps[i].version);
 		sdsfree(lf.deps[i].path);
 		sdsfree(lf.deps[i].commit);
+		sdsfree(lf.deps[i].checksum);
 	}
 	safe_free(lf.deps);
 

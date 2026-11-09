@@ -92,10 +92,12 @@ int64_t handle_add(options *opts)
 		}
 	}
 
-	/* A bare package name is resolved through the recipes catalog.  The
-	 * lookup stays after the already-exists check, so that re-adding an
-	 * existing dep remains a no-op that never touches the network. */
-	sds registry_url = nullptr;
+	/* A bare package name is resolved through the recipes catalog and
+	 * recorded as "name = \"<recipe version>\"", which fetch installs
+	 * from the recipe.  The lookup stays after the already-exists check,
+	 * so that re-adding an existing dep remains a no-op that never touches
+	 * the network. */
+	sds registry_version = nullptr;
 	if (git_url == nullptr && path == nullptr) {
 		if (opts->offline) {
 			fprintf_safe(stderr, "Error: cannot resolve '%s' from the registry in offline mode\n", package_name);
@@ -103,20 +105,25 @@ int64_t handle_add(options *opts)
 			sdsfree(manifest_path);
 			return 1;
 		}
-		bool recipe_found = false;
-		registry_url      = registry_source_url(package_name, &recipe_found);
-		if (registry_url == nullptr) {
-			if (recipe_found) {
-				fprintf_safe(stderr, "Error: recipe for '%s' has no usable source URL\n", package_name);
-			} else {
-				fprintf_safe(stderr, "Error: cannot resolve '%s' from the registry (unknown package or unreachable)\n",
-				             package_name);
-			}
+		sds       key = sdsnew(package_name);
+		recipe_t *r   = registry_get(key);
+		sdsfree(key);
+		if (r == nullptr) {
+			fprintf_safe(stderr, "Error: cannot resolve '%s' from the registry (unknown package or unreachable)\n",
+			             package_name);
 			manifest_free(m);
 			sdsfree(manifest_path);
 			return 1;
 		}
-		git_url = registry_url;
+		if (r->version == nullptr || !version_is_valid(r->version)) {
+			fprintf_safe(stderr, "Error: recipe for '%s' has no valid version\n", package_name);
+			registry_free_recipe(r);
+			manifest_free(m);
+			sdsfree(manifest_path);
+			return 1;
+		}
+		registry_version = sdsnew(r->version);
+		registry_free_recipe(r);
 	}
 
 	/* Add new dependency. */
@@ -132,6 +139,10 @@ int64_t handle_add(options *opts)
 			dep_str = sdscatprintf(sdsempty(), "%s = { path = \"%s\" }", package_name, esc_path);
 		}
 		sdsfree(esc_path);
+	} else if (registry_version != nullptr) {
+		sds esc_version = toml_escape(registry_version);
+		dep_str         = sdscatprintf(sdsempty(), "%s = \"%s\"", package_name, esc_version);
+		sdsfree(esc_version);
 	} else {
 		sds esc_git = toml_escape(git_url);
 		dep_str     = sdscatprintf(sdsempty(), "%s = { git = \"%s\" }", package_name, esc_git);
@@ -153,7 +164,7 @@ int64_t handle_add(options *opts)
 	if (manifest_write(manifest_path, m) != 0) {
 		fprintf_safe(stderr, "Error: Could not write manifest at %s\n", manifest_path);
 		manifest_free(m);
-		sdsfree(registry_url);
+		sdsfree(registry_version);
 		sdsfree(manifest_path);
 		return 1;
 	}
@@ -187,7 +198,7 @@ int64_t handle_add(options *opts)
 	}
 
 	sdsfree(makefile_path);
-	sdsfree(registry_url);
+	sdsfree(registry_version);
 	manifest_free(m);
 	sdsfree(manifest_path);
 	return 0;

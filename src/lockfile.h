@@ -4,10 +4,11 @@
 #include "coffee.h"
 
 typedef struct {
-	sds name;    // dependency name
-	sds version; // resolved version (from library.toml or "*")
-	sds path;    // resolved filepath (e.g. "deps/toml")
-	sds commit;  // pinned git commit SHA (for git deps)
+	sds name;     // dependency name
+	sds version;  // resolved version (from library.toml or "*")
+	sds path;     // resolved filepath (e.g. "deps/toml")
+	sds commit;   // pinned git commit SHA (for git deps)
+	sds checksum; // sha256 of the recipe install.sh (for registry deps)
 } lockfile_dep_t;
 
 typedef struct {

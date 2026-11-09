@@ -4,6 +4,7 @@
 #include "../lockfile.h"
 #include "../manifest.h"
 #include "../project.h"
+#include "../recipe_install.h"
 #include "safe.h"
 
 #include <stdio.h>
@@ -13,6 +14,30 @@
 #include <sys/stat.h>
 #include <toml.h>
 #include <unistd.h>
+
+/*
+ * Reinstall a registry dependency from the current recipe and fill its
+ * lockfile entry.  The node must hold a completed recipe install
+ * (installed); on failure the entry keeps describing that install.
+ */
+static void update_recipe_dep(const dep_node_t *node, const struct recipe_info *installed, lockfile_dep_t *entry,
+                              bool verbose)
+{
+	struct recipe_info        info;
+	const struct recipe_info *use = installed;
+	enum recipe_status        st  = recipe_install(node->name, node->version_constraint, nullptr, verbose, &info);
+	if (st == RECIPE_INSTALLED && dep_link(node->name, info.prefix) == 0) {
+		use = &info;
+	} else {
+		fprintf_safe(stderr, "  Warning: Failed to update registry dep '%s'\n", node->name);
+	}
+	entry->path     = sdsnew(use->prefix);
+	entry->version  = sdsnew(use->version);
+	entry->checksum = sdsnew(use->checksum);
+	if (st == RECIPE_INSTALLED) {
+		recipe_info_free(&info);
+	}
+}
 
 int64_t handle_update(options *opts)
 {
@@ -84,11 +109,12 @@ int64_t handle_update(options *opts)
 				if (old_lf != nullptr) {
 					lockfile_dep_t *old = lockfile_find_dep(old_lf, dep_name);
 					if (old != nullptr) {
-						new_lf.deps[dep_idx].name    = sdsnew(dep_name);
-						new_lf.deps[dep_idx].version = old->version ? sdsnew(old->version) : sdsnew("*");
-						new_lf.deps[dep_idx].path    = old->path ? sdsnew(old->path) : sdsnew("");
-						new_lf.deps[dep_idx].commit  = old->commit ? sdsnew(old->commit) : nullptr;
-						new_lf.deps_count            = dep_idx + 1;
+						new_lf.deps[dep_idx].name     = sdsnew(dep_name);
+						new_lf.deps[dep_idx].version  = old->version ? sdsnew(old->version) : sdsnew("*");
+						new_lf.deps[dep_idx].path     = old->path ? sdsnew(old->path) : sdsnew("");
+						new_lf.deps[dep_idx].commit   = old->commit ? sdsnew(old->commit) : nullptr;
+						new_lf.deps[dep_idx].checksum = old->checksum ? sdsnew(old->checksum) : nullptr;
+						new_lf.deps_count             = dep_idx + 1;
 						dep_idx++;
 						lockfile_free(old_lf);
 						continue;
@@ -103,7 +129,13 @@ int64_t handle_update(options *opts)
 
 			new_lf.deps[dep_idx].name = sdsnew(dep_name);
 
-			if (dep_graph_is_git(g, dep_name)) {
+			const dep_node_t  *node = &g->nodes[gi];
+			struct recipe_info installed;
+			if (node->git_url == nullptr && node->source_path == nullptr && node->path != nullptr &&
+			    recipe_read_installed(node->path, &installed)) {
+				update_recipe_dep(node, &installed, &new_lf.deps[dep_idx], opts->verbose);
+				recipe_info_free(&installed);
+			} else if (dep_graph_is_git(g, dep_name)) {
 				/* Fetch and update git dep */
 				i64 ret = dep_graph_fetch_git(g, dep_name, opts->verbose);
 				if (ret == 0) {
@@ -150,6 +182,7 @@ int64_t handle_update(options *opts)
 		sdsfree(new_lf.deps[i].version);
 		sdsfree(new_lf.deps[i].path);
 		sdsfree(new_lf.deps[i].commit);
+		sdsfree(new_lf.deps[i].checksum);
 	}
 	safe_free(new_lf.deps);
 
