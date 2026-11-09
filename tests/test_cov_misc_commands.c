@@ -1975,6 +1975,101 @@ TEST(cov_misc_test_dependency_flags)
 	PASS();
 }
 
+/* The position of needle in haystack, or -1. */
+static long find_at(const char *haystack, const char *needle)
+{
+	const char *p = haystack != nullptr ? strstr(haystack, needle) : nullptr;
+	return p != nullptr ? (long)(p - haystack) : -1;
+}
+
+/* Prebuilt deps link by libname after every source; deps that ship
+ * sources are compiled into the runner and not linked by name (C9). */
+TEST(cov_misc_test_link_flags_after_sources)
+{
+	struct fixture fx;
+	ASSERT(fixture_enter(&fx), "fixture");
+	sds saved_filter = env_save("TEST_FILTER");
+	unsetenv("TEST_FILTER");
+	ASSERT(write_test_project(&fx, "dependencies = [\"libx\", \"srcdep\"]\n", "tproj", nullptr), "project");
+	make_dirs("deps", "deps/libx", "deps/libx/lib");
+	make_dirs("deps/srcdep", "deps/srcdep/src", nullptr);
+	ASSERT(write_file("deps/libx/library.toml", "libname = \"xx\"\n"), "libx recipe");
+	ASSERT(write_file("deps/srcdep/src/s.c", "int s;\n"), "dep source");
+
+	sds out     = nullptr;
+	i64 ret     = run_test_cmd(nullptr, false, &out);
+	sds cc_args = read_file("cc.args");
+	env_restore("TEST_FILTER", saved_filter);
+	fixture_leave(&fx);
+
+	long last_src = find_at(cc_args, "deps/srcdep/src/s.c\n");
+	long test_src = find_at(cc_args, "/tests/t2.c\n");
+	long lib_dir  = find_at(cc_args, "-Ldeps/libx/lib\n");
+	long lib      = find_at(cc_args, "-lxx\n");
+	ASSERT(ret == 0, "test run should succeed");
+	ASSERT(last_src >= 0 && test_src >= 0, "dependency and test sources compiled");
+	ASSERT(lib_dir > last_src && lib_dir > test_src && lib > lib_dir, "-L/-l after every source");
+	ASSERT(!has(cc_args, "-llibx\n") && !has(cc_args, "-lsrcdep\n"), "package names are not libraries");
+	sdsfree(out);
+	sdsfree(cc_args);
+	PASS();
+}
+
+/* [test] project_sources replaces the project sources the runner links;
+ * [test] sources are globs, as documented. */
+TEST(cov_misc_test_project_sources)
+{
+	struct fixture fx;
+	ASSERT(fixture_enter(&fx), "fixture");
+	sds saved_filter = env_save("TEST_FILTER");
+	unsetenv("TEST_FILTER");
+	ASSERT(write_test_project(&fx, nullptr, "tproj",
+	                          "\n[test]\nproject_sources = [\"src/util.c\"]\nsources = [\"tests/t*.c\"]\n"),
+	       "project");
+
+	sds out     = nullptr;
+	i64 ret     = run_test_cmd(nullptr, false, &out);
+	sds cc_args = read_file("cc.args");
+	env_restore("TEST_FILTER", saved_filter);
+	fixture_leave(&fx);
+
+	ASSERT(ret == 0, "test run should succeed");
+	ASSERT(has(cc_args, "/src/util.c\n") && !has(cc_args, "/src/main.c\n"), "only project_sources linked");
+	ASSERT(has(cc_args, "/tests/t1.c\n") && has(cc_args, "/tests/t2.c\n"), "[test] sources are globs");
+	sdsfree(out);
+	sdsfree(cc_args);
+	PASS();
+}
+
+/* Without [test] project_sources the runner uses [package] sources, like
+ * the generated Makefile; a pattern that matches nothing is named. */
+TEST(cov_misc_test_package_sources)
+{
+	struct fixture fx;
+	ASSERT(fixture_enter(&fx), "fixture");
+	sds saved_filter = env_save("TEST_FILTER");
+	unsetenv("TEST_FILTER");
+	ASSERT(write_test_project(&fx, nullptr, "tproj", "sources = [\"src/util.c\"]\n"), "project");
+
+	sds out     = nullptr;
+	i64 ret     = run_test_cmd(nullptr, false, &out);
+	sds cc_args = read_file("cc.args");
+	ASSERT(write_manifest(nullptr, "tproj", "sources = [\"lib/*.c\"]\n"), "manifest without matches");
+	sds out2 = nullptr;
+	i64 ret2 = run_test_cmd(nullptr, false, &out2);
+	env_restore("TEST_FILTER", saved_filter);
+	fixture_leave(&fx);
+
+	ASSERT(ret == 0, "test run should succeed");
+	ASSERT(has(cc_args, "/src/util.c\n") && !has(cc_args, "/src/main.c\n"), "[package] sources linked");
+	ASSERT(ret2 == 1, "no project sources is an error");
+	ASSERT(has(out2, "No project sources found in lib/*.c"), "unmatched pattern named");
+	sdsfree(out);
+	sdsfree(out2);
+	sdsfree(cc_args);
+	PASS();
+}
+
 TEST(cov_misc_test_unresolvable_graph_still_builds)
 {
 	struct fixture fx;
@@ -3033,7 +3128,8 @@ TEST(cov_misc_libs_odd_library_toml)
 	fixture_leave(&fx);
 
 	ASSERT(ret == 0, "libs should succeed");
-	ASSERT(has(out, "-Ldeps/broken/lib -lbroken -lodd\n"), "convention fallback for unusable library.toml");
+	/* odd has no library directory and an unusable libname: nothing to link */
+	ASSERT(has(out, "-Ldeps/broken/lib -lbroken\n"), "convention fallback for unusable library.toml");
 	ASSERT(!has(out, "-l "), "no bare -l for the nameless entry");
 	sdsfree(out);
 	PASS();
@@ -3427,6 +3523,9 @@ void coffee_register_cov_misc_commands_tests(void)
 	TEST_REGISTER(cov_misc_test_env_filter_and_verbose);
 	TEST_REGISTER(cov_misc_test_manifest_sources_and_target_dir);
 	TEST_REGISTER(cov_misc_test_dependency_flags);
+	TEST_REGISTER(cov_misc_test_link_flags_after_sources);
+	TEST_REGISTER(cov_misc_test_project_sources);
+	TEST_REGISTER(cov_misc_test_package_sources);
 	TEST_REGISTER(cov_misc_test_unresolvable_graph_still_builds);
 	TEST_REGISTER(cov_misc_test_compile_failure);
 	TEST_REGISTER(cov_misc_test_runner_failure);

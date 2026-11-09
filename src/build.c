@@ -324,82 +324,142 @@ sds dep_resolve_dir_constraint(const char *name, const char *constraint)
 }
 
 /*
- * Append compiler flags for a single dependency to the flags string.
- * Returns the number of .c source files found (appended to src_argv).
+ * Append ` <flag>"<dep_dir>/<path>"` for every string in the library.toml
+ * array `key`.  Non-string elements are skipped.  Returns the number of
+ * flags appended.
+ */
+static size_t lt_add_dir_array(toml_table_t *conf, const char *key, const char *flag, const char *dep_dir, sds *flags)
+{
+	toml_array_t *arr   = toml_array_in(conf, key);
+	size_t        added = 0;
+	for (i64 i = 0; arr != nullptr && i < toml_array_nelem(arr); i++) {
+		toml_datum_t s = toml_string_at(arr, i);
+		if (s.ok) {
+			*flags = sdscatprintf(*flags, " %s\"%s/%s\"", flag, dep_dir, s.u.s);
+			safe_free(s.u.s);
+			added++;
+		}
+	}
+	return added;
+}
+
+/* Same as lt_add_dir_array() for a single string field (include_dir, lib_dir). */
+static size_t lt_add_dir_string(toml_table_t *conf, const char *key, const char *flag, const char *dep_dir, sds *flags)
+{
+	toml_datum_t s = toml_string_in(conf, key);
+	if (!s.ok) {
+		return 0;
+	}
+	*flags = sdscatprintf(*flags, " %s\"%s/%s\"", flag, dep_dir, s.u.s);
+	safe_free(s.u.s);
+	return 1;
+}
+
+/* Append ` <flag>"<dep_dir>/<sub>"` when that directory exists.  Returns 1 if appended. */
+static size_t add_dir_if_present(const char *dep_dir, const char *sub, const char *flag, sds *flags)
+{
+	sds    path  = sdscatprintf(sdsempty(), "%s/%s", dep_dir, sub);
+	size_t added = 0;
+	if (safe_access(path, F_OK) == 0) {
+		*flags = sdscatprintf(*flags, " %s\"%s\"", flag, path);
+		added  = 1;
+	}
+	sdsfree(path);
+	return added;
+}
+
+/*
+ * Append -l for the library.toml libname, a string or an array of
+ * strings.  Returns the number of flags appended.
+ */
+static size_t lt_add_libnames(toml_table_t *conf, sds *flags)
+{
+	toml_datum_t one = toml_string_in(conf, "libname");
+	if (one.ok) {
+		*flags = sdscatprintf(*flags, " -l\"%s\"", one.u.s);
+		safe_free(one.u.s);
+		return 1;
+	}
+	toml_array_t *arr   = toml_array_in(conf, "libname");
+	size_t        added = 0;
+	for (i64 i = 0; arr != nullptr && i < toml_array_nelem(arr); i++) {
+		toml_datum_t s = toml_string_at(arr, i);
+		if (s.ok) {
+			*flags = sdscatprintf(*flags, " -l\"%s\"", s.u.s);
+			safe_free(s.u.s);
+			added++;
+		}
+	}
+	return added;
+}
+
+static toml_table_t *lt_parse(const char *dep_dir)
+{
+	sds   toml_path = sdscatprintf(sdsempty(), "%s/library.toml", dep_dir);
+	FILE *fp        = safe_fopen(toml_path, "r");
+	sdsfree(toml_path);
+	if (fp == nullptr) {
+		return nullptr;
+	}
+	char          errbuf[256];
+	toml_table_t *conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
+	safe_fclose(fp);
+	return conf;
+}
+
+/*
+ * Append compiler and linker flags for a single dependency to the flags
+ * string.  Returns nonzero when library.toml named include or library
+ * directories.
+ *
+ * Include directories come from library.toml `include` (array) and
+ * `include_dir` (string), else from include/ when it exists.  Library
+ * directories come from `lib` and `lib_dir`, else from lib/.  The two
+ * fallbacks are independent.  Libraries are linked by `libname` (a string
+ * or an array of strings); a package without libname that has a library
+ * directory is linked as -l<dep_name>.  `header_only = true` links
+ * nothing.
  */
 size_t dep_add_flags(const char *dep_dir, const char *dep_name, sds *flags, sds *src_list, size_t *src_count)
 {
-	size_t found = 0;
-
 	if (dep_dir == nullptr) {
 		return 0;
 	}
 
-	/* Read library.toml if present */
-	sds   toml_path = sdscatprintf(sdsempty(), "%s/library.toml", dep_dir);
-	FILE *fp        = safe_fopen(toml_path, "r");
-	if (fp) {
-		char          errbuf[256];
-		toml_table_t *conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
-		if (conf) {
-			/* Include directories */
-			toml_array_t *inc = toml_array_in(conf, "include");
-			if (inc) {
-				i64 n = toml_array_nelem(inc);
-				for (i64 i = 0; i < n; i++) {
-					toml_raw_t raw = toml_raw_at(inc, i);
-					if (raw) {
-						char *s;
-						if (toml_rtos(raw, &s) == 0 && s) {
-							*flags = sdscatprintf(*flags, " -I\"%s/%s\"", dep_dir, s);
-							safe_free(s);
-							found = 1;
-						}
-					}
-				}
-			}
+	toml_table_t *conf        = lt_parse(dep_dir);
+	size_t        inc_found   = 0;
+	size_t        lib_found   = 0;
+	size_t        libnames    = 0;
+	bool          header_only = false;
+	if (conf != nullptr) {
+		inc_found += lt_add_dir_array(conf, "include", "-I", dep_dir, flags);
+		inc_found += lt_add_dir_string(conf, "include_dir", "-I", dep_dir, flags);
+	}
+	size_t found = inc_found;
+	if (inc_found == 0) {
+		add_dir_if_present(dep_dir, "include", "-I", flags);
+	}
 
-			/* Library directories */
-			toml_array_t *lib = toml_array_in(conf, "lib");
-			if (lib) {
-				i64 n = toml_array_nelem(lib);
-				for (i64 i = 0; i < n; i++) {
-					toml_raw_t raw = toml_raw_at(lib, i);
-					if (raw) {
-						char *s;
-						if (toml_rtos(raw, &s) == 0 && s) {
-							*flags = sdscatprintf(*flags, " -L\"%s/%s\"", dep_dir, s);
-							safe_free(s);
-							found = 1;
-						}
-					}
-				}
-			}
+	if (conf != nullptr) {
+		lib_found += lt_add_dir_array(conf, "lib", "-L", dep_dir, flags);
+		lib_found += lt_add_dir_string(conf, "lib_dir", "-L", dep_dir, flags);
+	}
+	found += lib_found;
+	if (lib_found == 0) {
+		lib_found = add_dir_if_present(dep_dir, "lib", "-L", flags);
+	}
 
-			toml_free(conf);
+	if (conf != nullptr) {
+		toml_datum_t ho = toml_bool_in(conf, "header_only");
+		header_only     = ho.ok && ho.u.b;
+		if (!header_only) {
+			libnames = lt_add_libnames(conf, flags);
 		}
-		safe_fclose(fp);
+		toml_free(conf);
 	}
-	sdsfree(toml_path);
-
-	/* Fallback: include/ directory */
-	if (!found) {
-		sds inc_path = sdscatprintf(sdsempty(), "%s/include", dep_dir);
-		if (safe_access(inc_path, F_OK) == 0) {
-			*flags = sdscatprintf(*flags, " -I\"%s\"", inc_path);
-		}
-		sdsfree(inc_path);
+	if (!header_only && libnames == 0 && lib_found > 0) {
+		*flags = sdscatprintf(*flags, " -l\"%s\"", dep_name);
 	}
-
-	/* Fallback: lib/ directory */
-	sds lib_path = sdscatprintf(sdsempty(), "%s/lib", dep_dir);
-	if (safe_access(lib_path, F_OK) == 0) {
-		*flags = sdscatprintf(*flags, " -L\"%s\"", lib_path);
-	}
-	sdsfree(lib_path);
-
-	/* Always add -l<name> */
-	*flags = sdscatprintf(*flags, " -l\"%s\"", dep_name);
 
 	/* Also compile dep source files if they exist (only if src_list provided) */
 	if (src_list != nullptr && src_count != nullptr) {
@@ -717,6 +777,38 @@ sds split_flags_to_argv(const char *flags, char **argv, size_t start_idx, size_t
 	return copy;
 }
 
+void dep_split_flags(const char *flags, bool has_sources, sds *compile, sds *link)
+{
+	size_t ntok   = count_flag_tokens(flags);
+	char **tokens = (char **)safe_malloc(sizeof(char *) * (ntok + 1));
+	size_t end    = 0;
+	sds    copy   = split_flags_to_argv(flags, tokens, 0, &end);
+	for (size_t i = 0; i < end; i++) {
+		bool is_link = strncmp(tokens[i], "-L", 2) == 0 || strncmp(tokens[i], "-l", 2) == 0;
+		if (!is_link) {
+			*compile = sdscatprintf(*compile, " \"%s\"", tokens[i]);
+		} else if (!has_sources) {
+			*link = sdscatprintf(*link, " \"%s\"", tokens[i]);
+		}
+	}
+	sdsfree(copy);
+	safe_free((void *)tokens);
+}
+
+sds flags_append_unquoted(sds out, const char *flags)
+{
+	size_t ntok   = count_flag_tokens(flags);
+	char **tokens = (char **)safe_malloc(sizeof(char *) * (ntok + 1));
+	size_t end    = 0;
+	sds    copy   = split_flags_to_argv(flags, tokens, 0, &end);
+	for (size_t i = 0; i < end; i++) {
+		out = sdscatprintf(out, "%s ", tokens[i]);
+	}
+	sdsfree(copy);
+	safe_free((void *)tokens);
+	return out;
+}
+
 size_t append_clang_tidy_extra_args(const char *flags, char **argv, size_t start_idx)
 {
 	size_t tokens_cnt = count_flag_tokens(flags);
@@ -734,7 +826,8 @@ size_t append_clang_tidy_extra_args(const char *flags, char **argv, size_t start
 	return start_idx;
 }
 
-i64 compile_sources(sds *src_files, size_t n, sds output, char *cc, const char *flags_in, bool verbose)
+i64 compile_sources(sds *src_files, size_t n, sds output, char *cc, const char *flags_in, const char *link_flags,
+                    bool verbose)
 {
 	if (n == 0) {
 		fprintf_safe(stderr, "Error: No source files to compile\n");
@@ -742,7 +835,8 @@ i64 compile_sources(sds *src_files, size_t n, sds output, char *cc, const char *
 	}
 
 	size_t flag_tokens = count_flag_tokens(flags_in);
-	size_t argc_total  = 1 + flag_tokens + 2 + n + 1;
+	size_t link_tokens = count_flag_tokens(link_flags);
+	size_t argc_total  = 1 + flag_tokens + 2 + n + link_tokens + 1;
 	char **argv        = (char **)safe_malloc(sizeof(char *) * argc_total);
 
 	size_t idx  = 0;
@@ -758,10 +852,13 @@ i64 compile_sources(sds *src_files, size_t n, sds output, char *cc, const char *
 	for (size_t i = 0; i < n; i++) {
 		argv[idx++] = src_files[i];
 	}
-	argv[idx] = nullptr;
+	sds link_copy = split_flags_to_argv(link_flags, argv, idx, &end_idx);
+	idx           = end_idx;
+	argv[idx]     = nullptr;
 
 	i64 ret = run_command(argv, (int)verbose ? RUN_CMD_VERBOSE : 0);
 
+	sdsfree(link_copy);
 	sdsfree(flags_copy);
 	safe_free((void *)argv);
 

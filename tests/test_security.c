@@ -838,6 +838,9 @@ static void make_local_git_repo(const char *repo_dir, const char *name)
 			"git", "-c", "user.email=test@test", "-c", "user.name=test", "commit", "-q", "-m", "init", nullptr,
 		};
 		assert(run_command(commit_argv, RUN_CMD_QUIET) == 0);
+		/* A recipe without install.sh is cloned at the tag v<version>. */
+		char *tag_argv[] = { "git", "tag", "v1.0", nullptr };
+		assert(run_command(tag_argv, RUN_CMD_QUIET) == 0);
 	}
 }
 
@@ -2056,6 +2059,8 @@ TEST(fetch_transitive_dep_no_lockfile_corruption)
 			"git", "-c", "user.email=test@test", "-c", "user.name=test", "commit", "-q", "-m", "init", nullptr,
 		};
 		ASSERT(run_command(commit_argv, RUN_CMD_QUIET) == 0, "git commit nested failed");
+		char *tag_argv[] = { "git", "tag", "v1.0", nullptr };
+		ASSERT(run_command(tag_argv, RUN_CMD_QUIET) == 0, "git tag nested failed");
 	}
 
 	/* Local registry fixture: a recipe for "nested" whose recipe_url is

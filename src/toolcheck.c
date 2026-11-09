@@ -1,13 +1,16 @@
 #include "toolcheck.h"
 
 #include "build.h"
+#include "safe.h"
 #include "strings.h"
 
 #include <stdbool.h>
 
+#include <stdlib.h>
 #include <string.h>
 
 #include <sds/sds.h>
+#include <unistd.h>
 
 static bool tool_exists(const char *name)
 {
@@ -16,6 +19,35 @@ static bool tool_exists(const char *name)
 	bool  result  = (run_command(argv, RUN_CMD_QUIET | RUN_CMD_NOOUT) == 0);
 	sdsfree(my_name);
 	return result;
+}
+
+bool toolcheck_on_path(const char *name)
+{
+	/* Tool names come from third-party recipes; a name with a '/' or a
+	 * leading '.' could probe outside the PATH directories. */
+	if (!dep_name_is_valid(name)) {
+		return false;
+	}
+	const char *path = getenv("PATH");
+	if (path == nullptr) {
+		return false;
+	}
+	bool        found = false;
+	const char *start = path;
+	while (!found) {
+		const char *end = strchr(start, ':');
+		size_t      len = end != nullptr ? (size_t)(end - start) : strlen(start);
+		/* An empty PATH entry means the current directory. */
+		sds         candidate = len == 0 ? sdsnew(".") : sdsnewlen(start, len);
+		candidate             = sdscatprintf(candidate, "/%s", name);
+		found                 = safe_access(candidate, X_OK) == 0;
+		sdsfree(candidate);
+		if (end == nullptr) {
+			break;
+		}
+		start = end + 1;
+	}
+	return found;
 }
 
 /* Hard tool requirements, per command.  clang covers the compiler and

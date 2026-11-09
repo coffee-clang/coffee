@@ -521,6 +521,15 @@ manifest_t *manifest_parse(sds path)
 				m->test.sources[i] = toml_datum_to_string(src);
 			}
 		}
+		toml_array_t *proj_arr = toml_array_in(test_tab, "project_sources");
+		if (proj_arr) {
+			m->test.project_sources_count = array_nelem_safe(proj_arr);
+			m->test.project_sources       = safe_calloc(m->test.project_sources_count, sizeof(sds));
+			for (size_t i = 0; i < m->test.project_sources_count; i++) {
+				toml_datum_t src           = toml_string_at(proj_arr, (i64)i);
+				m->test.project_sources[i] = toml_datum_to_string(src);
+			}
+		}
 		toml_datum_t harness   = toml_string_in(test_tab, "harness");
 		m->test.harness        = toml_datum_to_string(harness);
 		toml_datum_t framework = toml_string_in(test_tab, "framework");
@@ -530,12 +539,36 @@ manifest_t *manifest_parse(sds path)
 	/* Parse [compilation] section */
 	toml_table_t *comp_tab = toml_table_in(conf, "compilation");
 	if (comp_tab) {
-		toml_datum_t makefile   = toml_string_in(comp_tab, "Makefile");
-		m->compilation.makefile = toml_datum_to_string(makefile);
+		toml_datum_t makefile       = toml_string_in(comp_tab, "Makefile");
+		m->compilation.makefile     = toml_datum_to_string(makefile);
+		toml_datum_t is_static      = toml_bool_in(comp_tab, "static");
+		m->compilation.dynamic_link = is_static.ok && !is_static.u.b;
 	}
 
 	toml_free(conf);
 	return m;
+}
+
+sds *manifest_project_sources(const manifest_t *m, size_t *count)
+{
+	sds   *src = m->package.sources;
+	size_t n   = m->package.sources_count;
+	if (n == 0 && m->bin_count > 0) {
+		src = m->bin[0].src;
+		n   = m->bin[0].src_count;
+	}
+	if (n == 0) {
+		sds *out = safe_calloc(1, sizeof(sds));
+		out[0]   = sdsnew("src/*.c");
+		*count   = 1;
+		return out;
+	}
+	sds *out = safe_calloc(n, sizeof(sds));
+	for (size_t i = 0; i < n; i++) {
+		out[i] = sdsnew(src[i] != nullptr ? src[i] : "");
+	}
+	*count = n;
+	return out;
 }
 
 void manifest_extract_dep_info(const char *entry, sds *name_out, sds *version_out)
@@ -615,6 +648,10 @@ void manifest_free(manifest_t *m)
 		sdsfree(m->test.sources[i]);
 	}
 	safe_free(m->test.sources);
+	for (size_t i = 0; i < m->test.project_sources_count; i++) {
+		sdsfree(m->test.project_sources[i]);
+	}
+	safe_free(m->test.project_sources);
 	sdsfree(m->test.harness);
 	sdsfree(m->test.framework);
 
@@ -803,13 +840,22 @@ i64 manifest_write(sds path, manifest_t *m)
 		}
 	}
 
-	if (m->test.sources_count > 0 || m->test.harness || m->test.framework) {
+	if (m->test.sources_count > 0 || m->test.project_sources_count > 0 || m->test.harness || m->test.framework) {
 		fprintf_safe(fp, "\n[test]\n");
 		if (m->test.sources_count > 0) {
 			fprintf_safe(fp, "sources = [\n");
 			for (size_t i = 0; i < m->test.sources_count; i++) {
 				if (m->test.sources[i]) {
 					fprintf_toml_value(fp, "  \"%s\",\n", m->test.sources[i]);
+				}
+			}
+			fprintf_safe(fp, "]\n");
+		}
+		if (m->test.project_sources_count > 0) {
+			fprintf_safe(fp, "project_sources = [\n");
+			for (size_t i = 0; i < m->test.project_sources_count; i++) {
+				if (m->test.project_sources[i]) {
+					fprintf_toml_value(fp, "  \"%s\",\n", m->test.project_sources[i]);
 				}
 			}
 			fprintf_safe(fp, "]\n");
@@ -822,9 +868,14 @@ i64 manifest_write(sds path, manifest_t *m)
 		}
 	}
 
-	if (m->compilation.makefile) {
+	if (m->compilation.makefile || m->compilation.dynamic_link) {
 		fprintf_safe(fp, "\n[compilation]\n");
+	}
+	if (m->compilation.makefile) {
 		fprintf_toml_value(fp, "Makefile = \"%s\"\n", m->compilation.makefile);
+	}
+	if (m->compilation.dynamic_link) {
+		fprintf_safe(fp, "static = false\n");
 	}
 
 	if (fflush(fp) != 0) {

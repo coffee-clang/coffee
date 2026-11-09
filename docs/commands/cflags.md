@@ -27,7 +27,8 @@ coffee cflags json-c
 ## Implementation Notes
 
 - Resolves dependencies from Coffee.toml's `[dependencies]` section
-- For each dependency, reads `library.toml` for explicit `include` paths
-- Falls back to `deps/<name>/include` directory if no library.toml is found
+- Uses the same flags as the generated Makefile and `coffee test` (`dep_add_flags()` in `src/build.c`)
+- Include directories: `library.toml` `include` (array) and `include_dir` (string), else
+  `<dir>/include` when it exists. The fallback does not depend on the library settings
 - Uses `pkg_dir()` to locate the installation directory of each package
 - Strips trailing whitespace from the output

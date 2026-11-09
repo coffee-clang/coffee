@@ -1790,7 +1790,7 @@ TEST(covp_makefile_dep_glob_flags_skipped)
 	sds libu = sub_path(dir, "deps/libu");
 	ASSERT(mkdir(deps, 0755) == 0 && mkdir(libu, 0755) == 0, "mkdir deps");
 	sds p1 = write_file(libu, "library.toml",
-	                    "include = [\"inc*\", \"inc?\", \"good\"]\n\n"
+	                    "include = [\"inc*\", \"inc?\", \"good\"]\nlib = [\"lib\"]\nlibname = \"u\"\n\n"
 	                    "[package]\nname = \"libu\"\nversion = \"1.0.0\"\n");
 	ASSERT(p1 != nullptr, "write library.toml");
 	manifest_t *m = parse_manifest_text(dir, "dependencies = [\"libu\"]\n\n[package]\nname = \"app\"\n");
@@ -1808,7 +1808,7 @@ TEST(covp_makefile_dep_glob_flags_skipped)
 	ASSERT(out != nullptr, "render");
 	ASSERT(strstr(out, "CFLAGS += -Ideps/libu/good\n") != nullptr, "safe include kept");
 	ASSERT(strstr(out, "inc*") == nullptr && strstr(out, "inc?") == nullptr, "glob flags skipped");
-	ASSERT(strstr(out, "LDLIBS := -llibu\n") != nullptr, "prebuilt dep linked");
+	ASSERT(strstr(out, "LDLIBS := -Ldeps/libu/lib -lu\n") != nullptr, "prebuilt dep linked by libname");
 
 	sdsfree(out);
 	dep_graph_free(g);

@@ -1,6 +1,7 @@
 #ifndef TOOLCHECK_H_
 #define TOOLCHECK_H_
 
+#include <stdbool.h>
 #include <stdint.h>
 
 typedef int64_t i64;
@@ -22,5 +23,13 @@ typedef int64_t i64;
  */
 [[nodiscard]]
 i64 toolcheck_run(const char *command_name);
+
+/**
+ * @brief True when an executable named @p name is in a PATH directory.
+ *
+ * Used for the [build-dependencies] of a recipe, the host tools its
+ * install.sh runs.  Names outside [A-Za-z0-9_-] are never found.
+ */
+bool toolcheck_on_path(const char *name);
 
 #endif /* TOOLCHECK_H_ */

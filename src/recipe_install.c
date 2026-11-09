@@ -4,6 +4,7 @@
 #include "project.h"
 #include "registry.h"
 #include "safe.h"
+#include "toolcheck.h"
 #include "version.h"
 
 #include <stdio.h>
@@ -155,6 +156,41 @@ static i64 recipe_install_deps(const char *name, const char *recipe_toml, bool v
 	return ret;
 }
 
+/*
+ * Check that the host tools in the [build-dependencies] table of a
+ * downloaded recipe (cmake, meson, pkg-config, ...) are on PATH.  They
+ * are needed by install.sh and are never installed from the registry.
+ * Returns 0 when every tool is present.
+ */
+static i64 recipe_check_build_tools(const char *name, const char *recipe_toml)
+{
+	FILE *fp = safe_fopen(recipe_toml, "r");
+	if (fp == nullptr) {
+		return 0;
+	}
+	char          errbuf[256];
+	toml_table_t *conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
+	safe_fclose(fp);
+	if (conf == nullptr) {
+		fprintf_safe(stderr, "  Error: cannot parse the recipe for '%s': %s\n", name, errbuf);
+		return 1;
+	}
+	i64           ret   = 0;
+	toml_table_t *tools = toml_table_in(conf, "build-dependencies");
+	for (i64 i = 0; tools != nullptr; i++) {
+		const char *tool = toml_key_in(tools, i);
+		if (tool == nullptr) {
+			break;
+		}
+		if (!toolcheck_on_path(tool)) {
+			fprintf_safe(stderr, "  Error: building '%s' needs '%s', which is not on PATH\n", name, tool);
+			ret = 1;
+		}
+	}
+	toml_free(conf);
+	return ret;
+}
+
 /* Check the downloaded recipe against the constraint and the lockfile. */
 static bool recipe_matches(const char *name, const char *version, const char *checksum, const char *constraint,
                            const lockfile_dep_t *locked)
@@ -193,6 +229,13 @@ static i64 recipe_install_prefix(const char *name, const char *recipe_dir, const
 		return 0;
 	}
 	sdsfree(installed);
+
+	sds recipe_toml = sdscatprintf(sdsempty(), "%s/library.toml", recipe_dir);
+	i64 tools_ret   = recipe_check_build_tools(name, recipe_toml);
+	sdsfree(recipe_toml);
+	if (tools_ret != 0) {
+		return tools_ret;
+	}
 
 	if (verbose) {
 		printf_safe("    Installing %s into %s...\n", name, prefix);
@@ -270,7 +313,13 @@ static enum recipe_status recipe_install_at(const char *name, const char *constr
 	if (registry_fetch(key, r->version, recipe_dir) != 0) {
 		status = RECIPE_NOT_FOUND;
 	} else if (safe_access(script, F_OK) != 0) {
-		status = RECIPE_NO_SCRIPT;
+		/* The caller clones recipe_url at the recipe version instead. */
+		if (!version_is_valid(r->version)) {
+			fprintf_safe(stderr, "  Error: recipe for '%s' has an invalid version\n", name);
+		} else if (recipe_matches(name, r->version, "", constraint, nullptr)) {
+			info->version = sdsnew(r->version);
+			status        = RECIPE_NO_SCRIPT;
+		}
 	} else if (!version_is_valid(r->version)) {
 		fprintf_safe(stderr, "  Error: recipe for '%s' has an invalid version\n", name);
 	} else {

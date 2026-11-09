@@ -286,9 +286,10 @@ TEST(dep_graph_transitive_chain)
 	sds flags_a = dep_graph_flags(g, "libA");
 	sds flags_b = dep_graph_flags(g, "libB");
 	sds flags_c = dep_graph_flags(g, "libC");
-	ASSERT(sdslen(flags_a) > 0, "libA has flags");
-	ASSERT(sdslen(flags_b) > 0, "libB has flags");
-	ASSERT(sdslen(flags_c) > 0, "libC has flags");
+	/* Source-only deps: no include or library directory, nothing to link */
+	ASSERT(strstr(flags_a, "-l") == nullptr, "libA is not linked by name");
+	ASSERT(strstr(flags_b, "-l") == nullptr, "libB is not linked by name");
+	ASSERT(strstr(flags_c, "-l") == nullptr, "libC is not linked by name");
 	sdsfree(flags_a);
 	sdsfree(flags_b);
 	sdsfree(flags_c);
@@ -1668,6 +1669,9 @@ TEST(dep_graph_transitive_registry_fetch)
 			"-q",  "-m", "init",        nullptr,
 		};
 		ASSERT(run_command(commit_argv, RUN_CMD_QUIET) == 0, "git commit nested failed");
+		/* A recipe without install.sh is cloned at the tag v<version>. */
+		char *tag_argv[] = { "git", "-C", "nested-repo", "tag", "v1.0", nullptr };
+		ASSERT(run_command(tag_argv, RUN_CMD_QUIET) == 0, "git tag nested failed");
 	}
 
 	/* Local registry fixture: recipe for "nested" with an absolute

@@ -121,11 +121,63 @@ recipe version and `checksum` (sha256 of `install.sh`) for registry deps.
 
 ### `[compilation]` — configure the generated build
 
-⬜ **OPEN** — The generated Makefile hardcodes `-static`, `clang` and `-O3 -g`, none of which
-`Coffee.toml` can change. Add optional `cflags` / `ldflags` arrays and a `static` bool to the
-`[compilation]` section so a project that cannot be linked statically, or needs another standard,
-is buildable by coffee. Deferred on purpose: it is a `Coffee.toml` schema change and deserves its
-own plan; today the documented escape hatch is `[compilation] Makefile = "legacy"`.
+🟡 **PARTIAL** — `static = false` drops `-static` (for recipes that install only shared libraries, such as
+libsais built with `-DLIBSAIS_BUILD_SHARED_LIB=ON`, and to avoid a static glibc). The compiler (`clang`)
+and `-O3 -g` are still fixed; optional `cflags` / `ldflags` arrays remain open and deserve their own plan.
+The escape hatch is `[compilation] Makefile = "legacy"`.
+
+### Dependency link flags, build tools, test runner, Makefile safety
+
+✅ **DONE** — Fixes from the C3/C6–C10 review:
+
+- `-l` comes from `library.toml` `libname` (string or array), never from the package name alone, and
+  `header_only = true` links nothing; `include_dir` / `lib_dir` are read as well. The include/ and lib/
+  fallbacks are independent (a recipe that sets only `lib` keeps its `-I`, and lib/ is no longer added on
+  top of `lib`). `coffee cflags`, `coffee libs`, `coffee test` and the generated Makefile all go through
+  `dep_add_flags()` + `dep_split_flags()`.
+- A recipe's `[build-dependencies]` are host tools: checked on `PATH` before `install.sh` runs, never
+  installed, never graph nodes.
+- `coffee test` links `-L`/`-l` after the sources, compiles the sources of source dependencies, uses the
+  Makefile's project sources (overridable with `[test] project_sources`), and globs `[test] sources`.
+- `coffee build` refuses to overwrite a `Makefile` without the coffee banner.
+- A recipe without `install.sh` is cloned at the tag `v<version>` or `<version>`, and its version must
+  satisfy the constraint.
+
+### Multiple programs and library targets in the generated Makefile
+
+⬜ **OPEN — design proposal, not implemented.** The generated Makefile builds one program (from
+`[package] sources` or the first `[[bin]]`) and no library, so a project like bgfatools (`libgfa.a`,
+`libbgfa.a` and a CLI) needs legacy mode, and a coffee project cannot itself be packaged as a library
+recipe. Proposal for review:
+
+```toml
+[[lib]]
+name = "gfa"            # libgfa.a / libgfa.so
+src  = ["src/gfa/*.c"]
+type = "static"         # "static" (default), "shared" or "both"
+
+[[lib]]
+name = "bgfa"
+src  = ["src/bgfa/*.c"]
+deps = ["gfa"]          # project libraries it links against
+
+[[bin]]
+name = "bgfatools"
+src  = ["src/cli/*.c"]
+libs = ["bgfa", "gfa"]  # project libraries linked into this program
+```
+
+- One object rule per source (`$(OBJ_DIR)/%.o`), so objects are shared between targets instead of
+  recompiling `$(SOURCES)` per target.
+- `all` builds every `[[lib]]` and every `[[bin]]`; `--bin <name>` builds one program (today rejected as
+  "not yet implemented").
+- `[package] sources` keeps today's meaning when there is no `[[bin]]`/`[[lib]]`, so existing manifests
+  render the same Makefile.
+- An `install` target puts headers under `$(PREFIX)/include`, libraries under `$(PREFIX)/lib`, and writes
+  a `library.toml` with `libname` = the `[[lib]]` names, so a recipe's `install.sh` can be
+  `coffee build install PREFIX="$PREFIX"`.
+- Open questions: per-library public headers (`include/<name>/`?), shared-library versioning (soname),
+  and whether `[[lib]]` replaces `[package] headers`.
 
 ### `coffee build --bin` / `--example` / `--profile` / `--target`
 
@@ -206,6 +258,9 @@ dependency entries, and compact JSON registry indexes.
 | Recipes only unpack sources    | Medium   | Most recipes' `install.sh` only extract the source into `~/.coffee/<name>/<version>/` without building, so there is no `include/` or `lib/` for `cflags`/`libs`. To be fixed in the recipes repository. |
 | Bare versions are exact        | Low      | `name = "1.1.0"` (what `coffee add` writes) is an exact match, so `update` cannot move past it when the registry bumps the recipe; `outdated` still reports it. Use `">= 1.1"` to allow updates. |
 | Recipe scripts are trusted     | Info     | `fetch` runs `install.sh` from the registry as the user. Needs `bash`, `sha256sum`, `tail`, plus whatever the scripts call (`wget`, `git`, `cmake`, ...). |
+| Header changes do not rebuild | Low      | The project Makefile has no header dependencies (`-MMD`), so changing a struct in a header leaves stale objects; `make clean` first. |
+| `coffee add` edits Makefiles   | Low      | `coffee add` still appends `-l<package>` to an existing Makefile. A generated Makefile drops it on the next build; a legacy Makefile keeps the package name as a library name. |
+| No dev-dependencies            | Low      | A test framework listed in `[dependencies]` is also part of the `coffee build` link. |
 | `doc_generate` test            | Low      | Emits "doxygen not installed" error when doxygen is absent; test handles gracefully but user experience could be smoother. |
 
 ---

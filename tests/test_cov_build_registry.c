@@ -624,7 +624,7 @@ TEST(cov_br_run_command_capture_pipe_failure)
 TEST(cov_br_compile_sources_no_files)
 {
 	sds output = sdsnew("a.out");
-	ASSERT(compile_sources(nullptr, 0, output, "cc", "-O2", false) == 1, "no sources is an error");
+	ASSERT(compile_sources(nullptr, 0, output, "cc", "-O2", nullptr, false) == 1, "no sources is an error");
 	sdsfree(output);
 	PASS();
 }
@@ -640,7 +640,7 @@ TEST(cov_br_compile_sources_builds_argv)
 
 	sds srcs[2] = { sdsnew("one.c"), sdsnew("two.c") };
 	sds output  = sdsnew("prog");
-	i64 ret     = compile_sources(srcs, 2, output, cc, "-O2 -DNAME=\"a b\"  -Wall ", true);
+	i64 ret     = compile_sources(srcs, 2, output, cc, "-O2 -DNAME=\"a b\"  -Wall ", nullptr, true);
 	ASSERT(ret == 0, "compiler succeeded");
 
 	sds text = read_file_text(args);
@@ -648,7 +648,7 @@ TEST(cov_br_compile_sources_builds_argv)
 	ASSERT(strcmp(text, "-O2\n-DNAME=a b\n-Wall\n-o\nprog\none.c\ntwo.c\n") == 0, "argv assembled in order");
 	sdsfree(text);
 
-	ASSERT(compile_sources(srcs, 1, output, "/nonexistent/cc", nullptr, false) != 0, "missing compiler fails");
+	ASSERT(compile_sources(srcs, 1, output, "/nonexistent/cc", nullptr, nullptr, false) != 0, "missing compiler fails");
 
 	sdsfree(srcs[0]);
 	sdsfree(srcs[1]);
@@ -828,7 +828,7 @@ TEST(cov_br_dep_add_flags_collects_sources)
 	dep_add_flags(root, "mylib", &flags, list, &src_count);
 	ASSERT(src_count == 2, "both dependency sources collected");
 	ASSERT(strcmp(list[0], a) == 0 && strcmp(list[1], b) == 0, "sources in glob order");
-	ASSERT(strstr(flags, "-l\"mylib\"") != nullptr, "-l flag added");
+	ASSERT(strstr(flags, "-l") == nullptr, "no library directory, no -l flag");
 	for (size_t i = 0; i < src_count; i++) {
 		sdsfree(list[i]);
 	}
@@ -1632,7 +1632,7 @@ TEST(cov_br_dep_add_flags_non_string_entries)
 	sds    flags = sdsempty();
 	size_t count = 0;
 	ASSERT(dep_add_flags(one, "one", &flags, nullptr, &count) == 0, "no usable include or lib entry");
-	ASSERT(strcmp(flags, " -l\"one\"") == 0, "only the -l flag");
+	ASSERT(strcmp(flags, "") == 0, "no flags at all");
 	ASSERT(count == 0, "no source list, nothing collected");
 
 	sdsfree(flags);
@@ -1641,7 +1641,7 @@ TEST(cov_br_dep_add_flags_non_string_entries)
 	ASSERT(dep_add_flags(two, "two", &flags, list, nullptr) == 0, "no usable entry either");
 	ASSERT(dep_add_flags(two, "two", &flags, list, &count) == 0, "sources searched");
 	ASSERT(count == 0 && list[0] == nullptr, "no src/ directory, no sources");
-	ASSERT(strcmp(flags, " -l\"two\" -l\"two\"") == 0, "only -l flags");
+	ASSERT(strcmp(flags, "") == 0, "no flags either");
 
 	sdsfree(flags);
 	sdsfree(one_toml);
@@ -2078,8 +2078,162 @@ TEST(cov_br_toolcheck_all_tools_present)
 	PASS();
 }
 
+/* dep_add_flags() for one dependency directory with the given library.toml
+ * (nullptr: none) and subdirectories; returns the flags. */
+static sds flags_for(const char *root, const char *name, const char *toml, const char *dir1, const char *dir2)
+{
+	sds dir = join_path(root, name);
+	make_dirs(dir);
+	const char *subs[] = { dir1, dir2 };
+	for (size_t i = 0; i < 2; i++) {
+		if (subs[i] != nullptr) {
+			sds sub = join_path(dir, subs[i]);
+			make_dirs(sub);
+			sdsfree(sub);
+		}
+	}
+	if (toml != nullptr) {
+		sds file = join_path(dir, "library.toml");
+		write_file(file, toml);
+		sdsfree(file);
+	}
+	sds flags = sdsempty();
+	dep_add_flags(dir, name, &flags, nullptr, nullptr);
+	sdsfree(dir);
+	return flags;
+}
+
+/* libname decides the -l flags; header_only links nothing (C6/C7). */
+TEST(cov_br_dep_add_flags_libname_and_header_only)
+{
+	sds root = new_tmpdir();
+	ASSERT(root != nullptr, "tmpdir");
+
+	sds one   = flags_for(root, "sais", "libname = \"libsais\"\n", "include", "lib");
+	sds many  = flags_for(root, "gfa", "libname = [\"gfa\", \"bgfa\"]\n", "include", "lib");
+	sds hdr   = flags_for(root, "hdr", "header_only = true\n", "include", "lib");
+	sds plain = flags_for(root, "plain", nullptr, "include", "lib");
+	sds srcs  = flags_for(root, "srconly", nullptr, "include", nullptr);
+
+	bool one_ok   = strstr(one, " -l\"libsais\"") != nullptr && strstr(one, "-l\"sais\"") == nullptr;
+	bool many_ok  = strstr(many, " -l\"gfa\" -l\"bgfa\"") != nullptr;
+	bool hdr_ok   = strstr(hdr, "-l") == nullptr && strstr(hdr, "-I") != nullptr;
+	bool plain_ok = strstr(plain, " -l\"plain\"") != nullptr;
+	bool srcs_ok  = strstr(srcs, "-l") == nullptr && strstr(srcs, "-L") == nullptr;
+	sdsfree(one);
+	sdsfree(many);
+	sdsfree(hdr);
+	sdsfree(plain);
+	sdsfree(srcs);
+	leave_dir(root);
+
+	ASSERT(one_ok, "libname replaces the package name");
+	ASSERT(many_ok, "a libname array links every library");
+	ASSERT(hdr_ok, "header_only = true adds no -l");
+	ASSERT(plain_ok, "without libname, a library directory links -l<name>");
+	ASSERT(srcs_ok, "no library directory, nothing to link");
+	PASS();
+}
+
+/* The include/ and lib/ fallbacks are independent: a recipe that sets only
+ * lib still gets include/, and lib/ is not added on top of lib. */
+TEST(cov_br_dep_add_flags_independent_fallbacks)
+{
+	sds root = new_tmpdir();
+	ASSERT(root != nullptr, "tmpdir");
+
+	sds only_lib = flags_for(root, "onlylib", "lib = [\"lib64\"]\n", "include", "lib");
+	sds only_inc = flags_for(root, "onlyinc", "include = [\"inc\"]\n", "include", "lib");
+	sds dirs     = flags_for(root, "dirs", "include_dir = \"include/x\"\nlib_dir = \"lib64\"\n", "include", "lib");
+
+	sds inc_onlylib = sdscatprintf(sdsempty(), " -I\"%s/onlylib/include\"", root);
+	sds lib_onlyinc = sdscatprintf(sdsempty(), " -L\"%s/onlyinc/lib\"", root);
+	sds inc_dirs    = sdscatprintf(sdsempty(), " -I\"%s/dirs/include/x\"", root);
+	sds lib_dirs    = sdscatprintf(sdsempty(), " -L\"%s/dirs/lib64\"", root);
+
+	bool lib_ok  = strstr(only_lib, inc_onlylib) != nullptr && strstr(only_lib, "/onlylib/lib\"") == nullptr &&
+	               strstr(only_lib, "/onlylib/lib64\"") != nullptr;
+	bool inc_ok  = strstr(only_inc, lib_onlyinc) != nullptr && strstr(only_inc, "/onlyinc/include\"") == nullptr;
+	bool dirs_ok = strstr(dirs, inc_dirs) != nullptr && strstr(dirs, lib_dirs) != nullptr &&
+	               strstr(dirs, "/dirs/include\"") == nullptr && strstr(dirs, "/dirs/lib\"") == nullptr;
+
+	sdsfree(inc_onlylib);
+	sdsfree(lib_onlyinc);
+	sdsfree(inc_dirs);
+	sdsfree(lib_dirs);
+	sdsfree(only_lib);
+	sdsfree(only_inc);
+	sdsfree(dirs);
+	leave_dir(root);
+
+	ASSERT(lib_ok, "lib set: include/ fallback kept, lib/ fallback not duplicated");
+	ASSERT(inc_ok, "include set: lib/ fallback kept, include/ not duplicated");
+	ASSERT(dirs_ok, "include_dir and lib_dir replace the fallbacks");
+	PASS();
+}
+
+/* dep_split_flags(): -I to the compiler, -L/-l to the linker, and no link
+ * flags for a dependency compiled from source. */
+TEST(cov_br_dep_split_flags)
+{
+	const char *flags   = " -I\"a b/include\" -L\"a b/lib\" -l\"x\"";
+	sds         compile = sdsempty();
+	sds         link    = sdsempty();
+	dep_split_flags(flags, false, &compile, &link);
+	ASSERT(strcmp(compile, " \"-Ia b/include\"") == 0, "compile flags");
+	ASSERT(strcmp(link, " \"-La b/lib\" \"-lx\"") == 0, "link flags");
+
+	sdsclear(compile);
+	sdsclear(link);
+	dep_split_flags(flags, true, &compile, &link);
+	ASSERT(strcmp(compile, " \"-Ia b/include\"") == 0, "compile flags kept for a source dep");
+	ASSERT(sdslen(link) == 0, "no link flags for a source dep");
+
+	sds printed = flags_append_unquoted(sdsempty(), " \"-La b/lib\" \"-lx\"");
+	ASSERT(strcmp(printed, "-La b/lib -lx ") == 0, "unquoted form");
+	sdsfree(printed);
+	sdsfree(compile);
+	sdsfree(link);
+	PASS();
+}
+
+/* toolcheck_on_path() looks executables up in PATH, for recipe build tools. */
+TEST(cov_br_toolcheck_on_path)
+{
+	sds root = new_tmpdir();
+	ASSERT(root != nullptr, "tmpdir");
+	sds tool = join_path(root, "coffee-fake-tool");
+	ASSERT(write_file(tool, "#!/bin/sh\n"), "tool");
+	chmod(tool, 0755);
+	sds plain = join_path(root, "coffee-not-exec");
+	ASSERT(write_file(plain, "data\n"), "non-executable");
+	sds old_path = prepend_path(root);
+
+	bool found     = toolcheck_on_path("coffee-fake-tool");
+	bool not_exec  = toolcheck_on_path("coffee-not-exec");
+	bool missing   = toolcheck_on_path("coffee-no-such-tool");
+	bool traversal = toolcheck_on_path("../bin/sh");
+	setenv("PATH", "", 1);
+	bool empty_path = toolcheck_on_path("coffee-fake-tool");
+	env_restore("PATH", old_path);
+
+	sdsfree(tool);
+	sdsfree(plain);
+	leave_dir(root);
+	ASSERT(found, "an executable in PATH is found");
+	ASSERT(!not_exec, "a non-executable file is not a tool");
+	ASSERT(!missing, "a missing tool is not found");
+	ASSERT(!traversal, "a name with a path is rejected");
+	ASSERT(!empty_path, "an empty PATH entry means the cwd only");
+	PASS();
+}
+
 void coffee_register_cov_build_registry_tests(void)
 {
+	TEST_REGISTER(cov_br_dep_add_flags_libname_and_header_only);
+	TEST_REGISTER(cov_br_dep_add_flags_independent_fallbacks);
+	TEST_REGISTER(cov_br_dep_split_flags);
+	TEST_REGISTER(cov_br_toolcheck_on_path);
 	TEST_REGISTER(cov_br_toml_escape_specials);
 	TEST_REGISTER(cov_br_toml_escape_manifest_roundtrip);
 	TEST_REGISTER(cov_br_safe_fopen_nofollow);

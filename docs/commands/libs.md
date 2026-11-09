@@ -27,8 +27,10 @@ coffee libs cjson
 ## Implementation Notes
 
 - Resolves dependencies from Coffee.toml's `[dependencies]` section
-- For each dependency, reads `library.toml` for explicit `lib` paths and `libname` override
-- Falls back to `deps/<name>/lib` directory if no library.toml is found
-- Uses the package name as the library name (`-l<name>`) unless overridden in library.toml
+- Uses the same flags as the generated Makefile and `coffee test` (`dep_add_flags()` in `src/build.c`)
+- Library directories: `library.toml` `lib` (array) and `lib_dir` (string), else `<dir>/lib` when it exists
+- Libraries: `-l` for each `libname` (a string or an array of strings). Without `libname`, a package
+  with a library directory is linked as `-l<name>`, and one without links nothing.
+  `header_only = true` links nothing
 - Uses `pkg_dir()` to locate the installation directory of each package
 - Strips trailing whitespace from the output

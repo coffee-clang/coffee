@@ -290,6 +290,27 @@ static i64 record_installed_recipe(const char *name, lockfile_dep_t **deps, size
 }
 
 /*
+ * Clone the source of a recipe without install.sh at the recipe version:
+ * the tag v<version>, else the tag <version>.  The default branch is
+ * never used, since it need not match the version the recipe declares.
+ */
+static i64 fetch_recipe_source(const char *name, const char *url, const char *version, const char *global_dir,
+                               bool verbose)
+{
+	sds tag = sdscatprintf(sdsempty(), "v%s", version);
+	i64 ret = fetch_git_dep(name, url, global_dir, tag, verbose);
+	if (ret != 0) {
+		ret = fetch_git_dep(name, url, global_dir, version, verbose);
+	}
+	if (ret != 0) {
+		fprintf_safe(stderr, "  Error: cannot clone '%s' %s from %s (no tag %s or %s)\n", name, version, url, tag,
+		             version);
+	}
+	sdsfree(tag);
+	return ret;
+}
+
+/*
  * Materialize a dependency declared as a plain version string (no git or
  * path source) by resolving it through the registry.  When the recipe ships
  * an install.sh, install it (see recipe_install.h) and symlink deps/<name>
@@ -330,10 +351,17 @@ static i64 fetch_registry_dep(const char *name, const char *constraint, const lo
 			fprintf_safe(stderr, "  Error: cannot resolve '%s' from the registry (unknown package or unreachable)\n",
 			             name);
 		}
+		recipe_info_free(&info);
 		return 1;
 	}
-	i64 ret = fetch_git_dep(name, url, global_dir, nullptr, verbose);
+	i64 ret = 1;
+	if (info.version != nullptr) {
+		ret = fetch_recipe_source(name, url, info.version, global_dir, verbose);
+	} else {
+		fprintf_safe(stderr, "  Error: cannot download the recipe for '%s'\n", name);
+	}
 	sdsfree(url);
+	recipe_info_free(&info);
 	if (ret != 0) {
 		return ret;
 	}

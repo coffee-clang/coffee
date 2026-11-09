@@ -26,6 +26,9 @@ coffee fetch
   it into ~/.coffee/<name>/<version>/, and deps/<name> is symlinked there, so `cflags` and `libs` pick
   up its include/ and lib/ folders (implemented in `src/recipe_install.c`)
 - The recipe version must satisfy the version in Coffee.toml (a bare version is an exact match)
+- The host tools in the recipe's `[build-dependencies]` (cmake, meson, pkg-config, ...) must be on `PATH`
+  before its `install.sh` runs; they are never installed from the registry and are not dependency graph
+  nodes. A missing tool fails the fetch and is named in the error
 - The recipe's own `[dependencies]` are installed first, so its `install.sh` can build against them.
   The recipe's library.toml is copied into the install directory, which makes those dependencies
   graph nodes that are linked into deps/ and recorded in Coffee.lock as well
@@ -37,7 +40,9 @@ coffee fetch
   A failing `install.sh` fails the fetch
 - Coffee.lock records the recipe version, the install directory and the `install.sh` checksum
 - A recipe without `install.sh` falls back to cloning its `recipe_url` into ~/.coffee/deps/ and
-  symlinking it into deps/
+  symlinking it into deps/. The recipe version must satisfy Coffee.toml, and the clone checks out the tag
+  `v<version>`, else `<version>`; a repository with neither tag fails the fetch rather than building
+  whatever the default branch holds
 - A dep that cannot be materialized (no source, not in the registry) fails the fetch and leaves
   Coffee.lock unchanged
 - `--offline` never touches the network: git deps and registry deps are recorded only if already on

@@ -1492,6 +1492,88 @@ TEST(cov_fetch_registry_install_script_fails)
 	PASS();
 }
 
+/* [build-dependencies] are host tools: checked on PATH before install.sh
+ * runs, never installed, and never dependency graph nodes (C8). */
+TEST(cov_fetch_registry_build_tools)
+{
+	sds root = tmp_new();
+	sandbox_on(root);
+	proj_enter(root, "toolproj", "[dependencies]\nregdep = \"1.0\"\n");
+	sds script = recipe_script("regdep", "1.0.0", nullptr);
+	recipe_fixture(root, "regdep", "1.0.0", "\n[build-dependencies]\ncoffee-no-such-tool = \"\"\n", script);
+
+	i64  missing_ret = fetch_with(false, false);
+	bool reported    = file_contains("err.txt", "building 'regdep' needs 'coffee-no-such-tool'");
+	sds  runs        = install_runs(root);
+	bool not_run     = runs == nullptr || sdslen(runs) == 0;
+	sdsfree(runs);
+
+	recipe_fixture(root, "regdep", "1.0.0", "\n[build-dependencies]\nsh = \"\"\n", script);
+	i64  ok_ret    = fetch_with(false, false);
+	sds  lock      = lock_text();
+	bool no_tool   = strstr(lock, "name = \"sh\"") == nullptr;
+	bool installed = safe_access("deps/regdep/include/regdep.h", F_OK) == 0;
+	sdsfree(lock);
+	sdsfree(script);
+	sandbox_off();
+	leave_dir(root);
+
+	ASSERT(missing_ret == 1, "a missing build tool fails the fetch");
+	ASSERT(reported, "the missing tool is named");
+	ASSERT(not_run, "install.sh does not run without its tools");
+	ASSERT(ok_ret == 0, "fetch succeeds when the tool is on PATH");
+	ASSERT(installed, "the package is installed");
+	ASSERT(no_tool, "the build tool is not a dependency");
+	PASS();
+}
+
+/* A recipe without install.sh is cloned at its version's tag, never at the
+ * default branch, and its version must satisfy the constraint (C3). */
+TEST(cov_fetch_registry_no_script_uses_version)
+{
+	sds root   = tmp_new();
+	sds origin = join(root, "origin");
+	origin_make(origin);
+	sandbox_on(root);
+	proj_enter(root, "tagproj", "[dependencies]\nregdep = \"1.0\"\n");
+	sds   recipe_dir   = join(root, "registry/recipes/r/regdep");
+	char *mkdir_argv[] = { "mkdir", "-p", recipe_dir, nullptr };
+	run_command(mkdir_argv, RUN_CMD_QUIET);
+	sds recipe = join(recipe_dir, "library.toml");
+	sds text   = sdscatprintf(sdsempty(), "version = \"1.0.0\"\nrecipe_url = \"%s\"\n", origin);
+	write_text(recipe, text);
+
+	i64  untagged_ret = fetch_with(false, false);
+	bool no_tag       = file_contains("err.txt", "no tag v1.0.0 or 1.0.0");
+
+	git_in(origin, "tag", "1.0.0", nullptr, nullptr, nullptr);
+	i64  tagged_ret = fetch_with(false, false);
+	bool linked     = safe_access("deps/regdep/src/origin.c", F_OK) == 0;
+
+	struct recipe_info info;
+	enum recipe_status st      = recipe_install("regdep", ">= 2.0", nullptr, false, &info);
+	bool               refused = st == RECIPE_FAILED;
+	recipe_info_free(&info);
+	st              = recipe_install("regdep", nullptr, nullptr, false, &info);
+	bool version_ok = st == RECIPE_NO_SCRIPT && info.version != nullptr && strcmp(info.version, "1.0.0") == 0;
+	recipe_info_free(&info);
+
+	sdsfree(text);
+	sdsfree(recipe);
+	sdsfree(recipe_dir);
+	sdsfree(origin);
+	sandbox_off();
+	leave_dir(root);
+
+	ASSERT(untagged_ret == 1, "a repository without the version tag is refused");
+	ASSERT(no_tag, "the missing tag is reported");
+	ASSERT(tagged_ret == 0, "the tag <version> is cloned");
+	ASSERT(linked, "the clone is linked");
+	ASSERT(refused, "a version outside the constraint is refused");
+	ASSERT(version_ok, "RECIPE_NO_SCRIPT reports the recipe version");
+	PASS();
+}
+
 /* A recipe's own dependencies are installed before it, and become graph
  * nodes through the library.toml copied into the prefix. */
 TEST(cov_fetch_registry_recipe_deps_first)
@@ -3929,6 +4011,7 @@ TEST(cov_recipe_install_edge_cases)
 	ASSERT(recipe_install("ghost", nullptr, nullptr, false, &info) == RECIPE_NOT_FOUND, "unknown recipe");
 	recipe_fixture(root, "noscript", "1.0.0", nullptr, nullptr);
 	ASSERT(recipe_install("noscript", nullptr, nullptr, false, &info) == RECIPE_NO_SCRIPT, "no install.sh");
+	recipe_info_free(&info);
 
 	/* Verbose, against a lock entry without version or checksum. */
 	sds script = recipe_script("vrb", "1.0.0", nullptr);
@@ -4407,6 +4490,8 @@ void coffee_register_cov_deps_commands_tests(void)
 	TEST_REGISTER(cov_fetch_registry_failures);
 	TEST_REGISTER(cov_fetch_registry_install_script);
 	TEST_REGISTER(cov_fetch_registry_install_script_fails);
+	TEST_REGISTER(cov_fetch_registry_build_tools);
+	TEST_REGISTER(cov_fetch_registry_no_script_uses_version);
 	TEST_REGISTER(cov_fetch_registry_recipe_deps_first);
 	TEST_REGISTER(cov_fetch_registry_version_mismatch);
 	TEST_REGISTER(cov_fetch_registry_locked_and_offline);

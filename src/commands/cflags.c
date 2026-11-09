@@ -1,3 +1,4 @@
+#include "../build.h"
 #include "../coffee.h"
 #include "../manifest.h"
 #include "../project.h"
@@ -22,43 +23,16 @@ static void append_cflags_for_pkg(const char *name, sds *buf)
 		return;
 	}
 
-	sds toml_path = sdscatprintf(sdsempty(), "%s/library.toml", dir);
+	sds flags   = sdsempty();
+	sds compile = sdsempty();
+	sds link    = sdsempty();
+	dep_add_flags(dir, name, &flags, nullptr, nullptr);
+	dep_split_flags(flags, false, &compile, &link);
+	*buf = flags_append_unquoted(*buf, compile);
 
-	i64   found = 0;
-	FILE *fp    = safe_fopen(toml_path, "r");
-	if (fp) {
-		char          errbuf[256];
-		toml_table_t *conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
-		if (conf) {
-			toml_array_t *inc = toml_array_in(conf, "include");
-			if (inc) {
-				i64 n = toml_array_nelem(inc);
-				for (i64 i = 0; i < n; i++) {
-					toml_raw_t raw = toml_raw_at(inc, i);
-					if (raw) {
-						char *s;
-						if (toml_rtos(raw, &s) == 0 && s) {
-							*buf = sdscatprintf(*buf, "-I%s/%s ", dir, s);
-							safe_free(s);
-							found = 1;
-						}
-					}
-				}
-			}
-			toml_free(conf);
-		}
-		safe_fclose(fp);
-	}
-
-	if (!found) {
-		sds inc_path = sdscatprintf(sdsempty(), "%s/include", dir);
-		if (safe_access(inc_path, F_OK) == 0) {
-			*buf = sdscatprintf(*buf, "-I%s ", inc_path);
-		}
-		sdsfree(inc_path);
-	}
-
-	sdsfree(toml_path);
+	sdsfree(link);
+	sdsfree(compile);
+	sdsfree(flags);
 	sdsfree(dir);
 }
 

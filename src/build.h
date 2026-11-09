@@ -44,10 +44,12 @@ sds run_command_capture(char **argv, int flags);
  * output: path to output binary
  * cc: compiler to use (e.g. "clang")
  * flags: compiler flags string (space-separated, e.g. "-O0 -g -DFOO")
+ * link_flags: linker flags (-L, -l) placed after the sources, or nullptr
  * verbose: if true, print the compiler command
  * Returns 0 on success, non-zero on failure.
  */
-i64 compile_sources(sds *src_files, size_t n, sds output, char *cc, const char *flags_in, bool verbose);
+i64 compile_sources(sds *src_files, size_t n, sds output, char *cc, const char *flags_in, const char *link_flags,
+                    bool verbose);
 
 /*
  * Build a project: generate (or reuse) the Makefile and run make on the
@@ -92,11 +94,34 @@ i64 deps_fetch_missing(manifest_t *m, options *opts);
 sds dep_resolve_dir_constraint(const char *name, const char *constraint);
 
 /*
- * Append compiler flags for a single dependency to the flags string.
- * Returns the number of .c source files found (appended to src_argv).
- * Pass nullptr for src_list/src_count if only flags are needed.
+ * Append compiler and linker flags for a single dependency to the flags
+ * string, as space-separated -I"dir", -L"dir" and -l"name" tokens:
+ * include and library directories from library.toml (include/include_dir,
+ * lib/lib_dir) or from the include/ and lib/ directories, -l for each
+ * libname (else -l<dep_name> when there is a library directory), and no
+ * -l at all when header_only = true.  Returns nonzero when library.toml
+ * named include or library directories.  When src_list and src_count are
+ * both non-null, the dependency's .c files in src/ are appended to src_list.
  */
 size_t dep_add_flags(const char *dep_dir, const char *dep_name, sds *flags, sds *src_list, size_t *src_count);
+
+/*
+ * Split one dependency's dep_add_flags() output into compiler flags
+ * (appended to compile) and linker flags -L/-l (appended to link), each
+ * token wrapped in double quotes.  A dependency that ships sources is
+ * compiled into the binary, so its linker flags are dropped: linking its
+ * library as well would define every symbol twice.  Linker flags belong
+ * after the sources on the command line, where ld can resolve the symbols
+ * the objects need.
+ */
+void dep_split_flags(const char *flags, bool has_sources, sds *compile, sds *link);
+
+/*
+ * Append every token of flags to out with its double quotes removed,
+ * each followed by a space: the form `coffee cflags` and `coffee libs`
+ * print.  Returns the updated out.
+ */
+sds flags_append_unquoted(sds out, const char *flags);
 
 /*
  * Extract dependency name from a raw TOML dependency entry string.

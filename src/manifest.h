@@ -53,12 +53,15 @@ typedef struct {
 typedef struct {
 	sds   *sources;
 	size_t sources_count;
+	sds   *project_sources; /* project source globs for the test runner; default: manifest_project_sources() */
+	size_t project_sources_count;
 	sds    harness;
 	sds    framework;
 } test_section_t;
 
 typedef struct {
-	sds makefile; /* "legacy" = run only; any other value = generate */
+	sds  makefile;     /* "legacy" = run only; any other value = generate */
+	bool dynamic_link; /* static = false: the generated Makefile links without -static */
 } compilation_t;
 
 typedef struct {
@@ -85,6 +88,14 @@ i64         manifest_write(sds path, manifest_t *m);
  * @return true if a dependency was removed, false otherwise
  */
 bool manifest_remove_dependency(manifest_t *m, const char *name);
+
+/*
+ * The source globs that make up the project build: [package] sources,
+ * else the first [[bin]] src, else every .c file in src/.  The generated Makefile and
+ * `coffee test` both use it.  Returns a new array of new strings (free
+ * each with sdsfree, then the array with safe_free); *count is never 0.
+ */
+sds *manifest_project_sources(const manifest_t *m, size_t *count);
 
 /**
  * Extract package name and version constraint from a dependency entry.

@@ -1,3 +1,4 @@
+#include "../build.h"
 #include "../coffee.h"
 #include "../manifest.h"
 #include "../project.h"
@@ -22,62 +23,16 @@ static void append_libs_for_pkg(const char *name, sds *buf)
 		return;
 	}
 
-	i64 has_libdir = 0;
-	sds libname    = sdsnew(name);
+	sds flags   = sdsempty();
+	sds compile = sdsempty();
+	sds link    = sdsempty();
+	dep_add_flags(dir, name, &flags, nullptr, nullptr);
+	dep_split_flags(flags, false, &compile, &link);
+	*buf = flags_append_unquoted(*buf, link);
 
-	sds toml_path = sdscatprintf(sdsempty(), "%s/library.toml", dir);
-
-	FILE *fp = safe_fopen(toml_path, "r");
-	if (fp) {
-		char          errbuf[256];
-		toml_table_t *conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
-		if (conf) {
-			/* Read libname override */
-			toml_raw_t raw_libname = toml_raw_in(conf, "libname");
-			if (raw_libname) {
-				char *s;
-				if (toml_rtos(raw_libname, &s) == 0 && s) {
-					sdsfree(libname);
-					libname = sdsnew(s);
-					safe_free(s);
-				}
-			}
-
-			/* Read lib array */
-			toml_array_t *lib = toml_array_in(conf, "lib");
-			if (lib) {
-				i64 n = toml_array_nelem(lib);
-				for (i64 i = 0; i < n; i++) {
-					toml_raw_t raw = toml_raw_at(lib, i);
-					if (raw) {
-						char *s;
-						if (toml_rtos(raw, &s) == 0 && s) {
-							*buf = sdscatprintf(*buf, "-L%s/%s ", dir, s);
-							safe_free(s);
-							has_libdir = 1;
-						}
-					}
-				}
-			}
-			toml_free(conf);
-		}
-		safe_fclose(fp);
-	}
-
-	/* Fallback: convention-based library path */
-	if (!has_libdir) {
-		sds lib_path = sdscatprintf(sdsempty(), "%s/lib", dir);
-		if (safe_access(lib_path, F_OK) == 0) {
-			*buf = sdscatprintf(*buf, "-L%s ", lib_path);
-		}
-		sdsfree(lib_path);
-	}
-
-	/* Append -l flag */
-	*buf = sdscatprintf(*buf, "-l%s ", libname);
-
-	sdsfree(libname);
-	sdsfree(toml_path);
+	sdsfree(link);
+	sdsfree(compile);
+	sdsfree(flags);
 	sdsfree(dir);
 }
 

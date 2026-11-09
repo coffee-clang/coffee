@@ -36,7 +36,10 @@ struct recipe_info {
  * installed first, so its install.sh can build against them.  constraint
  * (nullable) must be satisfied by the recipe version.  When locked is
  * non-null, the recipe version and the install.sh checksum must match it.
- * On RECIPE_INSTALLED, *info is filled (free with recipe_info_free).
+ * On RECIPE_INSTALLED, *info is filled; on RECIPE_NO_SCRIPT, only
+ * info->version is, after checking it against constraint.  Free it with
+ * recipe_info_free either way.  The host tools listed in the recipe's
+ * [build-dependencies] must be on PATH before install.sh runs.
  */
 enum recipe_status recipe_install(const char *name, const char *constraint, const lockfile_dep_t *locked, bool verbose,
                                   struct recipe_info *info);
