@@ -1109,6 +1109,643 @@ TEST(covp_cmdline_null_args_rejected)
 	PASS();
 }
 
+TEST(covp_cmdline_jobs_out_of_range)
+{
+	char *negative[] = { (char *)"coffee", (char *)"-j", (char *)"-1", nullptr };
+	char *too_big[]  = { (char *)"coffee", (char *)"--jobs", (char *)"3000000000", nullptr };
+	char *in_range[] = { (char *)"coffee", (char *)"-j", (char *)"2147483647", nullptr };
+
+	struct cli_args args;
+	ASSERT(cmdline_parser(3, negative, &args) == 1, "negative job count rejected");
+	ASSERT(cmdline_parser(3, too_big, &args) == 1, "job count above INT_MAX rejected");
+	ASSERT(cmdline_parser(3, in_range, &args) == 0, "INT_MAX job count accepted");
+	ASSERT(args.jobs_arg == 2'147'483'647, "job count stored");
+	cmdline_parser_free(&args);
+	PASS();
+}
+
+/* ------------------------------------------------------------------ */
+/* version.c: operator and cursor edges                               */
+/* ------------------------------------------------------------------ */
+
+TEST(covp_version_satisfies_more_edges)
+{
+	ASSERT(version_satisfies("1.0.0", "!1.0.0"), "lone '!' is not an operator; unparseable passes");
+	ASSERT(version_satisfies("*1", ">= 1.0"), "star prefix is not the wildcard; unparseable passes");
+	ASSERT(version_satisfies("1.2.3", ">= 1.0,"), "trailing comma ends the walk");
+	ASSERT(!version_satisfies("0.9.0", ">= 1.0,"), "trailing comma still checks the first segment");
+	PASS();
+}
+
+/* ------------------------------------------------------------------ */
+/* lockfile.c: empty dependency array and lockfile_same_deps          */
+/* ------------------------------------------------------------------ */
+
+TEST(covp_lockfile_parse_empty_dependencies)
+{
+	sds dir = make_scratch_dir();
+	ASSERT(dir != nullptr, "scratch dir");
+	sds path = write_file(dir, "Coffee.lock", "version = 1\ndependencies = []\n");
+	ASSERT(path != nullptr, "write file");
+
+	lockfile_t *lf = lockfile_parse(path);
+	ASSERT(lf != nullptr, "empty array parses");
+	ASSERT(lf->deps_count == 0 && lf->deps == nullptr, "no deps allocated");
+
+	lockfile_free(lf);
+	sdsfree(path);
+	drop_scratch_dir(dir);
+	PASS();
+}
+
+/* Fields of one lockfile entry, in lockfile_dep_t order; nullptr = absent. */
+struct lock_fields {
+	const char *name;
+	const char *version;
+	const char *path;
+	const char *commit;
+	const char *checksum;
+};
+
+static sds sds_or_null(const char *s)
+{
+	if (s == nullptr) {
+		return nullptr;
+	}
+	return sdsnew(s);
+}
+
+static void lock_dep_fill(lockfile_dep_t *d, const struct lock_fields *f)
+{
+	d->name     = sds_or_null(f->name);
+	d->version  = sds_or_null(f->version);
+	d->path     = sds_or_null(f->path);
+	d->commit   = sds_or_null(f->commit);
+	d->checksum = sds_or_null(f->checksum);
+}
+
+static void lock_dep_clear(lockfile_dep_t *d)
+{
+	sdsfree(d->name);
+	sdsfree(d->version);
+	sdsfree(d->path);
+	sdsfree(d->commit);
+	sdsfree(d->checksum);
+}
+
+/* lockfile_same_deps on two single-entry lockfiles. */
+static bool same_single_dep(const struct lock_fields *fa, const struct lock_fields *fb)
+{
+	lockfile_dep_t da = { 0 };
+	lockfile_dep_t db = { 0 };
+	lock_dep_fill(&da, fa);
+	lock_dep_fill(&db, fb);
+	lockfile_t a = { 0 };
+	lockfile_t b = { 0 };
+	a.deps       = &da;
+	a.deps_count = 1;
+	b.deps       = &db;
+	b.deps_count = 1;
+	bool same    = lockfile_same_deps(&a, &b);
+	lock_dep_clear(&da);
+	lock_dep_clear(&db);
+	return same;
+}
+
+TEST(covp_lockfile_same_deps_fields)
+{
+	static const struct lock_fields base = { "x", "1.0", "deps/x", "abc", "sum" };
+	static const struct {
+		struct lock_fields other;
+		bool               same;
+		const char        *what;
+	} cases[] = {
+		{ { "x", "1.0", "deps/x", "abc", "sum" }, true, "identical entries" },
+		{ { "y", "1.0", "deps/x", "abc", "sum" }, false, "name differs" },
+		{ { "x", "2.0", "deps/x", "abc", "sum" }, false, "version differs" },
+		{ { "x", "1.0", "deps/y", "abc", "sum" }, false, "path differs" },
+		{ { "x", "1.0", "deps/x", "def", "sum" }, false, "commit differs" },
+		{ { "x", "1.0", "deps/x", "abc", "other" }, false, "checksum differs" },
+		{ { "x", nullptr, "deps/x", "abc", "sum" }, false, "version missing" },
+		{ { "x", "1.0", nullptr, "abc", "sum" }, false, "path missing" },
+		{ { "x", "1.0", "deps/x", nullptr, "sum" }, false, "commit missing" },
+		{ { "x", "1.0", "deps/x", "abc", nullptr }, false, "checksum missing" },
+	};
+
+	for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+		ASSERT(same_single_dep(&base, &cases[i].other) == cases[i].same, cases[i].what);
+		ASSERT(same_single_dep(&cases[i].other, &base) == cases[i].same, cases[i].what);
+	}
+
+	static const struct lock_fields bare = { "x", nullptr, nullptr, nullptr, nullptr };
+	ASSERT(same_single_dep(&bare, &bare), "entries with only a name match");
+	PASS();
+}
+
+TEST(covp_lockfile_same_deps_shape)
+{
+	static const struct lock_fields fx = { "x", "1.0", nullptr, nullptr, nullptr };
+	static const struct lock_fields fy = { "y", "2.0", nullptr, nullptr, nullptr };
+
+	lockfile_dep_t ad[2] = { 0 };
+	lockfile_dep_t bd[2] = { 0 };
+	lock_dep_fill(&ad[0], &fx);
+	lock_dep_fill(&ad[1], &fy);
+	lock_dep_fill(&bd[0], &fy);
+	lock_dep_fill(&bd[1], &fx);
+	lockfile_t a = { 0 };
+	lockfile_t b = { 0 };
+	a.deps       = ad;
+	a.deps_count = 2;
+	b.deps       = bd;
+	b.deps_count = 2;
+
+	ASSERT(lockfile_same_deps(&a, &b), "order does not matter");
+	ASSERT(!lockfile_same_deps(nullptr, &b), "null first lockfile");
+	ASSERT(!lockfile_same_deps(&a, nullptr), "null second lockfile");
+	b.deps_count = 1;
+	ASSERT(!lockfile_same_deps(&a, &b), "different entry counts");
+
+	for (size_t i = 0; i < 2; i++) {
+		lock_dep_clear(&ad[i]);
+		lock_dep_clear(&bd[i]);
+	}
+	PASS();
+}
+
+/* ------------------------------------------------------------------ */
+/* manifest.c: parser edges                                           */
+/* ------------------------------------------------------------------ */
+
+TEST(covp_manifest_parse_odd_sections)
+{
+	sds dir = make_scratch_dir();
+	ASSERT(dir != nullptr, "scratch dir");
+
+	/* Feature names with characters just outside each allowed range */
+	manifest_t *m = parse_manifest_text(dir, "[package]\nname = \"p\"\n\n"
+	                                         "[features]\n\"a{b\" = []\n\"a[b\" = []\n\"a:b\" = []\n\"a!b\" = []\n"
+	                                         "f = [\"g\"]\ng = [1, \"f\"]\n");
+	ASSERT(m != nullptr, "parse odd feature names");
+	ASSERT(m->features_count == 6, "invalid names still recorded");
+	manifest_free(m);
+
+	/* A [features] table with no array entries */
+	m = parse_manifest_text(dir, "[package]\nname = \"p\"\n\n[features]\nscalar = \"x\"\n");
+	ASSERT(m != nullptr, "parse scalar-only features");
+	ASSERT(m->features_count == 0 && m->features == nullptr, "no features");
+	manifest_free(m);
+
+	/* An empty bin array */
+	m = parse_manifest_text(dir, "bin = []\n[package]\nname = \"p\"\n");
+	ASSERT(m != nullptr, "parse empty bin array");
+	ASSERT(m->bin_count == 0 && m->bin == nullptr, "no bins");
+	manifest_free(m);
+
+	/* A bin with an empty src array, and a [test] table without sources */
+	m = parse_manifest_text(dir, "[package]\nname = \"p\"\n\n"
+	                             "[[bin]]\nname = \"t\"\nsrc = []\n\n"
+	                             "[test]\nharness = \"h.c\"\n");
+	ASSERT(m != nullptr, "parse empty src");
+	ASSERT(m->bin_count == 1 && m->bin[0].src_count == 0, "bin without sources");
+	ASSERT(m->test.sources_count == 0, "test without sources");
+	ASSERT(strcmp(m->test.harness, "h.c") == 0, "harness kept");
+	manifest_free(m);
+
+	drop_scratch_dir(dir);
+	PASS();
+}
+
+TEST(covp_manifest_remove_structured_past_unnamed)
+{
+	manifest_t *m                = safe_calloc(1, sizeof(manifest_t));
+	m->dependencies.deps_count   = 2;
+	m->dependencies.deps         = safe_calloc(2, sizeof(dependency_t));
+	m->dependencies.deps[1].name = sdsnew("x");
+
+	ASSERT(manifest_remove_dependency(m, "x"), "structured dep removed past an unnamed slot");
+	ASSERT(m->dependencies.deps_count == 1, "count decremented");
+	ASSERT(m->dependencies.deps[0].name == nullptr, "unnamed slot kept");
+
+	manifest_free(m);
+	PASS();
+}
+
+TEST(covp_manifest_extract_dep_info_edges)
+{
+	static const struct {
+		const char *entry;
+		const char *name;
+		const char *version;
+	} cases[] = {
+		{ " \t", "", "*" },
+		{ "a\t= 1.0", "a", "1.0" },
+		{ " =1", " ", "1" },
+		{ "a =\t\"1.0\"", "a", "1.0" },
+		{ "a = 1.0", "a", "1.0" },
+		{ "a = 1.0 \t", "a", "1.0" },
+		{ "a = \"1.0\" ", "a", "1.0" },
+		{ "a =", "a", "" },
+	};
+
+	for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+		sds name    = nullptr;
+		sds version = nullptr;
+		manifest_extract_dep_info(cases[i].entry, &name, &version);
+		ASSERT(name != nullptr && strcmp(name, cases[i].name) == 0, cases[i].entry);
+		ASSERT(version != nullptr && strcmp(version, cases[i].version) == 0, cases[i].entry);
+		sdsfree(name);
+		sdsfree(version);
+	}
+
+	/* Outputs start non-null so the clearing is observable */
+	sds stale   = sdsnew("stale");
+	sds name    = stale;
+	sds version = stale;
+	manifest_extract_dep_info(nullptr, &name, &version);
+	ASSERT(name == nullptr && version == nullptr, "null entry clears both outputs");
+	version = stale;
+	manifest_extract_dep_info("a = 1", nullptr, &version);
+	ASSERT(version == nullptr, "null name output clears the version output");
+	name = stale;
+	manifest_extract_dep_info("a = 1", &name, nullptr);
+	ASSERT(name == nullptr, "null version output clears the name output");
+	sdsfree(stale);
+	PASS();
+}
+
+/* ------------------------------------------------------------------ */
+/* manifest.c: writer edges                                           */
+/* ------------------------------------------------------------------ */
+
+static sds *sds_array2(const char *first, const char *second)
+{
+	sds *arr = safe_calloc(2, sizeof(sds));
+	arr[0]   = sds_or_null(first);
+	arr[1]   = sds_or_null(second);
+	return arr;
+}
+
+/* One structured dep per optional field, so each field is written first. */
+static void add_single_field_deps(manifest_t *m)
+{
+	m->dependencies.deps_count = 6;
+	m->dependencies.deps       = safe_calloc(6, sizeof(dependency_t));
+	dependency_t *d            = m->dependencies.deps;
+	d[0].name                  = sdsnew("dgit");
+	d[0].git                   = sdsnew("https://example.invalid/g.git");
+	d[1].name                  = sdsnew("dver");
+	d[1].version               = sdsnew("1.0");
+	d[2].name                  = sdsnew("dbranch");
+	d[2].branch                = sdsnew("main");
+	d[3].name                  = sdsnew("dtag");
+	d[3].tag                   = sdsnew("v1");
+	d[4].name                  = sdsnew("drev");
+	d[4].rev                   = sdsnew("abc");
+	d[5].name                  = sdsnew("dopt");
+	d[5].optional              = true;
+}
+
+/* Bins: unnamed (skipped), no sources, and sources with a null slot. */
+static void add_odd_bins(manifest_t *m)
+{
+	m->bin_count        = 3;
+	m->bin              = safe_calloc(3, sizeof(binary_target_t));
+	m->bin[1].name      = sdsnew("nosrc");
+	m->bin[2].name      = sdsnew("withsrc");
+	m->bin[2].src_count = 2;
+	m->bin[2].src       = sds_array2(nullptr, "w.c");
+}
+
+TEST(covp_manifest_write_sparse_fields)
+{
+	sds dir = make_scratch_dir();
+	ASSERT(dir != nullptr, "scratch dir");
+	sds path = sub_path(dir, "Coffee.toml");
+
+	manifest_t *m             = safe_calloc(1, sizeof(manifest_t));
+	m->package.sources_count  = 2;
+	m->package.sources        = sds_array2(nullptr, "src/a.c");
+	m->package.headers_count  = 2;
+	m->package.headers        = sds_array2(nullptr, "include/a.h");
+	m->features_count         = 2;
+	m->features               = safe_calloc(2, sizeof(feature_def_t));
+	m->features[1].name       = sdsnew("f");
+	m->features[1].deps_count = 2;
+	m->features[1].deps       = sds_array2("x", nullptr);
+	m->test.harness           = sdsnew("t/h.c");
+	add_single_field_deps(m);
+	add_odd_bins(m);
+
+	ASSERT(manifest_write(path, m) == 0, "write");
+	sds text = read_all(path);
+	ASSERT(text != nullptr, "read back");
+	ASSERT(strstr(text, "[package]\n\nsources = [\n  \"src/a.c\",\n]\n") == text, "no name, null source skipped");
+	ASSERT(strstr(text, "headers = [\n  \"include/a.h\",\n]\n") != nullptr, "null header skipped");
+	ASSERT(strstr(text, "dgit = { git = ") != nullptr, "git written first");
+	ASSERT(strstr(text, "dver = { version = \"1.0\" }") != nullptr, "version written first");
+	ASSERT(strstr(text, "dbranch = { branch = \"main\" }") != nullptr, "branch written first");
+	ASSERT(strstr(text, "dtag = { tag = \"v1\" }") != nullptr, "tag written first");
+	ASSERT(strstr(text, "drev = { rev = \"abc\" }") != nullptr, "rev written first");
+	ASSERT(strstr(text, "dopt = { optional = true }") != nullptr, "optional written first");
+	ASSERT(strstr(text, "f = [\"x\", ]") != nullptr, "null feature dep skipped");
+	ASSERT(strstr(text, "harness = \"t/h.c\"") != nullptr, "harness without sources");
+	ASSERT(strstr(text, "framework") == nullptr, "no framework");
+	ASSERT(strstr(text, "name = \"nosrc\"\n\n") != nullptr, "bin without src list");
+
+	manifest_t *back = manifest_parse(path);
+	ASSERT(back != nullptr, "written file re-parses");
+	ASSERT(back->dependencies.deps_count == 6, "six structured deps");
+	ASSERT(back->bin_count == 2, "unnamed bin dropped");
+	ASSERT(back->package.sources_count == 1 && back->package.headers_count == 1, "null slots dropped");
+	manifest_free(back);
+	sdsfree(text);
+
+	/* [test] with only a framework, then with only sources (one null) */
+	sdsfree(m->test.harness);
+	m->test.harness   = nullptr;
+	m->test.framework = sdsnew("unity");
+	ASSERT(manifest_write(path, m) == 0, "write framework only");
+	text = read_all(path);
+	ASSERT(text != nullptr && strstr(text, "[test]\nframework = \"unity\"") != nullptr, "framework only");
+	sdsfree(text);
+
+	sdsfree(m->test.framework);
+	m->test.framework     = nullptr;
+	m->test.sources_count = 2;
+	m->test.sources       = sds_array2(nullptr, "t/a.c");
+	ASSERT(manifest_write(path, m) == 0, "write sources only");
+	text = read_all(path);
+	ASSERT(text != nullptr && strstr(text, "[test]\nsources = [\n  \"t/a.c\",\n]\n") != nullptr, "sources only");
+	sdsfree(text);
+
+	manifest_free(m);
+	sdsfree(path);
+	drop_scratch_dir(dir);
+	PASS();
+}
+
+/* ------------------------------------------------------------------ */
+/* coffee_features.c: null slots and argument checks                  */
+/* ------------------------------------------------------------------ */
+
+TEST(covp_features_hand_built_sets)
+{
+	resolved_features_t rf       = { 0 };
+	sds                 names[2] = { nullptr, sdsnew("app") };
+	sds                 feats[5] = { nullptr, sdsnew("default"), sdsnew("X1"), sdsnew("fast-mode"), sdsnew("a{b") };
+	feature_set_t       sets[2]  = { { 0 }, { feats, 5 } };
+	rf.package_names             = names;
+	rf.packages                  = sets;
+	rf.package_count             = 2;
+
+	sds app = sdsnew("app");
+	sds x1  = sdsnew("X1");
+	ASSERT(features_is_enabled(&rf, app, x1), "lookup skips null package and feature slots");
+	ASSERT(!features_is_enabled(&rf, nullptr, x1), "null package");
+	ASSERT(!features_is_enabled(&rf, app, nullptr), "null feature");
+	ASSERT(!features_is_enabled(nullptr, app, x1), "null set");
+
+	size_t count = 99;
+	ASSERT(features_to_compiler_flags(&rf, nullptr, &count) == nullptr, "null package");
+	ASSERT(features_to_compiler_flags(&rf, app, nullptr) == nullptr, "null count");
+	sds *flags = features_to_compiler_flags(&rf, app, &count);
+	ASSERT(flags != nullptr && count == 3, "null and default skipped");
+	ASSERT(strcmp(flags[0], "-DFEATURE_X1") == 0, "upper case and digits kept");
+	ASSERT(strcmp(flags[1], "-DFEATURE_FAST_MODE") == 0, "lower case raised, dash replaced");
+	ASSERT(strcmp(flags[2], "-DFEATURE_A{B") == 0, "bytes above z kept");
+
+	for (size_t i = 0; i < count; i++) {
+		sdsfree(flags[i]);
+	}
+	safe_free(flags);
+	sdsfree(x1);
+	sdsfree(app);
+	for (size_t i = 1; i < 5; i++) {
+		sdsfree(feats[i]);
+	}
+	sdsfree(names[1]);
+	PASS();
+}
+
+TEST(covp_features_resolve_null_slots)
+{
+	manifest_t *m             = safe_calloc(1, sizeof(manifest_t));
+	m->package.name           = sdsnew("app");
+	m->features_count         = 3;
+	m->features               = safe_calloc(3, sizeof(feature_def_t));
+	m->features[1].name       = sdsnew("default");
+	m->features[1].deps_count = 2;
+	m->features[1].deps       = sds_array2(nullptr, "fast");
+	m->features[2].name       = sdsnew("fast");
+
+	sds                  req[] = { nullptr, sdsnew("extra") };
+	resolved_features_t *rf    = features_resolve(m, req, 2, false, false);
+	ASSERT(rf != nullptr, "resolve");
+	ASSERT(package_has_feature(rf, "app", "extra"), "requested feature enabled");
+	ASSERT(package_has_feature(rf, "app", "fast"), "default dep enabled");
+	features_free(rf);
+
+	rf = features_resolve(m, nullptr, 0, true, false);
+	ASSERT(rf != nullptr, "resolve all");
+	ASSERT(package_has_feature(rf, "app", "default") && package_has_feature(rf, "app", "fast"), "all named features");
+	features_free(rf);
+
+	sdsfree(req[1]);
+	manifest_free(m);
+	PASS();
+}
+
+TEST(covp_features_dep_without_package_name)
+{
+	sds dir = make_scratch_dir();
+	ASSERT(dir != nullptr, "scratch dir");
+	sds deps = sub_path(dir, "deps");
+	sds anon = sub_path(dir, "deps/anon");
+	ASSERT(mkdir(deps, 0755) == 0 && mkdir(anon, 0755) == 0, "mkdir deps");
+	sds p1 = write_file(anon, "Coffee.toml", "[features]\nx = [\"other/y\"]\n");
+	ASSERT(p1 != nullptr, "write dep manifest");
+
+	manifest_t *m = parse_manifest_text(dir, "[package]\nname = \"app\"\n\n[features]\nf = [\"anon/x\"]\n");
+	ASSERT(m != nullptr, "parse root");
+
+	char *saved_cwd = getcwd(nullptr, 0);
+	ASSERT(saved_cwd != nullptr, "getcwd");
+	ASSERT(chdir(dir) == 0, "chdir");
+	sds                  req[] = { sdsnew("f") };
+	resolved_features_t *rf    = features_resolve(m, req, 1, false, true);
+	ASSERT(chdir(saved_cwd) == 0, "restore cwd");
+	free(saved_cwd);
+
+	ASSERT(rf != nullptr, "resolve");
+	ASSERT(package_has_feature(rf, "anon", "x"), "anon/x enabled");
+	ASSERT(rf->package_count == 2, "unnamed dep manifest adds no package and no cross refs");
+
+	features_free(rf);
+	sdsfree(req[0]);
+	manifest_free(m);
+	sdsfree(p1);
+	sdsfree(anon);
+	sdsfree(deps);
+	drop_scratch_dir(dir);
+	PASS();
+}
+
+/* ------------------------------------------------------------------ */
+/* makefile.c: value and token safety                                 */
+/* ------------------------------------------------------------------ */
+
+TEST(covp_makefile_target_dir_safety)
+{
+	static const struct {
+		const char *value;
+		bool        safe;
+	} cases[] = {
+		{ "az", true },   { "AZ", true },   { "09", true },   { "a.b", true },  { "a_b", true },  { "a/b", true },
+		{ "a+b", true },  { "a@b", true },  { "a=b", true },  { "a-b", true },  { "a*b", true },  { "a?b", true },
+		{ "a{b", false }, { "a[b", false }, { "a:b", false }, { "a!b", false }, { "a b", false }, { "a$b", false },
+	};
+
+	for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+		const char *resolved = makefile_resolve_target_dir(cases[i].value);
+		const char *expected = cases[i].safe ? cases[i].value : "build";
+		ASSERT(strcmp(resolved, expected) == 0, cases[i].value);
+	}
+	PASS();
+}
+
+/* A hand-built manifest named "mk" whose package sources are given. */
+static manifest_t *manifest_with_sources(const char **sources, size_t count)
+{
+	manifest_t *m            = safe_calloc(1, sizeof(manifest_t));
+	m->package.name          = sdsnew("mk");
+	m->package.sources_count = count;
+	m->package.sources       = safe_calloc(count, sizeof(sds));
+	for (size_t i = 0; i < count; i++) {
+		m->package.sources[i] = sds_or_null(sources[i]);
+	}
+	return m;
+}
+
+/* The SOURCES line of a rendered Makefile, or nullptr. */
+static sds render_sources_line(const manifest_t *m, const char *target_dir, bool warn)
+{
+	sds out = makefile_render(m, nullptr, nullptr, target_dir, false, false, warn);
+	if (out == nullptr) {
+		return nullptr;
+	}
+	char *start = strstr(out, "SOURCES :=");
+	char *end   = start != nullptr ? strchr(start, '\n') : nullptr;
+	sds   line  = nullptr;
+	if (end != nullptr) {
+		line = sdsnewlen(start, (size_t)(end - start));
+	}
+	sdsfree(out);
+	return line;
+}
+
+TEST(covp_makefile_source_token_safety)
+{
+	static const char *const unsafe[] = {
+		"a$b.c",  "a`b.c", "a;b.c",  "a&b.c", "a|b.c", "a>b.c",  "a<b.c",  "a#b.c",
+		"a\"b.c", "a'b.c", "a\\b.c", "a(b.c", "a)b.c", "a\nb.c", "a\rb.c", "a\tb.c",
+	};
+
+	for (size_t i = 0; i < sizeof(unsafe) / sizeof(unsafe[0]); i++) {
+		const char *sources[] = { "src/ok.c", unsafe[i] };
+		manifest_t *m         = manifest_with_sources(sources, 2);
+		sds         line      = render_sources_line(m, nullptr, false);
+		ASSERT(line != nullptr && strcmp(line, "SOURCES := src/ok.c") == 0, unsafe[i]);
+		sdsfree(line);
+		manifest_free(m);
+	}
+
+	/* All at once, plus a null slot, a '?' glob and a spaced path: more
+	 * entries than the initial list capacity */
+	const char *sources[(sizeof(unsafe) / sizeof(unsafe[0])) + 3];
+	size_t      n = 0;
+	sources[n++]  = nullptr;
+	sources[n++]  = "src/a?.c";
+	sources[n++]  = "my dir/b.c";
+	for (size_t i = 0; i < sizeof(unsafe) / sizeof(unsafe[0]); i++) {
+		sources[n++] = unsafe[i];
+	}
+	manifest_t *m    = manifest_with_sources(sources, n);
+	sds         line = render_sources_line(m, nullptr, false);
+	ASSERT(line != nullptr && strcmp(line, "SOURCES := my\\ dir/b.c $(wildcard src/a?.c)") == 0, "mixed list");
+	sdsfree(line);
+	manifest_free(m);
+	PASS();
+}
+
+TEST(covp_makefile_render_source_fallbacks)
+{
+	/* Only empty sources: nothing to list */
+	const char *empty[] = { "" };
+	manifest_t *m       = manifest_with_sources(empty, 1);
+	sds         line    = render_sources_line(m, "bad dir", true);
+	ASSERT(line != nullptr && strcmp(line, "SOURCES :=") == 0, "empty source list");
+	sdsfree(line);
+
+	sds out = makefile_render(m, nullptr, nullptr, "bad dir", false, false, false);
+	ASSERT(out != nullptr && strstr(out, "TARGET_DIR := build\n") != nullptr, "quiet fallback");
+	sdsfree(out);
+	out = makefile_render(m, nullptr, nullptr, "bad dir", false, false, true);
+	ASSERT(out != nullptr && strstr(out, "TARGET_DIR := build\n") != nullptr, "unsafe target dir falls back");
+	sdsfree(out);
+	manifest_free(m);
+
+	/* A bin without sources does not replace the default glob */
+	m               = safe_calloc(1, sizeof(manifest_t));
+	m->package.name = sdsnew("mk");
+	m->bin_count    = 1;
+	m->bin          = safe_calloc(1, sizeof(binary_target_t));
+	m->bin[0].name  = sdsnew("tool");
+	line            = render_sources_line(m, nullptr, false);
+	ASSERT(line != nullptr && strcmp(line, "SOURCES := $(wildcard src/*.c)") == 0, "default glob");
+	sdsfree(line);
+	manifest_free(m);
+	PASS();
+}
+
+TEST(covp_makefile_dep_glob_flags_skipped)
+{
+	sds dir = make_scratch_dir();
+	ASSERT(dir != nullptr, "scratch dir");
+	sds deps = sub_path(dir, "deps");
+	sds libu = sub_path(dir, "deps/libu");
+	ASSERT(mkdir(deps, 0755) == 0 && mkdir(libu, 0755) == 0, "mkdir deps");
+	sds p1 = write_file(libu, "library.toml",
+	                    "include = [\"inc*\", \"inc?\", \"good\"]\n\n"
+	                    "[package]\nname = \"libu\"\nversion = \"1.0.0\"\n");
+	ASSERT(p1 != nullptr, "write library.toml");
+	manifest_t *m = parse_manifest_text(dir, "dependencies = [\"libu\"]\n\n[package]\nname = \"app\"\n");
+	ASSERT(m != nullptr, "parse root");
+
+	char *saved_cwd = getcwd(nullptr, 0);
+	ASSERT(saved_cwd != nullptr, "getcwd");
+	ASSERT(chdir(dir) == 0, "chdir");
+	dep_graph_t *g = dep_graph_create(m, nullptr, false);
+	ASSERT(chdir(saved_cwd) == 0, "restore cwd");
+	free(saved_cwd);
+	ASSERT(g != nullptr, "graph created");
+
+	sds out = makefile_render(m, g, nullptr, nullptr, false, false, false);
+	ASSERT(out != nullptr, "render");
+	ASSERT(strstr(out, "CFLAGS += -Ideps/libu/good\n") != nullptr, "safe include kept");
+	ASSERT(strstr(out, "inc*") == nullptr && strstr(out, "inc?") == nullptr, "glob flags skipped");
+	ASSERT(strstr(out, "LDLIBS := -llibu\n") != nullptr, "prebuilt dep linked");
+
+	sdsfree(out);
+	dep_graph_free(g);
+	manifest_free(m);
+	sdsfree(p1);
+	sdsfree(libu);
+	sdsfree(deps);
+	drop_scratch_dir(dir);
+	PASS();
+}
+
 /* ------------------------------------------------------------------ */
 /* Registration                                                       */
 /* ------------------------------------------------------------------ */
@@ -1145,4 +1782,20 @@ void coffee_register_cov_parsers_tests(void)
 	TEST_REGISTER(covp_cmdline_help_exits_zero);
 	TEST_REGISTER(covp_cmdline_version_exits_zero);
 	TEST_REGISTER(covp_cmdline_null_args_rejected);
+	TEST_REGISTER(covp_cmdline_jobs_out_of_range);
+	TEST_REGISTER(covp_version_satisfies_more_edges);
+	TEST_REGISTER(covp_lockfile_parse_empty_dependencies);
+	TEST_REGISTER(covp_lockfile_same_deps_fields);
+	TEST_REGISTER(covp_lockfile_same_deps_shape);
+	TEST_REGISTER(covp_manifest_parse_odd_sections);
+	TEST_REGISTER(covp_manifest_remove_structured_past_unnamed);
+	TEST_REGISTER(covp_manifest_extract_dep_info_edges);
+	TEST_REGISTER(covp_manifest_write_sparse_fields);
+	TEST_REGISTER(covp_features_hand_built_sets);
+	TEST_REGISTER(covp_features_resolve_null_slots);
+	TEST_REGISTER(covp_features_dep_without_package_name);
+	TEST_REGISTER(covp_makefile_target_dir_safety);
+	TEST_REGISTER(covp_makefile_source_token_safety);
+	TEST_REGISTER(covp_makefile_render_source_fallbacks);
+	TEST_REGISTER(covp_makefile_dep_glob_flags_skipped);
 }
