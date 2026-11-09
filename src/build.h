@@ -9,6 +9,7 @@
 /* Flags for run_command */
 #define RUN_CMD_VERBOSE (1 << 0)
 #define RUN_CMD_QUIET   (1 << 1)
+#define RUN_CMD_NOOUT   (1 << 2)
 
 /*
  * Cast away const for execvp argv arrays. POSIX execvp takes char *const *
@@ -25,7 +26,8 @@ static inline char *unconst(const char *p)
 
 /*
  * Run an external command with fork+execvp. Returns exit code.
- * Supports flags: RUN_CMD_VERBOSE (print command), RUN_CMD_QUIET (stderr to /dev/null).
+ * Supports flags: RUN_CMD_VERBOSE (print command), RUN_CMD_QUIET (stderr to /dev/null),
+ * RUN_CMD_NOOUT (stdout to /dev/null).
  */
 i64 run_command(char **argv, int flags);
 

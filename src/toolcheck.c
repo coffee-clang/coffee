@@ -13,7 +13,7 @@ static bool tool_exists(const char *name)
 {
 	sds   my_name = sdsnew(name);
 	char *argv[]  = { my_name, "--version", nullptr };
-	bool  result  = (run_command(argv, RUN_CMD_QUIET) == 0);
+	bool  result  = (run_command(argv, RUN_CMD_QUIET | RUN_CMD_NOOUT) == 0);
 	sdsfree(my_name);
 	return result;
 }

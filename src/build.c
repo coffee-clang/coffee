@@ -38,10 +38,15 @@ i64 run_command(char **argv, int flags)
 	pid_t pid = fork();
 
 	if (pid == 0) {
-		if (flags & RUN_CMD_QUIET) {
+		if (flags & (RUN_CMD_QUIET | RUN_CMD_NOOUT)) {
 			int devnull = safe_open("/dev/null", O_WRONLY);
 			if (devnull >= 0) {
-				dup2(devnull, STDERR_FILENO);
+				if (flags & RUN_CMD_QUIET) {
+					dup2(devnull, STDERR_FILENO);
+				}
+				if (flags & RUN_CMD_NOOUT) {
+					dup2(devnull, STDOUT_FILENO);
+				}
 				safe_close(devnull);
 			}
 		}

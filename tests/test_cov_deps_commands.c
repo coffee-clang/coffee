@@ -1432,6 +1432,21 @@ TEST(cov_fetch_registry_install_script_fails)
 	PASS();
 }
 
+/* RUN_CMD_NOOUT discards the child's stdout. */
+TEST(cov_run_command_noout)
+{
+	sds root = tmp_new();
+	enter_dir(root);
+	char *argv[] = { "echo", "visible-marker", nullptr };
+	stdout_begin("out.txt");
+	i64 ret = run_command(argv, RUN_CMD_NOOUT);
+	stdout_end();
+	ASSERT(ret == 0, "echo succeeds");
+	ASSERT(!file_contains("out.txt", "visible-marker"), "stdout is discarded");
+	leave_dir(root);
+	PASS();
+}
+
 TEST(cov_fetch_offline_git_deps)
 {
 	sds root   = tmp_new();
@@ -2824,6 +2839,7 @@ void coffee_register_cov_deps_commands_tests(void)
 	TEST_REGISTER(cov_fetch_registry_failures);
 	TEST_REGISTER(cov_fetch_registry_install_script);
 	TEST_REGISTER(cov_fetch_registry_install_script_fails);
+	TEST_REGISTER(cov_run_command_noout);
 	TEST_REGISTER(cov_fetch_offline_git_deps);
 	TEST_REGISTER(cov_fetch_head_commit_edge_cases);
 	TEST_REGISTER(cov_fetch_link_failure);
