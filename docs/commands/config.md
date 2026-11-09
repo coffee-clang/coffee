@@ -24,7 +24,9 @@ coffee config unset build.jobs
 
 ## Keys
 
-Keys are dot-separated paths into the config TOML:
+Keys are dot-separated paths into the config TOML: `build.jobs` is `jobs` in the `[build]` section, and a key
+without a dot is a top-level key. `set` replaces the key in its own section (a new top-level key goes before the
+first section header) and `unset` removes it from its own section only.
 
 | Key | Default | Description |
 |-----|---------|-------------|

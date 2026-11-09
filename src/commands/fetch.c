@@ -106,6 +106,21 @@ static i64 fetch_git_dep(const char *name, const char *url, const char *global_d
 	return ret;
 }
 
+/* True when inner is outer itself or lies below it (both resolved). */
+static bool path_is_within(const char *inner, const char *outer)
+{
+	char *real_path = realpath(inner, nullptr);
+	char *real_dir  = realpath(outer, nullptr);
+	bool  within    = false;
+	if (real_path != nullptr && real_dir != nullptr) {
+		size_t len = strlen(real_dir);
+		within     = strncmp(real_path, real_dir, len) == 0 && (real_path[len] == '\0' || real_path[len] == '/');
+	}
+	safe_free(real_path);
+	safe_free(real_dir);
+	return within;
+}
+
 /*
  * Materialize a path dependency: create a symlink from deps/<name> to the path.
  */
@@ -136,6 +151,15 @@ static i64 fetch_path_dep(const char *name, const char *path, const char *local_
 
 	sds         link_path = sdscatprintf(sdsempty(), "%s/%s", local_deps_dir, name);
 	struct stat st;
+	if (lstat(link_path, &st) == 0 && !S_ISLNK(st.st_mode) && path_is_within(target, link_path)) {
+		/* deps/<name> is a real directory holding the dependency: removing
+		 * it to make room for the link would delete the source itself. */
+		fprintf_safe(stderr, "  Error: path '%s' for '%s' is inside '%s', which fetch would replace\n", path, name,
+		             link_path);
+		sdsfree(link_path);
+		sdsfree(target);
+		return 1;
+	}
 	if (lstat(link_path, &st) == 0) {
 		char *rm_argv[] = { "rm", "-rf", link_path, nullptr };
 		run_command(rm_argv, 0);

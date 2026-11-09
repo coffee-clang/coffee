@@ -1043,6 +1043,36 @@ TEST(cov_br_registry_search_cached_index)
 	PASS();
 }
 
+/* A compact one-line JSON index: keys after the opening brace or a comma
+ * on the same line are found. */
+TEST(cov_br_registry_search_compact_index)
+{
+	sds root = new_tmpdir();
+	ASSERT(root != nullptr, "tmpdir");
+	sds old_home = nullptr;
+	sds home     = setup_index_home(root,
+	                                "[{\"name\":\"alpha\",\"version\":\"1.0.0\",\"description\":\"First\"},"
+	                                "{\"name\": \"beta\", \"description\": \"version\", \"version\": \"2.0.0\"}]",
+	                                &old_home);
+
+	recipe_list_t *all = registry_search(nullptr);
+	ASSERT(all != nullptr && all->count == 2, "both objects found");
+	ASSERT(all->recipes[0].name != nullptr && strcmp(all->recipes[0].name, "alpha") == 0, "first name");
+	ASSERT(all->recipes[0].version != nullptr && strcmp(all->recipes[0].version, "1.0.0") == 0, "first version");
+	ASSERT(all->recipes[0].description != nullptr && strcmp(all->recipes[0].description, "First") == 0,
+	       "first description");
+	ASSERT(all->recipes[1].name != nullptr && strcmp(all->recipes[1].name, "beta") == 0, "second name");
+	ASSERT(all->recipes[1].version != nullptr && strcmp(all->recipes[1].version, "2.0.0") == 0,
+	       "a value equal to a key name is not taken for the key");
+	registry_free_recipes(all);
+
+	env_restore("COFFEE_HOME", old_home);
+	sdsfree(home);
+	test_remove_tree(root);
+	sdsfree(root);
+	PASS();
+}
+
 TEST(cov_br_registry_search_unusable_index)
 {
 	sds root = new_tmpdir();
@@ -1688,6 +1718,45 @@ TEST(cov_br_build_project_legacy_no_features_default_target)
 	PASS();
 }
 
+/* A deleted cwd (getcwd() fails) must still build the project named by
+ * an absolute manifest path, in that project's directory. */
+TEST(cov_br_build_project_from_deleted_cwd)
+{
+	sds root = new_tmpdir();
+	ASSERT(root != nullptr, "tmpdir");
+	sds proj = join_path(root, "proj");
+	sds gone = join_path(root, "gone");
+	make_dirs(proj);
+	make_dirs(gone);
+	sds manifest = join_path(proj, "Coffee.toml");
+	sds makefile = join_path(proj, "Makefile");
+	sds flags    = join_path(proj, "flags.txt");
+	ASSERT(write_file(manifest, legacy_manifest), "manifest");
+	ASSERT(write_file(makefile, flags_makefile), "Makefile");
+	sds saved_makeflags = env_save("MAKEFLAGS");
+	unsetenv("MAKEFLAGS");
+	ASSERT(enter_dir(gone), "enter");
+	ASSERT(rmdir(gone) == 0, "delete the cwd");
+
+	options opts;
+	memset(&opts, 0, sizeof(opts));
+	opts.manifest_path = sdsdup(manifest);
+	i64 ret            = build_project(&opts, "", nullptr);
+
+	ASSERT(ret == 0, "the legacy Makefile is found in the project directory");
+	ASSERT(path_exists(flags), "make ran in the project directory");
+
+	sdsfree(opts.manifest_path);
+	env_restore("MAKEFLAGS", saved_makeflags);
+	sdsfree(flags);
+	sdsfree(makefile);
+	sdsfree(manifest);
+	sdsfree(gone);
+	sdsfree(proj);
+	leave_dir(root);
+	PASS();
+}
+
 TEST(cov_br_build_project_non_legacy_makefile_value)
 {
 	sds root = new_tmpdir();
@@ -1808,7 +1877,7 @@ TEST(cov_br_registry_index_odd_entries)
 	ASSERT(r->version != nullptr && strcmp(r->version, "3.1.0") == 0, "near-miss keys skipped");
 	ASSERT(r->description != nullptr && strcmp(r->description, "Gamma tool") == 0, "malformed values skipped");
 	r = &all->recipes[1];
-	ASSERT(r->name == nullptr, "a key on the brace line is not seen");
+	ASSERT(r->name != nullptr && strcmp(r->name, "first-line") == 0, "a key on the brace line is seen");
 	ASSERT(r->version != nullptr && strcmp(r->version, "0.1.0") == 0, "version of the second object");
 	ASSERT(r->description == nullptr, "no description");
 	r = &all->recipes[3];
@@ -1819,7 +1888,8 @@ TEST(cov_br_registry_index_odd_entries)
 	sds            query = sdsnew("gadget");
 	recipe_list_t *hit   = registry_search(query);
 	ASSERT(hit != nullptr && hit->count == 1, "description match without a name");
-	ASSERT(hit->recipes[0].name == nullptr && hit->recipes[0].version == nullptr, "missing fields stay nullptr");
+	ASSERT(hit->recipes[0].name != nullptr && strcmp(hit->recipes[0].name, "hidden") == 0, "name on the brace line");
+	ASSERT(hit->recipes[0].version == nullptr, "missing fields stay nullptr");
 	ASSERT(strcmp(hit->recipes[0].description, "Gadget maker") == 0, "description copied");
 	registry_free_recipes(hit);
 	sdsfree(query);
@@ -2060,9 +2130,11 @@ void coffee_register_cov_build_registry_tests(void)
 	TEST_REGISTER(cov_br_dep_add_flags_non_string_entries);
 	TEST_REGISTER(cov_br_build_project_legacy_feature_flags);
 	TEST_REGISTER(cov_br_build_project_legacy_no_features_default_target);
+	TEST_REGISTER(cov_br_build_project_from_deleted_cwd);
 	TEST_REGISTER(cov_br_build_project_non_legacy_makefile_value);
 	TEST_REGISTER(cov_br_build_project_offline_missing_locked_dep);
 	TEST_REGISTER(cov_br_registry_index_odd_entries);
+	TEST_REGISTER(cov_br_registry_search_compact_index);
 	TEST_REGISTER(cov_br_registry_search_oversized_cached_index);
 	TEST_REGISTER(cov_br_registry_search_decompressor_failures);
 	TEST_REGISTER(cov_br_registry_default_url_and_broken_recipe);

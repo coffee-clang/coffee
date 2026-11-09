@@ -130,51 +130,68 @@ static char *fetch_url(const char *url)
 	return buffer;
 }
 
+/*
+ * The quoted string value that follows a key: after_key points just past
+ * the key; a ':' or '=' and a non-empty "value" on the same line must
+ * follow.  Returns a fresh copy, or nullptr.
+ */
+static char *string_val_after(const char *after_key)
+{
+	while (*after_key == ' ' || *after_key == '\t') {
+		after_key++;
+	}
+	if (*after_key != ':' && *after_key != '=') {
+		return nullptr;
+	}
+	after_key++;
+	while (*after_key == ' ' || *after_key == '\t') {
+		after_key++;
+	}
+	if (*after_key != '\"') {
+		return nullptr;
+	}
+	after_key++;
+	const char *start = after_key;
+	while (*after_key != '\0' && *after_key != '\"' && *after_key != '\n') {
+		after_key++;
+	}
+	if (*after_key != '\"' || after_key == start) {
+		return nullptr;
+	}
+	char *result = safe_malloc((size_t)(after_key - start + 1));
+	memccpy(result, start, '\0', (size_t)(after_key - start));
+	result[after_key - start] = '\0';
+	return result;
+}
+
 static char *extract_string_val(const char *text, const char *key)
 {
-	const char *p      = text;
-	size_t      keylen = strlen(key);
+	size_t keylen = strlen(key);
 
+	/* "key": "value" anywhere, so a compact one-line JSON object works.
+	 * A quoted string that is a value is followed by ',' or '}', never
+	 * by ':', so it is not mistaken for the key. */
+	for (const char *p = strchr(text, '\"'); p != nullptr; p = strchr(p + 1, '\"')) {
+		if (strncmp(p + 1, key, keylen) == 0 && p[1 + keylen] == '\"') {
+			char *result = string_val_after(p + 1 + keylen + 1);
+			if (result != nullptr) {
+				return result;
+			}
+		}
+	}
+
+	/* key = "value" at the start of a line. */
+	const char *p = text;
 	while (*p != '\0') {
 		while (*p == ' ' || *p == '\t' || *p == '\n') {
 			p++;
 		}
-
-		const char *after_key = nullptr;
-
-		if (*p == '\"') {
-			if (strncmp(p + 1, key, keylen) == 0 && p[1 + keylen] == '\"') {
-				after_key = p + 1 + keylen + 1;
-			}
-		} else if (strncmp(p, key, keylen) == 0) {
-			after_key = p + keylen;
-		}
-
-		if (after_key) {
-			while (*after_key == ' ' || *after_key == '\t') {
-				after_key++;
-			}
-			if (*after_key == ':' || *after_key == '=') {
-				after_key++;
-				while (*after_key == ' ' || *after_key == '\t') {
-					after_key++;
-				}
-				if (*after_key == '\"') {
-					after_key++;
-					const char *start = after_key;
-					while (*after_key != '\0' && *after_key != '\"' && *after_key != '\n') {
-						after_key++;
-					}
-					if (*after_key == '\"' && after_key > start) {
-						char *result = safe_malloc((size_t)(after_key - start + 1));
-						memccpy(result, start, '\0', (size_t)(after_key - start));
-						result[after_key - start] = '\0';
-						return result;
-					}
-				}
+		if (strncmp(p, key, keylen) == 0) {
+			char *result = string_val_after(p + keylen);
+			if (result != nullptr) {
+				return result;
 			}
 		}
-
 		while (*p != '\0' && *p != '\n') {
 			p++;
 		}

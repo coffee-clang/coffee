@@ -18,6 +18,8 @@ coffee fetch
 - Dependency URLs must use an allow-listed scheme (`https`, `git`, `ssh`, `git+ssh`, `git+https`),
   a local path, or scp-style ssh; `http` is rejected
 - Downloads each package to ~/.coffee/deps/
+- A path dependency is symlinked as deps/<name>. A path inside a real (non-symlink) deps/<name>
+  directory is refused, because replacing that directory with the link would delete the source
 - A dependency declared as a plain version string (no git or path source) is resolved through
   the registry. When the recipe ships an `install.sh`, it is downloaded to ~/.coffee/recipes/<name>/
   and run with `COFFEE_HOME` set; the script fetches the source (git or archive), builds it and installs

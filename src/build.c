@@ -325,7 +325,6 @@ sds dep_resolve_dir_constraint(const char *name, const char *constraint)
 
 /*
  * Append compiler flags for a single dependency to the flags string.
-=======
  * Returns the number of .c source files found (appended to src_argv).
  */
 size_t dep_add_flags(const char *dep_dir, const char *dep_name, sds *flags, sds *src_list, size_t *src_count)
@@ -877,11 +876,22 @@ i64 build_project(options *opts, const char *target, sds *exe_path_out)
 	}
 
 	/* Dependency resolution and make both operate relative to the
-	 * project directory, so move there for the duration of the build. */
-	char old_cwd[4'096];
-	bool have_cwd = getcwd(old_cwd, sizeof(old_cwd)) != nullptr;
-	bool moved    = false;
-	if (have_cwd && strcmp(project_dir, ".") != 0 && chdir(project_dir) == 0) {
+	 * project directory, so move there for the duration of the build.
+	 * The old cwd is kept as a descriptor rather than a getcwd() path:
+	 * a deleted cwd or one longer than PATH_MAX must not skip the move. */
+	int  old_cwd = -1;
+	bool moved   = false;
+	if (strcmp(project_dir, ".") != 0) {
+		old_cwd = safe_open(".", O_RDONLY | O_DIRECTORY);
+		if (chdir(project_dir) != 0) {
+			fprintf_safe(stderr, "Error: cannot enter project directory '%s'\n", project_dir);
+			if (old_cwd >= 0) {
+				safe_close(old_cwd);
+			}
+			manifest_free(manifest);
+			sdsfree(project_dir);
+			return 1;
+		}
 		moved = true;
 	}
 
@@ -991,8 +1001,11 @@ i64 build_project(options *opts, const char *target, sds *exe_path_out)
 done:
 	features_free(rf);
 	manifest_free(manifest);
-	if (moved) {
-		chdir(old_cwd);
+	if (moved && old_cwd >= 0) {
+		fchdir(old_cwd);
+	}
+	if (old_cwd >= 0) {
+		safe_close(old_cwd);
 	}
 	sdsfree(project_dir);
 	return ret;

@@ -3852,6 +3852,35 @@ TEST(cov_fetch_path_dep_through_own_link)
 	PASS();
 }
 
+/* A path dependency inside a real deps/<name> directory is refused: making
+ * room for the deps/<name> link would delete the source itself. */
+TEST(cov_fetch_path_dep_inside_own_deps_dir)
+{
+	sds root = tmp_new();
+	sandbox_on(root);
+	proj_enter(root, "selfdir", "[dependencies]\nself = { path = \"./deps/self/sub\" }\n");
+	mkdir("deps", 0755);
+	mkdir("deps/self", 0755);
+	mkdir("deps/self/sub", 0755);
+	write_text("deps/self/sub/keep.c", "int keep;\n");
+
+	ASSERT(fetch_with(false, false) == 1, "the fetch is refused");
+	ASSERT(file_contains("err.txt", "is inside 'deps/self'"), "the overlap is reported");
+	ASSERT(safe_access("deps/self/sub/keep.c", F_OK) == 0, "the source survives");
+	ASSERT(safe_access("Coffee.lock", F_OK) != 0, "no lockfile written");
+
+	/* The same directory given as an absolute path. */
+	sds tail = sdscatprintf(sdsempty(), "[dependencies]\nself = { path = \"%s/proj/deps/self\" }\n", root);
+	write_project("selfdir", nullptr, tail);
+	sdsfree(tail);
+	ASSERT(fetch_with(false, false) == 1, "the absolute form is refused too");
+	ASSERT(safe_access("deps/self/sub/keep.c", F_OK) == 0, "the source still survives");
+
+	sandbox_off();
+	leave_dir(root);
+	PASS();
+}
+
 TEST(cov_fetch_offline_plain_dir_and_transitive_git)
 {
 	sds root   = tmp_new();
@@ -4430,6 +4459,7 @@ void coffee_register_cov_deps_commands_tests(void)
 	TEST_REGISTER(cov_fetch_many_path_deps);
 	TEST_REGISTER(cov_fetch_registry_edge_cases);
 	TEST_REGISTER(cov_fetch_path_dep_through_own_link);
+	TEST_REGISTER(cov_fetch_path_dep_inside_own_deps_dir);
 	TEST_REGISTER(cov_fetch_offline_plain_dir_and_transitive_git);
 	TEST_REGISTER(cov_recipe_install_edge_cases);
 	TEST_REGISTER(cov_recipe_read_installed_variants);

@@ -207,8 +207,9 @@ static i64 config_set_raw(const char *section, const char *key, const char *valu
 		sect_header = sdscatprintf(sdsempty(), "[%s]", section);
 	}
 
-	/* Write back, tracking which section we're in */
-	bool in_target_section = false;
+	/* Write back, tracking which section we're in.  A top-level key
+	 * (no section) lives before the first section header. */
+	bool in_target_section = section == nullptr;
 	bool section_written   = false;
 
 	for (size_t i = 0; i < nlines; i++) {
@@ -218,7 +219,7 @@ static i64 config_set_raw(const char *section, const char *key, const char *valu
 		/* Check if this line is a section header */
 		if (trimmed[0] == '[') {
 			/* Leaving target section? If section exists but key wasn't found, insert it */
-			if (in_target_section && !found && section) {
+			if (in_target_section && !found) {
 				fprintf_safe(fp, "%s", new_line);
 				found = true;
 			}
@@ -249,7 +250,7 @@ static i64 config_set_raw(const char *section, const char *key, const char *valu
 	}
 
 	/* If section exists but key was never found (insert at end of section) */
-	if (in_target_section && !found && section) {
+	if (in_target_section && !found) {
 		fprintf_safe(fp, "%s", new_line);
 		found = true;
 	}
@@ -283,7 +284,6 @@ static i64 config_set_raw(const char *section, const char *key, const char *valu
  */
 static i64 config_unset_raw(const char *section, const char *key)
 {
-	(void)section;
 	sds   path = config_path();
 	FILE *fp   = safe_fopen(path, "r");
 
@@ -319,12 +319,23 @@ static i64 config_unset_raw(const char *section, const char *key)
 		return 1;
 	}
 
+	/* Only the key inside the given section (or, without a section,
+	 * before the first section header) is removed. */
+	sds sect_header = nullptr;
+	if (section != nullptr) {
+		sect_header = sdscatprintf(sdsempty(), "[%s]", section);
+	}
+	bool in_target_section = section == nullptr;
 	for (size_t i = 0; i < nlines; i++) {
 		sds trimmed = sdsnew(lines[i]);
 		sdstrim(trimmed, " \t\r\n");
 
+		if (trimmed[0] == '[') {
+			in_target_section = sect_header != nullptr && sdscmp(trimmed, sect_header) == 0;
+		}
 		bool skip = false;
-		if (strncmp(trimmed, key, strlen(key)) == 0 && (trimmed[strlen(key)] == '=' || trimmed[strlen(key)] == ' ')) {
+		if (in_target_section && strncmp(trimmed, key, strlen(key)) == 0 &&
+		    (trimmed[strlen(key)] == '=' || trimmed[strlen(key)] == ' ')) {
 			skip = true;
 		}
 
@@ -335,6 +346,7 @@ static i64 config_unset_raw(const char *section, const char *key)
 		}
 	}
 
+	sdsfree(sect_header);
 	safe_fclose(fp);
 
 	sdsfree(path);

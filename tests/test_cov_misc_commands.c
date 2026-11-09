@@ -2741,6 +2741,62 @@ TEST(cov_misc_config_set_and_unset_read_only_file)
 	PASS();
 }
 
+/* A top-level key is replaced in place, and a new one goes before the
+ * first section header instead of into the last section. */
+TEST(cov_misc_config_set_top_level_key)
+{
+	struct fixture fx;
+	ASSERT(fixture_enter(&fx), "fixture");
+	ASSERT(write_config("top = \"t\"\n[a]\nx = \"1\"\n"), "config");
+
+	sds out1 = nullptr;
+	sds out2 = nullptr;
+	sds out3 = nullptr;
+	sds out4 = nullptr;
+	i64 ret1 = run_config("set", "top", "v", &out1);
+	i64 ret2 = run_config("set", "top", "w", &out2);
+	i64 ret3 = run_config("set", "fresh", "f", &out3);
+	sds cfg  = read_config();
+	i64 ret4 = run_config("get", "fresh", nullptr, &out4);
+	fixture_leave(&fx);
+
+	ASSERT(ret1 == 0 && ret2 == 0 && ret3 == 0, "every set succeeds");
+	ASSERT(strcmp(cfg, "top = \"w\"\nfresh = \"f\"\n[a]\nx = \"1\"\n") == 0,
+	       "top-level keys replaced once and inserted before [a]");
+	ASSERT(ret4 == 0 && has(out4, "f"), "the new key is read back at the top level");
+	sdsfree(out1);
+	sdsfree(out2);
+	sdsfree(out3);
+	sdsfree(out4);
+	sdsfree(cfg);
+	PASS();
+}
+
+/* unset removes the key from its own section only. */
+TEST(cov_misc_config_unset_respects_section)
+{
+	struct fixture fx;
+	ASSERT(fixture_enter(&fx), "fixture");
+	ASSERT(write_config("x = \"0\"\n[a]\nx = \"1\"\n[b]\nx = \"2\"\n"), "config");
+
+	sds out1 = nullptr;
+	sds out2 = nullptr;
+	i64 ret1 = run_config("unset", "a.x", nullptr, &out1);
+	sds cfg1 = read_config();
+	i64 ret2 = run_config("unset", "x", nullptr, &out2);
+	sds cfg2 = read_config();
+	fixture_leave(&fx);
+
+	ASSERT(ret1 == 0 && ret2 == 0, "unset succeeds");
+	ASSERT(strcmp(cfg1, "x = \"0\"\n[a]\n[b]\nx = \"2\"\n") == 0, "only a.x removed");
+	ASSERT(strcmp(cfg2, "[a]\n[b]\nx = \"2\"\n") == 0, "only the top-level x removed");
+	sdsfree(out1);
+	sdsfree(out2);
+	sdsfree(cfg1);
+	sdsfree(cfg2);
+	PASS();
+}
+
 TEST(cov_misc_config_unset_long_file_keeps_similar_keys)
 {
 	struct fixture fx;
@@ -2958,7 +3014,9 @@ TEST(cov_misc_cflags_odd_library_toml)
 	fixture_leave(&fx);
 
 	ASSERT(ret == 0, "cflags should succeed");
-	ASSERT(strcmp(out, "-Ideps/broken/include\n") == 0, "convention fallback for unusable library.toml");
+	ASSERT(has(out, "skipping dependency entry '=1.0' without a name"), "nameless entry skipped");
+	ASSERT(has(out, "\n-Ideps/broken/include\n"), "convention fallback for unusable library.toml");
+	ASSERT(!has(out, "-I\"deps/\"") && !has(out, "-Ideps//"), "no flag for the nameless entry");
 	sdsfree(out);
 	PASS();
 }
@@ -2976,6 +3034,7 @@ TEST(cov_misc_libs_odd_library_toml)
 
 	ASSERT(ret == 0, "libs should succeed");
 	ASSERT(has(out, "-Ldeps/broken/lib -lbroken -lodd\n"), "convention fallback for unusable library.toml");
+	ASSERT(!has(out, "-l "), "no bare -l for the nameless entry");
 	sdsfree(out);
 	PASS();
 }
@@ -3110,6 +3169,8 @@ TEST(cov_misc_search_entries_with_missing_fields)
 /* report / check: empty dependency names, default git ref             */
 /* ------------------------------------------------------------------ */
 
+/* A dependency entry without a name ("=1.0") is skipped when the manifest
+ * is parsed, so no command sees an empty name. */
 TEST(cov_misc_report_deps_empty_dependency_name)
 {
 	struct fixture fx;
@@ -3121,8 +3182,9 @@ TEST(cov_misc_report_deps_empty_dependency_name)
 	fixture_leave(&fx);
 
 	ASSERT(ret == 0, "report should succeed");
-	ASSERT(has(out, "\n                     unknown\n"), "empty name reported as unknown");
-	ASSERT(has(out, "Total: 1 dependencies"), "total");
+	ASSERT(has(out, "skipping dependency entry '=1.0' without a name"), "nameless entry skipped");
+	ASSERT(!has(out, "unknown"), "no nameless dependency listed");
+	ASSERT(has(out, "No dependencies"), "no dependencies left");
 	sdsfree(out);
 	PASS();
 }
@@ -3396,6 +3458,8 @@ void coffee_register_cov_misc_commands_tests(void)
 	TEST_REGISTER(cov_misc_config_set_replaces_existing_keys);
 	TEST_REGISTER(cov_misc_config_set_and_unset_read_only_file);
 	TEST_REGISTER(cov_misc_config_unset_long_file_keeps_similar_keys);
+	TEST_REGISTER(cov_misc_config_set_top_level_key);
+	TEST_REGISTER(cov_misc_config_unset_respects_section);
 	TEST_REGISTER(cov_misc_doc_generate_ignores_non_string_settings);
 	TEST_REGISTER(cov_misc_doc_generate_keeps_existing_doxyfile);
 	TEST_REGISTER(cov_misc_test_manifest_sources_without_project_sources);

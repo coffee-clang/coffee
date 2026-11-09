@@ -1417,6 +1417,80 @@ static void add_odd_bins(manifest_t *m)
 	m->bin[2].src       = sds_array2(nullptr, "w.c");
 }
 
+/* A null first feature dependency must not leave a leading comma
+ * (f = [, "x"] is invalid TOML); the file has to parse again. */
+TEST(covp_manifest_write_null_first_feature_dep)
+{
+	sds dir = make_scratch_dir();
+	ASSERT(dir != nullptr, "scratch dir");
+	sds path = sub_path(dir, "Coffee.toml");
+
+	manifest_t *m             = safe_calloc(1, sizeof(manifest_t));
+	m->package.name           = sdsnew("p");
+	m->package.version        = sdsnew("1.0.0");
+	m->features_count         = 2;
+	m->features               = safe_calloc(2, sizeof(feature_def_t));
+	m->features[0].name       = sdsnew("f");
+	m->features[0].deps_count = 2;
+	m->features[0].deps       = sds_array2(nullptr, "x");
+	m->features[1].name       = sdsnew("g");
+	m->features[1].deps_count = 2;
+	m->features[1].deps       = sds_array2(nullptr, nullptr);
+
+	ASSERT(manifest_write(path, m) == 0, "write");
+	sds text = read_all(path);
+	ASSERT(text != nullptr, "read back");
+	ASSERT(strstr(text, "f = [\"x\"]\n") != nullptr, "no leading comma");
+	ASSERT(strstr(text, "g = []\n") != nullptr, "all-null list is empty");
+	manifest_t *back = manifest_parse(path);
+	ASSERT(back != nullptr, "written file re-parses");
+	ASSERT(back->features_count == 2, "both features kept");
+	manifest_free(back);
+	sdsfree(text);
+	manifest_free(m);
+	sdsfree(path);
+	drop_scratch_dir(dir);
+	PASS();
+}
+
+/* Null output pointers are a no-op, not a null write. */
+TEST(covp_features_parse_cli_null_outputs)
+{
+	sds   *features = nullptr;
+	size_t count    = 7;
+	features_parse_cli("a,b", nullptr, &count);
+	ASSERT(count == 7, "count untouched without an output array");
+	features_parse_cli("a,b", &features, nullptr);
+	ASSERT(features == nullptr, "array untouched without an output count");
+	features_parse_cli(nullptr, nullptr, nullptr);
+	PASS();
+}
+
+/* A dependency entry without a name ("=1.0", or an empty table key) is
+ * skipped when parsed, so no command sees an empty name. */
+TEST(covp_manifest_skips_nameless_dependency)
+{
+	sds dir = make_scratch_dir();
+	ASSERT(dir != nullptr, "scratch dir");
+
+	manifest_t *m = parse_manifest_text(dir, "dependencies = [\"=1.0\", \" = 2.0\", \"ok = 1.0\"]\n"
+	                                         "[package]\nname = \"p\"\nversion = \"1.0.0\"\n");
+	ASSERT(m != nullptr, "array form parses");
+	ASSERT(m->package.dependencies_count == 1, "nameless entries skipped");
+	ASSERT(strcmp(m->package.dependencies[0], "ok = 1.0") == 0, "named entry kept");
+	manifest_free(m);
+
+	m = parse_manifest_text(dir, "[package]\nname = \"p\"\nversion = \"1.0.0\"\n"
+	                             "[dependencies]\n\"\" = \"1.0\"\nok = \"1.0\"\n");
+	ASSERT(m != nullptr, "table form parses");
+	ASSERT(m->package.dependencies_count == 1, "empty key skipped");
+	ASSERT(strcmp(m->package.dependencies[0], "ok = \"1.0\"") == 0, "named entry kept");
+	manifest_free(m);
+
+	drop_scratch_dir(dir);
+	PASS();
+}
+
 TEST(covp_manifest_write_sparse_fields)
 {
 	sds dir = make_scratch_dir();
@@ -1448,7 +1522,7 @@ TEST(covp_manifest_write_sparse_fields)
 	ASSERT(strstr(text, "dtag = { tag = \"v1\" }") != nullptr, "tag written first");
 	ASSERT(strstr(text, "drev = { rev = \"abc\" }") != nullptr, "rev written first");
 	ASSERT(strstr(text, "dopt = { optional = true }") != nullptr, "optional written first");
-	ASSERT(strstr(text, "f = [\"x\", ]") != nullptr, "null feature dep skipped");
+	ASSERT(strstr(text, "f = [\"x\"]\n") != nullptr, "null feature dep skipped");
 	ASSERT(strstr(text, "harness = \"t/h.c\"") != nullptr, "harness without sources");
 	ASSERT(strstr(text, "framework") == nullptr, "no framework");
 	ASSERT(strstr(text, "name = \"nosrc\"\n\n") != nullptr, "bin without src list");
@@ -1791,6 +1865,9 @@ void coffee_register_cov_parsers_tests(void)
 	TEST_REGISTER(covp_manifest_remove_structured_past_unnamed);
 	TEST_REGISTER(covp_manifest_extract_dep_info_edges);
 	TEST_REGISTER(covp_manifest_write_sparse_fields);
+	TEST_REGISTER(covp_manifest_write_null_first_feature_dep);
+	TEST_REGISTER(covp_features_parse_cli_null_outputs);
+	TEST_REGISTER(covp_manifest_skips_nameless_dependency);
 	TEST_REGISTER(covp_features_hand_built_sets);
 	TEST_REGISTER(covp_features_resolve_null_slots);
 	TEST_REGISTER(covp_features_dep_without_package_name);

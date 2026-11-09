@@ -175,10 +175,14 @@ so every `build`, `fetch` and `outdated` printed version banners. They now disca
 ### Branch coverage ≥ 95%
 
 ✅ **DONE** — `make coverage` builds a gcc `--coverage` runner and fails when the project's branch coverage
-(vendored sds/toml/include excluded) is below `COVERAGE_THRESHOLD` (default 95). It went from 86.4% to 95.8%
-(4006/4180 branches; lines 98.3%). Most of the arms still uncovered cannot be reached through the API:
+(vendored sds/toml/include excluded) is below `COVERAGE_THRESHOLD` (default 95). It went from 86.4% to 95.6%
+(4026/4212 branches; lines 98.2%). Most of the arms still uncovered cannot be reached through the API:
 `== nullptr` checks after allocators that abort, fork/pipe/dup2/fclose failures, the branches of a forked
-child that `_exit()`s or execs, and null slots or names that the parsers never produce.
+child that `_exit()`s or execs, and null slots or names that the parsers never produce. The new tests
+uncovered nine bugs, all fixed with a regression test each: a use-after-free in feature resolution, `fetch`
+deleting a path dependency's source inside `deps/<name>`, `config set`/`unset` ignoring sections, `build`
+from a deleted cwd, invalid TOML from `manifest_write`, a null write in `features_parse_cli`, nameless
+dependency entries, and compact JSON registry indexes.
 
 ---
 
@@ -190,7 +194,7 @@ child that `_exit()`s or execs, and null slots or names that the parsers never p
 | **v0.3** — "Testable"          | 65%      | P1: test/bench improvements, semver update, tree with transitive |
 | **v0.4** — "Publishable"       | 78%      | P2: metadata features+deps, fix/lint --fix, bench Makefile       |
 | **v0.5** — "Dep management"    | 85%      | Transitive deps, git ref checkout, git-aware outdated/update     |
-| **v1.0** — "Coffee-competitive" | 94%+     | All P0–P3 done. 771 tests.                                       |
+| **v1.0** — "Coffee-competitive" | 94%+     | All P0–P3 done. 779 tests.                                       |
 
 ---
 
@@ -202,14 +206,6 @@ child that `_exit()`s or execs, and null slots or names that the parsers never p
 | Recipes only unpack sources    | Medium   | Most recipes' `install.sh` only extract the source into `~/.coffee/<name>/<version>/` without building, so there is no `include/` or `lib/` for `cflags`/`libs`. To be fixed in the recipes repository. |
 | Bare versions are exact        | Low      | `name = "1.1.0"` (what `coffee add` writes) is an exact match, so `update` cannot move past it when the registry bumps the recipe; `outdated` still reports it. Use `">= 1.1"` to allow updates. |
 | Recipe scripts are trusted     | Info     | `fetch` runs `install.sh` from the registry as the user. Needs `bash`, `sha256sum`, `tail`, plus whatever the scripts call (`wget`, `git`, `cmake`, ...). |
-| `fetch` path dep inside `deps/<name>` | High | `self = { path = "./deps/self/sub" }` with a real `deps/self/` directory: `fetch_path_dep` runs `rm -rf deps/self`, deleting the source it just resolved, then links to the missing path. |
-| `config set` top-level key     | Medium   | `in_target_section` is only set for sectioned keys, so setting a top-level key twice writes a duplicate line (invalid TOML), and after a `[section]` header it lands in that section. |
-| `config unset` ignores section | Medium   | `config_unset_raw` ignores its section: `config unset a.x` removes `x` from every section and the top level. |
-| `build_project` without cwd    | Low      | When `getcwd()` fails (deleted cwd, path > 4096) the chdir into the project is skipped, so the legacy `Makefile` check and `Coffee.lock` are looked up in the wrong directory while `make -C` uses the right one. |
-| `manifest_write` null feature dep | Low   | The comma is written before the null check, so a null first entry writes `f = [, "x"]` (invalid TOML). |
-| `features_parse_cli` null outputs | Low   | The guard returns on null outputs but the body still writes `*out_features`/`*out_count`. No caller passes null. |
-| Empty dependency name          | Low      | A `"=1.0"` dependency entry yields an empty name: `libs` prints a bare `-l`, `check` adds `-I"deps/"`. |
-| Compact JSON registry index    | Info     | `extract_string_val` only matches keys at the start of a line, so a single-line JSON index yields entries without fields. |
 | `doc_generate` test            | Low      | Emits "doxygen not installed" error when doxygen is absent; test handles gracefully but user experience could be smoother. |
 
 ---

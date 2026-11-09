@@ -274,7 +274,10 @@ sds *features_to_compiler_flags(resolved_features_t *rf, sds package, size_t *ou
 
 void features_parse_cli(const char *cli_string, sds **out_features, size_t *out_count)
 {
-	if (!cli_string || !out_features || out_count == nullptr) {
+	if (out_features == nullptr || out_count == nullptr) {
+		return;
+	}
+	if (cli_string == nullptr) {
 		*out_features = nullptr;
 		*out_count    = 0;
 		return;

@@ -141,6 +141,16 @@ static sds toml_datum_to_string(toml_datum_t datum)
 	return result;
 }
 
+/* True when a flat dependency entry ("name" or "name = version") has a
+ * non-empty name: "=1.0" would become deps/ and a bare -l. */
+static bool dep_entry_has_name(const char *entry)
+{
+	sds  name = dep_parse_name(entry);
+	bool ok   = name[0] != '\0';
+	sdsfree(name);
+	return ok;
+}
+
 /* toml_array_nelem returns i64; guard against a negative count wrapping
  * to SIZE_MAX on the subsequent allocation. */
 static size_t array_nelem_safe(toml_array_t *arr)
@@ -238,7 +248,13 @@ manifest_t *manifest_parse(sds path)
 			if (!dep.ok) {
 				continue; /* table element — handled by the structured parse */
 			}
-			m->package.dependencies[idx++] = toml_datum_to_string(dep);
+			sds entry = toml_datum_to_string(dep);
+			if (!dep_entry_has_name(entry)) {
+				fprintf_safe(stderr, "Warning: skipping dependency entry '%s' without a name\n", entry);
+				sdsfree(entry);
+				continue;
+			}
+			m->package.dependencies[idx++] = entry;
 		}
 		m->package.dependencies_count = idx;
 	} else {
@@ -264,6 +280,10 @@ manifest_t *manifest_parse(sds path)
 				const char *key = toml_key_in(deps_table, i);
 				if (key == nullptr) {
 					break;
+				}
+				if (key[0] == '\0') {
+					fprintf_safe(stderr, "Warning: skipping dependency entry without a name\n");
+					continue;
 				}
 				toml_datum_t val = toml_string_in(deps_table, key);
 				if (val.ok) {
@@ -747,13 +767,16 @@ i64 manifest_write(sds path, manifest_t *m)
 		for (size_t i = 0; i < m->features_count; i++) {
 			if (m->features[i].name) {
 				fprintf_safe(fp, "%s = [", m->features[i].name);
+				bool first = true;
 				for (size_t j = 0; j < m->features[i].deps_count; j++) {
-					if (j > 0) {
+					if (m->features[i].deps[j] == nullptr) {
+						continue;
+					}
+					if (!first) {
 						fprintf_safe(fp, ", ");
 					}
-					if (m->features[i].deps[j]) {
-						fprintf_toml_value(fp, "\"%s\"", m->features[i].deps[j]);
-					}
+					fprintf_toml_value(fp, "\"%s\"", m->features[i].deps[j]);
+					first = false;
 				}
 				fprintf_safe(fp, "]\n");
 			}
